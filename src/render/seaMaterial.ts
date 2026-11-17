@@ -23,7 +23,7 @@ import {
 } from 'three/webgpu';
 import {
   Break, Fn, If, Loop, abs, attribute, clamp, cos, cross, dFdx, dFdy, dot, exp, exp2, float, frontFacing, length, max, min, mix, mod,
-  normalize, pmremTexture, positionGeometry, positionLocal, pow, reflect, refract, saturate, select, sin, smoothstep, sqrt, texture,
+  normalize, pmremTexture, screenUV, positionGeometry, positionLocal, pow, reflect, refract, saturate, select, sin, smoothstep, sqrt, texture,
   uniform, uniformArray, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import { fullSky } from '@futuremagic/sky/rig';
@@ -342,7 +342,9 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     const L = I.sunDir;
     // The light a matte, level surface sends back per unit of albedo: the sun's, and the sky's through the
     // environment map at the strength lit materials take it (three: the map's colour times its intensity).
-    const skyDown = pmremTexture(env, vec3(0, 1, 0), float(1)).rgb.mul(I.skyLight);
+    const skyNode = pmremTexture(env, vec3(0, 1, 0), float(1));
+    (globalThis as any).__seaPmrem = skyNode;
+    const skyDown = skyNode.rgb.mul(I.skyLight);
     const daylight = I.sun.mul(max(L.y, 0)).div(Math.PI).add(skyDown);
     // The water's body: what it sends back up of the light that enters it, coloured by the deep, stirred in a gale,
     // and green-white where foam has filled it with bubbles.
@@ -397,6 +399,8 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       if (D === 5) return pmremTexture(env, R, float(0.05)).rgb;
       if (D === 6) return skyDown;
       if (D === 7) return vec3(R.y, R.y.negate(), 0);
+      if (D === 8) return texture(env, screenUV).rgb;
+      if (D === 9) return vec3(I.skyLight.mul(0.1), 0, 0);
       return mix(gusted, foamLit, cover);
     })();
 

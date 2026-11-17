@@ -85,7 +85,12 @@ const BUBBLE_CELLS = 31;
 const BREAKUP_CELLS = 4;
 const BREAKUP_OCTAVES = 4;
 /** How thin the lace's strands are, and the bubbles' holes, in cells. */
-const LACE_WIDTH = 0.09;
+const LACE_WIDTH = 0.16;
+/** How far the lace's strands wander (cells) and on what lattice; how much their width swells, on what lattice. */
+const WARP_CELLS = 6;
+const WARP_REACH = 0.45;
+const LACE_SWELL = 0.9;
+const SWELL_CELLS = 12;
 const BUBBLE_HOLE = 0.32;
 /** Numbers per texel (RGBA bytes). */
 export const FOAM_CHANNELS = 4;
@@ -100,12 +105,16 @@ export const FOAM_AT = { lace: 0, breakup: 1, bubbles: 2 } as const;
  */
 export function foamPattern(seed: number): Uint8Array {
   const rng = new Rng(seed);
-  const laceSeed = rng.int(0, BYTE * BYTE), bubbleSeed = rng.int(0, BYTE * BYTE), breakSeed = rng.int(0, BYTE * BYTE);
+  const laceSeed = rng.int(0, BYTE * BYTE), warpSeed = rng.int(0, BYTE * BYTE), bubbleSeed = rng.int(0, BYTE * BYTE), breakSeed = rng.int(0, BYTE * BYTE);
   const out = new Uint8Array(FOAM_TEXELS * FOAM_TEXELS * FOAM_CHANNELS), cell = newCell();
   for (let j = 0; j < FOAM_TEXELS; j++) for (let i = 0; i < FOAM_TEXELS; i++) {
     const u = (i + 1 / 2) / FOAM_TEXELS, v = (j + 1 / 2) / FOAM_TEXELS, at = (j * FOAM_TEXELS + i) * FOAM_CHANNELS;
-    worley(laceSeed, u * LACE_CELLS, v * LACE_CELLS, LACE_CELLS, LACE_CELLS, 1, cell, true);
-    const lace = 1 - smoothstep(0, LACE_WIDTH, cell.edge);
+    // The lace's strands wander (its cells' corners warped by a soft noise) and swell and thin along their length.
+    const wx = pgrad(warpSeed, u * WARP_CELLS, v * WARP_CELLS, WARP_CELLS, WARP_CELLS) * WARP_REACH;
+    const wy = pgrad(warpSeed + 1, u * WARP_CELLS, v * WARP_CELLS, WARP_CELLS, WARP_CELLS) * WARP_REACH;
+    worley(laceSeed, u * LACE_CELLS + wx, v * LACE_CELLS + wy, LACE_CELLS, LACE_CELLS, 1, cell, true);
+    const width = LACE_WIDTH * (1 + LACE_SWELL * pgrad(warpSeed + 2, u * SWELL_CELLS, v * SWELL_CELLS, SWELL_CELLS, SWELL_CELLS));
+    const lace = 1 - smoothstep(0, Math.max(width, LACE_WIDTH / 2), cell.edge);
     worley(bubbleSeed, u * BUBBLE_CELLS, v * BUBBLE_CELLS, BUBBLE_CELLS, BUBBLE_CELLS, 1, cell);
     const bubbles = smoothstep(BUBBLE_HOLE / 2, BUBBLE_HOLE, cell.f1);
     let noise = 0, weight = 0, scale = BREAKUP_CELLS, amp = 1;
