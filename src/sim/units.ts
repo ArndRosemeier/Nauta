@@ -20,3 +20,6 @@ export function wrapBearing(bearing: number): number {
   const b = bearing % full;
   return b < 0 ? b + full : b;
 }
+
+/** Acceleration of gravity at the sea's surface, m/s². */
+export const GRAVITY = 9.81;

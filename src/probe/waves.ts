@@ -3,11 +3,10 @@
  * the same sum on the CPU to check the GPU's answer. Pure. Not the game's sea (that is N1.1, `src/sim/sea/`): only a
  * job of the right shape to time, deterministic so every device runs the same one.
  */
+import { GRAVITY } from '../sim/units';
 
 /** Floats per wave in the table the GPU reads: direction x and z, wavenumber, amplitude, phase, angular speed, two pads (32 bytes, WGSL's struct alignment). */
 export const WAVE_FLOATS = 8;
-/** Standard gravity, m/s²: deep-water waves run at ω = √(g·k). */
-const GRAVITY = 9.81;
 /** Wavenumber of the longest wave, rad/m (about a 300 m swell). */
 const K_FIRST = 0.02;
 /** Each wave is this much shorter than the one before (16 waves reach about 5 m). */
