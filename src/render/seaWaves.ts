@@ -17,14 +17,14 @@ export const SEA_DRAWN_WAVES = 64;
 export const SEA_WAVE_STRIDE = 4;
 /** Where each number of a wave sits in its entry of `wave`: kx, kz, phase, height (the vertex stage reads x, y, z, w). */
 export const WAVE_AT = { kx: 0, kz: 1, phase: 2, height: 3 } as const;
-/** And in its entry of `more`: reach and |k|. */
-export const MORE_AT = { reach: 0, k: 1 } as const;
+/** And in its entry of `more`: reach, |k| and the angular frequency (what foam that lingers looks back by). */
+export const MORE_AT = { reach: 0, k: 1, omega: 2 } as const;
 
 /** The waves of one moment, as the vertex stage reads them. */
 export interface SeaWaveTable {
   /** Per wave: kx and kz (rad/m), the phase at the table's origin now (rad, −π..π), and its height (m, weighted). */
   readonly wave: Float32Array;
-  /** Per wave: how far it moves the water sideways (`reach`, m, weighted), |k| (rad/m), and two unused. */
+  /** Per wave: how far it moves the water sideways (`reach`, m, weighted), |k| (rad/m), omega (rad/s), one unused. */
   readonly more: Float32Array;
   /** How many waves are in the lists. */
   count: number;
@@ -53,6 +53,7 @@ function addSet(table: SeaWaveTable, w: WaveSet, f: number, ox: number, oz: numb
     table.wave[at + WAVE_AT.height] = f * w.amp[i]!;
     table.more[at + MORE_AT.reach] = f * w.reach[i]!;
     table.more[at + MORE_AT.k] = Math.hypot(kx, kz);
+    table.more[at + MORE_AT.omega] = w.omega[i]!;
     table.extent += f * w.amp[i]!;
     table.count++;
   }
