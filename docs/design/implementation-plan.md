@@ -148,11 +148,11 @@ A brig rides the swell and you can roam every deck of her. The ship herself is d
 
 **Work in other repositories that N2 to N4 wait for** (each can start now):
 
-| Id | What | Where | Needed by |
-| --- | --- | --- | --- |
-| X1 | `@futuremagic/instances` draws its instances in a moving frame, so all her fittings move with her pose | AssetGenerator | N2.6 |
-| X2 | An age-of-sail navy wardrobe: seamen's slops, marines, officers, for two navies | Actors | N2.7 (the captain's own body), N4.3 |
-| X3 | `@futuremagic/figure` climbs shrouds and ratlines, goes round the futtock shrouds and walks a footrope | AssetGenerator | N3.11, N4.3 |
+| Id | What | Where | Needed by | Status |
+| --- | --- | --- | --- | --- |
+| X1 | `@futuremagic/instances` draws its instances in a moving frame, so all her fittings move with her pose | AssetGenerator | N2.6 | done (AssetGenerator #181: `DrawOptions.frames`, a record's `FRAME`; frames nest by multiplying, so a gun on its slide or a door on its hinges is a frame too) |
+| X2 | An age-of-sail navy wardrobe: seamen's slops, marines, officers, for two navies | Actors | N2.7 (the captain's own body), N4.3 | open |
+| X3 | `@futuremagic/figure` climbs shrouds and ratlines, goes round the futtock shrouds and walks a footrope | AssetGenerator | N3.11, N4.3 | done (AssetGenerator #182: `shroudWays`, `Yard` with the 'footrope' and 'yard' steps, `sidle`; at sea `up`, `grip`, `pace`. The rig plan, N3.2, puts each futtock stave at `futtock.lo`) |
 
 **Design questions for N2, answered** (Arnd, 2026-11-17, in ship.md): the brig is a Cruizer-class brig-sloop, the same hull for both navies; you see your own hands, arms and legs, the head hidden; the captain goes everywhere, from the hold to the crosstrees, and the whole ship is navigable.
 
