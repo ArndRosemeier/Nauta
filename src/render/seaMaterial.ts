@@ -12,6 +12,7 @@ import {
   sin, smoothstep, uniform, uniformArray, varyingProperty, vec2, vec3,
 } from 'three/tsl';
 import { EARTH_RADIUS } from './earth';
+import { seaCut } from './seaCut';
 import { SEA_LOD_RANGE, SEA_MAX_TILES, SEA_MORPH_START, SEA_TILE_CELLS, SEA_WAVE_FULL_CELLS, SEA_WAVE_GONE_CELLS } from './seaGrid';
 import { SEA_DRAWN_WAVES, SEA_WAVE_STRIDE } from './seaWaves';
 
@@ -110,6 +111,9 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     vToEye.assign(I.eye.sub(placed));
     return placed;
   })();
+
+  // No water inside a hull (seaCut.ts): the surface's point here is the eye less the way to it.
+  m.maskNode = seaCut(I.eye.sub(vToEye));
 
   // --- A stand-in look until the sea material (N1.4).
   m.colorNode = Fn(() => {

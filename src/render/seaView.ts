@@ -43,7 +43,8 @@ export class SeaView {
   private readonly frustum = new Frustum();
   private readonly box = new Box3();
   private readonly viewProj = new Matrix4();
-  private readonly origin = new Vector3();
+  /** Where the sea's own frame stands (it follows the eye in steps); the ship's sea cut reads it. */
+  readonly origin = new Vector3();
 
   constructor() {
     const grid = tileGrid(SEA_TILE_CELLS);

@@ -42,6 +42,10 @@
       .whatsnew-date { font-weight: 400; opacity: 0.6; margin-left: 10px; }
       .whatsnew-release ul { margin: 0; padding-left: 20px; }
       .whatsnew-release li { margin: 3px 0; }
+      /* ?slice: where to stand on her (src/app/standpointBar.ts), buttons a finger can hit, clear of the version button. */
+      #standpoints { position: fixed; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); right: 140px; display: flex; flex-wrap: wrap; gap: 8px; }
+      #standpoints button { min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #ffffff33; background: #0b1a2a99; color: #e8eef4; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+      #standpoints button.on { border-color: #f2c14e; color: #f2c14e; }
     </style>
   </head>
   <body>
