@@ -27,3 +27,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The gust patches near a place, for drawing them on the water | `src/sim/wind.ts#gustsNear` |
 | A gust's shape across its patch | `src/sim/wind.ts#gustShape` |
 | The wind's tuning: gusts, veer and freshening per force | `src/sim/rules/wind.ts#WIND_PRESETS` |
+| The game's version and its history, from git at build time | `tools/version/version.ts#readVersion` |
+| Which commits are builds, and which build added a note | `tools/version/version.ts#versionInfo` |
+| A version's number as shown (`0.012`) | `tools/version/version.ts#formatVersion` |
+| The version button and the what's-new panel | `src/app/whatsNew.ts#showVersion` |

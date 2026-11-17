@@ -1,8 +1,11 @@
 import { defineConfig } from 'vite';
+import { versionPlugin } from './tools/version/version';
 
 export default defineConfig({
   // GitHub Pages serves the game under /Nauta/ (set by .github/workflows/pages.yml); locally it is /.
   base: process.env.VITE_BASE ?? '/',
+  // The version and the what's-new history, worked out from git at build time (tools/version/version.ts).
+  plugins: [versionPlugin()],
   // One three.js: the vendored packages must not bring a second copy (it would split TSL's state).
   resolve: { dedupe: ['three'] },
   server: { port: 5300, host: true, fs: { allow: ['.', 'vendor/assetgenerator/packages'] } },

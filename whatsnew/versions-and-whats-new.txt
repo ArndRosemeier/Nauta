@@ -1,0 +1,3 @@
+Nauta has version numbers now, starting at 0.001, and every new build adds 0.001. The number sits in the bottom right corner; tap it to read what each version brought. A dot on it means there is a version you have not looked at yet.
+What the game holds so far: the sky through a whole day with sun, moon, stars and clouds; drag a finger to look around; open the page with ?probe to see what the iPad offers.
+Behind the scenes: a seeded wind with gusts is ready for the sea and the sails that come next.
