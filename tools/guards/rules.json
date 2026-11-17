@@ -23,5 +23,21 @@
       "why": "every random number comes from a seed (@futuremagic/core Rng)"
     }
   ],
-  "owners": []
+  "owners": [
+    {
+      "field": "windSeed",
+      "owner": "src/sim/wind.ts",
+      "what": "the seed of a match's wind swings and gusts"
+    },
+    {
+      "field": "windForce",
+      "owner": "src/sim/wind.ts",
+      "what": "a match's wind force on the Beaufort scale"
+    },
+    {
+      "field": "windFrom",
+      "owner": "src/sim/wind.ts",
+      "what": "the mean bearing a match's wind blows from"
+    }
+  ]
 }

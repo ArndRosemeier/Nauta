@@ -18,3 +18,12 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A median of measurements | `src/probe/report.ts#medianOf` |
 | A size in bytes as people read it | `src/probe/report.ts#formatBytes` |
 | The time budgets of `npm test` | `tools/test/judge.mjs#judge` |
+| Compass bearing to a direction on the water (0 north = -z, clockwise) | `src/sim/units.ts#bearingDir` |
+| Bringing a bearing into 0..2pi | `src/sim/units.ts#wrapBearing` |
+| The Beaufort scale: a force's mean wind speed | `src/sim/rules/beaufort.ts#beaufortSpeed` |
+| Making a match's wind (seed, force, bearing) | `src/sim/wind.ts#makeWind` |
+| The true wind at a place and moment, gusts included (what fills the sails) | `src/sim/wind.ts#windAt` |
+| The mean wind at a moment, without gusts (what drives the sea) | `src/sim/wind.ts#meanWind` |
+| The gust patches near a place, for drawing them on the water | `src/sim/wind.ts#gustsNear` |
+| A gust's shape across its patch | `src/sim/wind.ts#gustShape` |
+| The wind's tuning: gusts, veer and freshening per force | `src/sim/rules/wind.ts#WIND_PRESETS` |
