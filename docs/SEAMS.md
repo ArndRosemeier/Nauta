@@ -65,7 +65,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | How rough the sea is in a wind (Cox and Munk's mean square slope, glassy in a calm) | `src/render/seaFine.ts#seaRoughness` |
 | The slope a wave set carries | `src/render/seaFine.ts#slopeVariance` |
 | What the fine waves carry of the roughness | `src/render/seaFine.ts#fineSlope` |
-| A wind layer's fine waves (seeded, metres down to ripples) | `src/render/seaFine.ts#makeFineWaves` |
+| A wind layer's fine waves (seeded, metres down to half a metre; what they cannot carry is roughness, the rest the ripples') | `src/render/seaFine.ts#makeFineWaves` |
 | The fine waves of a moment as the material reads them (long to short, each with the slope of all shorter) | `src/render/seaFine.ts#fillFineWaves` |
 | How much a gust roughens the fine waves | `src/render/seaFine.ts#gustRoughening` |
 | The gust patches laid into a map around the eye for the sea to draw | `src/render/seaGusts.ts#drawGusts` |
@@ -73,6 +73,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Where foam forms in the waves drawn (the bunching that whitens that share) | `src/render/seaFoam.ts#foamLevels` |
 | A standard normal quantile | `src/render/seaFoam.ts#normalAbove` |
 | The foam's seeded, tiling pattern (lace, breakup, bubbles) | `src/render/seaFoam.ts#foamPattern` |
+| The ripples' share of the short waves' slope | `src/render/seaRipples.ts#rippleShare` |
+| The ripples' seeded, tiling slope texture (half a metre down to 3.5 cm) | `src/render/seaRipples.ts#ripplePattern` |
 | The strength lit materials take the sky's environment map at | `src/render/skyView.ts#SkyView` |
 | The sea drawn: tiles chosen for the camera each frame, waves and light handed to the shader | `src/render/seaView.ts#SeaView` |
 | A game kind's own attribute on the Stage's stand-in mesh | `src/render/materials.ts#standInAttribute` |
