@@ -184,7 +184,7 @@ Then the plan's order holds: the plan (N2.1), floating, drawing and fittings sid
 
 ## What this changes in the plan
 
-For the design thread to take into [implementation-plan.md](implementation-plan.md) and [nauta-plan.md](nauta-plan.md), once Arnd agrees:
+Taken into [implementation-plan.md](implementation-plan.md) and [nauta-plan.md](nauta-plan.md) by the design thread on 2026-11-17. The new packages are N2.0 (the slice), N3.10 (sails; N3.6 keeps masts and rigging) and N3.11 (the captain aloft); the work in other repositories is X1 (instances in a moving frame), X2 (the navy wardrobe) and X3 (climbing the rig). The budget warning is answered there: sea 4, crew 4, ships 3, smoke 2, sky, light and interface 2 ms. The list as it was handed over:
 
 1. **N2's open question "the brig's sheet"** is answered by the sheet above: a Cruizer-class brig-sloop, the same hull for both navies.
 2. **N2.1:** flush deck, so no "quarterdeck step"; the levels are the weather deck, the berth deck, the platforms and the hold. The hull form comes from a table of offsets taken off the draught. The plan also lists the stations, the crew's places (gun crews, pins, ladders, shrouds, yards), the compartments and their openings, every line of the rig with where it is made fast, and the one walk graph with its body-size rules. Its test "every deck space is reachable by a ladder or hatch" becomes the fuller set in "Every space navigable".
