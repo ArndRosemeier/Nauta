@@ -4,7 +4,9 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 // @ts-expect-error -- a plain script without types
-import { breaches, importsOf, readRules } from '../tools/guards/guards.mjs';
+import { breaches, disciplineBreaches, importsOf, readRules } from '../tools/guards/guards.mjs';
+// @ts-expect-error -- a plain script without types
+import { magicNumbers, ownerBreaches, seamProblems, seamRows } from '../tools/guards/discipline.mjs';
 // @ts-expect-error -- a plain script without types
 import { checkDuplication, duplicationFindings, readBaseline } from '../tools/guards/duplication.mjs';
 
@@ -56,4 +58,38 @@ test('a listed finding needs a reason and must still be found', () => {
   assert.ok(checkDuplication([key], [])[0].startsWith('NEW'));
   assert.ok(checkDuplication([key], [{ key, reason: ' ' }])[0].startsWith('UNEXPLAINED'));
   assert.ok(checkDuplication([], [{ key, reason: 'gone' }])[0].startsWith('STALE'));
+});
+
+test('the source keeps the change-friendly rules: named numbers, owned state, a true seam index', () => {
+  assert.deepEqual(disciplineBreaches(readRules()), []);
+});
+
+test('a bare number is found; names, 0 1 2, indexes, strings and comments are not', () => {
+  const src = [
+    'export const BROADSIDE_RELOAD = 35; // 99 in a comment',
+    'const TABLE = [[1, 12.5], [2, 40]] as const;',
+    'export function reload(crew: number, p: number[]) {',
+    '  const label = "takes 35 s", half = crew / 2 + p[3];',
+    '  return crew < 6 ? BROADSIDE_RELOAD * 1.5 : BROADSIDE_RELOAD - 0;',
+    '}',
+  ].join('\n');
+  assert.deepEqual(magicNumbers(src), [{ line: 5, text: '6' }, { line: 5, text: '1.5' }]);
+});
+
+test('state is changed by its owner alone', () => {
+  const owners = [{ field: 'hull', owner: 'src/sim/damage.ts', what: "a ship's hull strength" }];
+  const files = [
+    { file: 'src/sim/damage.ts', text: 'ship.hull -= hit;' },
+    { file: 'src/sim/guns.ts', text: 'if (ship.hull === 0) sink();\ntarget.hull -= 4;\nother.hull++;\nconst h = ship.hull;' },
+  ];
+  const found: string[] = ownerBreaches(owners, files);
+  assert.deepEqual(found.map((l) => l.split(': ')[0]), ['src/sim/guns.ts:2', 'src/sim/guns.ts:3']);
+});
+
+test('a seam row must point at an export that exists', () => {
+  const rows = seamRows('| What | The one place |\n| --- | --- |\n| Turning the look | `src/app/look.ts#turn` |\n| Sinking | `src/app/look.ts#sink` |\n| Nothing | `src/nope.ts#x` |\n');
+  assert.equal(rows.length, 3);
+  const found: string[] = seamProblems(rows, process.cwd());
+  assert.equal(found.length, 2);
+  assert.ok(found[0]!.includes('#sink') && found[1]!.includes('src/nope.ts'));
 });

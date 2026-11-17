@@ -1,0 +1,14 @@
+# The seam index: the one place that does X
+
+Before writing code that does something, look here. If a row covers it, call that place; if the place cannot do what you need, change it there. Never write a second one. A new responsibility gets its row in the same commit that creates it. `npm test` checks that every row points at an export that exists (`tools/guards/discipline.mjs`).
+
+| What | The one place |
+| --- | --- |
+| Turning the captain's look by a drag | `src/app/look.ts#turn` |
+| The direction looked along | `src/app/look.ts#lookDir` |
+| Reading the page's address (`?hud`, `?hour=`) | `src/app/params.ts#readParams` |
+| Defining a material (every shader the game draws with) | `src/render/materials.ts#defineKind` |
+| Renderer, scene, camera and the Stage | `src/render/view.ts#createView` |
+| Sun, moon, stars and clouds through the day | `src/render/skyView.ts#SkyView` |
+| Units of time and angle | `src/sim/units.ts#HOURS_PER_DAY` |
+| The time budgets of `npm test` | `tools/test/judge.mjs#judge` |

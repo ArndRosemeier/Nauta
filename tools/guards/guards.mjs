@@ -1,13 +1,15 @@
 /**
  * The guards, run by `npm test` through test/guards.test.ts and by `npm run guards`: the layer rules of
  * tools/guards/rules.json against every file under src (the pure layers import no renderer, nothing uses unseeded
- * randomness), and the duplication ratchet (duplication.mjs). `npm run guards -- --keys` prints what the duplicate
+ * randomness), the change-friendly rules (discipline.mjs: named numbers, one owner per piece of state, the seam index),
+ * and the duplication ratchet (duplication.mjs). `npm run guards -- --keys` prints what the duplicate
  * finders find now, as baseline entries to fill in.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkDuplication, duplicationFindings, readBaseline } from './duplication.mjs';
+import { magicNumbers, ownerBreaches, seamProblems, seamRows } from './discipline.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const posix = (p) => p.split(sep).join('/');
@@ -45,6 +47,19 @@ export function breaches(rules, base = root) {
   return out;
 }
 
+/** The breaches of the change-friendly rules (discipline.mjs) in the `src` tree under `base`. */
+export function disciplineBreaches(rules, base = root) {
+  const sources = files(join(base, 'src')).map((p) => ({ file: posix(relative(base, p)), text: readFileSync(p, 'utf8') }));
+  const out = [];
+  for (const { file, text } of sources) {
+    for (const n of magicNumbers(text)) out.push(`${file}:${n.line}: the number ${n.text} has no name (a top-level const in UPPER_CASE says what it means and is the one place to change it)`);
+  }
+  out.push(...ownerBreaches(rules.owners ?? [], sources));
+  const seams = join(base, 'docs/SEAMS.md');
+  out.push(...seamProblems(seamRows(readFileSync(seams, 'utf8')), base));
+  return out;
+}
+
 export const readRules = () => JSON.parse(readFileSync(join(root, 'tools/guards/rules.json'), 'utf8'));
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -52,7 +67,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     console.log(JSON.stringify(duplicationFindings().map((key) => ({ key, reason: '' })), null, 2));
     process.exit(0);
   }
-  const found = [...breaches(readRules()), ...checkDuplication(duplicationFindings(), readBaseline())];
+  const found = [...breaches(readRules()), ...disciplineBreaches(readRules()), ...checkDuplication(duplicationFindings(), readBaseline())];
   for (const line of found) console.error(line);
   console.log(found.length ? `${found.length} problem(s)` : 'guards: ok');
   process.exit(found.length ? 1 : 0);

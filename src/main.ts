@@ -4,6 +4,17 @@ import { readParams } from './app/params';
 import { watchLook } from './app/lookInput';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
+import { MS_PER_SECOND } from './sim/units';
+import type { Look } from './app/look';
+
+/** Where the captain looks at the start: a little above the horizon, toward the morning sun. */
+const START_LOOK: Look = { yaw: -1.2, pitch: 0.12 };
+/** The longest step of time one frame may take, seconds (a tab that slept does not jump the clock). */
+const MAX_FRAME_SECONDS = 0.1;
+/** How often the HUD's numbers are written anew, ms. */
+const HUD_EVERY_MS = 500;
+/** How long the loading screen takes to fade (the `transition` of #loading in index.html), ms, and a little more. */
+const LOADING_FADE_MS = 700;
 
 declare global {
   interface Window {
@@ -21,27 +32,26 @@ async function start(): Promise<void> {
   const sky = new SkyView(view.scene, view.renderer, params.hour, params.dayMinutes);
   await view.stage.warmUp();
   await view.stage.add(sky.dome);
-  // Looking a little above the horizon, toward the morning sun.
-  const input = watchLook(canvas, { yaw: -1.2, pitch: 0.12 }, view.radPerPixel);
+  const input = watchLook(canvas, START_LOOK, view.radPerPixel);
   if (params.hud) hud.style.display = 'block';
 
   let last = performance.now(), frames = 0, shown = last, ms = 0;
   view.renderer.setAnimationLoop(() => {
-    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000);
+    const now = performance.now(), dt = Math.min(MAX_FRAME_SECONDS, (now - last) / MS_PER_SECOND);
     last = now;
     view.camera.rotation.set(input.look.pitch, input.look.yaw, 0);
     sky.update(dt, view.camera);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
     frames++;
-    if (params.hud && now - shown >= 500) {
+    if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock}\n${view.stage.hudLine()}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
       loading.style.opacity = '0';
-      setTimeout(() => loading.remove(), 700);
+      setTimeout(() => loading.remove(), LOADING_FADE_MS);
     }
   });
 }

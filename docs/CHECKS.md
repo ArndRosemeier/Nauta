@@ -35,6 +35,7 @@ Part of `npm test` (`test/guards.test.ts`); `npm run guards` prints them alone.
 
 - **Layers** (`tools/guards/rules.json`): the pure layers (`src/sim`, and the pure files of `src/app`) import no three.js and nothing from `src/render`.
 - **No `Math.random`** anywhere under `src`.
+- **Change-friendly rules** (`tools/guards/discipline.mjs`, [ARCHITECTURE.md](ARCHITECTURE.md)): no bare number under `src` (only 0, 1, 2 and indexes; everything else is a named top-level constant); a field of the game's state is assigned only in its owner file (`owners` in `rules.json`); every row of [SEAMS.md](SEAMS.md) points at an export that exists.
 - **Duplication ratchet** (`tools/guards/duplication.mjs`), on every run:
   - A copied function body (two functions alike enough to be one) is **never allowed**. Keep one and call it from both places.
   - A repeated idiom (the same few lines in three files or more) or two alike functions of one name must be listed in `tools/guards/duplication-baseline.json` with a reason: a false alarm says why it is one, a real copy needs Arnd's OK. `npm run guards -- --keys` prints the entries to fill in.
