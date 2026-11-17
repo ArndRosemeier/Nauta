@@ -55,12 +55,13 @@ async function start(): Promise<void> {
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
   await view.stage.add(seaView.deep);
+  // On WebGPU, building the sea's shader can leave the sky's environment map blank until it is drawn again.
+  sky.redrawEnvironment();
   if (params.rig) await view.stage.add(makeTestBodies(startLook.yaw, params.eye));
   const input = watchLook(canvas, startLook, view.radPerPixel);
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
 
-  let dbgFrames = 0;
   let last = performance.now(), frames = 0, shown = last, ms = 0;
   view.renderer.setAnimationLoop(() => {
     const now = performance.now(), dt = Math.min(MAX_FRAME_SECONDS, (now - last) / MS_PER_SECOND);
@@ -77,11 +78,6 @@ async function start(): Promise<void> {
     if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${params.wind} · eye ${params.eye} m · sea ${seaView.tilesDrawn} tiles\n${view.stage.hudLine()}`;
-    }
-    dbgFrames++;
-    if (dbgFrames === 3 && new URLSearchParams(location.search).has('dbg')) {
-      const n = (globalThis as any).__seaPmrem, e = sky.envTexture as any;
-      console.error('SEADBG', JSON.stringify({ w: n?._width?.value, h: n?._height?.value, mip: n?._maxMip?.value, pm: !!n?._pmrem, same: n?._texture?.value === e, envW: e.image?.width, envH: e.image?.height, map: e.mapping, rt: e.isRenderTargetTexture, ver: e.pmremVersion, envSame: view.scene.environment === e, skyLight: sky.skyStrength, type: e.type, fmt: e.format }));
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
