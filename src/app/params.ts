@@ -1,4 +1,4 @@
-/** What the page's address asks for (`?gl&hud&hour=17`). Pure: it takes the query string. */
+/** What the page's address asks for (`?gl&hud&hour=17`, `?probe`). Pure: it takes the query string. */
 import { HOURS_PER_DAY } from '../sim/units';
 
 /** The hour a game starts at when the address names none: a clear morning. */
@@ -17,6 +17,8 @@ export interface Params {
   readonly hour: number;
   /** Real minutes a game day takes; 0 stops the clock. */
   readonly dayMinutes: number;
+  /** Show what the browser and device offer instead of the game (`?probe`, plan N0.5). */
+  readonly probe: boolean;
 }
 
 export function readParams(query: string): Params {
@@ -25,5 +27,5 @@ export function readParams(query: string): Params {
     const v = q.get(name), n = v === null || v === '' ? NaN : Number(v);
     return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
   };
-  return { forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY, dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX) };
+  return { forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY, dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe') };
 }

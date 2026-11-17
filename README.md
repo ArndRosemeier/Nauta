@@ -8,7 +8,7 @@ Design and build order: [docs/design/nauta-plan.md](docs/design/nauta-plan.md). 
 
 https://arndrosemeier.github.io/Nauta/ (built from `main` on every push). On an iPad, "Add to Home Screen" in Safari's share menu makes it a full-screen app.
 
-So far (step N0): the sky through the day. Drag with a finger or the mouse to look around. `?hud` shows frame time and the clock, `?hour=18` sets the hour, `?day=2` makes a day last two minutes.
+So far (step N0): the sky through the day. Drag with a finger or the mouse to look around. `?hud` shows frame time and the clock, `?hour=18` sets the hour, `?day=2` makes a day last two minutes. `?probe` shows what the browser and device offer (WebGPU, compute speed, float and storage textures, limits, screen, refresh) as a report to copy.
 
 ## Run it
 
