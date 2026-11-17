@@ -1,6 +1,6 @@
 # Nauta: the brig
 
-**Status: proposal**, written 2026-11-17 by the ship thread for Arnd to agree. It works out what [nauta-plan.md](nauta-plan.md) calls "a brig detailed enough to live on for twenty minutes" and answers the open questions of N2 in [implementation-plan.md](implementation-plan.md). Where it would change the plan, the section "What this changes in the plan" at the end says so; those changes go to the design thread and are not made here.
+**Status: agreed with Arnd on 2026-11-17** (his answers are at the end), written by the ship thread. It works out what [nauta-plan.md](nauta-plan.md) calls "a brig detailed enough to live on for twenty minutes" and answers the open questions of N2 in [implementation-plan.md](implementation-plan.md). Where it would change the plan, the section "What this changes in the plan" at the end says so; those changes go to the design thread and are not made here.
 
 ![The brig from the side](ship/brig-profile.svg)
 
@@ -46,7 +46,7 @@ What is new: the hull form, the structure, the decks below, the rig, the sails, 
 
 ## Where you can go
 
-All of her, from the hold to the tops of the masts for the crew, and every deck for the captain. She is flush-decked: no raised quarterdeck or forecastle, one open deck from bow to stern with the guns along both sides. The "quarterdeck" is the after part of it, where the captain stands.
+Everywhere. The captain is free to move anywhere (Arnd, 2026-11-17): every deck, every cabin and storeroom, the hold and the magazine, up the shrouds to the tops and crosstrees, out along the yards and onto the bowsprit. The whole ship is navigable, and it is checked to be ("Every space navigable" below). She is flush-decked: no raised quarterdeck or forecastle, one open deck from bow to stern with the guns along both sides. The "quarterdeck" is the after part of it, where the captain stands.
 
 **The weather deck** is where the fight is. From aft: the ensign, the wheel and binnacle with the helmsmen and the master; the skylight over the captain's cabin; the companion down; the capstan; the pumps either side of the mainmast; the main hatch under the boats on their skids; the fore hatch; the foremast with its fife rail and belaying pins; the galley chimney; the bitts and the heel of the bowsprit; the catheads with the anchors. Eight carronades and a long six each side, the hammock nettings along the rails, shot in garlands by every gun, the lines coiled on their pins.
 
@@ -54,7 +54,18 @@ All of her, from the hold to the tops of the masts for the crew, and every deck 
 
 **The platforms and the hold** are seen by lantern. Forward the magazine, where powder is filled into cartridges and passed up by the boys, lit only through the glazed light room beside it; aft the bread room. Amidships the well, where the pumps draw and the carpenter sounds the water; the shot locker; the water casks on shingle ballast; the cable tier. This is where flooding is first seen and where a fire becomes deadly.
 
-**Aloft** the tops of both masts, the yards with their footropes and the shrouds with their ratlines, where the topmen work. Whether the captain may climb to the maintop with his glass is a question below.
+**Aloft** the tops of both masts and the crosstrees above them, the yards with their footropes and the shrouds with their ratlines, where the topmen work, and the bowsprit and jib-boom with theirs. The captain goes there too, to look out with his glass or to watch the topmen at work.
+
+### Every space navigable
+
+"Navigable" means the captain's own body can walk, stoop, climb and squeeze into every space the plan has, in a seaway, and the crew can too. It is built in from the plan and proved by checks, not hoped for.
+
+- **One walk graph.** The plan gives every surface a body can stand on (decks, gratings, platforms, the tops, the crosstrees, the footropes of every yard and of the jib-boom, the bowsprit) and every way between them (ladders, the companion, hatches, doors, the shrouds and their ratlines, the futtock shrouds round the top, the topmast shrouds). The captain's walker (N2.3) and the crew's routes (N4.2) use this one graph, so where a man can go, the captain can go, and the other way round.
+- **Sized for a real body.** The plan's sizes come with rules in `src/sim/rules/ships.ts`: headroom under the beams (where it is under the captain's height he stoops, and the view lowers with him), the width of doors, hatches and the gaps between guns and gear, the step of ladders and ratlines, the highest step taken without climbing. A space that breaks a rule fails the plan's tests.
+- **Every door opens,** and is seen swinging. The captain's cabins are fully furnished; the officers' cabins hold a cot, a chest and a lantern; the storerooms hold their stores; the magazine has its own door and its light room.
+- **Climbing is seen.** Up the ratlines hand over hand, out and round the futtock shrouds, onto the top, along a footrope holding the jackstay, down a ladder backwards; the body leans in with the roll and slows as she heels. He cannot fall (Arnd); a hard roll aloft makes him hold on, not let go.
+- **What is in the way.** Men step aside for the captain or he steps round them; a gun run out, a fallen spar or wreckage can close a way, and then the graph finds another one. No space ever has its only way permanently shut, except by damage.
+- **Checks.** N2.1: from the quarterdeck every surface of the plan is reachable by the graph with the captain's body; every surface meets the headroom and width rules; every door, hatch and ladder joins two surfaces. N2.3: a slow check walks the captain along a path through every space and every climb in the strongest duel sea, and fails if he falls through, sticks, slides off or passes through a solid part. A drawn map of the graph is part of N2.1's pictures for Arnd.
 
 **Where orders are given.** Every order is given to a person at a place, which the plan names (N4.4 builds the menu on them):
 
@@ -87,7 +98,7 @@ Detail follows what the captain can touch, what he sees on board, and what he se
 5. **Weight.** A gun is heavy iron on a heavy slide, a mast is a tree, the deck is thick planking on beams you can see from below. Nothing is thin or toy-like.
 6. **Use and wear.** The deck scrubbed pale but stained at the guns, tar, rust streaks from the chainplates, rope worn where it chafes.
 
-**Left out on purpose:** carved stern galleries (a brig has none), studding sails and royals, the anchors at work, boats in the water, a furnished interior in every officer's cabin (their doors stay closed), and the deep hold beyond lantern light.
+**Left out on purpose:** carved stern galleries (a brig has none), studding sails and royals, the anchors at work, boats in the water, and rich furnishing in the officers' small cabins (simple but enterable).
 
 ## Masts, rigging and sails
 
@@ -176,7 +187,7 @@ Then the plan's order holds: the plan (N2.1), floating, drawing and fittings sid
 For the design thread to take into [implementation-plan.md](implementation-plan.md) and [nauta-plan.md](nauta-plan.md), once Arnd agrees:
 
 1. **N2's open question "the brig's sheet"** is answered by the sheet above: a Cruizer-class brig-sloop, the same hull for both navies.
-2. **N2.1:** flush deck, so no "quarterdeck step"; the levels are the weather deck, the berth deck, the platforms and the hold. The hull form comes from a table of offsets taken off the draught. The plan also lists the stations, the crew's places (gun crews, pins, ladders, shrouds, yards), the compartments and their openings, and every line of the rig with where it is made fast.
+2. **N2.1:** flush deck, so no "quarterdeck step"; the levels are the weather deck, the berth deck, the platforms and the hold. The hull form comes from a table of offsets taken off the draught. The plan also lists the stations, the crew's places (gun crews, pins, ladders, shrouds, yards), the compartments and their openings, every line of the rig with where it is made fast, and the one walk graph with its body-size rules. Its test "every deck space is reachable by a ladder or hatch" becomes the fuller set in "Every space navigable".
 3. **N2.6:** the guns are the 32-pounder carronade on its slide and the long 6-pounder on its carriage (not a 12-pounder and a 24-pounder carronade), and the fittings list grows as in "How she is made".
 4. **A new package before N2.4: the slice** (above), judged by Arnd on the iPad.
 5. **N2.4** gets the ship's own shadow map, the drawing by rooms and openings, and a hull laid out for a damage map from the start.
@@ -184,14 +195,12 @@ For the design thread to take into [implementation-plan.md](implementation-plan.
 7. **Budgets:** the ship's rows above, and the warning that the worst moment does not fit yet.
 8. **Actors:** an age-of-sail navy wardrobe (seamen's slops, marines, officers, for two navies) is needed before N4.3 and for the captain's body, and can start now, in Actors.
 9. **`@futuremagic/instances`** must draw instances in a moving frame (all her fittings move with her pose), an AssetGenerator change before N2.6.
-10. **N2's open questions** "whether you see your own body" and "how far below deck" are answered by Arnd's choices below.
+10. **N2's open questions** "whether you see your own body" and "how far below deck" are answered (Arnd, 2026-11-17): yes, hands, arms and legs, the head hidden; and everywhere, from the hold to the crosstrees.
+11. **N2.3** gets the walk-everywhere slow check in its "done when", and doors that open.
+12. **The captain aloft** (Arnd: free to move anywhere) needs the rig plan, so it is one more package after N3.2 and N3.6: climbing the shrouds, the tops and crosstrees, the yards' footropes and the bowsprit for the captain, on the same walk graph, with the climbing seen (`@futuremagic/figure` gains shroud and footrope climbing). Its check walks him to every masthead, yard arm and the jib-boom end.
 
-## Questions for Arnd
+## Arnd's answers (2026-11-17)
 
-1. **One ship in two coats, or two different brigs?** Proposed: the same hull for both navies, so a duel is fair.
-2. **The Cruizer's real guns,** carronades that make the fight close and brutal? Proposed: yes.
-3. **Your own body:** do you see your hands, arms and legs (on the rail, the glass, a ladder)? Proposed: yes, the head hidden.
-4. **May the captain climb to the maintop** with his glass? Proposed: yes, after N4, since the crew's climbing routes give it almost for free.
-5. **The slice first?** Proposed: yes.
+Agreed: one hull in two coats for the two navies; the Cruizer's real carronades and long sixes; the captain sees his own hands, arms and legs; the slice first. Changed: **the captain is free to move anywhere**, not only to the maintop and not only after N4, and **the whole ship must actually be navigable** (the section "Every space navigable").
 
 Sources for the sheet: [Cruizer-class brig-sloop](https://en.wikipedia.org/wiki/Cruizer-class_brig-sloop), [Abeille-class brig](https://en.wikipedia.org/wiki/Abeille-class_brig), [sail plan for 18-gun brigs, National Maritime Museum](https://www.rmg.co.uk/collections/objects/rmgc-object-84439), [inboard profile of the Cruizer class](https://prints.rmg.co.uk/products/inboard-profile-plan-for-cruiser-cruizer-class-brig-sloops-launched-from-1812-to-1815-j4873).
