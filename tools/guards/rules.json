@@ -4,6 +4,7 @@
     "src/sim",
     "src/app/look.ts",
     "src/app/params.ts",
+    "src/app/standpoints.ts",
     "src/probe/report.ts",
     "src/probe/waves.ts"
   ],
@@ -59,6 +60,11 @@
       "field": "seaLayers",
       "owner": "src/sim/sea/sea.ts",
       "what": "the sea's wave sets and when each fades in"
+    },
+    {
+      "field": "pose",
+      "owner": "src/render/ship/shipView.ts",
+      "what": "how she lies on the water (the stand-in motion until N2.2 computes it)"
     }
   ]
 }

@@ -5,8 +5,8 @@
 import { turn, type Look } from './look';
 
 export interface LookInput {
-  /** The look as dragged so far. */
-  readonly look: Look;
+  /** The look as dragged so far; set it to turn the look from elsewhere (a new standpoint). */
+  look: Look;
 }
 
 /** `radPerPixel`: the view's vertical angle over its height now (it changes when the window does). */

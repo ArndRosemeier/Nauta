@@ -2,6 +2,7 @@
 import { DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, type WebGPURenderer } from 'three/webgpu';
 import { Stage, createRenderer } from '@futuremagic/stage';
 import { allKinds, standInAttribute } from './materials';
+import { shadowingSun } from './ship/shipView';
 import { DEGREE } from '../sim/units';
 
 /** The view's vertical angle, degrees. */
@@ -24,7 +25,8 @@ export interface View {
 }
 
 /** The camera stands at zero until the caller places it. */
-export async function createView(canvas: HTMLCanvasElement, forceWebGL: boolean): Promise<View> {
+/** `shadows`: the sun casts shadows (a ship is drawn); decided before the warm-up, as it is part of every lit shader's key. */
+export async function createView(canvas: HTMLCanvasElement, forceWebGL: boolean, shadows = false): Promise<View> {
   // WebGPU where the browser has it. WebGL 2 stays as a fallback until the sea needs GPU compute (plan N1).
   const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL, depth: 'reversed', tone: 'agx' });
   const scene = new Scene();
@@ -33,7 +35,12 @@ export async function createView(canvas: HTMLCanvasElement, forceWebGL: boolean)
   // Lights are fixed before the warm-up: their number and order are part of every lit shader's key.
   const sun = new DirectionalLight(), hemi = new HemisphereLight();
   scene.add(sun, sun.target, hemi);
+  if (shadows) {
+    renderer.shadowMap.enabled = true;
+    shadowingSun(sun);
+  }
   const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute });
+  if (shadows) stage.shadowCamera = sun.shadow.camera;
   const fit = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
