@@ -127,6 +127,8 @@ To confirm on the device: WebGPU with compute in Safari on the reference iPad, b
 
 ## Build order
 
+The work packages of each step, their order and their gates are in [implementation-plan.md](implementation-plan.md).
+
 Each step ends in something you can stand in and judge, and the sea comes first because everything else floats on it. Sound is not a step of its own: every step brings its sounds.
 
 | Step | What is built | Done when |
