@@ -150,7 +150,7 @@ Not in the first game, but kept in mind so nothing blocks them: larger ships and
 
 Open:
 
-- **WebGPU only?** The proposed sea needs GPU compute, which the WebGL 2 fallback does not have. Until N1 decides, N0 keeps the fallback.
+- **WebGPU only:** decided 2026-11-17. The iPad Air M4 runs WebGPU compute at almost no cost (its probe report is in implementation-plan.md), so the sea's short waves are computed on the GPU and the WebGL 2 fallback goes with package N1.2.
 - **Android tablets** from the start too?
 - **How is the brig made?** Suggested: built in code from a ship plan (so damage can cut into it anywhere) with AssetGenerator props for fittings.
 - **Which navies?** British against French around 1800 is the obvious first pair.
