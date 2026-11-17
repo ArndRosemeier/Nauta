@@ -160,14 +160,25 @@ export function layerWeights(sea: SeaState, t: number, out: number[] = []): numb
 
 const weights: number[] = [];
 
+/**
+ * Every wave set that shows at time `t`, passed to `visit` with its factor: the swell at 1, then each wind layer
+ * whose factor from `layerWeights` is above 0. What `seaAt` sums, and what the renderer draws (render/seaWaves.ts).
+ */
+export function forEachShownSet(sea: SeaState, t: number, visit: (waves: WaveSet, factor: number) => void): void {
+  visit(sea.seaSwell, 1);
+  layerWeights(sea, t, weights);
+  for (let i = 0; i < weights.length; i++) if (weights[i]! > 0) visit(sea.seaLayers[i]!.waves, weights[i]!);
+}
+
+/** The calm point and time `sumAt` sums at, for `addHere` (kept here so a sample allocates nothing). */
+const here = { x: 0, z: 0, t: 0 };
+const addHere = (waves: WaveSet, factor: number): void => addWaves(sums, waves, factor, here.x, here.z, here.t);
+
 /** Sum the swell and every layer at calm point (x, z), time t, into `sums`. */
 function sumAt(sea: SeaState, x: number, z: number, t: number): Sums {
   sums.h = sums.dx = sums.dz = sums.vx = sums.vy = sums.vz = sums.hx = sums.hz = sums.xx = sums.xz = sums.zz = 0;
-  addWaves(sums, sea.seaSwell, 1, x, z, t);
-  layerWeights(sea, t, weights);
-  for (let i = 0; i < weights.length; i++) {
-    if (weights[i]! > 0) addWaves(sums, sea.seaLayers[i]!.waves, weights[i]!, x, z, t);
-  }
+  here.x = x; here.z = z; here.t = t;
+  forEachShownSet(sea, t, addHere);
   return sums;
 }
 

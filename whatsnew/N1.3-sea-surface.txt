@@ -1,0 +1,2 @@
+The sea is drawn: its waves roll past you out to a clean horizon line where the sea meets the sky. Its colour is a plain stand-in until the sea's own look comes.
+Try other heights and winds by adding to the address: ?eye=3 or ?eye=30 (metres above the water), ?wind=0 for a calm up to ?wind=8 for a gale.

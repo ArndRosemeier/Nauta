@@ -1,11 +1,9 @@
 /** The one renderer, scene and camera, and the Stage everything enters the scene through (docs/SHADERS.md). */
 import { DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, type WebGPURenderer } from 'three/webgpu';
 import { Stage, createRenderer } from '@futuremagic/stage';
-import { allKinds } from './materials';
+import { allKinds, standInAttribute } from './materials';
 import { DEGREE } from '../sim/units';
 
-/** The captain's eye above the water for now, metres (a brig's quarterdeck; the ship comes with N2). */
-export const EYE_HEIGHT = 4.5;
 /** The view's vertical angle, degrees. */
 const FOV = 60;
 /** The nearest and farthest the camera draws, metres: a rail under the hand, and the sky's dome. */
@@ -25,17 +23,17 @@ export interface View {
   radPerPixel(): number;
 }
 
+/** The camera stands at zero until the caller places it. */
 export async function createView(canvas: HTMLCanvasElement, forceWebGL: boolean): Promise<View> {
   // WebGPU where the browser has it. WebGL 2 stays as a fallback until the sea needs GPU compute (plan N1).
   const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL, depth: 'reversed', tone: 'agx' });
   const scene = new Scene();
   const camera = new PerspectiveCamera(FOV, 1, NEAR, FAR);
-  camera.position.set(0, EYE_HEIGHT, 0);
   camera.rotation.order = 'YXZ';
   // Lights are fixed before the warm-up: their number and order are part of every lit shader's key.
   const sun = new DirectionalLight(), hemi = new HemisphereLight();
   scene.add(sun, sun.target, hemi);
-  const stage = new Stage(renderer, scene, camera, { kinds: allKinds });
+  const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute });
   const fit = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
