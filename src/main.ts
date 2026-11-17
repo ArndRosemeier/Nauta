@@ -56,7 +56,10 @@ async function start(): Promise<void> {
   });
 }
 
-start().catch((err: unknown) => {
+/** `?probe` shows what the device offers instead of the game (plan N0.5); its code loads only when asked for. */
+const run = readParams(location.search).probe ? () => import('./probe/page').then((p) => p.runProbe()) : start;
+
+run().catch((err: unknown) => {
   const failed = el('failed');
   failed.textContent = err instanceof GraphicsUnavailable
     ? `Nauta needs 3D graphics this browser does not offer (${err.why}). Try a current Chrome, Edge or Safari.`

@@ -21,6 +21,13 @@
       #loading, #failed { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1a2a; transition: opacity 0.6s; }
       #loading h1 { font: 300 44px/1 Georgia, serif; letter-spacing: 0.35em; margin: 0 0 0 0.35em; }
       #failed { display: none; padding: 24px; text-align: center; }
+      /* ?probe: the report scrolls and can be selected, the buttons fit a finger. */
+      #probe { position: fixed; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 24px max(12px, env(safe-area-inset-left)); }
+      #probe header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      #probe h1 { font: 300 22px/1 Georgia, serif; letter-spacing: 0.2em; margin: 0 12px 0 0; }
+      #probe button { font: inherit; min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid #5a7894; background: #18324a; color: inherit; }
+      #probe button:disabled { opacity: 0.4; }
+      #probe pre { font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
     </style>
   </head>
   <body>

@@ -11,4 +11,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Renderer, scene, camera and the Stage | `src/render/view.ts#createView` |
 | Sun, moon, stars and clouds through the day | `src/render/skyView.ts#SkyView` |
 | Units of time and angle | `src/sim/units.ts#HOURS_PER_DAY` |
+| What the browser and device offer (`?probe`, its page) | `src/probe/page.ts#runProbe` |
+| Asking WebGPU, and timing a compute pass | `src/probe/gpu.ts#probeWebGPU` |
+| Asking WebGL 2 | `src/probe/gpu.ts#probeWebGL2` |
+| The probe's report as text | `src/probe/report.ts#formatReport` |
+| A median of measurements | `src/probe/report.ts#medianOf` |
+| A size in bytes as people read it | `src/probe/report.ts#formatBytes` |
 | The time budgets of `npm test` | `tools/test/judge.mjs#judge` |
