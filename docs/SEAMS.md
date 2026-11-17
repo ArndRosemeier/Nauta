@@ -42,3 +42,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | How strongly each wave layer of the sea shows at a moment (the renderer's per-layer factor) | `src/sim/sea/sea.ts#layerWeights` |
 | The sea at a calm point: height, normal, sideways shift, water velocity, stretch (what the renderer displaces by) | `src/sim/sea/sea.ts#seaAt` |
 | The water under a world point (what a hull feels) | `src/sim/sea/sea.ts#surfaceAt` |
+| The game's version and its history, from git at build time | `tools/version/version.ts#readVersion` |
+| Which commits are builds, and which build added a note | `tools/version/version.ts#versionInfo` |
+| A version's number as shown (`0.012`) | `tools/version/version.ts#formatVersion` |
+| The version button and the what's-new panel | `src/app/whatsNew.ts#showVersion` |

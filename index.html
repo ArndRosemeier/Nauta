@@ -28,11 +28,26 @@
       #probe button { font: inherit; min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid #5a7894; background: #18324a; color: inherit; }
       #probe button:disabled { opacity: 0.4; }
       #probe pre { font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+      /* The version and what's new (src/app/whatsNew.ts): a quiet corner button a finger can hit, its panel over the view. */
+      #version { position: fixed; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); display: none; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #ffffff33; background: #0b1a2a99; color: #e8eef4cc; font: 13px/1 system-ui, sans-serif; touch-action: manipulation; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+      #version.fresh::after { content: ''; display: inline-block; width: 8px; height: 8px; margin-left: 8px; border-radius: 50%; background: #f2c14e; vertical-align: 1px; }
+      .whatsnew-backdrop { position: fixed; inset: 0; display: grid; place-items: center; background: #00000080; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); touch-action: pan-y; }
+      .whatsnew-panel { width: min(560px, 100%); max-height: 100%; display: flex; flex-direction: column; background: #0f2236f2; border: 1px solid #5a789466; border-radius: 14px; box-shadow: 0 12px 40px #0008; overflow: hidden; }
+      .whatsnew-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 6px 6px 20px; border-bottom: 1px solid #5a789444; }
+      .whatsnew-head h2 { font: 300 22px/1 Georgia, serif; letter-spacing: 0.08em; margin: 0; }
+      .whatsnew-close { width: 44px; height: 44px; border: 0; background: none; color: inherit; font: 20px/1 system-ui, sans-serif; touch-action: manipulation; }
+      .whatsnew-list { overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 20px 16px; -webkit-user-select: text; user-select: text; }
+      .whatsnew-release h3 { font: 600 15px/1.2 system-ui, sans-serif; margin: 16px 0 6px; }
+      .whatsnew-release.current h3 { color: #f2c14e; }
+      .whatsnew-date { font-weight: 400; opacity: 0.6; margin-left: 10px; }
+      .whatsnew-release ul { margin: 0; padding-left: 20px; }
+      .whatsnew-release li { margin: 3px 0; }
     </style>
   </head>
   <body>
     <canvas id="view"></canvas>
     <pre id="hud"></pre>
+    <button id="version" type="button"></button>
     <div id="loading"><h1>NAUTA</h1></div>
     <div id="failed"></div>
     <script type="module" src="/src/main.ts"></script>

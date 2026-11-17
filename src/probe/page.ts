@@ -5,6 +5,7 @@
  */
 import { formatBytes, formatReport, hzFromIntervals, medianOf, yesNo, type Row, type Section } from './report';
 import { probeWebGL2, probeWebGPU, type Findings } from './gpu';
+import { LABEL } from 'virtual:nauta/version';
 
 /** How long the animation frames are watched to find the refresh rate, ms. */
 const REFRESH_WATCH_MS = 1500;
@@ -108,7 +109,7 @@ export async function runProbe(): Promise<void> {
   const parts = [await safely('Device', probeDevice), await safely('WebGL 2', probeWebGL2), await safely('WebGPU', probeWebGPU)];
   const [device, gl, gpu] = parts;
   const summary: Section = { title: 'Summary', rows: [...gpu.summary, ...gl.summary, ...device.summary] };
-  out.textContent = formatReport(`Nauta probe, ${new Date().toISOString()}, ${location.href}`, [summary, ...gpu.sections, ...gl.sections, ...device.sections]);
+  out.textContent = formatReport(`Nauta ${LABEL} probe, ${new Date().toISOString()}, ${location.href}`, [summary, ...gpu.sections, ...gl.sections, ...device.sections]);
   copy.disabled = false;
   window.__nautaReady = true;
 }

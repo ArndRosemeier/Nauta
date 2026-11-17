@@ -2,6 +2,7 @@
 import { GraphicsUnavailable } from '@futuremagic/stage';
 import { readParams } from './app/params';
 import { watchLook } from './app/lookInput';
+import { showVersion } from './app/whatsNew';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { MS_PER_SECOND } from './sim/units';
@@ -34,6 +35,7 @@ async function start(): Promise<void> {
   await view.stage.add(sky.dome);
   const input = watchLook(canvas, START_LOOK, view.radPerPixel);
   if (params.hud) hud.style.display = 'block';
+  showVersion(el<HTMLButtonElement>('version'));
 
   let last = performance.now(), frames = 0, shown = last, ms = 0;
   view.renderer.setAnimationLoop(() => {

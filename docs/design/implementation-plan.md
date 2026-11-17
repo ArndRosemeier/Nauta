@@ -13,9 +13,9 @@ Written 2026-11-17 by the design thread. Arnd decides at the gates; design quest
 **Each package lands like this:**
 
 1. Work on a branch. Keep `npm test` and `npm run build` green.
-2. Add the package's tests, its rows in SEAMS.md, its owners in `tools/guards/rules.json`, and its numbers as named constants or rule tables.
+2. Add the package's tests, its rows in SEAMS.md, its owners in `tools/guards/rules.json`, its numbers as named constants or rule tables, and its what's-new note `whatsnew/N1.3-<what>.txt` ([whatsnew/README.md](../../whatsnew/README.md)): what Arnd can now see or do on the iPad, in plain words, with no version number.
 3. Take the package's screenshots or run its check, and look at them.
-4. Open a pull request with `PLAN: N1.3` and a `COPIES:` line, and merge it into `main` once CI is green. No review by Arnd is needed for a package. `main` deploys to https://arndrosemeier.github.io/Nauta/.
+4. Open a pull request with `PLAN: N1.3` and a `COPIES:` line, and squash-merge it into `main` once CI is green (one commit is one build, one version). No review by Arnd is needed for a package. `main` deploys to https://arndrosemeier.github.io/Nauta/.
 5. In the same pull request, set the package's status in this file to `done` and note anything the next package must know under "Notes" of its milestone.
 
 **Stop and ask the design thread** (through Arnd) when a package needs a decision this plan does not make, when "done when" cannot be met as written, or when the work wants to change a fixed rule, a budget or another package's seam. Do not decide design in a coding thread.
@@ -254,3 +254,4 @@ Not planned in detail, in rough order of how much each adds for its cost: larger
 | 2026-11-17 | Tablets from the start as a web app; reference iPad Air M4 | Arnd |
 | 2026-11-17 | Guardrails: test time budgets, duplication ratchet, named numbers, state owners, seam index | Arnd |
 | 2026-11-17 | This thread is the design thread; other threads build work packages | Arnd |
+| 2026-11-17 | Versions start at 0.001 and go up by 0.001 with each build on `main`; a "What's new" button shows the full history; each change adds its note in `whatsnew/` | Arnd |

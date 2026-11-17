@@ -1,0 +1,1 @@
+Behind the scenes: the sea's big waves now exist as a simulation, from a light air to a hurricane, the same on every machine and following the wind over a few minutes. You will see them once the sea surface is drawn, which comes next.
