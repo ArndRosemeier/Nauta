@@ -1,0 +1,7 @@
+{
+  "comment": "Layers (CLAUDE.md rule 5). A folder in `pure` may not import any module in `banned`, nor a folder in `renderFolders`. `banEverywhere` lists text that no file under src may contain.",
+  "pure": ["src/sim", "src/app/look.ts", "src/app/params.ts"],
+  "banned": ["three", "three/webgpu", "three/tsl", "@futuremagic/stage", "@futuremagic/sky/node"],
+  "renderFolders": ["src/render"],
+  "banEverywhere": [{ "text": "Math.random", "why": "every random number comes from a seed (@futuremagic/core Rng)" }]
+}
