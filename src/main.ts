@@ -5,6 +5,8 @@ import { watchLook } from './app/lookInput';
 import { showVersion } from './app/whatsNew';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
+import { makeTestBodies } from './render/testBodies';
+import { EYE_HEIGHT } from './render/view';
 import { MS_PER_SECOND } from './sim/units';
 import type { Look } from './app/look';
 
@@ -30,9 +32,12 @@ async function start(): Promise<void> {
   const params = readParams(location.search);
   const canvas = el<HTMLCanvasElement>('view'), hud = el('hud'), loading = el('loading');
   const view = await createView(canvas, params.forceWebGL);
-  const sky = new SkyView(view.scene, view.renderer, params.hour, params.dayMinutes);
+  // The sky and its light (environment map, the sun's colour node) before the warm-up: they are part of every lit shader's key.
+  const sky = new SkyView(view.renderer, view.scene, view.sun, view.hemi, params.hour, params.dayMinutes);
+  sky.update(0, null);
   await view.stage.warmUp();
   await view.stage.add(sky.dome);
+  if (params.rig) await view.stage.add(makeTestBodies(START_LOOK.yaw, EYE_HEIGHT));
   const input = watchLook(canvas, START_LOOK, view.radPerPixel);
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));

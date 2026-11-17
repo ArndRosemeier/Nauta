@@ -12,7 +12,8 @@
     "three/webgpu",
     "three/tsl",
     "@futuremagic/stage",
-    "@futuremagic/sky/node"
+    "@futuremagic/sky/node",
+    "@futuremagic/sky/rig"
   ],
   "renderFolders": [
     "src/render"

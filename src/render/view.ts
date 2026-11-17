@@ -1,5 +1,5 @@
 /** The one renderer, scene and camera, and the Stage everything enters the scene through (docs/SHADERS.md). */
-import { PerspectiveCamera, Scene, type WebGPURenderer } from 'three/webgpu';
+import { DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, type WebGPURenderer } from 'three/webgpu';
 import { Stage, createRenderer } from '@futuremagic/stage';
 import { allKinds } from './materials';
 import { DEGREE } from '../sim/units';
@@ -18,6 +18,9 @@ export interface View {
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
   readonly stage: Stage;
+  /** The sun (or moon) and the hemisphere light (the ground's bounce): the sky's light rig sets both each frame. */
+  readonly sun: DirectionalLight;
+  readonly hemi: HemisphereLight;
   /** The view's vertical angle over its height in pixels: what a drag of one pixel turns the look by. */
   radPerPixel(): number;
 }
@@ -29,6 +32,9 @@ export async function createView(canvas: HTMLCanvasElement, forceWebGL: boolean)
   const camera = new PerspectiveCamera(FOV, 1, NEAR, FAR);
   camera.position.set(0, EYE_HEIGHT, 0);
   camera.rotation.order = 'YXZ';
+  // Lights are fixed before the warm-up: their number and order are part of every lit shader's key.
+  const sun = new DirectionalLight(), hemi = new HemisphereLight();
+  scene.add(sun, sun.target, hemi);
   const stage = new Stage(renderer, scene, camera, { kinds: allKinds });
   const fit = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -39,5 +45,5 @@ export async function createView(canvas: HTMLCanvasElement, forceWebGL: boolean)
   };
   fit();
   new ResizeObserver(fit).observe(canvas);
-  return { renderer, backend, scene, camera, stage, radPerPixel: () => (FOV * DEGREE) / Math.max(1, canvas.clientHeight) };
+  return { renderer, backend, scene, camera, stage, sun, hemi, radPerPixel: () => (FOV * DEGREE) / Math.max(1, canvas.clientHeight) };
 }
