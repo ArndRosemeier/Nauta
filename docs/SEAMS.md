@@ -35,6 +35,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The spread of a wind sea's waves around the wind | `src/sim/sea/spectrum.ts#spread` |
 | Drawing values spread as a density is (inverse of its running sum) | `src/sim/sea/spectrum.ts#quantiles` |
 | A wind's sea as a seeded set of wave components | `src/sim/sea/waves.ts#makeWaves` |
+| A wave set from its frequencies, directions and phases (equal energy, choppiness held below folding) | `src/sim/sea/waves.ts#waveSet` |
+| The swell from elsewhere: a seeded set of long, low waves well off the wind, the same in every preset | `src/sim/sea/swell.ts#makeSwell` |
+| The swell's tuning: height, periods, how far off the wind, spread | `src/sim/rules/sea.ts#SWELL_HEIGHT` |
 | Starting the sea | `src/sim/sea/sea.ts#startSea` |
 | Changing the sea's wind (the new waves fade in over minutes) | `src/sim/sea/sea.ts#changeWind` |
 | The sea following a moving wind, taking a new wave set now and then | `src/sim/sea/sea.ts#followWind` |

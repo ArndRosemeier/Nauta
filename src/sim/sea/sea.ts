@@ -7,6 +7,7 @@
 import { deriveSeed, smoothstep } from '@futuremagic/core';
 import { SEA_CHANGE_SECONDS, SEA_FOLLOW_ANGLE, SEA_FOLLOW_SPEED } from '../rules/sea';
 import { sincos } from '../trig';
+import { makeSwell } from './swell';
 import { makeWaves, type SeaWind, type WaveSet } from './waves';
 
 /** One wave set and when it fades in (s of the shared clock); the first layer of a sea is there from the start. */
@@ -18,12 +19,15 @@ export interface SeaLayer {
 }
 
 /**
- * The sea's state: its seed and its wave layers, oldest first. Each layer fades in over its [start, end] while
- * every layer before it fades out, keeping the sea's energy: the share of layer i is w_i·Π(1 − w_j) over the
- * later layers j. Changed only here (rules.json `owners`).
+ * The sea's state: its seed, its swell and its wind's wave layers, oldest first. Each layer fades in over its
+ * [start, end] while every layer before it fades out, keeping the sea's energy: the share of layer i is
+ * w_i·Π(1 − w_j) over the later layers j. The swell is always there at full strength and never changes.
+ * Changed only here (rules.json `owners`).
  */
 export interface SeaState {
   readonly seaSeed: number;
+  /** The swell from elsewhere (N1.10): drawn once with the sea, the same whatever the wind does later. */
+  readonly seaSwell: WaveSet;
   /** How many wave sets this sea has made; each gets its own seed, so no two layers are alike. */
   readonly setsMade: number;
   readonly seaLayers: readonly SeaLayer[];
@@ -56,10 +60,11 @@ export function seaSample(): SeaSample {
   return { height: 0, normal: [0, 1, 0], shift: [0, 0], velocity: [0, 0, 0], stretch: 1 };
 }
 
-/** A sea under `wind` from time `t` on. */
+/** A sea under `wind` from time `t` on, with its swell coming from well off that wind. */
 export function startSea(seed: number, wind: SeaWind, t: number): SeaState {
   const waves = makeWaves(deriveSeed(seed, 'sea', 0), wind);
-  return { seaSeed: seed, setsMade: 1, seaLayers: [{ wind, waves, start: t, end: t }] };
+  const seaSwell = makeSwell(deriveSeed(seed, 'swell'), wind.toward);
+  return { seaSeed: seed, seaSwell, setsMade: 1, seaLayers: [{ wind, waves, start: t, end: t }] };
 }
 
 /**
@@ -75,7 +80,7 @@ export function changeWind(sea: SeaState, wind: SeaWind, t: number): SeaState {
   layers = layers.slice(done);
   const start = Math.max(t, layers[layers.length - 1]!.end);
   const waves = makeWaves(deriveSeed(sea.seaSeed, 'sea', sea.setsMade), wind);
-  return { seaSeed: sea.seaSeed, setsMade: sea.setsMade + 1, seaLayers: [...layers, { wind, waves, start, end: start + SEA_CHANGE_SECONDS }] };
+  return { ...sea, setsMade: sea.setsMade + 1, seaLayers: [...layers, { wind, waves, start, end: start + SEA_CHANGE_SECONDS }] };
 }
 
 /**
@@ -155,9 +160,10 @@ export function layerWeights(sea: SeaState, t: number, out: number[] = []): numb
 
 const weights: number[] = [];
 
-/** Sum every layer at calm point (x, z), time t, into `sums`. */
+/** Sum the swell and every layer at calm point (x, z), time t, into `sums`. */
 function sumAt(sea: SeaState, x: number, z: number, t: number): Sums {
   sums.h = sums.dx = sums.dz = sums.vx = sums.vy = sums.vz = sums.hx = sums.hz = sums.xx = sums.xz = sums.zz = 0;
+  addWaves(sums, sea.seaSwell, 1, x, z, t);
   layerWeights(sea, t, weights);
   for (let i = 0; i < weights.length; i++) {
     if (weights[i]! > 0) addWaves(sums, sea.seaLayers[i]!.waves, weights[i]!, x, z, t);
@@ -168,7 +174,8 @@ function sumAt(sea: SeaState, x: number, z: number, t: number): Sums {
 /**
  * The sea at the calm point (x, z), time t (s of the shared clock): how high it stands there, how far its water
  * has moved sideways, its normal and the water's velocity. This is the surface exactly as the renderer displaces
- * it: the vertex of the calm sea at (x, z) is drawn at (x + shift[0], height, z + shift[1]).
+ * it: the vertex of the calm sea at (x, z) is drawn at (x + shift[0], height, z + shift[1]). It sums the swell
+ * (`seaSwell`, factor 1) and every wind layer (factor from `layerWeights`) alike.
  */
 export function seaAt(sea: SeaState, x: number, z: number, t: number, out: SeaSample = seaSample()): SeaSample {
   return fill(out, sumAt(sea, x, z, t));

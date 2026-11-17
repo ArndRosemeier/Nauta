@@ -45,6 +45,11 @@
       "what": "the seed the sea's wave sets are drawn from"
     },
     {
+      "field": "seaSwell",
+      "owner": "src/sim/sea/sea.ts",
+      "what": "the sea's swell from elsewhere, drawn once with the sea"
+    },
+    {
       "field": "setsMade",
       "owner": "src/sim/sea/sea.ts",
       "what": "how many wave sets the sea has made (each draws its own seed)"

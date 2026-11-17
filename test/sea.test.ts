@@ -2,14 +2,27 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Rng } from '@futuremagic/core';
 import { BEAUFORT, beaufortSpeed } from '../src/sim/rules/beaufort.ts';
-import { SEA_BY_FORCE, SEA_CHANGE_SECONDS, SEA_COMPONENTS } from '../src/sim/rules/sea.ts';
+import {
+  SEA_BY_FORCE, SEA_CHANGE_SECONDS, SEA_COMPONENTS, SWELL_COMPONENTS, SWELL_HEIGHT, SWELL_OFF_WIND, SWELL_PERIOD_LONGEST, SWELL_PERIOD_SHORTEST,
+} from '../src/sim/rules/sea.ts';
 import { changeWind, followWind, layerWeights, seaAt, seaSample, seaWind, startSea, surfaceAt, type SeaState } from '../src/sim/sea/sea.ts';
+import { makeSwell } from '../src/sim/sea/swell.ts';
 import { HEIGHT_PER_DEVIATION, makeWaves, seaPreset, type WaveSet } from '../src/sim/sea/waves.ts';
+import { GRAVITY } from '../src/sim/units.ts';
 
 const SEED = 1805;
 const wind = (force: number, toward = 0.4) => ({ speed: beaufortSpeed(force), toward });
 /** The forces a duel is likely to see, and the extremes. */
 const FORCES = [1, 3, 5, 7, 8, 10, 12];
+
+/** A wind preset's height with the swell added as squares add: Hs² of both. */
+const withSwell = (height: number) => Math.hypot(height, SWELL_HEIGHT);
+
+/** A set's significant height from its amplitudes: four times the root of the variance Σ amp²/2. */
+const setHeight = (w: WaveSet) => HEIGHT_PER_DEVIATION * Math.sqrt(w.amp.reduce((sum, a) => sum + (a * a) / 2, 0));
+
+/** The smallest angle between two directions, rad. */
+const between = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 
 /** Height statistics of the water under `n` seeded world points spread over many wavelengths and an hour. */
 function heights(sea: SeaState, n: number, span: number, t0 = 0, t1 = 3600) {
@@ -45,15 +58,13 @@ test('the presets follow the Beaufort scale and are read between forces by wind 
   assert.ok(Math.abs(mid.height - (SEA_BY_FORCE[5]!.height + SEA_BY_FORCE[6]!.height) / 2) < 1e-9);
   assert.deepEqual(seaPreset(-1), SEA_BY_FORCE[0]);
   assert.deepEqual(seaPreset(1000), SEA_BY_FORCE[SEA_BY_FORCE.length - 1]);
-  const calm = startSea(SEED, wind(0), 0);
-  assert.equal(seaAt(calm, 3, 4, 5).height, 0);
 });
 
-test('the mean height is zero and the significant wave height matches the preset within 10 %', () => {
+test('the mean height is zero and the significant wave height matches the preset with its swell within 10 %', () => {
   for (const force of FORCES) {
     const sea = startSea(SEED, wind(force), 0), w = sea.seaLayers[0]!.waves;
     const { mean, significant, minStretch } = heights(sea, 2000, w.peakLength * 40);
-    const want = SEA_BY_FORCE[force]!.height;
+    const want = withSwell(SEA_BY_FORCE[force]!.height);
     assert.ok(Math.abs(significant - want) / want < 0.1, `force ${force}: Hs ${significant.toFixed(3)} m, preset ${want} m`);
     assert.ok(Math.abs(mean) < 0.02 * want, `force ${force}: mean ${mean.toFixed(4)} m`);
     assert.ok(minStretch > 0, `force ${force}: the surface folds (${minStretch})`);
@@ -155,10 +166,10 @@ test('a change of wind blends over minutes without a jump', () => {
     [prev, prevAfter] = [h, ha];
   }
   assert.ok(worst <= steady * 1.1, `largest step ${worst.toFixed(4)} m, the new sea's own ${steady.toFixed(4)} m`);
-  // Halfway, both seas show, and the energy is shared: Hs² in between.
+  // Halfway, both seas show, and the energy is shared: Hs² in between, with the swell's on top.
   const span = after.seaLayers[0]!.waves.peakLength * 40;
   const mid = heights(sea, 1500, span, CHANGE + SEA_CHANGE_SECONDS / 2, CHANGE + SEA_CHANGE_SECONDS / 2).significant;
-  const want = Math.sqrt((SEA_BY_FORCE[3]!.height ** 2 + SEA_BY_FORCE[7]!.height ** 2) / 2);
+  const want = withSwell(Math.sqrt((SEA_BY_FORCE[3]!.height ** 2 + SEA_BY_FORCE[7]!.height ** 2) / 2));
   assert.ok(Math.abs(mid - want) / want < 0.1, `halfway Hs ${mid.toFixed(2)} m, expected about ${want.toFixed(2)} m`);
   assert.ok(heights(sea, 1500, span, CHANGE, end).minStretch > 0, 'the blend never folds the surface');
 });
@@ -199,4 +210,65 @@ test('the layer weights share the energy: their squares add up to one at every m
     assert.ok(Math.abs(w.reduce((s, f) => s + f * f, 0) - 1) < 1e-12, `at ${t}: ${w}`);
   }
   assert.deepEqual(layerWeights(sea, 50), [1, 0, 0]);
+});
+
+test('a flat calm keeps the swell: its height, and no wave shorter than the swell\'s', () => {
+  const calm = startSea(SEED, wind(0), 0), swell = calm.seaSwell;
+  assert.ok(calm.seaLayers[0]!.waves.amp.every((a) => a === 0), 'force 0 has no wind sea');
+  // Nothing shorter: the swell's shortest wave is that of its shortest period (deep water, L = g T² / 2π).
+  const longest = (GRAVITY * SWELL_PERIOD_SHORTEST ** 2) / (2 * Math.PI);
+  assert.ok(swell.shortest >= longest * (1 - 1e-9), `shortest swell wave ${swell.shortest.toFixed(1)} m`);
+  swell.omega.forEach((w) => {
+    const period = (2 * Math.PI) / w;
+    assert.ok(period >= SWELL_PERIOD_SHORTEST && period <= SWELL_PERIOD_LONGEST, `period ${period.toFixed(2)} s`);
+  });
+  assert.equal(swell.kx.length, SWELL_COMPONENTS);
+  assert.ok(Math.abs(setHeight(swell) - SWELL_HEIGHT) < 1e-9);
+  const { mean, significant, minStretch } = heights(calm, 2000, swell.peakLength * 10);
+  assert.ok(Math.abs(significant - SWELL_HEIGHT) / SWELL_HEIGHT < 0.1, `calm Hs ${significant.toFixed(3)} m`);
+  assert.ok(Math.abs(mean) < 0.02 * SWELL_HEIGHT && minStretch > 0);
+  // It breathes: the water at one place rises and falls by tens of centimetres over a minute.
+  let lo = Infinity, hi = -Infinity;
+  for (let t = 0; t < 60; t += 0.5) {
+    const h = seaAt(calm, 0, 0, t).height;
+    lo = Math.min(lo, h);
+    hi = Math.max(hi, h);
+  }
+  assert.ok(hi - lo > SWELL_HEIGHT / 4, `rise and fall ${(hi - lo).toFixed(2)} m`);
+});
+
+test('in every preset the swell raises the significant height by no more than its own share', () => {
+  BEAUFORT.forEach((_, force) => {
+    const sea = startSea(SEED, wind(force), 0);
+    const preset = SEA_BY_FORCE[force]!.height, both = Math.hypot(setHeight(sea.seaLayers[0]!.waves), setHeight(sea.seaSwell));
+    assert.ok(both - preset <= SWELL_HEIGHT + 1e-9 && both > preset, `force ${force}: ${preset} m becomes ${both.toFixed(3)} m`);
+    assert.ok(Math.abs(both - withSwell(preset)) < 1e-9);
+  });
+});
+
+test('the swell is the seed\'s: its direction well off the wind, its phases free, the same in every preset', () => {
+  const directions = new Set<string>(), phases = new Set<string>();
+  for (let seed = 0; seed < 40; seed++) {
+    for (const toward of [0, 1.3, -2.8]) {
+      const swell = startSea(seed, wind(4, toward), 0).seaSwell;
+      swell.kx.forEach((kx, i) => {
+        const off = between(Math.atan2(swell.kz[i]!, kx), toward);
+        assert.ok(off >= SWELL_OFF_WIND - 1e-9, `seed ${seed}: a swell wave runs ${(off * 180 / Math.PI).toFixed(1)}° off the wind`);
+      });
+      if (toward === 0) {
+        directions.add(Math.atan2(swell.kz[0]!, swell.kx[0]!).toFixed(3));
+        phases.add(swell.phase[0]!.toFixed(3));
+      }
+    }
+    // The same seed and wind direction give the same swell, whatever the force; a change of wind keeps it.
+    const calm = startSea(seed, wind(0, 0.7), 0), gale = startSea(seed, wind(10, 0.7), 0);
+    assert.deepEqual(calm.seaSwell, gale.seaSwell);
+    assert.deepEqual(changeWind(calm, wind(6, 2), 100).seaSwell, calm.seaSwell);
+    assert.deepEqual(followWind(calm, wind(8, -1), 100).seaSwell, calm.seaSwell);
+  }
+  assert.ok(directions.size === 40 && phases.size === 40, 'every seed draws its own direction and phases');
+  // Both sides of the wind occur.
+  const sides = [...directions].map((d) => Math.sign(Math.sin(Number(d))));
+  assert.ok(sides.includes(1) && sides.includes(-1));
+  assert.deepEqual(makeSwell(7, 0.3), makeSwell(7, 0.3));
 });
