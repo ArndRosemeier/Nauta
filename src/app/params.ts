@@ -1,4 +1,4 @@
-/** What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?probe`). Pure: it takes the query string. */
+/** What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?probe`, `?rig`). Pure: it takes the query string. */
 import { HOURS_PER_DAY } from '../sim/units';
 import { WIND_PRESETS } from '../sim/rules/wind';
 
@@ -31,6 +31,8 @@ export interface Params {
   readonly eye: number;
   /** The wind's force on the Beaufort scale, a whole number (`?wind=7`). */
   readonly wind: number;
+  /** Show the light rig's test bodies ahead of the captain (`?rig`, plan N1.5). */
+  readonly rig: boolean;
 }
 
 export function readParams(query: string): Params {
@@ -41,7 +43,7 @@ export function readParams(query: string): Params {
   };
   return {
     forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
-    dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'),
+    dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
     eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(num('wind', WIND_FORCE, 0, WIND_PRESETS.length - 1)),
   };
 }

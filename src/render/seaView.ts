@@ -54,8 +54,11 @@ export class SeaView {
     this.mesh.renderOrder = SEA_ORDER;
   }
 
-  /** Once per frame, before drawing: the sea at time `t` (s of the shared clock), seen by `camera`, lit by `light`. */
-  show(sea: SeaState, t: number, camera: PerspectiveCamera, light: SkyLight): void {
+  /**
+   * Once per frame, before drawing: the sea at time `t` (s of the shared clock), seen by `camera`, lit by `light`
+   * with `gain` on its lights as the scene's lights carry it (the sky rig's RIG_GAIN).
+   */
+  show(sea: SeaState, t: number, camera: PerspectiveCamera, light: SkyLight, gain: number): void {
     const I = SEA_INPUTS, cam = camera.position;
     this.origin.set(Math.round(cam.x / ORIGIN_STEP) * ORIGIN_STEP, 0, Math.round(cam.z / ORIGIN_STEP) * ORIGIN_STEP);
     this.mesh.position.copy(this.origin);
@@ -100,7 +103,7 @@ export class SeaView {
     this.mesh.count = n;
     this.tilesDrawn = n;
 
-    const sun = light.lightIntensity, sky = light.hemiIntensity;
+    const sun = light.lightIntensity * gain, sky = light.hemiIntensity * gain;
     I.sunDir.value.set(...light.lightDir);
     I.sun.value.set(light.lightColor[0] * sun, light.lightColor[1] * sun, light.lightColor[2] * sun);
     I.sky.value.set(light.skyColor[0] * sky, light.skyColor[1] * sky, light.skyColor[2] * sky);

@@ -6,6 +6,7 @@ import { showVersion } from './app/whatsNew';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
+import { makeTestBodies } from './render/testBodies';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
 import { makeWind, meanWind } from './sim/wind';
 import { followWind, startSea } from './sim/sea/sea';
@@ -39,17 +40,20 @@ async function start(): Promise<void> {
   const view = await createView(canvas, params.forceWebGL);
   view.camera.position.set(0, params.eye, 0);
   view.camera.rotation.set(START_LOOK.pitch, START_LOOK.yaw, 0);
-  const sky = new SkyView(view.scene, view.renderer, params.hour, params.dayMinutes);
+  // The sky and its light (environment map, the sun's colour node) before the warm-up: they are part of every lit shader's key.
+  const sky = new SkyView(view.renderer, view.scene, view.sun, view.hemi, params.hour, params.dayMinutes);
+  sky.update(0, null);
   // The wind and the sea of the match, on the clock `seaTime` (s); one shared clock comes with the simulation (N3.1).
   // The sea keeps the wind it is given, so it gets a copy of the mean wind, never the one `meanWind` writes into.
   const wind = makeWind(MATCH_SEED, params.wind, WIND_FROM), blowing = meanWind(wind, 0);
   let seaTime = 0, sea = startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
   const seaView = new SeaView();
-  seaView.show(sea, seaTime, view.camera, sky.light);
+  seaView.show(sea, seaTime, view.camera, sky.light, sky.gain);
   // The sea's mesh is drawn as many tiles at once, a shader of its own: the warm-up builds it with the kinds.
   await view.stage.warmUp([seaView.mesh]);
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
+  if (params.rig) await view.stage.add(makeTestBodies(START_LOOK.yaw, params.eye));
   const input = watchLook(canvas, START_LOOK, view.radPerPixel);
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
@@ -63,7 +67,7 @@ async function start(): Promise<void> {
     seaTime += dt;
     meanWind(wind, seaTime, blowing);
     sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
-    seaView.show(sea, seaTime, view.camera, sky.light);
+    seaView.show(sea, seaTime, view.camera, sky.light, sky.gain);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
     frames++;

@@ -19,7 +19,7 @@ The long-term range is several ages, from sail to modern destroyers and submarin
 
 ## The first game: a duel
 
-Two brigs of about 16 guns meet on open sea, each commanded by one player or by a computer captain. A match lasts 10 to 20 minutes and ends when one ship is destroyed or strikes her colours.
+Two brigs of 18 guns ([ship.md](ship.md)) meet on open sea, each commanded by one player or by a computer captain. A match lasts 10 to 20 minutes and ends when one ship is destroyed or strikes her colours.
 
 1. **Sighting.** The ships start in sight of each other and closing. You read the wind, judge her course through the spyglass and choose who gets the windward position.
 2. **Closing.** You set sail, clear for action and pick the shot. The crew goes to quarters around you.
@@ -47,7 +47,7 @@ An order is the game's only verb, and the time between giving it and seeing it d
 The feeling of standing on that deck is built from five things, in this order of importance.
 
 1. **Sound.** Timber creaking with each roll, wind in the rigging, water along the hull, canvas cracking as a sail fills. A broadside is a physical blow followed by ringing ears. Everything is placed in space and sounds different below deck. Sounds come in many seeded takes so nothing repeats noticeably. No voices.
-2. **A body, not a camera.** You lean with the roll and keep your feet on a moving deck. A hit staggers you, close shot makes you flinch, heavy weather makes you slow. The captain cannot be killed (Arnd): the ship is destroyed, game over, that is the risk.
+2. **A body, not a camera.** Looking down you see your own hands, arms and legs. You lean with the roll and keep your feet on a moving deck. A hit staggers you, close shot makes you flinch, heavy weather makes you slow. The captain cannot be killed (Arnd): the ship is destroyed, game over, that is the risk.
 3. **A ship full of people.** Men haul, climb, load, carry powder, pump, and drag wreckage clear. The deck is never empty and never idle.
 4. **Smoke and chaos.** After a broadside the enemy vanishes behind your own smoke until the wind clears it. Splinters fly, a spar comes down in a tangle of rope, a sail tears.
 5. **Lasting marks.** Shot holes stay where they hit, rails are gone, the deck is scarred.
@@ -152,6 +152,6 @@ Open:
 
 - **WebGPU only:** decided 2026-11-17. The iPad Air M4 runs WebGPU compute at almost no cost (its probe report is in implementation-plan.md), so the sea's short waves are computed on the GPU and the WebGL 2 fallback goes with package N1.2.
 - **Android tablets** from the start too?
-- **How is the brig made?** Suggested: built in code from a ship plan (so damage can cut into it anywhere) with AssetGenerator props for fittings.
-- **Which navies?** British against French around 1800 is the obvious first pair.
+- **How is the brig made?** Decided with Arnd 2026-11-17, in [ship.md](ship.md): a Cruizer-class brig-sloop built in code from one plan (so damage can cut into it anywhere), with AssetGenerator props for fittings. The captain is free to move anywhere on her, from the hold to the crosstrees.
+- **Which navies?** British against French around 1800, the same hull in two coats.
 - **Does the fight have a coast?** Open sea only is simplest for the first game.

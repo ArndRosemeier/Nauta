@@ -1,0 +1,2 @@
+The sky now lights things the way it does in MasterWorld: the same sun, sky glow, moonlight and colour of the day, from one shared light rig both games use.
+To see it, add ?rig to the address: three balls (sailcloth, oak and tar) float ahead of you, so you can watch the light on them change through the day.
