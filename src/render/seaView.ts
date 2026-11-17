@@ -13,7 +13,8 @@ import { SEA_INPUTS, SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, TILE_AT, useSeaSky } f
 import { SEA_MAX_TILES, SEA_TILE_CELLS, seaDropAtReach, seaReach, seaTiles } from './seaGrid';
 import { SEA_WAVE_STRIDE, WAVE_AT, fillSeaWaves, seaWaveTable } from './seaWaves';
 import { SEA_FINE_STRIDE, fillFineWaves, fineTable, slopeVariance } from './seaFine';
-import { foamLevels } from './seaFoam';
+import { FOAM_WRAP, foamLevels } from './seaFoam';
+import { RIPPLE_REPEATS_SECOND, RIPPLE_TILE } from './seaRipples';
 import { drawGusts, type GustMap } from './seaGusts';
 import type { SkyView } from './skyView';
 
@@ -31,7 +32,15 @@ const DEEP_SEGMENTS = 16;
 const DEEP_ORDER = -10;
 /** The foam's pattern drifts with the wind (m per m/s of wind and s), wrapped every FOAM_WRAP m (a whole number of both its tiles). */
 const FOAM_DRIFT = 0.03;
-const FOAM_WRAP = 256;
+/**
+ * The ripples' two layers drift at about their own speed (m/s; the slowest ripples run at 0.23 m/s), the first with the
+ * wind, the second across it at a third of a turn, so the pattern never slides as one.
+ */
+const RIPPLE_SPEED = 0.3;
+const RIPPLE_SPEED_SECOND = 0.22;
+const RIPPLE_TURN_SECOND = (2 * Math.PI) / (2 + 1);
+/** The second ripple layer's tile, m. */
+const RIPPLE_TILE_SECOND = FOAM_WRAP / RIPPLE_REPEATS_SECOND;
 /** The water is stirred grey-green from this wind (m/s) to fully at that one: force 5 to a gale. */
 const STIRRED_FROM = 8;
 const STIRRED_FULL = 20;
@@ -72,6 +81,8 @@ export class SeaView {
   private readonly sample = seaSample();
   private readonly coarse = new WeakMap<WaveSet, number>();
   private foamDrift = 0;
+  /** Where each ripple layer has drifted to, in its tiles (u, v of the first, then of the second), kept within one. */
+  private readonly rippleDrift = [0, 0, 0, 0];
 
   /** The sky's light rig must exist: the sea reflects its environment map. */
   constructor(sky: SkyView) {
@@ -122,6 +133,8 @@ export class SeaView {
       fm[i]!.fromArray(fine.more, i * SEA_FINE_STRIDE);
     }
     I.fineCount.value = fine.count;
+    I.fineExcess.value = fine.excess;
+    I.ripples.value = fine.ripples;
     const levels = foamLevels(table, speed);
     I.foamLevel.value = levels.level;
     I.foamRamp.value = levels.ramp;
@@ -131,6 +144,14 @@ export class SeaView {
       (ox - this.foamDrift * Math.cos(blowing.toward)) % FOAM_WRAP,
       (oz - this.foamDrift * Math.sin(blowing.toward)) % FOAM_WRAP,
     );
+    // A pattern that moves along d shows at p − d·s: the first layer reads (x, z), the second (z, −x).
+    const d = this.rippleDrift, a = blowing.toward, b = a + RIPPLE_TURN_SECOND;
+    const s1 = (RIPPLE_SPEED * dt) / RIPPLE_TILE, s2 = (RIPPLE_SPEED_SECOND * dt) / RIPPLE_TILE_SECOND;
+    d[0] = (d[0]! - s1 * Math.cos(a)) % 1;
+    d[1] = (d[1]! - s1 * Math.sin(a)) % 1;
+    d[2] = (d[2]! - s2 * Math.sin(b)) % 1;
+    d[3] = (d[3]! + s2 * Math.cos(b)) % 1;
+    I.rippleDrift.value.fromArray(d);
     I.stirred.value = smoothstep(STIRRED_FROM, STIRRED_FULL, speed);
     drawGusts(wind, t, cam.x, cam.z, speed, this.coarseOf(sea, t), this.gusts);
     I.gustCorner.value.set(this.gusts.x0 - ox, this.gusts.z0 - oz);

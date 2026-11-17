@@ -14,13 +14,14 @@ import { layerWeights, type SeaState } from '../sim/sea/sea';
 import { quantiles, spread } from '../sim/sea/spectrum';
 import type { SeaWind, WaveSet } from '../sim/sea/waves';
 import { GRAVITY } from '../sim/units';
+import { RIPPLE_LONGEST, rippleShare } from './seaRipples';
 
 /** Fine waves per wind layer: every one costs a sine and a cosine per pixel near the eye (a quality knob, N1.8). */
 export const SEA_FINE_PER_LAYER = 28;
 /** Room for fine waves drawn at once: two wind layers while one fades into the other, with one to spare. */
 export const SEA_FINE_DRAWN = 3 * SEA_FINE_PER_LAYER;
-/** The shortest fine wave, m: shorter ripples are smaller than a pixel from the deck. */
-export const FINE_SHORTEST = 0.035;
+/** The shortest fine wave, m: shorter ones are the ripples' (seaRipples.ts). */
+export const FINE_SHORTEST = RIPPLE_LONGEST;
 /** The longest fine wave as a share of the simulated set's shortest: a little overlap, so no band is left empty. */
 const FINE_OVERLAP = 0.9;
 /** The fine waves run more across the wind than the long ones (their spread's exponent, long end), the ripples nearly every way (short end). */
@@ -43,6 +44,13 @@ const GLASSY_SLOPE = 0.0001;
 /** The least slope the fine waves carry, so their share never falls to nothing when the simulated waves carry it all. */
 const FINE_SLOPE_FLOOR = 0.00005;
 
+/**
+ * The most slope one fine wave carries (its (amp · k)² / 2). In a gale the fine waves would each be steep enough to
+ * draw a regular weave near the eye; what they cannot carry is roughness instead (FineSet.excess), as a pixel too
+ * coarse for them would see it.
+ */
+const FINE_WAVE_SLOPE_MOST = 0.0012;
+
 /** Gusts roughen the short waves first: fully below GUST_FULL_LENGTH, not at all above GUST_NONE_LENGTH (m). */
 const GUST_FULL_LENGTH = 0.4;
 const GUST_NONE_LENGTH = 3;
@@ -51,8 +59,12 @@ const GUST_NONE_LENGTH = 3;
 export const SEA_FINE_STRIDE = 4;
 /** Where each number of a fine wave sits in its entry of `wave`: kx, kz, phase now at the origin, height. */
 export const FINE_AT = { kx: 0, kz: 1, phase: 2, height: 3 } as const;
-/** And in `more`: |k|, the slope variance of this wave and every shorter one, how much gusts roughen it (0..1). */
-export const FINE_MORE_AT = { k: 0, tail: 1, gust: 2 } as const;
+/**
+ * And in `more`: |k|, the slope variance of this wave and every shorter one, how much gusts roughen it (0..1), and how
+ * far and which way the material's slow warp bends its crests (−1..1: a few waves at each scale would otherwise cross in
+ * a regular weave).
+ */
+export const FINE_MORE_AT = { k: 0, tail: 1, gust: 2, warp: 3 } as const;
 
 const TURN = 2 * Math.PI;
 
@@ -82,22 +94,29 @@ export interface FineSet {
   readonly phase: Float64Array;
   /** How much a gust roughens each wave, 0..1. */
   readonly gust: Float64Array;
+  /** How much the material's warp bends each wave's crests, −1..1. */
+  readonly warp: Float64Array;
+  /** The slope beyond what the waves carry (FINE_WAVE_SLOPE_MOST each): roughness everywhere. */
+  readonly excess: number;
+  /** The slope the ripples below the shortest wave carry. */
+  readonly ripples: number;
 }
 
 /**
  * The fine waves of a wind layer: `wind` drives them, `longest` (m) is where they begin below the simulated waves,
- * and `slope` is the mean square slope they carry together. Drawn with `seed`.
+ * and `slope` is the mean square slope they and the ripples carry together. Drawn with `seed`.
  */
 export function makeFineWaves(seed: number, wind: SeaWind, longest: number, slope: number): FineSet {
-  const n = SEA_FINE_PER_LAYER, rng = new Rng(seed);
+  const ripples = slope * rippleShare(longest), waves = slope - ripples;
+  const n = SEA_FINE_PER_LAYER, rng = new Rng(seed), carried = Math.min(waves / n, FINE_WAVE_SLOPE_MOST);
   const set: FineSet = {
     kx: new Float64Array(n), kz: new Float64Array(n), omega: new Float64Array(n), amp: new Float64Array(n),
-    phase: new Float64Array(n), gust: new Float64Array(n),
+    phase: new Float64Array(n), gust: new Float64Array(n), warp: new Float64Array(n), excess: Math.max(0, waves - n * carried), ripples,
   };
-  const lengths = rng.fork('length'), turns = rng.fork('direction'), phases = rng.fork('phase');
+  const lengths = rng.fork('length'), turns = rng.fork('direction'), phases = rng.fork('phase'), warps = rng.fork('warp');
   const top = Math.log(Math.max(longest, FINE_SHORTEST)), bottom = Math.log(FINE_SHORTEST);
-  // Equal slope per wave: (amp · k)² / 2 = slope / n.
-  const each = Math.sqrt((2 * slope) / n);
+  // Equal slope per wave: (amp · k)² / 2 = slope / n, at most FINE_WAVE_SLOPE_MOST.
+  const each = Math.sqrt(2 * carried);
   for (let i = 0; i < n; i++) {
     // Lengths stratified on a log scale, longest first, each jittered inside its stratum.
     const share = (i + lengths.float()) / n, length = Math.exp(top + (bottom - top) * share);
@@ -110,6 +129,7 @@ export function makeFineWaves(seed: number, wind: SeaWind, longest: number, slop
     set.omega[i] = Math.sqrt(GRAVITY * k * (1 + (k / CAPILLARY_K) ** 2));
     set.amp[i] = each / k;
     set.phase[i] = phases.range(0, TURN);
+    set.warp[i] = warps.range(-1, 1);
     set.gust[i] = smoothstep(GUST_NONE_LENGTH, GUST_FULL_LENGTH, length);
   }
   return set;
@@ -119,20 +139,24 @@ export function makeFineWaves(seed: number, wind: SeaWind, longest: number, slop
 export interface FineTable {
   /** Per wave: kx, kz (rad/m), the phase now at the table's origin (rad, −π..π), height (m, weighted by its layer). */
   readonly wave: Float32Array;
-  /** Per wave: |k| (rad/m), the slope variance of it and every shorter wave, its gust share, one unused. */
+  /** Per wave: |k| (rad/m), the slope variance of it and every shorter wave, its gust share, its warp. */
   readonly more: Float32Array;
   count: number;
+  /** The slope the layers' waves do not carry, weighted as they are: roughness for every pixel. */
+  excess: number;
+  /** The slope the layers' ripples carry, weighted as their waves are. */
+  ripples: number;
 }
 
 /** An empty table, to fill with `fillFineWaves`. */
 export function fineTable(): FineTable {
-  return { wave: new Float32Array(SEA_FINE_DRAWN * SEA_FINE_STRIDE), more: new Float32Array(SEA_FINE_DRAWN * SEA_FINE_STRIDE), count: 0 };
+  return { wave: new Float32Array(SEA_FINE_DRAWN * SEA_FINE_STRIDE), more: new Float32Array(SEA_FINE_DRAWN * SEA_FINE_STRIDE), count: 0, excess: 0, ripples: 0 };
 }
 
 /** Every layer's fine set, made when the layer first shows and kept while it lives. */
 const made = new WeakMap<WaveSet, FineSet>();
 /** Scratch for one moment: the waves gathered from every layer, then their order by length. */
-const gathered = { kx: new Float64Array(SEA_FINE_DRAWN), kz: new Float64Array(SEA_FINE_DRAWN), phase: new Float64Array(SEA_FINE_DRAWN), amp: new Float64Array(SEA_FINE_DRAWN), gust: new Float64Array(SEA_FINE_DRAWN), k: new Float64Array(SEA_FINE_DRAWN) };
+const gathered = { warp: new Float64Array(SEA_FINE_DRAWN), kx: new Float64Array(SEA_FINE_DRAWN), kz: new Float64Array(SEA_FINE_DRAWN), phase: new Float64Array(SEA_FINE_DRAWN), amp: new Float64Array(SEA_FINE_DRAWN), gust: new Float64Array(SEA_FINE_DRAWN), k: new Float64Array(SEA_FINE_DRAWN) };
 const order: number[] = [];
 const weights: number[] = [];
 
@@ -155,14 +179,16 @@ function fineOf(sea: SeaState, i: number): FineSet {
 export function fillFineWaves(sea: SeaState, t: number, ox: number, oz: number, table: FineTable): FineTable {
   layerWeights(sea, t, weights);
   const g = gathered;
-  let n = 0;
+  let n = 0, excess = 0, ripples = 0;
   for (let i = 0; i < weights.length; i++) {
     const f = weights[i]!;
     if (f <= 0) continue;
     const set = fineOf(sea, i);
+    excess += f * f * set.excess;
+    ripples += f * f * set.ripples;
     for (let j = 0; j < set.kx.length && n < SEA_FINE_DRAWN; j++, n++) {
       const kx = set.kx[j]!, kz = set.kz[j]!, phase = kx * ox + kz * oz - set.omega[j]! * t + set.phase[j]!;
-      g.kx[n] = kx; g.kz[n] = kz; g.amp[n] = f * set.amp[j]!; g.gust[n] = set.gust[j]!;
+      g.kx[n] = kx; g.kz[n] = kz; g.amp[n] = f * set.amp[j]!; g.gust[n] = set.gust[j]!; g.warp[n] = set.warp[j]!;
       g.phase[n] = phase - TURN * Math.round(phase / TURN);
       g.k[n] = Math.hypot(kx, kz);
     }
@@ -183,8 +209,11 @@ export function fillFineWaves(sea: SeaState, t: number, ox: number, oz: number, 
     table.more[at + FINE_MORE_AT.k] = g.k[w]!;
     table.more[at + FINE_MORE_AT.tail] = tail;
     table.more[at + FINE_MORE_AT.gust] = g.gust[w]!;
+    table.more[at + FINE_MORE_AT.warp] = g.warp[w]!;
   }
   table.count = n;
+  table.excess = excess;
+  table.ripples = ripples;
   return table;
 }
 

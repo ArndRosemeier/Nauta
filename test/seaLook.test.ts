@@ -30,7 +30,17 @@ test('a layer\'s fine waves are seeded, run from the simulated waves down to rip
     assert.ok(length <= 4.5 + 1e-9 && length >= FINE_SHORTEST - 1e-9, `wave ${i} is ${length} m`);
     slope += (a.amp[i]! * k) ** 2 / 2;
   }
-  assert.ok(Math.abs(slope - 0.03) < 1e-9);
+  assert.ok(a.ripples > 0 && Math.abs(slope + a.ripples - 0.03) < 1e-9, 'the waves and the ripples carry it all');
+  assert.equal(a.excess, 0);
+  // A gale's slope is more than the waves may carry: they are capped and the rest is roughness, nothing lost.
+  const gale = makeFineWaves(7, wind(8), 9, 0.1);
+  let carried = 0, most = 0;
+  for (let i = 0; i < SEA_FINE_PER_LAYER; i++) {
+    const s = (gale.amp[i]! * Math.hypot(gale.kx[i]!, gale.kz[i]!)) ** 2 / 2;
+    carried += s; most = Math.max(most, s);
+  }
+  assert.ok(gale.excess > 0 && most < 0.1 / SEA_FINE_PER_LAYER);
+  assert.ok(Math.abs(carried + gale.excess + gale.ripples - 0.1) < 1e-9);
 });
 
 test('the fine waves of a moment are ordered long to short, each with the slope of every shorter one', () => {

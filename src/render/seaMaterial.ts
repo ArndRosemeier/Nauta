@@ -23,7 +23,7 @@ import {
 } from 'three/webgpu';
 import {
   Break, Fn, If, Loop, abs, attribute, clamp, cos, cross, dFdx, dFdy, dot, exp, exp2, float, frontFacing, length, max, min, mix, mod,
-  normalize, pmremTexture, positionGeometry, positionLocal, pow, reflect, refract, saturate, select, sin, smoothstep, sqrt, texture,
+  log, normalize, pmremTexture, positionGeometry, positionLocal, pow, reflect, refract, saturate, select, sin, smoothstep, sqrt, texture,
   uniform, uniformArray, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import { fullSky } from '@futuremagic/sky/rig';
@@ -31,7 +31,8 @@ import { EARTH_RADIUS } from './earth';
 import { SEA_LOD_RANGE, SEA_MAX_TILES, SEA_MORPH_START, SEA_TILE_CELLS, SEA_WAVE_FULL_CELLS, SEA_WAVE_GONE_CELLS } from './seaGrid';
 import { SEA_DRAWN_WAVES, SEA_WAVE_STRIDE } from './seaWaves';
 import { SEA_FINE_DRAWN, SEA_FINE_STRIDE } from './seaFine';
-import { FOAM_TEXELS, foamPattern } from './seaFoam';
+import { FOAM_TEXELS, FOAM_WRAP, foamPattern } from './seaFoam';
+import { RIPPLE_LONGEST, RIPPLE_REPEATS, RIPPLE_REPEATS_SECOND, RIPPLE_SHORTEST, RIPPLE_RANGE, RIPPLE_TEXELS, ripplePattern } from './seaRipples';
 import { GUST_GROWTH_TOP, GUST_SPAN, GUST_STRENGTH_TOP, GUST_TEXELS, gustMap } from './seaGusts';
 
 /** Numbers per tile in the tile list: corner x and z from the sea's origin (m), side (m), level (read as x, y, z, w). */
@@ -101,13 +102,16 @@ const FOAM_TILE = 8;
 const FOAM_TILE_FINE = 2.56;
 /** Fresh foam shows where its bunching (0..1) beats the breakup noise, with an edge this soft. */
 const FOAM_EDGE = 0.12;
+/** The breakup noise at the fine scale that joins the coarse one, so a sheet of foam has holes of every size. */
+const BREAKUP_FINE = 0.35;
+/** How much the bubbles grain fresh foam (0 none, 1 holes right through). */
+const BUBBLE_DEPTH = 0.25;
 /** The foam's pattern blurs into its mean share where a pixel covers this much of the water, m (sharp to blurred), and that share. */
 const FOAM_SHARP = 0.4;
 const FOAM_BLURRED = 2.5;
 const FOAM_FAR_SHARE = 0.5;
-/** Where most of the breakup noise lies (its values run about this low and high): blurred, fresh foam covers this share. */
-const BREAKUP_LOW = 0.3;
-const BREAKUP_HIGH = 0.7;
+/** Far off, fresh foam's share of a pixel: thin at its rim and never a solid sheet, as the broken-up foam it stands for. */
+const FOAM_FAR_FRESH = 0.8;
 /** The stretches of crest that break: the broad noise's tile (m, a whole fraction of 1024), and the part of its range that turns them on. */
 const BREAKING_TILE = 64;
 const BREAKING_LOW = 0.42;
@@ -125,6 +129,7 @@ const GUST_EDGE_END = 0.5;
 const HALF = 0.5;
 /** Seeds: the foam's pattern (the same on every sea). */
 const FOAM_SEED = 1805;
+const RIPPLE_SEED = 1806;
 /** The haze's colour: the sky just above the horizon in the direction looked, blurred. */
 const HAZE_UP = 0.02;
 const HAZE_BLUR = 0.6;
@@ -146,9 +151,9 @@ const BRDF_DENOMINATOR = 4;
 /** Make a three vector from a constant's numbers. */
 const v3 = (c: readonly number[]) => vec3(c[0], c[1], c[2]);
 
-/** The foam's pattern as a tiling, mipmapped texture. */
-function foamTexture(): Texture {
-  const t = new DataTexture(foamPattern(FOAM_SEED), FOAM_TEXELS, FOAM_TEXELS, RGBAFormat);
+/** A seeded pattern (the foam's, the ripples') as a tiling, mipmapped texture. */
+function tilingTexture(data: Uint8Array, texels: number, format: typeof RGFormat | typeof RGBAFormat): Texture {
+  const t = new DataTexture(data, texels, texels, format);
   t.wrapS = t.wrapT = RepeatWrapping;
   t.magFilter = LinearFilter;
   t.minFilter = LinearMipmapLinearFilter;
@@ -184,6 +189,10 @@ export const SEA_INPUTS = {
   fine: uniformArray(Array.from({ length: SEA_FINE_DRAWN }, () => new Vector4()), 'vec4'),
   fineMore: uniformArray(Array.from({ length: SEA_FINE_DRAWN }, () => new Vector4()), 'vec4'),
   fineCount: uniform(0, 'int'),
+  fineExcess: uniform(0),
+  /** The ripples' slope (seaRipples.ts), and where each of their two layers has drifted to (in their tiles). */
+  ripples: uniform(0),
+  rippleDrift: uniform(new Vector4()),
   /** The eye from the sea's origin: x and z, and its height over the calm sea (m). */
   eye: uniform(new Vector3()),
   /** Twice the deviation of the surface's height (m): a crest this high is a tall one. */
@@ -307,9 +316,13 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     const grow = float(1).add(gust.x.mul(GUST_GROWTH_TOP).mul(inMap));
     const gustStrength = gust.y.mul(GUST_STRENGTH_TOP).mul(inMap);
 
+    // Foam's pattern here.
+    const p = calm.add(I.foamDrift);
+    const coarse = texture(FOAM, p.div(FOAM_TILE)), fine = texture(FOAM, p.div(FOAM_TILE_FINE));
+
     // --- The surface's slope and stretch per pixel: every simulated wave, then the fine ones, long to short.
     const hx = float(0).toVar(), hz = float(0).toVar(), xx = float(0).toVar(), xz = float(0).toVar(), zz = float(0).toVar();
-    const rough = float(ROUGH_LEAST).toVar();
+    const rough = I.fineExcess.mul(grow).mul(grow).add(ROUGH_LEAST).toVar();
     Loop({ start: 0, end: I.count, type: 'int', condition: '<' }, ({ i }) => {
       const w = I.wave.element(i), more = I.more.element(i);
       const fade = smoothstep(gone, full, float(TURN).div(more.y));
@@ -335,6 +348,16 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       const slope = a.mul(more.x);
       rough.addAssign(float(1).sub(fade.mul(fade)).mul(slope).mul(slope).div(2));
     });
+    // The ripples: two layers of their texture, the second smaller and turned a quarter, each drifting its own way.
+    // Its mipmaps filter what a pixel cannot show; that share of their slope is roughness instead.
+    const r1 = texture(RIPPLES, p.mul(RIPPLE_REPEATS / FOAM_WRAP).add(I.rippleDrift.xy)).xy;
+    const r2 = texture(RIPPLES, vec2(p.y, p.x.negate()).mul(RIPPLE_REPEATS_SECOND / FOAM_WRAP).add(I.rippleDrift.zw)).xy;
+    // Each layer's slopes have a deviation of 1 along each axis; the two together √2, scaled to the ripples' slope.
+    const rippleAmp = sqrt(I.ripples).mul(grow).mul(RIPPLE_RANGE);
+    hx.addAssign(r1.x.sub(r2.y).mul(rippleAmp));
+    hz.addAssign(r1.y.add(r2.x).sub(1).mul(rippleAmp));
+    const rippleDrawn = saturate(log(float(RIPPLE_LONGEST).div(full)).div(Math.log(RIPPLE_LONGEST / RIPPLE_SHORTEST)));
+    rough.addAssign(I.ripples.mul(grow).mul(grow).mul(float(1).sub(rippleDrawn)));
     const along = vec3(xx.add(1), hx, xz), across = vec3(xz, hz, zz.add(1));
     const up = normalize(cross(across, along));
 
@@ -346,9 +369,7 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     const daylight = I.sun.mul(max(L.y, 0)).div(Math.PI).add(skyDown);
     // The water's body: what it sends back up of the light that enters it, coloured by the deep, stirred in a gale,
     // and green-white where foam has filled it with bubbles.
-    // Foam's pattern here. Not all of a crest breaks at once: a broad noise picks the stretches that do.
-    const p = calm.add(I.foamDrift);
-    const coarse = texture(FOAM, p.div(FOAM_TILE)), fine = texture(FOAM, p.div(FOAM_TILE_FINE));
+    // Not all of a crest breaks at once: a broad noise picks the stretches that do.
     const breaking = smoothstep(BREAKING_LOW, BREAKING_HIGH, texture(FOAM, p.div(BREAKING_TILE)).y);
     const foamNow = vFoam.x.mul(breaking), foamOld = vFoam.y.mul(breaking);
     const bubbles = saturate(foamNow.add(foamOld)).mul(AERATED_SHARE);
@@ -382,8 +403,9 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       // Foam: fresh white foam broken up by its noise, then a lace that thins as it fades.
       // Where the pattern is finer than a pixel, its share instead of its shape.
       const blurred = smoothstep(FOAM_SHARP, FOAM_BLURRED, pixelNarrow);
-      const freshShape = smoothstep(0, FOAM_EDGE, foamNow.sub(coarse.y)).mul(fine.z);
-      const freshCover = mix(freshShape, smoothstep(BREAKUP_LOW, BREAKUP_HIGH, foamNow), blurred);
+      const breakup = mix(coarse.y, fine.y, BREAKUP_FINE);
+      const freshShape = smoothstep(0, FOAM_EDGE, foamNow.sub(breakup)).mul(mix(float(1), fine.z, BUBBLE_DEPTH));
+      const freshCover = mix(freshShape, foamNow.mul(foamNow).mul(FOAM_FAR_FRESH), blurred);
       const ragged = mix(coarse.y, coarse.x, LACE_SHARE);
       const oldShape = smoothstep(float(1).sub(foamOld), float(1).sub(foamOld).add(LACE_SOFT), ragged).mul(foamOld);
       const oldCover = mix(oldShape, foamOld.mul(foamOld).mul(FOAM_FAR_SHARE), blurred);
@@ -413,7 +435,8 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
 }
 
 /** The foam's pattern, made once. */
-const FOAM = foamTexture();
+const FOAM = tilingTexture(foamPattern(FOAM_SEED), FOAM_TEXELS, RGBAFormat);
+const RIPPLES = tilingTexture(ripplePattern(RIPPLE_SEED), RIPPLE_TEXELS, RGFormat);
 
 /**
  * The deep around an eye under water (plan N1.4): a sphere about the eye in the murk's colour, lighter toward the
