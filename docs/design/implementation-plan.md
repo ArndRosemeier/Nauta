@@ -65,11 +65,15 @@ A sky on a page that deploys, with the rules that keep the code healthy.
 | N0.2 | Tests with time budgets, layer guards, duplication ratchet, slow-checks job | `npm test` enforces 2 s / 5 s / 30 s; CI green | done |
 | N0.3 | Change-friendly guards: named numbers, state owners, seam index | The three checks run in `npm test` | done |
 | N0.4 | Public page | GitHub Pages is switched on (Arnd: Settings, Pages, Source "GitHub Actions") and the Pages run is green | blocked: Arnd's click |
-| N0.5 | Device probe: `?probe` shows on screen what the browser offers (WebGPU or WebGL 2, adapter limits, a small compute pass run and timed, float texture filtering, storage textures, max texture size, device memory, screen size and refresh) | The probe's result from the iPad is copied into "Notes" below | open |
+| N0.5 | Device probe: `?probe` shows on screen what the browser offers (WebGPU or WebGL 2, adapter limits, a small compute pass run and timed, float texture filtering, storage textures, max texture size, device memory, screen size and refresh) | The probe's result from the iPad is copied into "Notes" below | blocked: built (`?probe`); waits for the iPad's report, which needs N0.4 (Pages) and Arnd |
 
 **Gate G0 (Arnd, on the iPad):** the page opens in Safari; the corner shows `webgpu`; dragging a finger looks around smoothly; "Add to Home Screen" gives a full-screen app in landscape; the probe's report is sent to the design thread.
 
 **Notes:** WebGL 2 stays as a fallback until N1.2 decides. Headless checks in the cloud use `?gl`.
+
+**The probe (N0.5).** Open https://arndrosemeier.github.io/Nauta/?probe in Safari on the iPad, wait a few seconds, tap "Copy report" and paste it into the design thread. The summary at the top holds what N1.2 needs: WebGPU yes or no and the adapter, float32 filtering, the storage texture formats and whether `read_write` works, the time of one wave pass (16 waves a texel at 256² and 512²) and of one FFT-shaped chain (16 compute passes over 256² complex values), the key limits, the screen and its refresh rate. The full report below it lists every feature, limit and WebGL 2 extension. The probe's code is in `src/probe/` and loads only with `?probe`. Times are wall time from submit to "work done", the median of 5 rounds, so they include each submit's overhead: read them as upper bounds. Safari does not tell the device memory; the JS heap limit is Chrome's only. Headless SwiftShader (cloud, 2026-11-17, a software GPU, only to show the probe works): WebGPU yes, compute result checked against the CPU ok, wave pass 6.4 ms at 256² and 24 ms at 512², FFT-shaped chain 12.5 ms.
+
+**The iPad's report:** not yet in.
 
 ---
 
