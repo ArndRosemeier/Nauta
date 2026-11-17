@@ -389,6 +389,14 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       const oldCover = mix(oldShape, foamOld.mul(foamOld).mul(FOAM_FAR_SHARE), blurred);
       const cover = max(freshCover, oldCover);
       const foamLit = I.sun.mul(saturate(dot(N, L))).div(Math.PI).add(skyDown).mul(FOAM_ALBEDO);
+      const D = Number(new URLSearchParams(location.search).get('dbg') ?? 0);
+      if (D === 1) return pmremTexture(env, vec3(0, 1, 0), float(0.3)).rgb;
+      if (D === 2) return pmremTexture(env, vec3(0, -1, 0), float(0.3)).rgb;
+      if (D === 3) return sky;
+      if (D === 4) return vec3(rough.mul(50), skyShare, roughness);
+      if (D === 5) return pmremTexture(env, R, float(0.05)).rgb;
+      if (D === 6) return skyDown;
+      if (D === 7) return vec3(R.y, R.y.negate(), 0);
       return mix(gusted, foamLit, cover);
     })();
 

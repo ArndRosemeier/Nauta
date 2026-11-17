@@ -6,7 +6,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | --- | --- |
 | Turning the captain's look by a drag | `src/app/look.ts#turn` |
 | The direction looked along | `src/app/look.ts#lookDir` |
-| Reading the page's address (`?hud`, `?hour=`) | `src/app/params.ts#readParams` |
+| Reading the page's address (`?hud`, `?hour=`, `?eye=`, `?wind=`, `?yaw=`, `?pitch=`) | `src/app/params.ts#readParams` |
 | Defining a material (every shader the game draws with; the registry is `@futuremagic/stage` Kinds) | `src/render/materials.ts#defineKind` |
 | Renderer, scene, camera and the Stage | `src/render/view.ts#createView` |
 | Sun, moon, stars and clouds through the day, and the light they throw (the light rig MasterWorld shares: `@futuremagic/sky/rig` SkyRig, its numbers in `@futuremagic/sky` light.ts) | `src/render/skyView.ts#SkyView` |
@@ -59,6 +59,20 @@ Before writing code that does something, look here. If a row covers it, call tha
 | How far a sea vertex has slid onto the next coarser grid (the vertex stage does the same) | `src/render/seaGrid.ts#seaMorph` |
 | How far out the sea is drawn for an eye height | `src/render/seaGrid.ts#seaReach` |
 | The sea's waves at a moment as the vertex stage reads them (weighted, phases near the eye) | `src/render/seaWaves.ts#fillSeaWaves` |
-| The sea's shader: the grid displaced by the simulated waves, and its stand-in look until N1.4 | `src/render/seaMaterial.ts#makeSeaMaterial` |
+| The sea's shader: the grid displaced by the simulated waves, foam's bunching now and a few seconds ago, and the water's look per pixel (sky reflection, sun and moon glitter, deep colour, light through crests, gusts, foam, haze, the view from below) | `src/render/seaMaterial.ts#makeSeaMaterial` |
+| Handing the sea the light rig's environment map (its reflections and the sky's light on the water) | `src/render/seaMaterial.ts#useSeaSky` |
+| The deep around an eye under water | `src/render/seaMaterial.ts#makeDeepMaterial` |
+| How rough the sea is in a wind (Cox and Munk's mean square slope, glassy in a calm) | `src/render/seaFine.ts#seaRoughness` |
+| The slope a wave set carries | `src/render/seaFine.ts#slopeVariance` |
+| What the fine waves carry of the roughness | `src/render/seaFine.ts#fineSlope` |
+| A wind layer's fine waves (seeded, metres down to ripples) | `src/render/seaFine.ts#makeFineWaves` |
+| The fine waves of a moment as the material reads them (long to short, each with the slope of all shorter) | `src/render/seaFine.ts#fillFineWaves` |
+| How much a gust roughens the fine waves | `src/render/seaFine.ts#gustRoughening` |
+| The gust patches laid into a map around the eye for the sea to draw | `src/render/seaGusts.ts#drawGusts` |
+| The share of the sea a wind whitens (Monahan) | `src/render/seaFoam.ts#whitecapShare` |
+| Where foam forms in the waves drawn (the bunching that whitens that share) | `src/render/seaFoam.ts#foamLevels` |
+| A standard normal quantile | `src/render/seaFoam.ts#normalAbove` |
+| The foam's seeded, tiling pattern (lace, breakup, bubbles) | `src/render/seaFoam.ts#foamPattern` |
+| The strength lit materials take the sky's environment map at | `src/render/skyView.ts#SkyView` |
 | The sea drawn: tiles chosen for the camera each frame, waves and light handed to the shader | `src/render/seaView.ts#SeaView` |
 | A game kind's own attribute on the Stage's stand-in mesh | `src/render/materials.ts#standInAttribute` |
