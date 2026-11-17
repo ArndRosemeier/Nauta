@@ -38,6 +38,21 @@
       "field": "windFrom",
       "owner": "src/sim/wind.ts",
       "what": "the mean bearing a match's wind blows from"
+    },
+    {
+      "field": "seaSeed",
+      "owner": "src/sim/sea/sea.ts",
+      "what": "the seed the sea's wave sets are drawn from"
+    },
+    {
+      "field": "setsMade",
+      "owner": "src/sim/sea/sea.ts",
+      "what": "how many wave sets the sea has made (each draws its own seed)"
+    },
+    {
+      "field": "seaLayers",
+      "owner": "src/sim/sea/sea.ts",
+      "what": "the sea's wave sets and when each fades in"
     }
   ]
 }

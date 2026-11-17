@@ -27,3 +27,18 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The gust patches near a place, for drawing them on the water | `src/sim/wind.ts#gustsNear` |
 | A gust's shape across its patch | `src/sim/wind.ts#gustShape` |
 | The wind's tuning: gusts, veer and freshening per force | `src/sim/rules/wind.ts#WIND_PRESETS` |
+| Gravity at the sea's surface | `src/sim/units.ts#GRAVITY` |
+| Sine and cosine together, fast and alike on every engine | `src/sim/trig.ts#sincos` |
+| The sea's tuning: wave height and period per force, how many waves, spread, choppiness, how fast it follows the wind | `src/sim/rules/sea.ts#SEA_BY_FORCE` |
+| Wave height and period for a wind speed | `src/sim/sea/waves.ts#seaPreset` |
+| The shape of a wind sea's spectrum (over frequency) | `src/sim/sea/spectrum.ts#jonswap` |
+| The spread of a wind sea's waves around the wind | `src/sim/sea/spectrum.ts#spread` |
+| Drawing values spread as a density is (inverse of its running sum) | `src/sim/sea/spectrum.ts#quantiles` |
+| A wind's sea as a seeded set of wave components | `src/sim/sea/waves.ts#makeWaves` |
+| Starting the sea | `src/sim/sea/sea.ts#startSea` |
+| Changing the sea's wind (the new waves fade in over minutes) | `src/sim/sea/sea.ts#changeWind` |
+| The sea following a moving wind, taking a new wave set now and then | `src/sim/sea/sea.ts#followWind` |
+| The wind the sea is following | `src/sim/sea/sea.ts#seaWind` |
+| How strongly each wave layer of the sea shows at a moment (the renderer's per-layer factor) | `src/sim/sea/sea.ts#layerWeights` |
+| The sea at a calm point: height, normal, sideways shift, water velocity, stretch (what the renderer displaces by) | `src/sim/sea/sea.ts#seaAt` |
+| The water under a world point (what a hull feels) | `src/sim/sea/sea.ts#surfaceAt` |
