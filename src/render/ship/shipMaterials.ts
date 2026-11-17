@@ -228,7 +228,7 @@ const STRAND_EDGE = 1 / 4;
 /** A rope is never drawn thinner than this many pixels across; its colour fades instead (ship.md: far rigging never shimmers). */
 const ROPE_PIXELS = 1.4;
 const ROUGH_HEMP = 0.88;
-const ROUGH_TAR = 0.72;
+const ROUGH_TAR = 0.86;
 /** Rope: tubes widened to a pixel and faded by how much of it they cover, with the lay of three strands up close. */
 export function makeRopeMaterial(): MeshStandardNodeMaterial {
   const m = new MeshStandardNodeMaterial({ side: FrontSide, transparent: true });
