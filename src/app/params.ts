@@ -1,5 +1,6 @@
-/** What the page's address asks for (`?gl&hud&hour=17`, `?probe`). Pure: it takes the query string. */
+/** What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?probe`). Pure: it takes the query string. */
 import { HOURS_PER_DAY } from '../sim/units';
+import { WIND_PRESETS } from '../sim/rules/wind';
 
 /** The hour a game starts at when the address names none: a clear morning. */
 const START_HOUR = 10;
@@ -7,6 +8,13 @@ const START_HOUR = 10;
 const DAY_MINUTES = 24;
 /** The longest day the address may ask for, real minutes. */
 const DAY_MINUTES_MAX = 100000;
+/** The captain's eye above the calm sea when the address names none, m (a brig's quarterdeck; the ship comes with N2). */
+const EYE_HEIGHT = 4.5;
+/** The lowest and highest eye the address may ask for, m: just over the water to high above a masthead. */
+const EYE_LOWEST = 0.5;
+const EYE_HIGHEST = 200;
+/** The wind's force on the Beaufort scale when the address names none: a moderate breeze, a duel's weather. */
+const WIND_FORCE = 4;
 
 export interface Params {
   /** Draw with WebGL 2 even where WebGPU exists (headless checks in the cloud). */
@@ -19,6 +27,10 @@ export interface Params {
   readonly dayMinutes: number;
   /** Show what the browser and device offer instead of the game (`?probe`, plan N0.5). */
   readonly probe: boolean;
+  /** The eye's height over the calm sea, m (`?eye=30`). */
+  readonly eye: number;
+  /** The wind's force on the Beaufort scale, a whole number (`?wind=7`). */
+  readonly wind: number;
 }
 
 export function readParams(query: string): Params {
@@ -27,5 +39,9 @@ export function readParams(query: string): Params {
     const v = q.get(name), n = v === null || v === '' ? NaN : Number(v);
     return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
   };
-  return { forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY, dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe') };
+  return {
+    forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
+    dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'),
+    eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(num('wind', WIND_FORCE, 0, WIND_PRESETS.length - 1)),
+  };
 }

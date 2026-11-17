@@ -3,7 +3,7 @@
  * picture (plan N0); the light it throws on the sea and the ship comes with them (N1).
  */
 import { BoxGeometry, Mesh, type PerspectiveCamera, type Scene, type Sprite, type WebGPURenderer } from 'three/webgpu';
-import { CLEAR, moonAt, skyLight, skyPath, starField, type SkyWeather, type Vec3 } from '@futuremagic/sky';
+import { CLEAR, moonAt, skyLight, skyPath, starField, type SkyLight, type SkyWeather, type Vec3 } from '@futuremagic/sky';
 import { MOON_RADIUS, makeStarsNode } from '@futuremagic/sky/node';
 import { SKY } from './materials';
 import { HOURS_PER_DAY, MINUTES_PER_HOUR, SECONDS_PER_MINUTE } from '../sim/units';
@@ -30,6 +30,8 @@ export class SkyView {
   hour: number;
   day = 0;
   weather: SkyWeather = { ...CLEAR };
+  /** The light the sky gives now (set by `update`): what the sea is lit by. */
+  light!: SkyLight;
   /** The dome: it goes in with `stage.add` after the warm-up has compiled its kind. */
   readonly dome: Mesh;
   private readonly stars: Sprite;
@@ -66,7 +68,7 @@ export class SkyView {
     this.time += dt;
     const sun = skyPath(this.hour, this.sunDir);
     const moon = moonAt(this.hour, this.day * HOURS_PER_DAY + this.hour, sun);
-    const L = skyLight(sun, moon, this.weather), wx = this.weather, U = this.U;
+    const L = (this.light = skyLight(sun, moon, this.weather)), wx = this.weather, U = this.U;
     U.sunPosition.value.set(sun[0], sun[1], sun[2]);
     U.cloudCoverage.value = wx.cover; U.cloudDensity.value = wx.density; U.cloudDark.value = wx.dark;
     U.overcast.value = L.overcast; U.skyFog.value = L.skyFog;

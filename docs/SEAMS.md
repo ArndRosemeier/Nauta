@@ -49,3 +49,15 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Which commits are builds, and which build added a note | `tools/version/version.ts#versionInfo` |
 | A version's number as shown (`0.012`) | `tools/version/version.ts#formatVersion` |
 | The version button and the what's-new panel | `src/app/whatsNew.ts#showVersion` |
+| The wave sets that show at a moment and how strongly (the swell, then each wind layer by its weight) | `src/sim/sea/sea.ts#forEachShownSet` |
+| The earth's curve: how far a point at a distance sinks below the eye's sea level (the horizon, hull-down) | `src/render/earth.ts#earthDrop` |
+| How far the horizon lies from an eye at a height | `src/render/earth.ts#horizonDistance` |
+| The sea mesh's tiles around the eye: which, where and how big | `src/render/seaGrid.ts#seaTiles` |
+| The side of a sea tile of a level | `src/render/seaGrid.ts#seaTileSize` |
+| How far from the eye a level of sea tiles reaches | `src/render/seaGrid.ts#seaLodRange` |
+| How far a sea vertex has slid onto the next coarser grid (the vertex stage does the same) | `src/render/seaGrid.ts#seaMorph` |
+| How far out the sea is drawn for an eye height | `src/render/seaGrid.ts#seaReach` |
+| The sea's waves at a moment as the vertex stage reads them (weighted, phases near the eye) | `src/render/seaWaves.ts#fillSeaWaves` |
+| The sea's shader: the grid displaced by the simulated waves, and its stand-in look until N1.4 | `src/render/seaMaterial.ts#makeSeaMaterial` |
+| The sea drawn: tiles chosen for the camera each frame, waves and light handed to the shader | `src/render/seaView.ts#SeaView` |
+| A game kind's own attribute on the Stage's stand-in mesh | `src/render/materials.ts#standInAttribute` |
