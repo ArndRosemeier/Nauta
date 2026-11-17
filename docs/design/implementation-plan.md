@@ -75,8 +75,6 @@ A sky on a page that deploys, with the rules that keep the code healthy.
 
 **The probe (N0.5).** Open https://arndrosemeier.github.io/Nauta/?probe in Safari on the iPad, wait a few seconds, tap "Copy report" and paste it into the design thread. The summary at the top holds what N1.2 needs: WebGPU yes or no and the adapter, float32 filtering, the storage texture formats and whether `read_write` works, the time of one wave pass (16 waves a texel at 256² and 512²) and of one FFT-shaped chain (16 compute passes over 256² complex values), the key limits, the screen and its refresh rate. The full report below it lists every feature, limit and WebGL 2 extension. The probe's code is in `src/probe/` and loads only with `?probe`. Times are wall time from submit to "work done", the median of 5 rounds, so they include each submit's overhead: read them as upper bounds. Safari does not tell the device memory; the JS heap limit is Chrome's only. Headless SwiftShader (cloud, 2026-11-17, a software GPU, only to show the probe works): WebGPU yes, compute result checked against the CPU ok, wave pass 6.4 ms at 256² and 24 ms at 512², FFT-shaped chain 12.5 ms.
 
-**The iPad's report:** not yet in.
-
 ---
 
 ## N1 The sea
