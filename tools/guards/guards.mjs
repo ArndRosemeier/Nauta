@@ -1,10 +1,13 @@
 /**
- * The layer rules of tools/guards/rules.json, checked against every file under src (run by `npm test` through
- * test/guards.test.ts): the pure layers import no renderer, and nothing uses unseeded randomness.
+ * The guards, run by `npm test` through test/guards.test.ts and by `npm run guards`: the layer rules of
+ * tools/guards/rules.json against every file under src (the pure layers import no renderer, nothing uses unseeded
+ * randomness), and the duplication ratchet (duplication.mjs). `npm run guards -- --keys` prints what the duplicate
+ * finders find now, as baseline entries to fill in.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkDuplication, duplicationFindings, readBaseline } from './duplication.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const posix = (p) => p.split(sep).join('/');
@@ -45,8 +48,12 @@ export function breaches(rules, base = root) {
 export const readRules = () => JSON.parse(readFileSync(join(root, 'tools/guards/rules.json'), 'utf8'));
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const found = breaches(readRules());
+  if (process.argv.includes('--keys')) {
+    console.log(JSON.stringify(duplicationFindings().map((key) => ({ key, reason: '' })), null, 2));
+    process.exit(0);
+  }
+  const found = [...breaches(readRules()), ...checkDuplication(duplicationFindings(), readBaseline())];
   for (const line of found) console.error(line);
-  console.log(found.length ? `${found.length} breach(es)` : 'guards: ok');
+  console.log(found.length ? `${found.length} problem(s)` : 'guards: ok');
   process.exit(found.length ? 1 : 0);
 }

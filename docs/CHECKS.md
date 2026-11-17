@@ -1,17 +1,43 @@
 # Checks
 
-Tests are only useful if they run all the time, so they stay fast.
+Tests are only useful if they run all the time, so they stay fast, and the limits are enforced by the tools, not by good intentions (Arnd 2026-11-17: "I often had test suites run out of control").
 
-| Limit | Value | How it is kept |
+## Time budgets
+
+The numbers live in `tools/test/budgets.json`. **Raising one needs Arnd's OK**, written next to the number here with his name and the date.
+
+| Limit | Value | What happens |
 |---|---|---|
-| One test | **5 s** | `--test-timeout=5000` in `npm test`. A test that needs more gets a smaller fixture or becomes a slow check. |
-| The whole of `npm test` | **70 s** | CI stops it at 70 s. No browsers, no network, no big worlds in `npm test`. |
-| A slow check (browser, screenshots, long simulation) | **5 min** each | Its own script, never inside `npm test`. |
+| One test | **2 s** | The runner stops it and it fails (`--test-timeout`). |
+| One test file | **5 s** (its tests added up) | The run fails, naming the file. |
+| The whole of `npm test` | warns at **20 s**, fails at **30 s** | The run fails, on a desk as in CI. |
+| A slow check (browser, screenshots, a long simulated fight) | warns at **2 min**, fails at **3 min** each | `tools/guards/budget.mjs` around the step in CI. |
+| All slow checks together | **10 min** | The CI job's own limit. |
 
-`npm test` runs `test/**/*.test.ts` (through tsx) and the tools' own tests with Node's test runner. It includes the guards (`tools/guards`, rules in `rules.json`): the pure layers import no renderer, and nothing calls `Math.random`.
+`npm test` is `node tools/test/run.mjs`: every `test/**/*.test.ts` (through tsx) and `tools/**/*.test.mjs` under Node's test runner. After each run it prints the five slowest tests and the suite's time against its budget, so creep shows long before a limit is hit. `npm test -- test/look.test.ts` runs the files given.
 
-Tests use seeds, fake clocks and small fixtures, never wall-clock waits.
+What keeps tests fast:
 
-Slow checks today: `npm run shot` (headless screenshots of the built game, see its header for the switches).
+- No browser, no network, no big simulation in `npm test`. Those are slow checks.
+- Seeds, fake clocks and small fixtures, never wall-clock waits.
+- A fixture several files need is built once and frozen, not once per test.
+- A test that outgrows 2 s gets a smaller fixture or is split. It does not get a longer limit.
 
-Duplication: `npm run dup` (functions sharing a name across files) and `npm run repeated` (repeated code) list candidates for a human to judge.
+## Slow checks
+
+Each is its own script, run in CI on pushes to `main` (the `Slow checks` job) and by hand, never inside `npm test`.
+
+- `npm run shot -- "<query>" out.png`: the built game in headless Chromium (see the script's header for its switches). CI takes a desktop view and a tablet view with a finger drag, and fails if the page reports an error or never gets ready.
+
+## Guards
+
+Part of `npm test` (`test/guards.test.ts`); `npm run guards` prints them alone.
+
+- **Layers** (`tools/guards/rules.json`): the pure layers (`src/sim`, and the pure files of `src/app`) import no three.js and nothing from `src/render`.
+- **No `Math.random`** anywhere under `src`.
+- **Duplication ratchet** (`tools/guards/duplication.mjs`), on every run:
+  - A copied function body (two functions alike enough to be one) is **never allowed**. Keep one and call it from both places.
+  - A repeated idiom (the same few lines in three files or more) or two alike functions of one name must be listed in `tools/guards/duplication-baseline.json` with a reason: a false alarm says why it is one, a real copy needs Arnd's OK. `npm run guards -- --keys` prints the entries to fill in.
+  - A listed entry that is no longer found fails as stale, so the list only ever shrinks to what is true.
+
+`npm run dup` and `npm run repeated` (the Toolbox finders behind the ratchet) write full reports to `reports/` for a closer look, including weaker candidates the ratchet does not fail on.

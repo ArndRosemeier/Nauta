@@ -1,0 +1,10 @@
+{
+  "comment": "Time limits, in seconds (docs/CHECKS.md). Raising one needs Arnd's OK, noted here with his name and the date.",
+  "test": 2,
+  "file": 5,
+  "suiteWarn": 20,
+  "suiteFail": 30,
+  "slowCheckWarn": 120,
+  "slowCheck": 180,
+  "slowChecksTotalMinutes": 10
+}

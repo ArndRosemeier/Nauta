@@ -21,8 +21,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Tests and guards (70 s at most)
-        run: timeout 70 npm test
+      # The runner holds the budgets itself (tools/test/budgets.json): a slow test, file or suite fails here as on a desk.
+      - name: Tests, guards and the duplication ratchet
+        run: npm test
 
   build:
     name: Build
@@ -39,6 +40,35 @@ jobs:
       - run: npm ci
       - name: Typecheck and build
         run: npm run build
+
+  # The slow checks (docs/CHECKS.md): each under its own budget, all of them within this job's 10 minutes.
+  slow:
+    name: Slow checks
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # The runner's own Chrome: no Playwright browser download.
+      CHROMIUM_PATH: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: The game starts and draws in a browser (desktop and a dragged tablet view)
+        run: |
+          node tools/guards/budget.mjs 120 180 -- npm run shot -- "?gl&hud&day=0" shots/desktop.png
+          SHOT_SIZE=1180x820 SHOT_DRAG=-300,120 node tools/guards/budget.mjs 120 180 -- npm run shot -- "?gl&hud&day=0" shots/tablet.png
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots
+          path: shots
 
   # The one status that says CI passed.
   check:
