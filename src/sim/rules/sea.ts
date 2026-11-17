@@ -29,9 +29,10 @@ export const SEA_BY_FORCE: readonly { readonly height: number; readonly period: 
 /**
  * How many wave components the simulation carries. Every one costs a sine and a cosine per sample, and 1000
  * samples must take under 1 ms (implementation plan, N1.1), so this stays small; the renderer adds the many short
- * waves on top.
+ * waves on top. 28 holds the time with room on a CI runner; below about 24 distant patches of a calm sea begin
+ * to resemble each other (autocorrelation over 0.65 within 2 km).
  */
-export const SEA_COMPONENTS = 32;
+export const SEA_COMPONENTS = 28;
 
 /**
  * The band of the spectrum the simulation carries, as multiples of the peak frequency. Below the low end there is

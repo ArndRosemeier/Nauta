@@ -7,7 +7,6 @@
 import { deriveSeed, smoothstep } from '@futuremagic/core';
 import { SEA_CHANGE_SECONDS, SEA_FOLLOW_ANGLE, SEA_FOLLOW_SPEED } from '../rules/sea';
 import { sincos } from '../trig';
-import { GRAVITY } from '../units';
 import { makeWaves, type SeaWind, type WaveSet } from './waves';
 
 /** One wave set and when it fades in (s of the shared clock); the first layer of a sea is there from the start. */
@@ -112,14 +111,12 @@ const sc: [number, number] = [0, 0];
 
 /** Add one wave set, weighted by `f`, at calm point (x, z), time t. */
 function addWaves(s: Sums, w: WaveSet, f: number, x: number, z: number, t: number): void {
-  const { kx, kz, omega, amp, phase } = w;
-  // Sideways shift per metre of height and per unit of wavenumber: chop / |k|, with |k| = omega² / g (deep water).
-  const chop = w.chop * GRAVITY;
+  const { kx, kz, omega, amp, phase, reach } = w;
   let h = 0, dx = 0, dz = 0, vx = 0, vy = 0, vz = 0, hx = 0, hz = 0, xx = 0, xz = 0, zz = 0;
   for (let i = 0; i < kx.length; i++) {
     const ax = kx[i]!, az = kz[i]!, om = omega[i]!, a = amp[i]!;
     sincos(ax * x + az * z - om * t + phase[i]!, sc);
-    const sn = sc[0], c = sc[1], q = (chop * a) / (om * om), qs = q * sn, qc = q * c, as = a * sn;
+    const sn = sc[0], c = sc[1], q = reach[i]!, qs = q * sn, qc = q * c, as = a * sn;
     h += a * c;
     dx -= ax * qs;
     dz -= az * qs;

@@ -21,7 +21,7 @@ export interface SeaWind {
 /**
  * A set of wave components, one entry per wave in each list. A wave's surface at a point (x, z) of the calm
  * sea, time t: phase θ = kx·x + kz·z − omega·t + phase, height amp·cos θ, and the water there moves sideways by
- * chop·amp·sin θ against its direction of travel (a Gerstner wave).
+ * reach·|k|·sin θ = chop·amp·sin θ against its direction of travel (a Gerstner wave).
  */
 export interface WaveSet {
   /** Wavenumber along x and along z, rad/m: the wave runs along (kx, kz), its length is 2π / |k|. */
@@ -33,6 +33,8 @@ export interface WaveSet {
   readonly amp: readonly number[];
   /** Phase at x = z = t = 0, rad. */
   readonly phase: readonly number[];
+  /** How far a wave moves its water sideways, m: chop·amp / |k|, so the shift is reach·(kx, kz)·sin θ against travel. */
+  readonly reach: readonly number[];
   /** Gerstner choppiness of every wave of the set (0..SEA_CHOPPINESS). */
   readonly chop: number;
   /** How far the mean level rises to make up for the Gerstner troughs being wider than the crests, m. */
@@ -95,6 +97,8 @@ export function makeWaves(seed: number, wind: SeaWind): WaveSet {
   // The Eulerian mean of a Gerstner wave lies chop·k·amp²/2 below its calm level; lift it back so the sea keeps
   // its volume and a hull floats at the same mean level in calm and in a seaway.
   const lift = omega.reduce((sum, w) => sum + (chop * (w * w) / GRAVITY * a * a) / 2, 0);
+  // Deep water: |k| = omega² / g.
+  const reach = omega.map((w) => (chop * a * GRAVITY) / (w * w));
   const peakLength = (2 * Math.PI * GRAVITY) / (peak * peak);
-  return { kx, kz, omega, amp, phase, chop, lift, height, peakLength, shortest };
+  return { kx, kz, omega, amp, phase, reach, chop, lift, height, peakLength, shortest };
 }
