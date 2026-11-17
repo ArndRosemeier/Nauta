@@ -79,26 +79,37 @@ export function makeWaves(seed: number, wind: SeaWind): WaveSet {
   const spreadShares = strata(rng.fork('direction'));
   const turns = quantiles((a) => spread(a, SEA_SPREAD), -Math.PI, Math.PI, order.map((i) => spreadShares[i]!));
   const phases = rng.fork('phase');
+  const dirs = turns.map((turn) => wind.toward + turn);
+  return waveSet(omega, dirs, omega.map(() => phases.range(0, 2 * Math.PI)), height, period, SEA_FOLD_LIMIT);
+}
+
+/**
+ * A wave set from its waves' angular frequencies (rad/s), the directions they run toward (rad) and their phases
+ * (rad), with equal energy per wave so that the set's significant height is `height` (m). `period` (s) is the
+ * period its peakLength is given for. The choppiness is SEA_CHOPPINESS unless the set's summed steepness would take
+ * it past `foldLimit`. Shared by the wind sea (`makeWaves`) and the swell (`makeSwell`).
+ */
+export function waveSet(omega: readonly number[], dirs: readonly number[], phase: readonly number[], height: number, period: number, foldLimit: number): WaveSet {
   // Equal energy per wave: amp²/2 each, adding up to the variance (height / 4)².
   const deviation = height / HEIGHT_PER_DEVIATION;
-  const a = Math.sqrt((2 * deviation * deviation) / n);
-  const kx: number[] = [], kz: number[] = [], amp: number[] = [], phase: number[] = [];
+  const a = Math.sqrt((2 * deviation * deviation) / omega.length);
+  const kx: number[] = [], kz: number[] = [], amp: number[] = [];
   let steepness = 0, shortest = Infinity;
   omega.forEach((w, i) => {
-    const k = (w * w) / GRAVITY, dir = wind.toward + turns[i]!;
+    // Deep water: |k| = omega² / g.
+    const k = (w * w) / GRAVITY, dir = dirs[i]!;
     kx.push(k * Math.cos(dir));
     kz.push(k * Math.sin(dir));
     amp.push(a);
-    phase.push(phases.range(0, 2 * Math.PI));
     steepness += k * a;
     shortest = Math.min(shortest, (2 * Math.PI) / k);
   });
-  const chop = steepness > 0 ? Math.min(SEA_CHOPPINESS, SEA_FOLD_LIMIT / steepness) : SEA_CHOPPINESS;
+  const chop = steepness > 0 ? Math.min(SEA_CHOPPINESS, foldLimit / steepness) : SEA_CHOPPINESS;
   // The Eulerian mean of a Gerstner wave lies chop·k·amp²/2 below its calm level; lift it back so the sea keeps
   // its volume and a hull floats at the same mean level in calm and in a seaway.
   const lift = omega.reduce((sum, w) => sum + (chop * (w * w) / GRAVITY * a * a) / 2, 0);
-  // Deep water: |k| = omega² / g.
   const reach = omega.map((w) => (chop * a * GRAVITY) / (w * w));
+  const peak = (2 * Math.PI) / period;
   const peakLength = (2 * Math.PI * GRAVITY) / (peak * peak);
-  return { kx, kz, omega, amp, phase, reach, chop, lift, height, peakLength, shortest };
+  return { kx, kz, omega: [...omega], amp, phase: [...phase], reach, chop, lift, height, peakLength, shortest };
 }
