@@ -17,7 +17,7 @@ import { VOCABULARY, type ShipOrders } from '../orders';
 import { bareSpot, shipPlan, type Spot } from '../ship/plan';
 import { sailShare, type SailSetting } from '../ship/sails';
 import type { SailWork } from '../ship/sailing';
-import { DAY_JOBS, type Watch } from '../rules/day';
+import { DAY_JOBS, TURN_OUT_METRES, TURN_OUT_SECONDS, type Watch } from '../rules/day';
 import { MINUTES_PER_HOUR, STEP_SECONDS, STEPS_PER_SECOND } from '../units';
 import type { Closures } from './closures';
 import { goingAt, goingRoute, startGoing, stepGoings, type Going } from './going';
@@ -163,9 +163,9 @@ function target(i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Ta
  * going while neither side bears, if that is at one of his pair's guns.
  */
 function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged | undefined, tick: number, onDeck?: Watch, minute?: number): string {
-  const post = roster[i]!.post, marine = roster[i]!.quarters, paces = roster[i]!.paces, watch = roster[i]!.watch;
+  const post = roster[i]!.post, marine = roster[i]!.quarters, paces = roster[i]!.paces;
+  if (quarters === undefined && onDeck !== undefined && keepsDay(roster[i]!)) return dayPlace(i, roster[i]!, onDeck, minute, tick);
   if (quarters === undefined && paces) return pacePlace(paces, i, tick);
-  if (quarters === undefined && watch !== null && onDeck !== undefined) return watch === onDeck && roster[i]!.watchPost ? (minute === undefined ? null : jobPlace(roster[i]!, minute)) ?? roster[i]!.watchPost! : roster[i]!.home;
   // A man at no gun with a place at quarters (the marines): there, on the side she fights; while neither or both
   // sides bear, the men take the sides in turn.
   if (quarters !== undefined && marine !== null) return atQuartersOf(marine, typeof quarters === 'number' ? quarters : SIDES[i % SIDES.length]!);
@@ -178,8 +178,29 @@ function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged
   return SIDES.map((side) => quartersPlace(i, side, roster)).find((p) => p !== null && sameSpot(at, placeSpot(p))) ?? post;
 }
 
+/** Whether a man is of the watch below in the sandbox (`onDeck` is the other's), so an order has to turn him out. */
+const turnedOut = (m: Man, onDeck: Watch | undefined): boolean => onDeck !== undefined && m.watch !== null && m.watch !== onDeck;
+
+/** Whether a man keeps the sandbox's day: he stands a watch, or keeps hours (the cook). */
+const keepsDay = (m: Man): boolean => m.watch !== null || m.hours !== null;
+
+/**
+ * Where a man who keeps the day's watches goes in the sandbox with her not at quarters: while his watch is below (or
+ * the cook after his hours) to his hammock; while it has the deck, to his place on it (pacing as officer of the
+ * watch, the wheel, the day's job, his post of `DECK_WATCH`), or, with none, he sleeps on.
+ */
+function dayPlace(i: number, m: Man, onDeck: Watch, minute: number | undefined, tick: number): string {
+  const below = m.berth ? m.berth.station : m.home;
+  if (m.hours) return minute !== undefined && minute / MINUTES_PER_HOUR >= m.hours[0] && minute / MINUTES_PER_HOUR < m.hours[1] ? m.home : below;
+  if (m.watch !== onDeck) return below;
+  const walks = m.paces ?? m.watchPaces;
+  if (walks) return pacePlace(walks, i, tick);
+  return (minute === undefined ? null : jobPlace(m, minute)) ?? m.watchPost ?? below;
+}
+
 /** The place of the day's job (rules/day.ts `DAY_JOBS`) a hand of the watch on deck is to be at in game minute `minute`, or null: his post. */
 function jobPlace(m: Man, minute: number): string | null {
+  if (m.watchSlot === null) return null;
   const hour = minute / MINUTES_PER_HOUR, job = DAY_JOBS.find((j) => hour >= j.from && hour < j.to && (j.who === null || j.who.includes(m.part)));
   return job ? job.places[m.watchSlot! % job.places.length]! : null;
 }
@@ -316,7 +337,7 @@ function strikeOut(crew: Crew, out: ReadonlySet<number>, roster: readonly Man[])
  * The tasks short of hands given free men, in the order the tasks were made: for each place in turn the nearest free
  * man of the parts the job is for (ties to the earlier in the roster), until their skill makes up its hands.
  */
-function manTasks(tasks: readonly Task[], men: readonly Hand[], roster: readonly Man[], tick: number, out: ReadonlySet<number>): Task[] {
+function manTasks(tasks: readonly Task[], men: readonly Hand[], roster: readonly Man[], tick: number, out: ReadonlySet<number>, onDeck?: Watch): Task[] {
   const busy = new Set(tasks.flatMap((t) => t.hands));
   return tasks.map((t) => {
     if (tick < t.piped) return t;
@@ -335,7 +356,7 @@ function manTasks(tasks: readonly Task[], men: readonly Hand[], roster: readonly
     while (skill < w.need && free.length > 0) {
       const place = footing(t.at ?? placeSpot(w.places[hands.length % w.places.length]!));
       let best = 0, bestFar = Infinity;
-      free.forEach((f, k) => { const far = farness(f.at, place); if (far < bestFar) { best = k; bestFar = far; } });
+      free.forEach((f, k) => { const far = farness(f.at, place) + (turnedOut(roster[f.i]!, onDeck) ? TURN_OUT_METRES : 0); if (far < bestFar) { best = k; bestFar = far; } });
       const { i } = free[best]!;
       free = free.filter((_, k) => k !== best);
       take(i);
@@ -356,6 +377,8 @@ function sendMen(men: readonly Hand[], roster: readonly Man[], byMan: ReadonlyMa
   for (const i of order) {
     if (sent >= SENT_PER_STEP) break;
     if (struck.has(i)) continue;
+    // A man of the watch below waits to be turned out by the pipe before he starts for his place.
+    if (byMan.has(i) && turnedOut(roster[i]!, deck.watch) && deck.tick < byMan.get(i)!.piped + TURN_OUT_SECONDS * STEPS_PER_SECOND) continue;
     const h = men[i]!, to = byMan.has(i) ? target(i, roster, byMan) : placeSpot(restPlace(i, h, roster, deck.quarters, deck.tick, deck.watch, deck.minute));
     if (h.blocked === deck.closures.waysSerial) continue;
     let from: Spot;
@@ -405,10 +428,10 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
   const idle = told.acts.filter((a) => !c.tasks.some((t) => t.act === a.id)).map((a) => a.id);
   // Nothing to do and every man at home (unless she is at quarters: then the gun crews stand to their posts).
   // (the officers who pace, and the men of a watch, are away from home on their rounds and posts, and go on when their turn comes).
-  const restless = deck.quarters === undefined && roster.some((m, i) => (m.paces || (m.watch !== null && deck.watch !== undefined)) && !c.men[i]!.going && !sameSpot(standing(c.men[i]!, m), placeSpot(restPlace(i, c.men[i]!, roster, undefined, deck.tick, deck.watch, deck.minute))));
-  if (c.tasks.length === 0 && deck.quarters === undefined && !restless && c.men.every((h, i) => h.going === null && (h.stands === null || roster[i]!.paces !== null || roster[i]!.watchPost !== null))) return { crew: c, done: idle, events: [], sails: [], mended: [] };
+  const restless = deck.quarters === undefined && roster.some((m, i) => (m.paces || (keepsDay(m) && deck.watch !== undefined)) && !c.men[i]!.going && !sameSpot(standing(c.men[i]!, m), placeSpot(restPlace(i, c.men[i]!, roster, undefined, deck.tick, deck.watch, deck.minute))));
+  if (c.tasks.length === 0 && deck.quarters === undefined && !restless && c.men.every((h, i) => h.going === null && (h.stands === null || roster[i]!.paces !== null || roster[i]!.watchPost !== null || roster[i]!.berth !== null || roster[i]!.watchPaces !== null))) return { crew: c, done: idle, events: [], sails: [], mended: [] };
   const events: CrewEvent[] = [];
-  let tasks = manTasks(c.tasks, c.men, roster, deck.tick, out);
+  let tasks = manTasks(c.tasks, c.men, roster, deck.tick, out, deck.watch);
   const byMan = new Map(tasks.flatMap((t) => t.hands.map((i) => [i, t] as const)));
   let men = sendMen(c.men, roster, byMan, deck, out);
   // Every man on his way moves on at once (a wounded man carried goes with his bearer); those who got there stand at their route's end.
