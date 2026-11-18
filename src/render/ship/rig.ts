@@ -11,7 +11,7 @@ import { CHANNEL } from '../../sim/rules/rig';
 import { CHAIN_PLATE_FOOT, DEADEYE, MAIN_CHANNEL, MAIN_SHROUDS, PIN_RAIL, PLANKING, ROPE } from '../../sim/rules/ships';
 import { hullHalfBreadth, waistDeck } from '../../sim/ship/hull';
 import { shipY, shipZ } from '../../sim/ship/section';
-import { rigPlan, type RigPlan } from '../../sim/ship/rig';
+import { rigPlan, sparOf, type RigPlan } from '../../sim/ship/rig';
 import { SIDES, type Deadeye } from '../../sim/ship/spars';
 import type { Belay, ShipPlan } from '../../sim/ship/plan';
 import { box, frameAlong, lathe, rod, direction } from './shapes';
@@ -19,10 +19,10 @@ import { BLACK, IRON, RED } from './looks';
 import { place, type Fittings } from './fittings';
 import type { ZoneParts } from './parts';
 import { BEVEL, SMALL_BEVEL } from './hullSide';
-import { FEW_SIDES, HEMP, TARRED, type Ropes } from './rope';
+import { FEW_SIDES, HEMP, TARRED, legFollow, type Ropes } from './rope';
 import { drawSpars } from './masts';
 import { LINE_OFF_PIN, buildRigging, type LineFoot } from './rigging';
-import { shipPoint, swingsOf } from './swings';
+import { shipPoint, sparFramesOf, swingsOf } from './swings';
 
 /** How far the deadeyes' holes are from their middle, m (the pack's: 0.052), and the hole pattern's turn. */
 const HOLE_RADIUS = 0.052;
@@ -71,10 +71,18 @@ const TURN = 2 * Math.PI;
 
 /** Her whole rig: spars, iron and timber aloft and on her sides, every line, the pins and coils. `belowDeck` gives the zone under a place (the masts stand through her decks), `turning` a turning spar's own parts. */
 export function buildRigs(fittings: Fittings, plan: ShipPlan, out: ZoneParts, belowDeck: (along: number, h: number) => ZoneParts | null, turning: (id: string) => ZoneParts | null, far = false): void {
-  const rig = rigPlan(plan), swings = swingsOf(rig);
+  const rig = rigPlan(plan), swings = swingsOf(rig), frames = sparFramesOf(rig);
+  const sparAt = new Map([...frames].map(([id, f]) => [f, id] as const));
   drawSpars(rig, { out, below: belowDeck, swung: turning, far });
-  const feet = drawDeadeyes(rig, fittings, out, far);
-  buildRigging(rig, swings, { ropes: out.ropes, solid: (frame) => (frame ? turning(swings[frame - 1]!.id)!.wood : out.wood), feet, far });
+  const feet = drawDeadeyes(rig, fittings, out, far, frames);
+  // A block on a turning spar goes into its own solid; one on a spar that stands is named for it in her outside's (it can fall, N6.5).
+  const into = (frame: number, draw: (s: typeof out.wood) => void) => {
+    const id = sparAt.get(frame);
+    if (!frame || id === undefined) draw(out.wood);
+    else if (frame <= swings.length) draw(turning(id)!.wood);
+    else out.wood.tagged(id, () => draw(out.wood));
+  };
+  buildRigging(rig, swings, { ropes: out.ropes, into, feet, far });
   if (!far) buildPins(plan, rig, fittings, out);
 }
 
@@ -83,7 +91,7 @@ export function buildRigs(fittings: Fittings, plan: ShipPlan, out: ZoneParts, be
  * rope leaves the upper one. `aloft`: high in a top, where its holes cannot be told from the deck, a turned disc
  * stands for the fitting.
  */
-function deadeyePair(fittings: Fittings, out: ZoneParts, lower: Vector3, top: Vector3, scale: number, seed: number, far: boolean, aloft: boolean): Vector3 {
+function deadeyePair(fittings: Fittings, out: ZoneParts, lower: Vector3, top: Vector3, scale: number, seed: number, far: boolean, aloft: boolean, frame = 0): Vector3 {
   const dir = direction(lower, top), apart = DEADEYE.apart * scale, diameter = DEADEYE.diameter * scale;
   const upper = lower.clone().addScaledVector(dir, apart);
   // The deadeyes' faces lie in the plane of the line and her length (across her, for a line running fore and aft).
@@ -106,8 +114,9 @@ function deadeyePair(fittings: Fittings, out: ZoneParts, lower: Vector3, top: Ve
     const face = (m: Matrix4, flip: number, h: Vector3, sideOf: number) => h.clone().setY(flip * sideOf * DEADEYE.thick / 2).applyMatrix4(m);
     const L = (i: number, s: number) => face(lowFrame, 1, holes[i]!, s), U = (i: number, s: number) => face(upFrame, -1, holes[i]!, s);
     const radius = ROPE.lanyard * scale / 2;
-    for (let i = 0; i < holes.length; i++) out.ropes.line([U(i, 1), L(i, 1)], radius, TARRED, FEW_SIDES);
-    for (let i = 0; i < holes.length - 1; i++) out.ropes.line([L(i, -1), U(i + 1, -1)], radius, TARRED, FEW_SIDES);
+    const rove = (a: Vector3, b: Vector3) => out.ropes.line([a, b], radius, TARRED, FEW_SIDES, legFollow(frame, a, frame, a, 2));
+    for (let i = 0; i < holes.length; i++) rove(U(i, 1), L(i, 1));
+    for (let i = 0; i < holes.length - 1; i++) rove(L(i, -1), U(i + 1, -1));
   }
   return upper.addScaledVector(dir, diameter / 2);
 }
@@ -117,7 +126,7 @@ function deadeyePair(fittings: Fittings, out: ZoneParts, lower: Vector3, top: Ve
  * and in the tops (the topmast shrouds) with their futtock plates. Returns, for each line set up to one, where it
  * leaves its upper deadeye.
  */
-function drawDeadeyes(rig: RigPlan, fittings: Fittings, out: ZoneParts, far: boolean): Map<string, LineFoot> {
+function drawDeadeyes(rig: RigPlan, fittings: Fittings, out: ZoneParts, far: boolean, frames: ReadonlyMap<string, number>): Map<string, LineFoot> {
   const feet = new Map<string, LineFoot>();
   const tops = new Map(rig.lines.filter((l) => l.ends[1].on === 'deadeye').map((l) => [l.ends[1].id, l]));
   rig.deadeyes.forEach((d, k) => {
@@ -125,16 +134,21 @@ function drawDeadeyes(rig: RigPlan, fittings: Fittings, out: ZoneParts, far: boo
     if (!line) return;
     const lower = shipPoint(d), top = shipPoint(line.ends[0]);
     const scale = d.on === 'top' ? TOP_DEADEYE : 1;
-    const start = deadeyePair(fittings, out, lower, top, scale, 2 * k, far, d.on === 'top');
-    feet.set(line.id, { at: start });
-    if (d.on === 'channel') chainPlate(out, d, lower, direction(lower, top));
-    else {
+    if (d.on === 'channel') {
+      feet.set(line.id, { at: deadeyePair(fittings, out, lower, top, scale, 2 * k, far, false), frame: 0 });
+      chainPlate(out, d, lower, direction(lower, top));
+      return;
+    }
+    // In a top: the deadeyes and their futtock plate go with the lower mast the top is on (it can fall, N6.5).
+    const mast = `${sparOf(rig, line.serves).mast}-mast`, frame = frames.get(mast) ?? 0;
+    out.wood.tagged(mast, () => out.iron.tagged(mast, () => {
+      feet.set(line.id, { at: deadeyePair(fittings, out, lower, top, scale, 2 * k, far, true, frame), frame });
       // The futtock plate from under the deadeye down through the top's rim, where the futtock shroud is hooked.
       const foot = lower.clone().addScaledVector(direction(lower, top), -DEADEYE.diameter * scale / 2);
       const plateEnd = foot.clone().add(new Vector3(0, -FUTTOCK_PLATE.length, 0));
       rod(out.iron, foot, plateEnd, FUTTOCK_PLATE.width / 2, BOLT.sides / 2, IRON);
-      feet.set(`${d.id}:plate`, { at: plateEnd });
-    }
+      feet.set(`${d.id}:plate`, { at: plateEnd, frame });
+    }));
   });
   // Each side's channels; the fore and main runs part by the gap between them.
   for (const side of SIDES) channels(out, rig.deadeyes.filter((d) => d.side === side && d.on === 'channel'));

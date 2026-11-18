@@ -12,7 +12,7 @@
  * the earth's curve as she draws away, and crossfaded to her far level by her distance through the glass.
  */
 import {
-  Color, Euler, Group, Matrix4, Mesh, Quaternion, Vector2, Vector3, Vector4, type DirectionalLight, type Material, type Object3D, type PerspectiveCamera,
+  BufferGeometry, Color, Euler, Group, Matrix4, Mesh, Quaternion, Uint32BufferAttribute, Vector2, Vector3, Vector4, type DirectionalLight, type Material, type Object3D, type PerspectiveCamera,
 } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import type { SeaState } from '../../sim/sea/sea';
@@ -30,6 +30,7 @@ import {
   SHIP_WOOD_HOLED,
 } from '../materials';
 import type { Damage } from '../../sim/damage';
+import { standingOf } from '../../sim/damage/fall';
 import { DamageView } from './damageView';
 import type { QualityKnobs } from '../../app/quality';
 import { SailsView } from './sailsView';
@@ -37,7 +38,8 @@ import { SAIL_TIME, setShipSails } from './sailMaterial';
 import { SEA_CUT } from '../seaCut';
 import { MOST_LAMPS, MOST_SKIES, SHIP_INPUTS, setShipFrame } from './shipMaterials';
 import { rigPlan } from '../../sim/ship/rig';
-import { swingMatrix, swingsOf, type Swing } from './swings';
+import { sparFramesOf, swingMatrix, swingsOf, type Swing } from './swings';
+import { cutAtSide, driftedOff, fallShape, keptIndex, takeFallen, wreckMatrix, type FallShape } from './wreck';
 import { RUDDER_ID, rudderMatrix } from './stern';
 import type { Kind } from '@futuremagic/stage';
 import { geometryOf, packedTriangles, type Packed } from './gathered';
@@ -98,9 +100,29 @@ const XYZ = 3;
 const SHARED_SHADOW_WITHIN = 80;
 
 
+/** A geometry drawing `index` of `from`'s vertices (shared, so not sent to the GPU again); its bounds are `from`'s. */
+function indexed(from: BufferGeometry, index: Uint32Array): BufferGeometry {
+  const g = new BufferGeometry();
+  for (const [name, a] of Object.entries(from.attributes)) g.setAttribute(name, a);
+  g.setIndex(new Uint32BufferAttribute(index, 1));
+  g.boundingBox = from.boundingBox?.clone() ?? null;
+  g.boundingSphere = from.boundingSphere?.clone() ?? null;
+  return g;
+}
+
 /** Her kinds, and what each draws with while it is being crossfaded. */
 const KINDS = { wood: SHIP_WOOD, iron: SHIP_IRON, copper: SHIP_COPPER, glow: SHIP_GLOW, ropes: SHIP_ROPE } as const;
 const FADING: ReadonlyMap<Kind, Kind> = new Map([[SHIP_WOOD, SHIP_WOOD_FADING], [SHIP_IRON, SHIP_IRON_FADING], [SHIP_COPPER, SHIP_COPPER_FADING]]);
+
+/** A spar of hers gone over the side (wreck.ts): how it goes, when it fell and was cut away (s of her time; NaN: still alongside), its meshes' groups near and far, its matrix, and where its ropes are cut. */
+interface Wreck {
+  readonly shape: FallShape;
+  readonly began: number;
+  cutAt: number;
+  readonly groups: Group[];
+  readonly matrix: Matrix4;
+  readonly cut: Matrix4;
+}
 
 /** One mesh of hers: what it draws with plain (the holed kind once her damage cuts her: `showDamage`) and crossfading. */
 interface Part {
@@ -167,12 +189,19 @@ export class ShipView {
   /** Her damage drawn (plan N6.5): her marks in her blocks of the damage maps, and whether she is drawn holed yet. */
   private readonly marks: DamageView;
   private holed = { hull: false, sails: false };
+  /** Her spars gone over the side, by the part each broke at; what each spar is carried by (the first fall that took it); her outside meshes' packed vertices and the triangles taken out of them. */
+  private readonly wrecks = new Map<number, Wreck>();
+  private damageSeen = false;
+  private readonly carried = new Map<string, { matrix: Matrix4; ropes: Matrix4; off: boolean }>();
+  private readonly packedOf = new Map<Mesh, Packed>();
+  private readonly taken = new Map<Mesh, Uint8Array>();
   /** Her rudder's groups near and far, and where it lies (rad, + its after edge to starboard). */
   private readonly rudder = { groups: [] as Group[], angle: Number.NaN, matrix: new Matrix4() };
   /** Each zone's ranges in her shaders' light lists. */
   private readonly ranges: Map<string, Vector4>;
   private readonly visibility: Visibility;
   private readonly plan = shipPlan();
+  private readonly sparFrames = sparFramesOf(rigPlan(this.plan));
   private readonly spaceZones = zoneOfSpaces(this.plan);
   private readonly inverse = new Matrix4();
   private readonly look = new Quaternion();
@@ -302,6 +331,7 @@ export class ShipView {
       // Below deck only her timber casts: the sun comes in through her openings alone, and her timber is what stops it.
       m.castShadow &&= light === undefined || kind === SHIP_WOOD;
       into.add(m);
+      if (packed.runs) this.packedOf.set(m, packed);
       if (kind === SHIP_ROPE) this.ropeMeshes.push(m);
       out.push({ mesh: m, plain: kind.make(), fading: fade });
     }
@@ -409,12 +439,89 @@ export class ShipView {
    * with the holed kinds (compiled at load, so nothing compiles now). Once a frame; nothing is done while it stands.
    */
   showDamage(d: Damage | null): void {
-    const shown = this.marks.marksFor(d);
+    if (d) this.showFalls(d);
+    const shown = this.marks.marksFor(d, this.sailsGone(d));
     const toKind = (parts: readonly Part[], from: Kind, to: Kind) => {
       for (const p of parts) if (p.plain === from.make()) p.plain = to.make();
     };
     if (shown.hullCut && !this.holed.hull) { this.holed.hull = true; toKind(this.outside, SHIP_WOOD, SHIP_WOOD_HOLED); }
     if (shown.sailsCut && !this.holed.sails) { this.holed.sails = true; toKind(this.outside, SHIP_SAILS, SHIP_SAILS_HOLED); }
+  }
+
+  /** Her sails that went over the side with a spar, once every wreck has come to lie (they are drawn on their yards as they fall). */
+  private sailsGone(d: Damage | null): readonly boolean[] {
+    if (!d?.fallen.length || [...this.wrecks.values()].some((w) => this.time - w.began < w.shape.topple)) return [];
+    return standingOf(d.fallen, d.cut, d.rent).sailDown;
+  }
+
+  /**
+   * Each spar newly broken goes over the side its wreck lies (`alongside`); one no longer alongside was cut away and
+   * drifts off. What is down the first time her damage is shown (a match joined late, `?scars`) fell before: it lies
+   * alongside already, or is gone if it was cut away.
+   */
+  private showFalls(d: Damage): void {
+    const before = !this.damageSeen;
+    this.damageSeen = true;
+    for (const part of d.fallen) {
+      const lies = d.alongside.find((c) => Math.floor(c / 2) === part), known = this.wrecks.get(part);
+      if (known) {
+        if (lies === undefined && Number.isNaN(known.cutAt)) known.cutAt = this.time;
+        continue;
+      }
+      const shape = fallShape(rigPlan(this.plan), part, lies === undefined || lies % 2 === 1 ? 1 : -1);
+      const began = before ? -Infinity : this.time, cutAt = lies === undefined ? (before ? -Infinity : this.time) : Number.NaN;
+      this.wrecks.set(part, { shape, began, cutAt, groups: this.fallen(shape), matrix: new Matrix4(), cut: cutAtSide(shape) });
+    }
+  }
+
+  /** The triangles a fall takes out of her outside, near and far, drawn as the wreck's own meshes in a group each (turned by `moveWrecks`). */
+  private fallen(shape: FallShape): Group[] {
+    const groups: Group[] = [];
+    for (const [parts, into] of [[this.outside, this.zones.get(OUTSIDE)!], [this.farParts, this.far]] as const) {
+      const g = new Group();
+      g.name = `wreck ${shape.root}`;
+      g.matrixAutoUpdate = false;
+      for (const p of [...parts]) {
+        const packed = this.packedOf.get(p.mesh);
+        if (!packed) continue;
+        const taken = this.taken.get(p.mesh) ?? new Uint8Array(packedTriangles(packed));
+        this.taken.set(p.mesh, taken);
+        const index = takeFallen(packed, shape, taken);
+        if (!index.length) continue;
+        const was = p.mesh.geometry;
+        p.mesh.geometry = indexed(geometryOf(packed), keptIndex(packed, taken));
+        if (was !== geometryOf(packed)) was.dispose();
+        const m = new Mesh(indexed(geometryOf(packed), index), p.mesh.material);
+        m.name = p.mesh.name;
+        m.castShadow = p.mesh.castShadow;
+        m.receiveShadow = p.mesh.receiveShadow;
+        m.userData.toShip = g.matrix;
+        m.userData.ship = this.index;
+        g.add(m);
+        parts.push({ mesh: m, plain: p.plain, fading: p.fading });
+      }
+      into.add(g);
+      groups.push(g);
+    }
+    return groups;
+  }
+
+  /** Each wreck placed for her time now, and what it carries: her ropes made fast to it by its spars' frames (cut at her side once it is cut away), its yards by `moveSwings`. */
+  private moveWrecks(): void {
+    if (!this.wrecks.size) return;
+    this.carried.clear();
+    for (const w of this.wrecks.values()) {
+      const adrift = this.time - w.cutAt, off = driftedOff(adrift);
+      wreckMatrix(w.shape, this.time - w.began, adrift, w.matrix);
+      for (const g of w.groups) { g.matrix.copy(w.matrix); g.visible = !off; }
+      for (const id of w.shape.carried) {
+        if (this.carried.has(id)) continue;
+        const ropes = adrift >= 0 ? w.cut : w.matrix;
+        this.carried.set(id, { matrix: w.matrix, ropes, off });
+        if (!this.swings.has(id)) setShipFrame(this.sparFrames.get(id)!, ropes, this.index);
+      }
+    }
+    this.swingsMoved = true;
   }
 
   /** The turning spars' ids. */
@@ -425,9 +532,11 @@ export class ShipView {
     if (!this.swingsMoved) return;
     this.swingsMoved = false;
     for (const w of this.swings.values()) {
-      const m = swingMatrix(w.swing, w.angle, w.hoist, w.matrix);
-      for (const g of w.groups) g.matrix.copy(m);
-      setShipFrame(w.swing.frame, m, this.index);
+      const m = swingMatrix(w.swing, w.angle, w.hoist, w.matrix), down = this.carried.get(w.swing.id);
+      // A spar gone over the side carries it (wreck.ts).
+      if (down) m.premultiply(down.matrix);
+      for (const g of w.groups) { g.matrix.copy(m); g.visible = !down?.off; }
+      setShipFrame(w.swing.frame, down && down.ropes !== down.matrix ? down.ropes : m, this.index);
     }
   }
   /** Where the far ship starts to fade in, m (quality.ts `shipFarFrom`). */
@@ -449,6 +558,7 @@ export class ShipView {
   private moveSails(dt: number): void {
     this.sails.follow(dt);
     for (const [id, share] of this.sails.hoists()) this.setHoist(id, share);
+    this.moveWrecks();
     this.moveSwings();
     this.sails.write((id) => this.swings.get(id)?.matrix ?? null, this.group.quaternion, this.time, (f, m) => setShipFrame(f, m, this.index));
     setShipSails(this.sails.rows, this.index);

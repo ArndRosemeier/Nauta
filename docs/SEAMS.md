@@ -171,6 +171,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Building the ship in a worker at load | `src/render/ship/loadShip.ts#loadShip` |
 | Every buffer of a build, to send it without a copy | `src/render/ship/ship.ts#shipBuffers` |
 | A build's typed arrays made into a geometry | `src/render/ship/gathered.ts#geometryOf` |
+| A piece of a mesh named so its triangles can be told apart later (a spar that can fall, N6.5) | `src/render/ship/gathered.ts#Gathered` (tagged) |
 | Her zones: which spaces are drawn together, the outside | `src/render/ship/zones.ts#zoneOfSpaces` |
 | The zone a place in her lies in | `src/render/ship/zones.ts#zoneAt` |
 | The zone under a place on a deck | `src/render/ship/zones.ts#zoneUnder` |
@@ -207,6 +208,11 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her spars turned from the spar table: masts, tops, trestle and cross trees, caps, yards, bowsprit, jib-boom, boom, gaff | `src/render/ship/masts.ts#drawSpars` |
 | Every line of the rig plan drawn by its sag, with its blocks, ratlines, futtock staves, footropes and stirrups | `src/render/ship/rigging.ts#buildRigging` |
 | Her spars that turn (yards, boom, gaff) as moving frames: pivot, axis, limit | `src/render/ship/swings.ts#swingsOf` |
+| Every spar's moving frame, the standing spars' after the sails' points (N6.5) | `src/render/ship/swings.ts#sparFramesOf` |
+| How a broken spar goes over the side: what it takes, the break, where it comes to lie | `src/render/ship/wreck.ts#fallShape` |
+| The wreck's matrix: falling, lying alongside, cut away and drifting astern | `src/render/ship/wreck.ts#wreckMatrix` |
+| The triangles a fall takes out of her outside, and what is left | `src/render/ship/wreck.ts#takeFallen`, `keptIndex` |
+| Her spars drawn going over the side and what is made fast to them (N6.5) | `src/render/ship/shipView.ts#ShipView.showDamage` (showFalls, moveWrecks) |
 | A turning spar's frame from its brace or swing angle and hoist | `src/render/ship/swings.ts#swingMatrix` |
 | A point of the rig plan in ship space | `src/render/ship/swings.ts#shipPoint` |
 | Handing the moving frames to the rope shader | `src/render/ship/shipMaterials.ts#setShipFrame` |

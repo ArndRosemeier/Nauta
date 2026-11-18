@@ -13,6 +13,8 @@ import { Matrix4, Vector3 } from 'three/webgpu';
 import { footropeY, yardPoint } from '@futuremagic/figure/rigging';
 import type { Ladder } from '@futuremagic/figure/ladder';
 import { RATLINE_PITCH, ROPE } from '../../sim/rules/ships';
+import { FALLS_AT_PART } from '../../sim/rules/damage';
+import { sparParts } from '../../sim/damage/meet';
 import type { RigLine } from '../../sim/ship/lines';
 import { sparOf, type RigPlan } from '../../sim/ship/rig';
 import { between, distance, point, type RigPoint, type Spar } from '../../sim/ship/spars';
@@ -21,7 +23,7 @@ import { lathe } from './shapes';
 import { OAK } from './looks';
 import type { Solid } from './solid';
 import { FEW_SIDES, HEMP, TARRED, legFollow, sagging, type RopeFollow, type Ropes } from './rope';
-import { shipPoint, swingOf, type Swing } from './swings';
+import { shipPoint, sparFramesOf, type Swing } from './swings';
 import { pointOfEnd, sailForms, sailPoints, type SailForm, type SailPoint } from './sailForm';
 
 /** How far a leg sags at its middle, as a share of its length: a taut shroud or stay, a running line, and a leg to a sail (laid with the sail set; it shortens as the sail is clewed up). */
@@ -61,15 +63,16 @@ const STIRRUP_SPACING = 2.4;
 const FOOTROPE = 0.024;
 const HORSE_SAG = 0.15;
 
-/** Where a line set up to a deadeye leaves it (ship space), from the deadeyes' builder (rig.ts). */
+/** Where a line set up to a deadeye leaves it (ship space), from the deadeyes' builder (rig.ts), and the frame that carries it (a deadeye in a top goes with its mast). */
 export interface LineFoot {
   readonly at: Vector3;
+  readonly frame: number;
 }
 
-/** What the rigging is drawn into: her ropes, the solid of each moving frame (0 her hull) for its blocks, where lines leave their deadeyes. */
+/** What the rigging is drawn into: her ropes, each moving frame's solid (0 her hull) for its blocks (`draw` is given it), where lines leave their deadeyes. */
 export interface RiggingTargets {
   readonly ropes: Ropes;
-  readonly solid: (frame: number) => Solid;
+  readonly into: (frame: number, draw: (s: Solid) => void) => void;
   readonly feet: ReadonlyMap<string, LineFoot>;
   readonly far: boolean;
 }
@@ -98,8 +101,8 @@ export function buildRigging(rig: RigPlan, swings: readonly Swing[], t: RiggingT
 }
 
 class Rigging {
-  /** Each standing line as drawn, from its foot to its head (ship space): the ratlines are seized across them. */
-  private readonly drawn = new Map<string, [Vector3, Vector3]>();
+  /** Each standing line as drawn, from its foot to its head (ship space), and the frames carrying them: the ratlines are seized across them. */
+  private readonly drawn = new Map<string, Shroud>();
   /** How many blocks are at each place so far, to spread them. */
   private readonly blocksAt = new Map<string, number>();
   /** How many eyes go round each masthead so far, to stack them. */
@@ -107,19 +110,33 @@ class Rigging {
 
   private readonly forms: readonly SailForm[];
   private readonly points: readonly SailPoint[];
+  /** Every spar's moving frame, and how far along it (share, heel 0) it can break at the lowest (plan N6.5: what is below stays with her hull). */
+  private readonly frames: ReadonlyMap<string, number>;
+  private readonly breaksFrom = new Map<string, number>();
 
   constructor(private readonly rig: RigPlan, private readonly swings: readonly Swing[], private readonly t: RiggingTargets) {
     this.forms = sailForms(rig);
     this.points = sailPoints(rig, this.forms, swings.length + 1);
+    this.frames = sparFramesOf(rig);
+    const parts = sparParts();
+    for (const s of rig.spars) {
+      const first = parts.findIndex((p) => p.spar === s.id), low = parts[first + FALLS_AT_PART]?.spar === s.id ? first + FALLS_AT_PART : first;
+      const [along, across, height] = parts[low]!.from;
+      this.breaksFrom.set(s.id, shareAlong(s, { along, across, height }));
+    }
   }
 
-  private frameOfSpar(id: string): number { return swingOf(this.swings, id)?.frame ?? 0; }
+  /** The frame a point on spar `id` is carried by: the spar's, unless it is below where the spar can break (her hull's then). */
+  private frameOfSpar(id: string, p?: RigPoint): number {
+    const s = sparOf(this.rig, id);
+    return p && !this.swings.some((w) => w.id === id) && shareAlong(s, p) < this.breaksFrom.get(id)! ? 0 : this.frames.get(id) ?? 0;
+  }
 
-  /** The moving frame a point between a line's ends is carried by: the turning spar it lies on, else her hull. */
+  /** The moving frame a point between a line's ends is carried by: the spar it lies on (a turning spar first), else her hull. */
   private frameNear(p: RigPoint): number {
-    for (const w of this.swings) {
-      const s = sparOf(this.rig, w.id), len = s.length, u = ((p.along - s.heel.along) * (s.head.along - s.heel.along) + (p.across - s.heel.across) * (s.head.across - s.heel.across) + (p.height - s.heel.height) * (s.head.height - s.heel.height)) / (len * len);
-      if (u >= 0 && u <= 1 && distance(p, between(s.heel, s.head, u)) < s.diameter / 2 + ON_SPAR) return w.frame;
+    for (const s of [...this.swings.map((w) => sparOf(this.rig, w.id)), ...this.rig.spars]) {
+      const u = shareAlong(s, p);
+      if (u >= 0 && u <= 1 && distance(p, between(s.heel, s.head, u)) < s.diameter / 2 + ON_SPAR) return this.frameOfSpar(s.id, p);
     }
     return 0;
   }
@@ -131,7 +148,7 @@ class Rigging {
       const p = pointOfEnd(this.points, this.forms, line, end);
       return { at: p.rest.clone(), frame: p.frame };
     }
-    if (e.on === 'spar') return { at: shipPoint(e), frame: this.frameOfSpar(e.id) };
+    if (e.on === 'spar') return { at: shipPoint(e), frame: this.frameOfSpar(e.id, e) };
     return { at: shipPoint(e), frame: 0 };
   }
 
@@ -141,13 +158,13 @@ class Rigging {
     for (const v of line.via) knots.push({ at: shipPoint(v), frame: this.frameNear(v) });
     const foot = this.t.feet.get(line.id);
     const last = line.ends[1];
-    if (foot) knots.push({ at: foot.at, frame: 0 });
+    if (foot) knots.push({ at: foot.at, frame: foot.frame });
     else if (last.on === 'belay') knots.push({ at: shipPoint(point(last.along, last.across, last.height + LINE_OFF_PIN)), frame: 0 });
     else knots.push(this.endKnot(line, 1));
     // A futtock shroud hangs from its plate under the top's deadeye.
     if (line.kind === 'futtock shroud') {
       const plate = this.t.feet.get(`${line.ends[0].id}:plate`);
-      if (plate) knots[0] = { at: plate.at, frame: 0 };
+      if (plate) knots[0] = { at: plate.at, frame: plate.frame };
     }
     if (line.standing && foot) knots[0] = { at: this.eye(knots[0]!.at, line), frame: knots[0]!.frame };
     // Blocks at one place are spread apart, along the yard they hang on or along her.
@@ -166,7 +183,7 @@ class Rigging {
       follow.push(...f.slice(from));
     }
     this.t.ropes.line(pts, line.diameter / 2, line.standing ? TARRED : HEMP, this.t.far ? FEW_SIDES : undefined, follow);
-    if (line.standing) this.drawn.set(line.id, [knots[knots.length - 1]!.at, knots[0]!.at]);
+    if (line.standing) { const foot = knots[knots.length - 1]!, head = knots[0]!; this.drawn.set(line.id, { foot: foot.at, head: head.at, frames: [foot.frame, head.frame] }); }
     if (!this.t.far) for (let i = 1; i < knots.length - 1; i++) this.block(knots[i]!, knots[i - 1]!.at, knots[i + 1]!.at, line.diameter);
   }
 
@@ -203,32 +220,47 @@ class Rigging {
     y.normalize();
     const x = new Vector3().crossVectors(y, z), length = Math.max(BLOCK_LEAST, BLOCK_PER_DIAMETER * diameter);
     const frame = new Matrix4().makeBasis(x, y, z).setPosition(k.at).scale(new Vector3(BLOCK_WIDTH * length, 1, BLOCK_THICK * length));
-    lathe(this.t.solid(k.frame), frame, BLOCK_PROFILE.map(([r, u]) => [r, u * length] as [number, number]), BLOCK_SIDES, OAK);
+    this.t.into(k.frame, (s) => lathe(s, frame, BLOCK_PROFILE.map(([r, u]) => [r, u * length] as [number, number]), BLOCK_SIDES, OAK));
   }
 
-  /** Standing lines as drawn, by their place along her (aft first), foot then head. */
-  drawnOf(lines: readonly RigLine[]): [Vector3, Vector3][] {
-    return lines.map((l) => this.drawn.get(l.id)).filter((d): d is [Vector3, Vector3] => !!d).sort((p, q) => q[0].z - p[0].z);
+  /** Standing lines as drawn, by their place along her (aft first). */
+  drawnOf(lines: readonly RigLine[]): Shroud[] {
+    return lines.map((l) => this.drawn.get(l.id)).filter((d): d is Shroud => !!d).sort((p, q) => q.foot.z - p.foot.z);
   }
 
-  /** The ratlines across a set of shrouds at the steps of the ladder they are climbed by, from `over` m above their feet. */
-  ratlines(shrouds: readonly [Vector3, Vector3][], ladder: Ladder, over: number): void {
+  /** The ratlines across a set of shrouds at the steps of the ladder they are climbed by, from `over` m above their feet; each carried as its shrouds are. */
+  ratlines(shrouds: readonly Shroud[], ladder: Ladder, over: number): void {
     if (shrouds.length < 2) return;
     const rung = ladder.rung ?? RATLINE_PITCH;
-    const from = Math.max(...shrouds.map(([a, b]) => Math.min(a.y, b.y))) + over;
+    const from = Math.max(...shrouds.map((s) => Math.min(s.foot.y, s.head.y))) + over;
     for (let y = ladder.lo; y <= ladder.hi + SAME_PLACE; y += rung) {
       if (y < from) continue;
-      const at = shrouds.map((s) => shroudAt(s, y));
-      const pts: Vector3[] = [];
-      for (let k = 0; k < at.length - 1; k++) pts.push(...sagging(at[k]!, at[k + 1]!, RATLINE_SAG, 2).slice(k ? 1 : 0));
-      this.t.ropes.line(pts, ROPE.ratline / 2, TARRED, FEW_SIDES);
+      this.across(shrouds, y, ROPE.ratline / 2, RATLINE_SAG);
     }
   }
 
   /** The futtock stave across the lower shrouds, where the futtock shrouds come down to them. */
-  stave(shrouds: readonly [Vector3, Vector3][], y: number): void {
+  stave(shrouds: readonly Shroud[], y: number): void {
     if (shrouds.length < 2) return;
-    this.t.ropes.line(shrouds.map((s) => shroudAt(s, y)), STAVE_RADIUS, TARRED, FEW_SIDES);
+    this.across(shrouds, y, STAVE_RADIUS, 0);
+  }
+
+  /** A rope seized across `shrouds` at height `y`, sagging `sag` m between two; each point carried as its shroud is there. */
+  private across(shrouds: readonly Shroud[], y: number, radius: number, sag: number): void {
+    const pts: Vector3[] = [], follow: RopeFollow[] = [];
+    shrouds.forEach((s, k) => {
+      const u = (y - s.foot.y) / (s.head.y - s.foot.y), at = new Vector3().lerpVectors(s.foot, s.head, u);
+      const f: RopeFollow = { a: s.frames[0], b: s.frames[1], t: Math.min(1, Math.max(0, u)), A: s.foot, B: s.head };
+      if (k && sag) {
+        const prev = pts[pts.length - 1]!, middle = sagging(prev, at, sag, 2)[1]!;
+        const before = follow[follow.length - 1]!;
+        pts.push(middle);
+        follow.push({ ...before, t: (before.t + f.t) / 2 });
+      }
+      pts.push(at);
+      follow.push(f);
+    });
+    this.t.ropes.line(pts, radius, TARRED, FEW_SIDES, follow);
   }
 
   /** Every yard's footropes with their stirrups, turning with the yard, and the jib-boom's horses. */
@@ -254,22 +286,32 @@ class Rigging {
     this.t.ropes.line(pts, radius, TARRED, FEW_SIDES, legFollow(frame, pts[0]!, frame, pts[0]!, pts.length));
   }
 
-  /** The jib-boom's horse on a side: hanging between its two ends under the boom, made fast up to it at both. */
+  /** The jib-boom's horse on a side: hanging between its two ends under the boom, made fast up to it at both, going with the boom. */
   private horse(spar: Spar, ends: readonly RigPoint[]): void {
     const a = shipPoint(ends[0]!), b = shipPoint(ends[1]!);
     const up = (p: Vector3) => p.clone().setY(shipY(nearestOn(spar, p).height));
-    this.t.ropes.line([up(a), ...sagging(a, b, HORSE_SAG, Math.ceil(a.distanceTo(b) / FOOTROPE_STEP)), up(b)], FOOTROPE / 2, TARRED, FEW_SIDES);
+    this.rigid([up(a), ...sagging(a, b, HORSE_SAG, Math.ceil(a.distanceTo(b) / FOOTROPE_STEP)), up(b)], FOOTROPE / 2, this.frameOfSpar(spar.id));
   }
 }
 
 const UP = new Vector3(0, 1, 0), ACROSS = new Vector3(1, 0, 0);
+
+/** A standing line as drawn: its foot and head (ship space) and the frames carrying them (foot, head). */
+interface Shroud {
+  readonly foot: Vector3;
+  readonly head: Vector3;
+  readonly frames: readonly [number, number];
+}
+
+/** How far along a spar a point lies, as a share of its length from its heel (not held to 0..1). */
+function shareAlong(s: Spar, p: RigPoint): number {
+  return ((p.along - s.heel.along) * (s.head.along - s.heel.along) + (p.across - s.heel.across) * (s.head.across - s.heel.across) + (p.height - s.heel.height) * (s.head.height - s.heel.height)) / (s.length * s.length);
+}
 /** Where a belayed line leaves its pin, m above the rail's top (rig.ts draws the pin and its turns there). */
 export const LINE_OFF_PIN = 0.08;
 
 /** A key for a place, to the nearest SAME_PLACE. */
 const placeKey = (p: Vector3): string => `${Math.round(p.x / SAME_PLACE)},${Math.round(p.y / SAME_PLACE)},${Math.round(p.z / SAME_PLACE)}`;
-/** Where a straight line (foot, head) is at a ship-space height. */
-const shroudAt = ([a, b]: readonly [Vector3, Vector3], y: number): Vector3 => new Vector3().lerpVectors(a, b, (y - a.y) / (b.y - a.y));
 /** The point on a spar's axis nearest a ship-space point (by height along it). */
 function nearestOn(spar: Spar, p: Vector3): RigPoint {
   const a = shipPoint(spar.heel), d = shipPoint(spar.head).sub(a), u = Math.max(0, Math.min(1, p.clone().sub(a).dot(d) / d.lengthSq()));

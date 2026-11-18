@@ -252,15 +252,24 @@ const PICK = { across: 0, down: 1, size: 2, stretch: 3 } as const;
 /** One ship's holes in her sails, kept up with `rent` (holes per sail, rig plan order). */
 export class SailMarks {
   private shown: readonly number[] = [];
+  /** The sails gone with a wreck, cut out whole. */
+  private readonly lost = new Set<number>();
 
   constructor(private readonly map: SailMap, private readonly rects: readonly SailRect[]) {}
 
-  /** Brings the holes up to `rent`; true if any byte changed. */
-  bringUpTo(rent: readonly number[]): boolean {
-    if (rent === this.shown) return false;
+  /** Brings the holes up to `rent`, and cuts out whole each sail `gone` (gone over the side with its spar, plan N6.5); true if any byte changed. */
+  bringUpTo(rent: readonly number[], gone: readonly boolean[] = []): boolean {
+    let changed = false;
+    gone.forEach((g, s) => {
+      const r = this.rects[s];
+      if (!g || !r || this.lost.has(s)) return;
+      this.lost.add(s);
+      for (let y = r.y; y < r.y + r.height; y++) for (let x = r.x; x < r.x + r.width; x++) raise(this.map, x, y, MARK.cut, FULL);
+      changed = true;
+    });
+    if (rent === this.shown) return changed;
     const was = this.shown;
     this.shown = rent;
-    let changed = false;
     const sails = rigPlan().sails;
     rent.forEach((n, s) => {
       const r = this.rects[s], had = was[s] ?? 0;

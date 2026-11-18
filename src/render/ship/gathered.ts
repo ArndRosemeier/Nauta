@@ -12,11 +12,18 @@ const CORNERS = 3;
 export interface Packed {
   readonly attributes: readonly { readonly name: string; readonly size: number; readonly data: Float32Array }[];
   readonly index: Uint32Array;
+  /** The runs of `index` drawn for a named piece (`Gathered.tagged`): its name, where it starts and ends (index places). */
+  readonly runs?: readonly Run[];
 }
+
+/** A run of a mesh's index drawn for one named piece (a spar that can fall, plan N6.5): [name, from, to]. */
+export type Run = readonly [string, number, number];
 
 /** One mesh's vertex arrays, named as the kind's attributes, with their numbers per vertex, and its triangles. */
 export class Gathered {
   readonly idx: number[] = [];
+  /** The runs drawn for named pieces. */
+  private readonly runs: Run[] = [];
   /** Each attribute's name, numbers per vertex and numbers. */
   private readonly arrays: [string, number, number[]][] = [];
 
@@ -29,11 +36,19 @@ export class Gathered {
 
   get triangles(): number { return this.idx.length / CORNERS; }
 
+  /** What `draw` gathers here, named `name` (a spar of hers that can fall, plan N6.5: the triangles can be told apart later). */
+  tagged<T>(name: string, draw: () => T): T {
+    const from = this.idx.length, out = draw();
+    if (this.idx.length > from) this.runs.push([name, from, this.idx.length]);
+    return out;
+  }
+
   /** The vertices as typed arrays (what a worker sends). */
   packed(): Packed {
     return {
       attributes: this.arrays.map(([name, size, data]) => ({ name, size, data: new Float32Array(data) })),
       index: new Uint32Array(this.idx),
+      ...(this.runs.length ? { runs: [...this.runs] } : {}),
     };
   }
 
