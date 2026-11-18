@@ -29,7 +29,7 @@ import { hullHalfBreadth } from '../ship/hull';
 import { pointVelocity, poseRotation, toWorld, type ShipPose } from '../ship/motion';
 import type { GunPlace } from '../ship/plan';
 import { shipY, shipZ } from '../ship/section';
-import { bearingDir, DEGREE, GRAVITY, STEP_SECONDS, STEPS_PER_SECOND } from '../units';
+import { bearingDir, DEGREE, GRAVITY, MS_PER_SECOND, STEP_SECONDS, STEPS_PER_SECOND } from '../units';
 import { drillPace, gunRow, type Firing } from './guns';
 
 /** A point or a direction, m or m/s. */
@@ -94,6 +94,21 @@ export interface Fire {
 const DRAG = monotoneCurve(SPHERE_DRAG.mach, SPHERE_DRAG.drag);
 /** Kilograms in a tonne (the air's density is in t/m³, rules/sailing.ts). */
 const KG_PER_TONNE = 1000;
+
+/** The shortest last piece of a path a ball's place is taken along, s: a thousandth of a step (a path ending right on a point). */
+const SHORTEST_PIECE = STEP_SECONDS / MS_PER_SECOND;
+
+/**
+ * A ball's place on its path `time` seconds after firing (straight between its points; the last point is where it
+ * ended): what damage traces (N6.1) and the drawing flies (N5.4a).
+ */
+export function pathAt(path: readonly Vec[], ends: number, time: number): Vec {
+  const last = path.length - 1, t = Math.min(time, ends), f = t / PATH_STEP, i = Math.min(last - 1, Math.floor(f));
+  if (last < 1) return path[0]!;
+  const a = path[i]!, b = path[i + 1]!, span = i + 1 === last ? Math.max(ends - i * PATH_STEP, SHORTEST_PIECE) : PATH_STEP;
+  const k = Math.min(1, Math.max(0, (t - i * PATH_STEP) / span));
+  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+}
 
 /** Where a gun's muzzle stands in ship space: in her port, at her side, halfway up the port. */
 export function muzzleAt(place: GunPlace): Vec {

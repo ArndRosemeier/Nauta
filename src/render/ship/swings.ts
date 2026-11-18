@@ -10,8 +10,12 @@ import { sparOf, type RigPlan } from '../../sim/ship/rig';
 import type { RigPoint, Spar } from '../../sim/ship/spars';
 import { shipY, shipZ } from '../../sim/ship/section';
 
-/** How many moving frames her ropes can follow: her hull, every spar that turns, and every point of a sail a line is made fast to (sailForm.ts `sailPoints`; the rope kind's frames texture, shipMaterials.ts). */
-export const MOST_FRAMES = 64;
+/** How many moving frames her rig takes: her hull, every spar that turns, and every point of a sail a line is made fast to (sailForm.ts `sailPoints`). */
+export const RIG_FRAMES = 64;
+/** How many her guns and port lids take after the rig's (gunPlaces.ts: a gun's breeching, a lid's lanyard). */
+export const GUN_FRAMES = 64;
+/** How many moving frames her ropes can follow (the rope kind's frames texture, shipMaterials.ts). */
+export const MOST_FRAMES = RIG_FRAMES + GUN_FRAMES;
 
 /** A spar that turns: its moving frame's number, the point it turns about and the axis (ship space), and how far a lowered yard drops. */
 export interface Swing {

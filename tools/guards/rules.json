@@ -16,6 +16,8 @@
     "src/app/crewLooks.ts",
     "src/app/crewLevels.ts",
     "src/app/crewTrial.ts",
+    "src/app/gunsSeen.ts",
+    "src/app/shotsSeen.ts",
     "src/probe/report.ts",
     "src/probe/waves.ts",
     "src/audio/ambience.ts",

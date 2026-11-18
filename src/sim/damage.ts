@@ -38,12 +38,12 @@ import { meetings, nearHer, plankingPlace, type Aboard, type Meeting, type Place
 import { atWork, manAt, type Crew, type Mended } from './crew/crew';
 import { brigRoster, type Man } from './crew/roster';
 import { battery, dismountGun, gunAt, gunCount, type Battery } from './guns/guns';
-import type { GunFired, Shot, Vec } from './guns/shot';
+import { pathAt, type GunFired, type Shot, type Vec } from './guns/shot';
 import {
   AWASH_SECONDS, CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
   MAN_AS_OAK, PIERCE, PUMP_POST, SMASHED, SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, WAD_RANGE, type Harm, type HurtBy,
 } from './rules/damage';
-import { SHOT, PATH_STEP, type ShotKind } from './rules/guns';
+import { SHOT, type ShotKind } from './rules/guns';
 import { LOAD_WATERLINE, type GunKind } from './rules/ships';
 import { surfaceAt, seaSample, type SeaState } from './sea/sea';
 import { toShip, toWorld, UNBURDENED, type Burden, type ShipPose } from './ship/motion';
@@ -207,15 +207,6 @@ const flightKey = (by: number, gun: number, tick: number): string => `${by}|${gu
 export function launch(flying: readonly Flying[], fired: GunFired): Flying[] {
   flights.set(flightKey(fired.ship, fired.gun, fired.tick), fired.fired);
   return [...flying, { by: fired.ship, gun: fired.gun, tick: fired.tick, spent: fired.fired.balls.map(() => 0) }];
-}
-
-/** A ball's place on its path `time` seconds after firing (straight between its points; the last point is where it ended). */
-function pathAt(path: readonly Vec[], ends: number, time: number): Vec {
-  const last = path.length - 1, t = Math.min(time, ends), f = t / PATH_STEP, i = Math.min(last - 1, Math.floor(f));
-  if (last < 1) return path[0]!;
-  const a = path[i]!, b = path[i + 1]!, span = i + 1 === last ? Math.max(ends - i * PATH_STEP, STEP_SECONDS / MM) : PATH_STEP;
-  const k = Math.min(1, Math.max(0, (t - i * PATH_STEP) / span));
-  return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
 }
 
 /** A world point as a place in a ship lying at `pose`. */

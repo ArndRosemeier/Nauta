@@ -18,7 +18,9 @@ import { hullHalfBreadth, sideTop } from '../src/sim/ship/hull.ts';
 import { outsideX } from '../src/render/ship/hullSide.ts';
 import { Vector3 } from 'three/webgpu';
 import { rigPlan } from '../src/sim/ship/rig.ts';
-import { MOST_FRAMES, shipPoint, swingMatrix, swingsOf } from '../src/render/ship/swings.ts';
+import { MOST_FRAMES, RIG_FRAMES, shipPoint, swingMatrix, swingsOf } from '../src/render/ship/swings.ts';
+import { gunFrame, lidFrame } from '../src/render/ship/gunPlaces.ts';
+import { battery } from '../src/sim/guns/guns.ts';
 import { LINE_OFF_PIN } from '../src/render/ship/rigging.ts';
 import { sailForms, sailPoints } from '../src/render/ship/sailForm.ts';
 
@@ -212,5 +214,8 @@ test('her yards brace round and her boom and gaff swing: each in its own frame, 
   }
   // Lines made fast to a sail follow its points' frames (N3.10), numbered after the spars'.
   const points = sailPoints(RIG, sailForms(RIG), SWINGS.length + 1);
-  assert.deepEqual([...used].sort((a, b) => a - b), [0, ...SWINGS.map((w) => w.frame), ...points.map((p) => p.frame)]);
+  // The breechings follow their carronades' carriages, the lanyards their lids (N5.4a), after the rig's frames.
+  const carronades = battery().flatMap((g, i) => (g.gun === 'carronade' ? [gunFrame(i)] : [])), lids = shipPlan().guns.map((_, j) => lidFrame(j));
+  assert.deepEqual([...used].sort((a, b) => a - b), [0, ...SWINGS.map((w) => w.frame), ...points.map((p) => p.frame), ...carronades, ...lids]);
+  assert.ok(Math.max(...lids) < MOST_FRAMES && Math.max(...points.map((p) => p.frame)) < RIG_FRAMES, 'every frame fits its block of the frames texture');
 });

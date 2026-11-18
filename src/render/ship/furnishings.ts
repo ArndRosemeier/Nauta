@@ -19,6 +19,7 @@ import { place, type Fittings, type SlotTarget } from './fittings';
 import { OAK, RED } from './looks';
 import { MODEL } from '../../sim/rules/fittings';
 import { Solid } from './solid';
+import { CARRONADE_PARTS } from './gunPlaces';
 
 /** Which of her kinds draws each material slot of the fittings' specs: timber and cloth, metal and glass, and what glows. */
 const SLOT_KIND: Readonly<Record<string, 'wood' | 'iron' | 'glow'>> = {
@@ -34,7 +35,9 @@ const KINDS = [['wood', FITTED_WOOD], ['iron', FITTED_IRON], ['glow', FITTED_GLO
  * ochre as on the slice. Every other slot (paint, rope, canvas, metal) keeps the spec's own colours.
  */
 const BARE: ReadonlySet<string> = new Set(['wood', 'planks', 'timber', 'head', 'oar', 'sheave']);
-const GUNS: ReadonlySet<string> = new Set([MODEL.long6]);
+const GUNS: ReadonlySet<string> = new Set([MODEL.long6, ...CARRONADE_PARTS]);
+/** Fittings that move, drawn by their own views (the long sixes, gunsView.ts). */
+const MOVING: ReadonlySet<string> = new Set([MODEL.long6]);
 
 /**
  * Levels of detail by size: a model's radius r (m) is drawn whole to r × NEAR_PER_METRE, its spec's lower levels each
@@ -92,13 +95,16 @@ function radiusOf(fittings: Fittings, name: string): number {
   return r;
 }
 
-/** A model's levels of detail: its own and its spec's lower levels, by distance from its size; `shadows`: whether its bigger parts cast the sun's shadow. */
-function drawKind(fittings: Fittings, name: string, shadows: boolean): DrawKind {
+/**
+ * A model's levels of detail: its own and its spec's lower levels, by distance from its size; `shadows`: whether its
+ * bigger parts cast the sun's shadow; `farthest`: drawn out to this distance at least, m (a gun seen from the other ship).
+ */
+export function drawKind(fittings: Fittings, name: string, shadows: boolean, farthest = 0): DrawKind {
   const names = [name];
   for (let k = 1; k <= MOST_LEVELS && fittings.has(`${name}_lod${k}`); k++) names.push(`${name}_lod${k}`);
   const r = radiusOf(fittings, name), m = fittings.get(name)!;
   const casts = shadows && [0, 1, 2].map((k) => m.max[k]! - m.min[k]!).sort((a, b) => a - b)[1]! >= LEAST_CASTER;
-  const far = Math.min(FAR_MOST, Math.max(FAR_LEAST, r * FAR_PER_METRE));
+  const far = Math.max(farthest, Math.min(FAR_MOST, Math.max(FAR_LEAST, r * FAR_PER_METRE)));
   const lods: DrawLod[] = names.map((n, i) => {
     const near = i === 0 ? 0 : Math.min(far, r * NEAR_PER_METRE * LEVEL_STEP ** (i - 1));
     const last = i === names.length - 1, end = last ? far : Math.min(far, r * NEAR_PER_METRE * LEVEL_STEP ** i);
@@ -131,6 +137,8 @@ export class Furnishings {
     const zoneOf = (f: Furnishing) => (f.level === 'weather' ? OUTSIDE : zoneUnder(plan, spaceZones, f.level, -f.z, f.x)) ?? OUTSIDE;
     const byZone = new Map<string, Furnishing[]>();
     for (const f of list) {
+      // The guns run in and out: gunsView.ts draws them.
+      if (MOVING.has(f.model)) continue;
       const z = zoneOf(f);
       if (outsideOnly && z !== OUTSIDE) continue;
       byZone.set(z, [...(byZone.get(z) ?? []), f]);

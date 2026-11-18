@@ -176,7 +176,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her bulwarks: the inside face, ports, lids, rail, waterway | `src/render/ship/hullSide.ts#buildBulwarks` |
 | Where the deck meets her side at her ends | `src/render/ship/hullSide.ts#deckEnds` |
 | Her side's outside and inside lines (planking, bulwark, ceiling) | `src/render/ship/hullSide.ts#outsideX` |
-| A port lid's lower edge (its lanyard's end) | `src/render/ship/hullSide.ts#lidEdge` |
+| A port lid's lower edge when up (its lanyard's end) | `src/render/ship/gunPlaces.ts#lidEdge` |
 | Places along her for rows, cut at given places | `src/render/ship/hullSide.ts#rowsAlong` |
 | The weather deck and its underside, per zone | `src/render/ship/decks.ts#buildWeatherDeck` |
 | A deck's planking cut for holes, and its underside per zone | `src/render/ship/decks.ts#deckCells` |
@@ -223,7 +223,11 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Handing the sea the ships' wake maps | `src/render/seaMaterial.ts#useWake` |
 | A ship's side wet where the sea has climbed it, draining down in streaks, from her own stations (her timber's and copper's shaders, either ship) | `src/render/wakeMap.ts#wetHull` |
 | The light a matte, level surface sends back (the sea's body, the deep, spray) | `src/render/seaMaterial.ts#daylight` |
-| Spray thrown from her bow when she slams and at speed: drops flown on the GPU | `src/render/spray.ts#SprayView` |
+| Spray thrown from her bow when she slams and at speed, and the column a ball throws where it falls in the sea: drops flown on the GPU | `src/render/spray.ts#SprayView` |
+| Where a thing flung into the air is after a time, slowed toward the wind and pulled down (the GPU's flight of spray, puffs and splinters) | `src/render/spray.ts#flown` |
+| A quad facing the eye: its geometry, and its corner in clip space (spray, gunfire) | `src/render/spray.ts#facingEye` |
+| The one quad geometry many instances facing the eye draw | `src/render/spray.ts#eyeQuad` |
+| A ring of starts moved by the floating origin's step | `src/render/spray.ts#shiftStarts` |
 | The spray's shader | `src/render/spray.ts#makeSprayMaterial` |
 | The ship-and-water check's pictures (sailed by a match: rail, bowsprit, astern, 50 m off, above, berth deck) | `tools/shot/ship.mjs#shipShots` |
 | The sun's shadow map round her | `src/render/ship/shipView.ts#shadowingSun` |
@@ -267,6 +271,21 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Gunfire's sound as data: the report near, far and through her deck, shot passing and splashing, deafened (dull world, ringing), her guns' jolt (the takes: tools/sound/sounds.json; the ringing: tools/sound/ring.mjs) | `src/audio/gunTuning.ts#GUN_NEAR` |
 | What is heard of gunfire, from the fired events: reports arriving by the speed of sound, balls passing and falling near the ear, the ears' load, jolts | `src/audio/gunHearing.ts#GunWatch` |
 | Where a ball's path passes nearest a point | `src/audio/gunHearing.ts#nearestPass` |
+| A ball's place on its path a time after firing (damage traces it, the drawing flies it) | `src/sim/guns/shot.ts#pathAt` |
+| How a ship's guns stand for the drawing: run out or in, leaping back when fired, trained; her lids wanted up (N5.4a) | `src/app/gunsSeen.ts#gunsSeen` |
+| How far run out a gun stands through her recoil (the leap back on her breeching) | `src/app/gunsSeen.ts#recoilOut` |
+| What is seen of gunfire, from the events and the shots in flight: flashes, balls along their paths, splashes where they touch the sea, strikes; a ball stopped in a ship drawn no further | `src/app/shotsSeen.ts#ShotsSeen` |
+| Her guns and port lids drawn moving: slides trained, carriages run out and in, the long sixes on their trucks, lids swung, as instances in moving frames (N5.4a) | `src/render/ship/gunsView.ts#GunsView` |
+| A gun's moving frame: trained about her pivot and run in along her axis | `src/render/ship/gunPlaces.ts#gunMove` |
+| A port lid's moving frame: swung on its hinge | `src/render/ship/gunPlaces.ts#lidMove` |
+| The rope frames of her guns and lids (breechings, lanyards), after the rig's | `src/render/ship/gunPlaces.ts#gunFrame` |
+| A carronade at her port as built (run out, square) | `src/render/ship/gunPlaces.ts#carronadeRest` |
+| The carronade cut into her slide and the gun on her carriage | `src/render/ship/gunPlaces.ts#splitCarronade` |
+| The ring on a carronade's cascabel her breeching is rove through | `src/render/ship/gunPlaces.ts#cascabelRing` |
+| Gunfire drawn: muzzle flashes and first puffs, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
+| Balls falling in the sea: a column of spray and white water in the nearest ship's wake map | `src/render/gunfire.ts#fallInSea` |
+| Shot fallen in the sea as white water on her wake map | `src/render/wakeMap.ts#WakeMap` |
+| Something that moves on her outside (her guns and lids), drawn near and far | `src/render/ship/shipView.ts#ShipView` |
 | A room as a deafened ear hears it | `src/audio/gunHearing.ts#deafened` |
 | Gunfire heard: its sounds played through the ship's engine, the jolts and the deafened room handed back | `src/audio/gunSound.ts#GunSound` |
 | A watch's frame emptied to be filled again | `src/audio/heard.ts#clearHeard` |

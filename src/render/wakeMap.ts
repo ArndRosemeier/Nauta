@@ -87,6 +87,19 @@ const SLICK_GAIN = 2;
 const STRIP_FROM = -2;
 const STRIP_TO = 4;
 
+/**
+ * Shot falling in the sea (N5.4a): each splash leaves a patch of white water where the ball went in, its radius
+ * (`radius`, m, by the ball and how it struck) widening as the square root of its age by `SPLASH_SPREAD` (m per
+ * √s), fresh for `SPLASH_FRESH` s and then lace that thins over `SPLASH_LACE` s. A map holds its `MOST_SPLASHES`
+ * newest, each for `SPLASH_LIFE` s; the patch's edge is soft over its outer `SPLASH_EDGE` share.
+ */
+export const MOST_SPLASHES = 32;
+const SPLASH_SPREAD = 0.6;
+const SPLASH_FRESH = 2.5;
+const SPLASH_LACE = 12;
+const SPLASH_LIFE = 30;
+const SPLASH_EDGE = 0.5;
+
 /** The waterline's length, m. */
 const WATERLINE_LENGTH = STERN_Z - STEM_Z;
 
@@ -106,6 +119,10 @@ function makeInputs() {
     now: uniform(new Vector4()),
     /** From the sea's frame (its origin) into her ship space. */
     toShip: uniform(new Matrix4()),
+    /** Shot fallen in the sea near her: x, z from the sea's origin, the clock's time it fell, its patch's radius (m); how many, and the clock now. */
+    splash: uniformArray(Array.from({ length: MOST_SPLASHES }, () => new Vector4()), 'vec4'),
+    splashes: uniform(0, 'int'),
+    clock: uniform(0),
   };
 }
 type WakeInputs = ReturnType<typeof makeInputs>;
@@ -291,6 +308,15 @@ export class WakeMap {
       const slick = clamp(strength.mul(SLICK_GAIN), 0, 1).mul(exp(ago.div(-WAKE.slickLife))).mul(exp(slickAcross.mul(slickAcross).negate()))
         .mul(smoothstep(-HALF_LENGTH, 0, sStern));
 
+      // --- Shot fallen in the sea: white water where each ball went in, spreading and thinning to lace.
+      Loop({ start: int(0), end: I.splashes, type: 'int', condition: '<' }, ({ i }) => {
+        const S = I.splash.element(i), age = max(I.clock.sub(S.z), 0), r = S.w.add(sqrt(age).mul(SPLASH_SPREAD));
+        const patch = float(1).sub(smoothstep(r.mul(1 - SPLASH_EDGE), r, length(p.sub(S.xy))));
+        const young = exp(age.div(-SPLASH_FRESH));
+        fresh.assign(max(fresh, patch.mul(young)));
+        old.assign(max(old, patch.mul(float(1).sub(young)).mul(exp(age.div(-SPLASH_LACE)))));
+      });
+
       if (near) {
         // --- Close to her hull, in her own frame: the bow wave and the body's hollow and rise; its slope by differences.
         const nowSpeed = I.now.x, nowHead = nowSpeed.mul(nowSpeed).div(2 * GRAVITY), drift = I.now.y;
@@ -347,6 +373,24 @@ export class WakeMap {
       const x = Math.floor((cx + ox - side / 2) / texel) * texel - ox, z = Math.floor((cz + oz - side / 2) / texel) * texel - oz;
       v.set(x, z, texel, this.drawn[l] ? 1 : 0);
     });
+  }
+
+  /** Shot fallen in the sea near her, the newest last (the world: x, z; the clock's time; the patch's radius, m). */
+  private readonly fallen: { x: number; z: number; t: number; radius: number }[] = [];
+
+  /** A ball fallen into the sea at world `x`, `z` at the clock's `t`, its white water `radius` m at first. */
+  splash(x: number, z: number, t: number, radius: number): void {
+    this.fallen.push({ x, z, t, radius });
+    if (this.fallen.length > MOST_SPLASHES) this.fallen.shift();
+  }
+
+  /** Once a frame, before the passes run: the splashes still showing at the clock's `t`, laid out from the sea's origin (`ox`, `oz`). */
+  laySplashes(t: number, ox: number, oz: number): void {
+    while (this.fallen.length && t - this.fallen[0]!.t > SPLASH_LIFE) this.fallen.shift();
+    const I = this.inputs, list = I.splash.array as Vector4[];
+    this.fallen.forEach((f, i) => list[i]!.set(f.x - ox, f.z - oz, f.t, f.radius));
+    I.splashes.value = this.fallen.length;
+    I.clock.value = t;
   }
 
   /** Compiles the passes (behind the loading screen). */

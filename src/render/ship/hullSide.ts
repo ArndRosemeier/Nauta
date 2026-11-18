@@ -2,7 +2,8 @@
  * Her outside, the whole length of her (plan N2.4): the hull's planking from the keel to the top of her side, laid on
  * the fair surface of her lines (sim/ship/hull.ts), copper below the waterline, black paint above, the ochre band
  * along her ports, the wales standing proud, the gun ports cut through, the keel, stem and sternpost, the square
- * stern; and above the deck the bulwarks' inside, the rail, the ports' linings and lids, and the channels.
+ * stern; and above the deck the bulwarks' inside, the rail, the ports' linings, and the channels (the lids swing with
+ * the guns: gunsView.ts).
  *
  * Her side's grain runs along her (u: ship-space z) and up her girth (v: m from the bottom of her hull at that
  * place), which is also how the damage map lays out her planking (damageMap.ts) and how the plan's planking cells
@@ -51,10 +52,6 @@ const LEAST_INSIDE = 0.05;
 /** Ambient occlusion baked into corners, and how far its shade reaches, m. */
 export const CORNER_AO = 0.55;
 export const CORNER_REACH = 0.35;
-/** A port lid: how far it is swung up from shut (rad), its thickness and how much bigger than the port it is, m. */
-const LID_OPEN = 1.35;
-const LID_THICK = 0.075;
-const LID_LAP = 0.05;
 /** Columns across the stern's transom. */
 const TRANSOM_COLUMNS = 16;
 /** The taffrail across the top of her stern: its width and depth, m (the rail's). */
@@ -275,9 +272,9 @@ export function buildBulwarks(out: ZoneParts, deckAft: number, deckFore: number,
 /** Rows of the bulwark's face across a port's height. */
 const PORT_ROWS = 3;
 
-/** One gun port's linings through the bulwark and its lid, hinged at its top outside and swung up: black outside, red inside. */
+/** One gun port's linings through the bulwark (its lid swings on its hinge with the guns: gunPlaces.ts, gunsView.ts). */
 function buildPort(out: ZoneParts, [, along, sill, top, width]: (typeof PORTS)[number], side: number): void {
-  const z0 = shipZ(along + width / 2), z1 = shipZ(along - width / 2), zc = shipZ(along);
+  const z0 = shipZ(along + width / 2), z1 = shipZ(along - width / 2);
   const xo = (h: number) => side * outsideX(along, h), xi = (h: number) => side * bulwarkInside(along, h);
   const thick = BULWARK_THICK;
   const faces: [Vector3, Vector3, Vector3, Vector3][] = [
@@ -287,19 +284,5 @@ function buildPort(out: ZoneParts, [, along, sill, top, width]: (typeof PORTS)[n
     [new Vector3(xi(sill), shipY(sill), z1), new Vector3(xo(sill), shipY(sill), z1), new Vector3(xo(top), shipY(top), z1), new Vector3(xi(top), shipY(top), z1)],
   ];
   for (const f of faces) sheet(out.wood, [[f[0], f[3]], [f[1], f[2]]], RED, (i, j) => [i * thick, j * width], () => true, side > 0);
-  const hinge = new Vector3(xo(top) + side * LID_THICK / 2, shipY(top + LID_LAP), zc);
-  const h = top - sill + 2 * LID_LAP, w = width + 2 * LID_LAP;
-  const lid = new Matrix4().setPosition(hinge).multiply(new Matrix4().makeRotationZ(side * LID_OPEN)).multiply(new Matrix4().makeTranslation(0, -h / 2, 0));
-  // Two layers: its outside black, its inside red.
-  const layer = LID_THICK / 2;
-  for (const [face, look] of [[1, BLACK], [-1, RED]] as const) {
-    box(out.wood, lid.clone().multiply(new Matrix4().makeTranslation((face * side * layer) / 2, 0, 0)), [layer, h, w], look, SMALL_BEVEL, 1);
-  }
 }
 
-/** Where a port's lid hangs when open: its lower edge's middle, ship space (its lanyard runs from there). */
-export function lidEdge(along: number, top: number, sill: number, side: number): Vector3 {
-  const h = top - sill + 2 * LID_LAP;
-  return new Vector3(side * (outsideX(along, top) + LID_THICK / 2), shipY(top + LID_LAP), shipZ(along))
-    .add(new Vector3(side * Math.sin(LID_OPEN) * h, -Math.cos(LID_OPEN) * h, 0));
-}

@@ -5,17 +5,19 @@
  * ship at a distance. Built in a worker at load (shipWorker.ts); the page only makes the meshes.
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
-import { MAIN_HATCH, PORTS, PORT_GUNS, ROPE } from '../../sim/rules/ships';
+import { MAIN_HATCH, ROPE } from '../../sim/rules/ships';
+import { battery } from '../../sim/guns/guns';
 import { weatherDeck } from '../../sim/ship/hull';
 import { berthDeck, shipPlan, type ShipPlan } from '../../sim/ship/plan';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { lathe } from './shapes';
-import { hanging } from './rope';
-import { IRON, RED } from './looks';
-import { place, type Fittings } from './fittings';
+import { hanging, legFollow } from './rope';
+import { IRON } from './looks';
+import type { Fittings } from './fittings';
+import { CARRONADE, carronadeRest, cascabelRing, gunFrame, lidEdge, lidFrame, splitCarronade } from './gunPlaces';
 import { ShipParts, type ZoneParts } from './parts';
 import type { Packed } from './gathered';
-import { bulwarkInside, buildBulwarks, buildOutside, deckEnds, lidEdge, outsideX, type Detail } from './hullSide';
+import { bulwarkInside, buildBulwarks, buildOutside, deckEnds, outsideX, type Detail } from './hullSide';
 import { buildDeckBeams, buildDeckOpenings, buildPartners, buildWeatherDeck, type DeckContext } from './decks';
 import { buildRooms } from './rooms';
 import { buildRigs } from './rig';
@@ -28,10 +30,6 @@ const BREECHING_BOLT = { out: 0.62, up: 0.55, sag: 0.16, steps: 10 } as const;
 const RING_BOLT = { radius: 0.035, thick: 0.012, sides: 10 } as const;
 /** The port lid's lanyard runs to a hole this far below the rail, m; its sag and pieces. */
 const LANYARD = { belowRail: 0.12, sag: 0.03, steps: 6 } as const;
-/** The carronade's breeching ring in the pack's model space (Blender's [0, 0.97, 0.70] turned Y up, front +Z). */
-const BREECHING_RING = [0, 0.7, -0.97] as const;
-/** Each carronade's seed from its place along her (its small differences of finish). */
-const GUN_SEED_PER_METRE = 10;
 /** A quarter turn, rad. */
 const QUARTER = Math.PI / 2;
 /** How much of the sky an opening lets through below: a grating's holes, a hooded companion, the glazed skylight, open ladderways and scuttles. */
@@ -142,30 +140,33 @@ function buildFar(fittings: Fittings): { out: ZoneParts; parts: ShipParts } {
   return { out, parts };
 }
 
-/** The carronades at their ports, both sides, run out, with their breechings and the port lids' lanyards (the long sixes come with N2.6). */
+/**
+ * At every gun port: the ring bolts either side for the breeching, the carronade's breeching from one through the ring
+ * on her cascabel to the other, following her carriage as she runs in and out, and the lid's lanyard following its lid
+ * (gunPlaces.ts frames). The guns and the lids themselves are drawn moving, by gunsView.ts.
+ */
 function buildGuns(fittings: Fittings, out: ZoneParts): void {
-  for (const side of [1, -1]) {
-    for (const [mark, along, sill, top] of PORTS) {
-      const zc = shipZ(along);
-      const inX = (h: number) => side * bulwarkInside(along, h);
-      // The ring bolts either side of the port for the breeching.
-      const boltH = weatherDeck(along, bulwarkInside(along, sill)) + BREECHING_BOLT.up;
-      for (const dz of [-BREECHING_BOLT.out, BREECHING_BOLT.out]) {
-        lathe(out.iron, new Matrix4().makeRotationZ(side * QUARTER).setPosition(new Vector3(inX(boltH), shipY(boltH), zc + dz)), ringProfile(), RING_BOLT.sides, IRON);
-      }
-      // The lid's lanyard, from its lower edge up through the bulwark under the rail.
-      const hole = new Vector3(side * outsideX(along, top), shipY(top + LANYARD.belowRail), zc);
-      out.ropes.line(hanging(lidEdge(along, top, sill, side), hole, LANYARD.sag, LANYARD.steps), ROPE.running / 2, 1);
-      if (PORT_GUNS[mark]!.gun !== 'carronade') continue;
-      const x = inX(sill), frame = new Matrix4().makeRotationY(side * QUARTER).setPosition(x, shipY(weatherDeck(along, x)), zc);
-      place(fittings, 'prop_carronade_32', frame, { iron: { solid: out.iron, paint: 1 }, wood: { solid: out.wood, paint: 1, rgb: RED.rgb } }, Math.round(along * GUN_SEED_PER_METRE));
-      // The breeching: from a ring bolt by the port, through the ring on the cascabel, to the other.
-      const ring = new Vector3(...BREECHING_RING).applyMatrix4(frame);
-      for (const dz of [-BREECHING_BOLT.out, BREECHING_BOLT.out]) {
-        out.ropes.line(hanging(new Vector3(inX(boltH), shipY(boltH), zc + dz), ring, BREECHING_BOLT.sag, BREECHING_BOLT.steps), ROPE.breeching / 2, 0);
-      }
+  const ring = cascabelRing(splitCarronade(fittings.get(CARRONADE)!).gun), guns = battery();
+  shipPlan().guns.forEach((g, port) => {
+    const { along, sill, top, side } = g, zc = shipZ(along);
+    const inX = (h: number) => side * bulwarkInside(along, h);
+    const boltH = weatherDeck(along, bulwarkInside(along, sill)) + BREECHING_BOLT.up;
+    for (const dz of [-BREECHING_BOLT.out, BREECHING_BOLT.out]) {
+      lathe(out.iron, new Matrix4().makeRotationZ(side * QUARTER).setPosition(new Vector3(inX(boltH), shipY(boltH), zc + dz)), ringProfile(), RING_BOLT.sides, IRON);
     }
-  }
+    // The lid's lanyard, from its lower edge up through the bulwark under the rail.
+    const hole = new Vector3(side * outsideX(along, top), shipY(top + LANYARD.belowRail), zc), edge = lidEdge(g);
+    const lanyard = hanging(edge, hole, LANYARD.sag, LANYARD.steps);
+    out.ropes.line(lanyard, ROPE.running / 2, 1, undefined, legFollow(lidFrame(port), edge, 0, hole, lanyard.length));
+    const gun = guns.indexOf(g);
+    if (g.gun !== 'carronade' || gun < 0) return;
+    // The breeching: from a ring bolt by the port, through the ring on the cascabel, to the other.
+    const at = ring.clone().applyMatrix4(carronadeRest(along, sill, side));
+    for (const dz of [-BREECHING_BOLT.out, BREECHING_BOLT.out]) {
+      const bolt = new Vector3(inX(boltH), shipY(boltH), zc + dz), line = hanging(bolt, at, BREECHING_BOLT.sag, BREECHING_BOLT.steps);
+      out.ropes.line(line, ROPE.breeching / 2, 0, undefined, legFollow(0, bolt, gunFrame(gun), at, line.length));
+    }
+  });
 }
 
 /** A ring bolt's ring as a turned profile (a short eye standing off the timber). */
