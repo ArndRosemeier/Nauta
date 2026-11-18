@@ -380,3 +380,18 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her fittings drawn as instances in her moving frame, by zone of her and level of detail | `src/render/ship/furnishings.ts#Furnishings` |
 | Something more of hers put into one of her zones, seen with it and lit by its lanterns (`ShipView.addToZone`) | `src/render/ship/shipView.ts#ShipView` |
 | One of her materials made to draw instances in her frame (they see ship space) | `src/render/ship/fitted.ts#fitted` |
+| The guns' rules: each kind's arcs, reload, recoil, running in and laying rates; the drill's steps and their shares; the short-hands rule (first proposals) | `src/sim/rules/guns.ts#GUNS` |
+| The battery: the brig's 18 guns' plan places in battery order (kind, port, side, crew places) | `src/sim/guns/guns.ts#battery` |
+| A battery at the start, every gun housed | `src/sim/guns/guns.ts#startGuns` |
+| How many men stand at each gun now (read from the crew) | `src/sim/guns/guns.ts#handsAtGuns` |
+| The pace of a gun's handwork by the men at her (short hands stretch it; under two she stops) | `src/sim/guns/guns.ts#drillPace` |
+| The seconds of full-crew work of a step of the drill | `src/sim/guns/guns.ts#handWork` |
+| A gun's training and elevation kept within her arcs | `src/sim/guns/guns.ts#withinArcs` |
+| One step of a gun: laid toward what is wanted, taken on through her drill (the one owner of every gun's state) | `src/sim/guns/guns.ts#stepGun` |
+| One step of the whole battery | `src/sim/guns/guns.ts#stepGuns` |
+| What a battery with no gunnery orders does: nothing new | `src/sim/guns/guns.ts#standingWants` |
+| Why a gun cannot fire now (unloaded, run in, dismounted, too few men) | `src/sim/guns/guns.ts#cannotFire` |
+| Firing a gun: refused with its reason, or her recoil and what left her | `src/sim/guns/guns.ts#fireGun` |
+| A gun read out of a ship's packed battery | `src/sim/guns/guns.ts#gunAt` |
+| A gun's training and elevation in radians | `src/sim/guns/guns.ts#laidAt` |
+| A gun knocked off her carriage or slide (damage asks for it) | `src/sim/guns/guns.ts#dismountGun` |
