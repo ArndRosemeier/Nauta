@@ -64,7 +64,7 @@ test('nobody visible just stands about: every man with nothing to do is busy at 
   assert.ok(roster.every((m, i) => m.home.startsWith('station-sentries') || m.home.startsWith('station-cabin-door') || men[i]!.clip !== 'pistol idle'), 'only sentries keep a pistol ready');
   // The hands off watch sleep below, each in a hammock of his own; the others have a job on deck or at a station below.
   roster.forEach((m, i) => assert.equal(men[i]!.clip === SLEEPING, m.bunk !== null, `${m.rank} ${i} at ${m.home}`));
-  assert.ok(roster.filter((m) => m.bunk !== null).length >= 80, 'most of the crew is asleep');
+  assert.ok(roster.filter((m) => m.bunk !== null).length >= 50, 'most of the crew is asleep');
 });
 
 test('a sleeper lies athwart her in his hammock under the deck beams, his head inboard, over the floor of his space', () => {

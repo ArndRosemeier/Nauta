@@ -36,8 +36,10 @@ const WAIT_SECONDS = 40;
 /** Long enough for the gun crews to run to their guns on the side she fights from where they stand by, s, and the fewest men then at each gun. */
 const MUSTER_SECONDS = 80;
 const MUSTERED_AT_GUN = 4;
+/** The waisters left to haul in the test of two orders at once: too few for both masts' braces together. */
+const HAULING_WAISTERS = 10;
 
-test('the roster is the brig\'s 121, every man posted at a crew place of the plan, the guns\' men each at a place of his own', () => {
+test('the roster is the brig\'s 80, every man posted at a crew place of the plan, the guns\' men each at a place of his own', () => {
   const roster = brigRoster(), places = crewPlaces();
   assert.equal(roster.length, COMPLEMENT);
   assert.equal(ROSTER.reduce((n, r) => n + r.count, 0), COMPLEMENT);
@@ -80,7 +82,7 @@ const POWDER_TEST_SECONDS = 150;
 test('at quarters the powder boys carry cartridges: each goes from his post to a powder place by a gun of the side she fights and back, and every powder place can be walked to', () => {
   // The boys alone, which is far cheaper to step than the whole crew.
   const roster = brigRoster().filter((m) => m.powderBoy !== null), boys = roster.map((_, i) => i);
-  assert.equal(boys.length, 8);
+  assert.equal(boys.length, 5);
   const powder = [...crewPlaces().values()].filter((p) => p.kind === 'powder');
   assert.equal(powder.length, shipPlan().guns.filter((g) => !g.chase).length);
   const graph = routeNetwork().graph;
@@ -100,28 +102,28 @@ test('at quarters the powder boys carry cartridges: each goes from his post to a
   for (const [i, s] of seen) assert.ok(s.has('gun') && s.has('post'), `boy ${i} stood at a gun and at his post: ${[...s]}`);
 });
 
-test('the marines stand as ruled: two sentries aft, one at the cabin door, the rest below or in the waist; at quarters two aft, six aloft, six forward, five on the engaged side', () => {
+test('the marines stand as ruled: two sentries aft, one at the cabin door, the rest below or in the waist; at quarters two aft, two aloft, two forward, two on the engaged side', () => {
   const marines = brigRoster().filter((m) => m.rank.endsWith('of marines'));
-  assert.equal(marines.length, 19);
+  assert.equal(marines.length, 8);
   const count = (at: (m: (typeof marines)[number]) => string, pred: (p: string) => boolean): number => marines.filter((m) => pred(at(m))).length;
   // Before quarters.
   assert.equal(count((m) => m.post, (p) => p === 'station-sentries'), 2);
   assert.equal(count((m) => m.post, (p) => p === 'station-cabin-door'), 1);
-  assert.equal(count((m) => m.post, (p) => p === 'station-marines-waist' || p === 'station-marines-below'), 16);
+  assert.equal(count((m) => m.post, (p) => p === 'station-marines-waist' || p === 'station-marines-below'), 5);
   // Nobody of them is posted on the quarterdeck but the two sentries aft.
   assert.equal(count((m) => m.post, (p) => placeSpot(p).space === 'deck' && placeSpot(p).along <= BREAKS.quarterdeck), 2);
   // At quarters, on either side.
   for (const side of SIDES) {
     const at = (m: (typeof marines)[number]) => (m.quarters === null ? m.post : atQuartersOf(m.quarters, side));
     assert.equal(count(at, (p) => p === 'station-sentries'), 2, 'two stay aft');
-    assert.equal(count(at, (p) => p.startsWith('top-')), 6, 'six to the tops');
-    assert.equal(count(at, (p) => p === 'station-forecastle'), 6, 'six to the forecastle');
-    assert.equal(count(at, (p) => p === (side > 0 ? 'station-marines-s' : 'station-marines-p')), 5, 'five along the engaged side');
+    assert.equal(count(at, (p) => p.startsWith('top-')), 2, 'two to the tops');
+    assert.equal(count(at, (p) => p === 'station-forecastle'), 2, 'two to the forecastle');
+    assert.equal(count(at, (p) => p === (side > 0 ? 'station-marines-s' : 'station-marines-p')), 2, 'two along the engaged side');
   }
 });
 
 test('standing by, the gun crews are in the waist, on the forecastle and below, and the quarterdeck holds only its officers, helm and sentries; at quarters they run to their guns', () => {
-  const roster = brigRoster(), AT_EASE = new Set(['captain', 'first lieutenant', 'master', "master's mate", 'midshipman', 'quartermaster', 'boatswain', "captain's clerk", 'drummer', 'corporal of marines', 'private of marines']);
+  const roster = brigRoster(), AT_EASE = new Set(['captain', 'first lieutenant', 'master', 'midshipman', 'quartermaster', 'boatswain', 'drummer', 'corporal of marines', 'private of marines']);
   for (const m of roster) {
     const spot = placeSpot(m.home);
     if (m.gun !== null) assert.notEqual(m.home, m.post, `${m.rank} stands by away from his gun`);
@@ -166,8 +168,9 @@ test('with half the hands a job takes longer by the rule, and with too few it do
 });
 
 test('two orders at once share the men: the later job waits for hands or starts short, and both are done', () => {
-  // Only the waisters haul (both masts' braces call on them), too few for both masts at once.
-  const roster = brigRoster().map((m) => (m.part === 'waist' || !GANGS.fore.deck.concat(GANGS.main.deck).includes(m.part) ? m : { ...m, part: 'idlers' as const }));
+  // Only some of the waisters haul (both masts' braces call on them), too few for both masts at once.
+  let waisters = 0;
+  const roster = brigRoster().map((m) => ((m.part === 'waist' ? waisters++ < HAULING_WAISTERS : !GANGS.fore.deck.concat(GANGS.main.deck).includes(m.part)) ? m : { ...m, part: 'idlers' as const }));
   const fore: Order = { kind: 'back', ship: 0, mast: 'fore' }, main: Order = { kind: 'back', ship: 0, mast: 'main' };
   const alone = drive([main], roster).doneAt.get('back')!;
   const both = drive([fore, main], roster);

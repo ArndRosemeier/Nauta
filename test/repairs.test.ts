@@ -66,13 +66,13 @@ test('each repair restores what the rule says', () => {
   for (const job of ['pump', 'fight', 'fetch', 'carry'] as const) assert.equal(mend(d, [{ job, on: 0 }]), d, `${job} changes nothing of her damage`);
 });
 
-test('unasked, the carpenter and his mate plug a hole under the water, the boatswain and his mates splice a shroud, the quartermasters rig the relieving tackles', () => {
+test('unasked, the carpenter and his mate plug a hole under the water, the boatswain and his mate splice a shroud, the quartermasters rig the relieving tackles', () => {
   const holes = holesUnder(1 / 2, 1), shroud = rigPlan().lines.findIndex((l) => l.standing && l.kind === 'shroud');
   let s = run(lying({ holes, cut: [shroud], steering: false }), 20);
   const crew = s.ships[0]!.crew;
   const at = (job: string) => { const t = repairTasks(crew, job); assert.equal(t.length, 1, `one ${job}`); assert.notEqual(t[0]!.began, null, `the ${job} has begun`); return ranksOf(t[0]!.hands); };
   assert.deepEqual(at('plug'), ['carpenter', "carpenter's mate"]);
-  assert.deepEqual(at('splice'), ['boatswain', "boatswain's mate", "boatswain's mate"]);
+  assert.deepEqual(at('splice'), ['boatswain', "boatswain's mate"]);
   assert.deepEqual(at('tackle'), ['quartermaster', 'quartermaster', 'quartermaster', 'quartermaster']);
   assert.ok(s.ships[0]!.damage.flooded[1] > 0, 'the sea comes in meanwhile');
   // Their work nearly done: in a moment the hole is plugged, the shroud whole, her steering back.

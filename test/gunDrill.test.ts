@@ -18,7 +18,7 @@ import { musterCrew } from './support/muster.ts';
 import { duelSetup } from './support/match.ts';
 
 /** A gun's full crew. */
-const FULL = 5;
+const FULL = 4;
 const roster = brigRoster(), places = battery();
 const base = startMatch(duelSetup(1805, 4)).ships[0]!;
 /** The pair's crew of gun `gun`, all at her (her side bears: the pair's whole crew crosses to her), by their place in it (1 her captain). */
@@ -43,7 +43,7 @@ test('every motion of the drill table is in the pack, and the crowd bakes each o
 
 test('through a reload each man of a gun\'s crew plays his part: ramming at the muzzle, heaving her out at the tackles, her captain crouching once she is ready', () => {
   const crew = crewOf(0);
-  assert.equal(crew.length, FULL, 'a pair\'s crew is five men');
+  assert.equal(crew.length, FULL, 'a pair\'s crew is four men');
   const seen = new Map<string, Set<string | null>>();
   let guns = startGuns();
   for (let k = 0; k < 40 * STEPS_PER_SECOND; k++) {

@@ -135,10 +135,10 @@ test('laying goes at her rate within her arcs, slower short-handed, not while sh
   assert.equal(gunAt(stepGuns(recoiling, hands, wants), CARRONADE).trained, gunAt(recoiling, CARRONADE).trained);
 });
 
-test('the men at each gun are read from the crew: the quarter bill stands two or three at each gun', () => {
+test('the men at each gun are read from the crew: the quarter bill stands one or two at each gun (a pair of four split, the chase pair of three)', () => {
   const crew = musterCrew(), men = handsAtGuns(crew);
   assert.equal(men.length, battery().length);
-  assert.ok(men.every((n) => n >= 2 && n <= 3), men.join(' '));
+  assert.ok(men.every((n) => n >= 1 && n <= 2), men.join(' '));
   // A man sent away is no longer at his gun; one standing at a gun place that is not his post counts there.
   const roster = brigRoster(), i = roster.findIndex((m) => m.gun === battery()[CARRONADE]!.id);
   const g = battery()[CARRONADE]!, other = battery()[LONG6]!;

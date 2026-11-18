@@ -25,7 +25,7 @@ const RANGE = 150;
 /** Long enough for the gun captains to lay every gun on her, s (a gun not yet laid holds her fire at the word). */
 const LAYING = 4;
 /** A full crew at each gun, for making the battery ready. */
-const FULL = 5;
+const FULL = 4;
 /** Long enough for a full crew to load and run out every gun, s (a reload is 35 s, its recoil 1.5 s of it). */
 const READYING = 40;
 
