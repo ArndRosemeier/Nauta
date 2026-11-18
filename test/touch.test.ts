@@ -126,7 +126,8 @@ test('the same on both machines: the state through bytes steps on to the same bi
 
 test('yards and bowsprit over the other\'s deck foul once, when they first reach over', () => {
   const far = startMatch({ seed: SEED, windForce: FORCE, windFrom: FROM, ships: [{ x: 0, z: 0, heading: 0 }, { x: 60, z: 0, heading: 0 }] });
-  const alongside = startMatch({ seed: SEED, windForce: FORCE, windFrom: FROM, ships: [{ x: 0, z: 0, heading: 0 }, { x: 9.6, z: 0, heading: 0 }] });
+  // (9.0 m: the lower yards brace 42° now, 0.5 m less across, so they reach over the other's deck from a little nearer.)
+  const alongside = startMatch({ seed: SEED, windForce: FORCE, windFrom: FROM, ships: [{ x: 0, z: 0, heading: 0 }, { x: 9.0, z: 0, heading: 0 }] });
   const first = touch(far.ships, alongside.ships, 0).events;
   const spars = (ship: number) => first.filter((e) => e.kind === 'fouled' && e.ship === ship).map((e) => (e as { spar: string }).spar);
   for (const ship of [0, 1]) assert.ok(spars(ship).includes('main-yard') && spars(ship).includes('fore-yard'), `ship ${ship}'s lower yards foul (${spars(ship).join(', ')})`);

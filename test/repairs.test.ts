@@ -25,6 +25,7 @@ import { step, type SimEvent } from '../src/sim/step.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { holesUnder } from './support/damage.ts';
 import { musterCrew } from './support/muster.ts';
+import './support/warm.ts';
 
 const roster = brigRoster();
 const BADLY = HARMS.indexOf('badly'), KILLED = HARMS.indexOf('killed');

@@ -36,7 +36,7 @@ for (const [part, rows] of [[1, SPEED_TABLE.slice(0, half)], [2, SPEED_TABLE.sli
   });
 }
 
-test('she is fastest with the wind abaft the beam, and makes no way within about 60° of it', () => {
+test('she is fastest with the wind abaft the beam, and makes barely any way within about 60° of it', () => {
   assert.equal(speeds.size, SPEED_TABLE.length, 'the table was sailed first');
   const [fastest] = [...speeds].sort((a, b) => b[1] - a[1])[0]!;
   assert.ok(fastest > 90 && fastest < 180, `fastest at ${fastest}°`);

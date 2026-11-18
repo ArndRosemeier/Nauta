@@ -33,10 +33,11 @@ const COMPASS = 360;
 const SETTLE = { canvas: 150, course: 75, clew: 28, furl: 200 };
 /**
  * Through a tack the match runs on by this many seconds at a time (`step`; `long` while she comes back to full sail) until the sails stand as the step names, at most this
- * long (the hands stand by in the waist and below, PR 110, and walk to their stations first: a tack waits for them, and
- * the courses can stay aback minutes after a course change from the beam).
+ * long (the hands stand by in the waist and below, PR 110, and walk to their stations first: a tack waits for them).
+ * `fill`: after a course change from the beam no sail may stay aback longer than this (the courses once did, minutes:
+ * their yards braced 4° less than the topsails', so they could not fill whenever the topsails just drew).
  */
-const STAYS = { step: 2, long: 6, most: 240 };
+const STAYS = { step: 2, long: 6, most: 240, fill: 30 };
 
 /** A sail still set at the clewing-up picture: the match runs on this many s more, at most this many times, and the picture is taken again. */
 const CLEW_LATE = { step: 10, times: 3 };
@@ -88,10 +89,10 @@ const until = async (done, step = STAYS.step) => {
 };
 await onward(SETTLE.course);
 // Full on the port tack first (her sheets crossed from running before the wind), so the sails aback come from the tack.
-// With gusts the courses can stay aback minutes after a course change whatever the hands do (the wind they were braced for has gone round), so this waits a while and goes on.
+// Once braced round the sails fill within seconds: `fill` is the most this may take.
 const full = await until((n) => n === 0, STAYS.long);
 const before = await page.evaluate(() => window.__nautaSail.aback());
-if (before > 0) console.log(`${before} sails still aback ${full} s after the course: the tack is judged by sails going further aback`);
+if (full > STAYS.fill || before > 0) problems.push(`${before} sails still aback ${full} s after the course change: they should fill within ${STAYS.fill} s`);
 await say('tack');
 // In stays: the match runs on until it has more sail aback (the drawing follows on the next frame).
 const waited = await until((n) => n > before);
