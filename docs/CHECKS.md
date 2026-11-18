@@ -41,7 +41,7 @@ Each is its own script, run in CI on pushes to `main` (the `Slow checks` job) an
 **Keeping the browser checks inside their budget** (design thread, 2026-11-18). On CI's software GPU nearly all of a browser check's time is the page's load and warm-up (about 100 s and growing with every material kind), not the pictures. So:
 
 - **One page load serves every picture it can.** The start shots (desktop, and the tablet view with its drag) and the sea shots are one check on one loaded page, which changes the view's size and the scene (`window.__nautaScene`) between pictures. A new picture joins an existing check's page; it does not load its own.
-- **CI takes the part of a set that guards something**, the whole set is for looking and runs by hand: of the 24 sea shots CI takes the 12 from the quarterdeck.
+- **CI takes the part of a set that guards something**, the whole set is for looking and runs by hand: of the 24 sea shots CI takes six from the quarterdeck, each time of day and each sea once (`CI_SHOTS` in `tools/shot/check.mjs`), because on CI's software GPU a sea scene costs about 6 s, most of it the fine sea's compute.
 - **A check past its 2 minute warning is cut back before anything is added to it.** A second page load (the ship's shots, a fight) is a second check with its own 3 minutes, and all slow checks together still fit the job's 10 minutes; the job prints their sum against that.
 - None of this changes a limit.
 

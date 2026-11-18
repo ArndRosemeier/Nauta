@@ -63,6 +63,8 @@ Which side fires is never ordered: the side she bears on fires. Orders left out 
 
 **Orders compete for men.** A new order to the same officer replaces his last one if they cannot both stand (a tack ordered during a tack is refused until she is round). Orders to different officers run together and share the hands; when there are too few, the first lieutenant says so and the slower work is seen. The captain never queues orders: one word at a time to each officer, as on a ship.
 
+**Answers are events, and they are codes, not sentences.** The simulation raises three kinds for an order: `refused` (not done, with why), `answered` (taken, with something the captain must know: "wearing round", "close-hauled instead", "too few hands, it will be slow") and the plain result events (`tacked`, `wore`, `missed stays`). Each carries a short code for what is said, never the words: the phrase book (N4.5) turns the code into the man's words in the player's language. An order that is taken but changed (a course she cannot lie) is `answered`, not `refused`.
+
 ## What you are told without asking
 
 Reports are bubbles over the man who makes them, raised by the simulation's events, never by a rule in the interface. Each is short enough to read at a glance and shows for as long as it takes to read.
