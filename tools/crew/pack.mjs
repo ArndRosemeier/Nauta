@@ -89,6 +89,23 @@ const cmu = (manifest.clipLibraries ?? []).find((l) => l.name === 'cmu');
 const cut = { ...library, clips: library.clips.filter((c) => keep.mocap.has(c.name)) };
 mkdirSync(join(dest, 'clips/cmu'), { recursive: true });
 for (const c of cut.clips) copyFileSync(join(cmuDir, c.file), join(dest, 'clips/cmu', c.file));
+// Walks cut to one stride cycle that loops (the first and last frames the same pose, found by comparing every window of
+// 0.9 to 3 s of the motion that travels at least 0.7 m/s), played in place: [first frame, end frame, metres the root is
+// lowered by]. The balance beam's root rides 0.43 m high (the beam under the walker): lowered, he is on the spar.
+const CUTS = { 'cmu 77_28': [323, 360, 0], 'cmu 136_09': [130, 168, 0], 'cmu 89_06': [624, 666, 0.43] };
+for (const c of cut.clips) {
+  const window = CUTS[c.name];
+  if (!window) continue;
+  const [from, end, lower] = window, bones = cut.rigs[c.rig].bones.length, frames = end - from;
+  const buf = readFileSync(join(cmuDir, c.file)), whole = c.frameCount;
+  // Per frame: the bones' four i16 each, then (after every frame's) the root's three floats.
+  const poses = buf.subarray(from * bones * 8, end * bones * 8);
+  const roots = new Float32Array(frames * 3);
+  for (let f = 0; f < frames; f++) roots[f * 3 + 1] = buf.readFloatLE(whole * bones * 8 + (from + f) * 12 + 4) - lower;
+  writeFileSync(join(dest, 'clips/cmu', c.file), Buffer.concat([poses, Buffer.from(roots.buffer)]));
+  c.frameCount = frames;
+  c.loop = true;
+}
 writeFileSync(join(dest, 'clips/cmu/index.json'), JSON.stringify(cut));
 // The manifest as shipped, with that library; the page narrows its catalog to what was copied (src/app/crewLooks.ts
 // `packCatalog`), so nothing asks for a file left out.

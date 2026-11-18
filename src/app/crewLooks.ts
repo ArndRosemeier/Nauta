@@ -34,7 +34,7 @@ export const PACK_CLIPS = [
  * pack (tools/crew/pack.mjs cuts the library to these): the rammer's stroke (pushing a broom), the sponge (washing a
  * window), hauling a tackle (coiling a rope, hand over hand), a man lying down (asleep in his hammock: its last frame held).
  */
-export const PACK_MOCAP = ['cmu 80_19', 'cmu 79_44', 'cmu 62_21', 'cmu 111_12'];
+export const PACK_MOCAP = ['cmu 80_19', 'cmu 79_44', 'cmu 62_21', 'cmu 111_12', 'cmu 136_09', 'cmu 77_28', 'cmu 89_06'];
 
 /** Where the build serves the cut pack (`npm run packs` fills public/packs), under the page's base. */
 export const PACK = 'packs/human/manifest.json';

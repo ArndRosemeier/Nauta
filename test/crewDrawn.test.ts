@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OUTFITS, type CharacterCatalog } from '@actors/generator';
-import { CAPTAIN_CLEAR, DUCK, FULL, JOB_CLIPS, LYING, MEDIUM, POOL_STICK, RUNNING, SLEEPING, WALKING, duckTo, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
+import { CAPTAIN_CLEAR, DUCK, FULL, JOB_CLIPS, LYING, MEDIUM, POOL_STICK, RUNNING, SLEEPING, SURFACE_WALKS, WALKING, duckTo, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
 import { BERTH_HEADROOM, BREAKS } from '../src/sim/rules/ships.ts';
 import { shipY } from '../src/sim/ship/section.ts';
 import { heightAt, routeNetwork } from '../src/sim/crew/network.ts';
@@ -150,7 +150,7 @@ test('making sail, men on their way walk or run and men at work play their job\'
   const from = { ...ship, crew: before }, to = { ...ship, crew };
   const men = drawnAll(from, to);
   const going = men.filter((_, i) => crew.men[i]!.going);
-  assert.ok(going.length > 0 && going.every((d) => d.clip === 'walk' || d.clip === 'jog'));
+  assert.ok(going.length > 0 && going.every((d) => d.clip === 'walk' || d.clip === 'jog' || Object.values(SURFACE_WALKS).includes(d.clip)));
   crew.tasks.filter((t) => t.began !== null).forEach((t) => t.hands.forEach((i) => { if (!crew.men[i]!.going) assert.equal(men[i]!.clip, JOB_CLIPS[t.job]); }));
   // Halfway between the two steps, a man walking on one floor is halfway between where each step has him.
   const a = drawnAll(from, from), b = drawnAll(to, to), half = drawnAll(from, to, 1 / 2);
@@ -164,13 +164,14 @@ test('making sail, men on their way walk or run and men at work play their job\'
 test('a man on a ladder or the shrouds is drawn climbing, on the rungs of his way, a man on a footrope leaning over its yard, and never runs there or aloft (Arnd 2026-11-18)', () => {
   const sailing = startSail(), told = give(startTold(), sailing, { kind: 'sail', ship: 0, canvas: 'plain' });
   let crew: Crew = ship.crew, climbing = 0, onWays = 0, footropes = 0;
-  for (let tick = 0; tick < 25 * STEPS_PER_SECOND; tick++) {
+  for (let tick = 0; tick < 30 * STEPS_PER_SECOND; tick++) {
     crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas }).crew;
     if (tick % STEPS_PER_SECOND) continue;
     const now = { ...ship, crew };
     for (const d of drawnAll(now, now)) {
       if (d.way !== null || routeNetwork().surfaces.has(d.space)) assert.notEqual(d.clip, RUNNING, `no one runs on a way or aloft (${d.way ?? d.space})`);
       if (d.way !== null) onWays++;
+      if (SURFACE_WALKS[routeNetwork().surfaces.get(d.space)?.kind ?? '']) assert.notEqual(d.clip, WALKING, `${d.space}: no plain walk on the boards, timbers or spar aloft`);
       if (!d.climb) continue;
       climbing++;
       if (d.climb.kind === SIDLING) {
