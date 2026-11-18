@@ -118,3 +118,8 @@ export function sparAngles(state: SimState, ship: number): [id: string, angle: n
   const standing = sailsSeen(state, ship)?.standing ?? [], sails = rigPlan().sails;
   return standing.flatMap((st, i) => sails[i]!.on.map((id): [string, number] => [id, st.angle]));
 }
+
+/** Where ship `ship`'s rudder lies in a state, rad (+ turns her to starboard), for the drawing (ShipView `setRudder`); amidships when there is no such ship. */
+export function rudderAngle(state: SimState, ship: number): number {
+  return state.ships[ship]?.sailing.helm ?? 0;
+}

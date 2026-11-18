@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { decodePack } from '@futuremagic/props';
 import {
-  DECK_AT_SIDE, DECK_CAMBER, KEEL_HALF_SIDING, LOAD_WATERLINE, MIDSHIP_SECTION, PLANKING,
+  DECK_AT_SIDE, DECK_CAMBER, KEEL_HALF_SIDING, LOAD_WATERLINE, MIDSHIP_SECTION, PLANKING, STERN,
 } from '../src/sim/rules/ships.ts';
 import { deckY, halfBreadth, sectionOutline, shipY, shipZ } from '../src/sim/ship/section.ts';
 import { STANDPOINTS, standpoint } from '../src/app/standpoints.ts';
@@ -15,7 +15,9 @@ import { Visibility } from '../src/render/ship/visibility.ts';
 import { DAMAGE_MAP_SIZE, DAMAGE_REGIONS, damageTexel } from '../src/render/ship/damageMap.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { hullHalfBreadth, sideTop } from '../src/sim/ship/hull.ts';
-import { outsideX } from '../src/render/ship/hullSide.ts';
+import { deckEnds, outsideX } from '../src/render/ship/hullSide.ts';
+import { RUDDER_ID, rudderMatrix } from '../src/render/ship/stern.ts';
+import { RUDDER } from '../src/sim/rules/sailing.ts';
 import { Vector3 } from 'three/webgpu';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { MOST_FRAMES, RIG_FRAMES, shipPoint, swingMatrix, swingsOf } from '../src/render/ship/swings.ts';
@@ -131,7 +133,7 @@ test('every standpoint: on deck in the open, below deck in a room under the beam
       assert.ok(zone !== null && zone !== OUTSIDE, `${s.name} in ${zone}`);
       const h = s.eye[1] + LOAD_WATERLINE;
       assert.ok(Math.abs(s.eye[0]) < hullHalfBreadth(-s.eye[2], h), s.name);
-    } else if (s.name !== 'Alongside') {
+    } else if (!['Alongside', 'Stern'].includes(s.name)) {
       assert.ok(zone === null || zone === OUTSIDE, `${s.name} in ${zone}`);
     }
   }
@@ -218,4 +220,22 @@ test('her yards brace round and her boom and gaff swing: each in its own frame, 
   const carronades = battery().flatMap((g, i) => (g.gun === 'carronade' ? [gunFrame(i)] : [])), lids = shipPlan().guns.map((_, j) => lidFrame(j));
   assert.deepEqual([...used].sort((a, b) => a - b), [0, ...SWINGS.map((w) => w.frame), ...points.map((p) => p.frame), ...carronades, ...lids]);
   assert.ok(Math.max(...lids) < MOST_FRAMES && Math.max(...points.map((p) => p.frame)) < RIG_FRAMES, 'every frame fits its block of the frames texture');
+});
+
+test('her stern is built: its inside faces the deck above her after end, and her rudder, near and far, turns with her helm', () => {
+  // On board, looking aft, the stern's inside is there: wood facing forward, aft of the deck's end, across her middle.
+  const out = SHIP.zones.find((z) => z.name === OUTSIDE)!, pos = attr(out.wood, 'position').data, nor = attr(out.wood, 'normal').data;
+  const aftEnd = shipZ(deckEnds().aft), [low, high] = [shipY(sideTop(deckEnds().aft)) - 1, shipY(sideTop(deckEnds().aft))];
+  let inside = 0;
+  for (let i = 0; i < pos.length; i += 3) {
+    if (nor[i + 2]! < -0.8 && pos[i + 2]! > aftEnd && Math.abs(pos[i]!) < 1 && pos[i + 1]! > low && pos[i + 1]! < high) inside++;
+  }
+  assert.ok(inside > 10, `${inside} points of the stern's inside`);
+  for (const list of [SHIP.swings, SHIP.farSwings]) assert.ok(zoneTris(list.find((z) => z.name === RUDDER_ID)!) > 0, 'her rudder near and far');
+  // Put over, its after edge swings to the side she turns to; held at its stops; amidships it hangs as built.
+  const heel = STERN[0]!, edge = new Vector3(0, shipY(heel[0]), shipZ(heel[1] - 1));
+  assert.ok(edge.clone().applyMatrix4(rudderMatrix(0.3)).x > 0.25, 'helm to starboard: her after edge to starboard');
+  assert.ok(edge.clone().applyMatrix4(rudderMatrix(-0.3)).x < -0.25);
+  assert.ok(edge.clone().applyMatrix4(rudderMatrix(9)).distanceTo(edge.clone().applyMatrix4(rudderMatrix(RUDDER.most))) < 1e-9);
+  assert.ok(edge.clone().applyMatrix4(rudderMatrix(0)).distanceTo(edge) < 1e-9);
 });

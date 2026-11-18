@@ -20,6 +20,7 @@ import type { Packed } from './gathered';
 import { bulwarkInside, buildBulwarks, buildOutside, deckEnds, outsideX, type Detail } from './hullSide';
 import { buildDeckBeams, buildDeckOpenings, buildPartners, buildWeatherDeck, type DeckContext } from './decks';
 import { buildRooms } from './rooms';
+import { RUDDER_ID, buildRudder, buildStern } from './stern';
 import { buildRigs } from './rig';
 import { buildSailGrids, type SailDetail } from './sailGrid';
 import { OUTSIDE, levelAt, openingsOn, rectCentre, portals, zoneOfSpaces, zoneUnder, type Portal } from './zones';
@@ -65,7 +66,7 @@ export interface ShipBuild {
   readonly zones: readonly ZoneBuild[];
   /** The coarse outside for the far ship. */
   readonly far: ZoneBuild;
-  /** The spars that turn (yards, boom, gaff), each named by its spar id, near and on the far ship. */
+  /** The spars that turn (yards, boom, gaff), each named by its spar id, and her rudder (stern.ts `RUDDER_ID`), near and on the far ship. */
   readonly swings: readonly ZoneBuild[];
   readonly farSwings: readonly ZoneBuild[];
   readonly doors: readonly { readonly id: string; readonly wood: Packed; readonly iron: Packed; readonly hinge: readonly [number, number, number]; readonly shut: number; readonly opens: number; readonly zones: readonly [string, string] }[];
@@ -98,6 +99,8 @@ export function buildShip(fittings: Fittings): ShipBuild {
   const { aft, fore } = deckEnds();
   buildOutside(out);
   buildBulwarks(out, aft, fore);
+  buildStern(out, aft);
+  buildRudder(parts.swing(RUDDER_ID), out);
   buildWeatherDeck(ctx, aft, fore);
   buildPartners(out);
   buildDeckBeams(ctx, aft, fore);
@@ -134,6 +137,8 @@ function buildFar(fittings: Fittings): { out: ZoneParts; parts: ShipParts } {
   const { aft, fore } = deckEnds();
   buildOutside(out, FAR_DETAIL);
   buildBulwarks(out, aft, fore, FAR_DETAIL);
+  buildStern(out, aft);
+  buildRudder(parts.swing(RUDDER_ID), out);
   buildWeatherDeck(ctx, aft, fore, FAR_DETAIL.rowStep);
   buildDeckOpenings(ctx, COAMING_THICK);
   buildRigs(fittings, plan, out, () => null, (id) => parts.swing(id), true);

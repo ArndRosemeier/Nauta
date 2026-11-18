@@ -18,7 +18,7 @@ import type { Settings } from './app/settings';
 import { Channel } from './audio/channel';
 import { OrderPanel } from './app/orderPanel';
 import { sailsSeen } from './app/sailsSeen';
-import { PageMatch, pageSeconds, sparAngles } from './app/pageMatch';
+import { PageMatch, pageSeconds, rudderAngle, sparAngles } from './app/pageMatch';
 import { RoomPanel } from './app/roomPanel';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
@@ -441,6 +441,7 @@ async function start(): Promise<void> {
       sea = match.state.sea;
       // Her yards, boom and gaff as the crew trims them: the order seen carried out aloft.
       for (const [id, angle] of sparAngles(match.state, match.ship)) ship?.setBrace(id, angle);
+      ship?.setRudder(rudderAngle(match.state, match.ship));
     } else {
       seaTime += dt;
       meanWind(wind, seaTime, blowing);
@@ -482,6 +483,7 @@ async function start(): Promise<void> {
           other.sails.stand(hers?.standing ?? null, hers?.canvas ?? null);
           other.sails.blow(windAt(wind, other.drawn.x, other.drawn.z, seaTime));
           for (const [id, angle] of sparAngles(match.state, match.other)) other.setBrace(id, angle);
+          other.setRudder(rudderAngle(match.state, match.other));
           if (jump > 0) other.sails.follow(jump);
           other.follow(sea, seaTime, dt, view.camera);
           herFittings?.update(other.group, view.camera, sky.lightDirection);

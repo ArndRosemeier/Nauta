@@ -5,7 +5,7 @@
  * inside her); last, by hand, the other brig's wake (plan N3.8) through the glass once the two have closed. One page:
  * she sails for a while first so her wake lies behind her, then each scene is set with `window.__nautaScene` (`ship=`
  * the standpoint; the match keeps its own clock, so she sails on between pictures).
- * CI takes three of the six (CI_SHOTS); `all` takes every one, words narrow the set (`npm run check:ship -- shots/ship
+ * CI takes three of the seven (CI_SHOTS); `all` takes every one, words narrow the set (`npm run check:ship -- shots/ship
  * bow`). Writes `<out dir>/<name>.png` (default `shots/ship`).
  * The browser's switches are browser.mjs's (CHROMIUM_PATH, SHOT_GPU, SHOT_SIZE); the quality is fixed at `high`.
  * It fails on any error or warning on the page (browser.mjs), or when a picture does not change between scenes.
@@ -44,6 +44,7 @@ export function shipShots() {
     { name: 'off50', query: 'ship=50-m-off&hour=11&day=0' },
     { name: 'above', query: 'ship=above&hour=11&day=0' },
     { name: 'berth', query: 'ship=berth-deck&hour=11&day=0' },
+    { name: 'stern', query: 'ship=stern&hour=11&day=0' },
     { name: 'other', query: 'ship=above&hour=16&day=0', other: true },
   ];
 }

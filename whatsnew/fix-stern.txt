@@ -1,0 +1,3 @@
+The back of the ship is built: from the quarterdeck you now look aft at her stern, red inside with two stern ports and the taffrail across the top, instead of open sea.
+Outside, her counter sits lower, as on the original plans, under a stern board with its moulding, two ports and a quarter piece at each corner, and her rudder hangs on the sternpost and turns as the helmsman steers.
+Try the new Stern button (?ship=stern), or walk aft on the quarterdeck.

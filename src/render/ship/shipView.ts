@@ -35,6 +35,7 @@ import { SEA_CUT } from '../seaCut';
 import { MOST_LAMPS, MOST_SKIES, SHIP_INPUTS, setShipFrame } from './shipMaterials';
 import { rigPlan } from '../../sim/ship/rig';
 import { swingMatrix, swingsOf, type Swing } from './swings';
+import { RUDDER_ID, rudderMatrix } from './stern';
 import type { Kind } from '@futuremagic/stage';
 import { geometryOf, packedTriangles, type Packed } from './gathered';
 import type { ShipBuild, ZoneBuild } from './ship';
@@ -160,6 +161,8 @@ export class ShipView {
   /** The sails' meshes near, fine and coarse (one shown, a quality knob), and far. */
   private readonly sailMeshes: { fine: Mesh; coarse: Mesh; far: Mesh };
   private swingsMoved = true;
+  /** Her rudder's groups near and far, and where it lies (rad, + its after edge to starboard). */
+  private readonly rudder = { groups: [] as Group[], angle: Number.NaN, matrix: new Matrix4() };
   /** Each zone's ranges in her shaders' light lists. */
   private readonly ranges: Map<string, Vector4>;
   private readonly visibility: Visibility;
@@ -217,13 +220,14 @@ export class ShipView {
     this.far.name = 'far ship';
     this.farParts.push(...this.meshes(build.far, this.far, undefined, true));
     // The turning spars: each in a group of its own, near inside her outside (seen and crossfaded with it), and on the far ship.
-    for (const swing of swingsOf(rigPlan(this.plan))) {
+    // Her rudder too, turned by her helm (setRudder).
+    const turning = (id: string): Group[] => {
       const groups: Group[] = [];
       for (const [list, into, parts, fading] of [[build.swings, this.zones.get(OUTSIDE)!, this.outside, false], [build.farSwings, this.far, this.farParts, true]] as const) {
-        const z = list.find((x) => x.name === swing.id);
+        const z = list.find((x) => x.name === id);
         if (!z) continue;
         const g = new Group();
-        g.name = `swing ${swing.id}`;
+        g.name = `swing ${id}`;
         g.matrixAutoUpdate = false;
         const made = this.meshes(z, g, undefined, fading);
         for (const p of made) p.mesh.userData.toShip = g.matrix;
@@ -232,8 +236,12 @@ export class ShipView {
         into.add(g);
         groups.push(g);
       }
-      this.swings.set(swing.id, { swing, groups, angle: 0, hoist: 1, matrix: new Matrix4() });
+      return groups;
+    };
+    for (const swing of swingsOf(rigPlan(this.plan))) {
+      this.swings.set(swing.id, { swing, groups: turning(swing.id), angle: 0, hoist: 1, matrix: new Matrix4() });
     }
+    this.rudder.groups.push(...turning(RUDDER_ID));
     // The sails and flags: near in her outside (fine or coarse), and on the far ship; shaped on the GPU, so never culled by their flat bounds.
     this.sails = new SailsView(rigPlan(this.plan));
     const sail = (packed: Packed, into: Group, parts: Part[], fading: boolean): Mesh => {
@@ -365,6 +373,14 @@ export class ShipView {
     d.angle = angle;
     d.pivot.rotation.y = d.shut + d.opens * angle;
     d.pivot.updateMatrix();
+  }
+
+  /** Puts her rudder over to `angle` rad (+: its after edge to starboard, turning her to starboard; stern.ts `rudderMatrix`). */
+  setRudder(angle: number): void {
+    if (angle === this.rudder.angle) return;
+    this.rudder.angle = angle;
+    rudderMatrix(angle, this.rudder.matrix);
+    for (const g of this.rudder.groups) g.matrix.copy(this.rudder.matrix);
   }
 
   /** Braces a yard round, or swings the boom or gaff, to `angle` rad (swings.ts: + a yard's starboard arm aft, the boom's end to starboard). */
