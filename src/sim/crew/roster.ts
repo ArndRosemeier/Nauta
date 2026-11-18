@@ -23,6 +23,8 @@ export interface Man {
   readonly gun: string | null;
   /** Where he goes at quarters when he is at no gun (rules/crew.ts `quarters`; `*` the side she fights), or null: his post. */
   readonly quarters: string | null;
+  /** The crew place he stands by at while she is not at quarters, and where he is when he has nothing to do: his post unless his row gives him `idle`. */
+  readonly home: string;
 }
 
 let places: ReadonlyMap<string, CrewPlace> | null = null;
@@ -72,8 +74,8 @@ export function brigRoster(): readonly Man[] {
   for (const row of ROSTER) {
     for (let k = 0; k < row.count; k++) {
       if (row.posts !== 'guns') {
-        const quarters = row.quarters ? row.quarters[k % row.quarters.length]! : null;
-        men.push({ rank: row.rank, part: row.part, skill: row.skill, post: row.posts[k % row.posts.length]!, gun: null, quarters });
+        const quarters = row.quarters ? row.quarters[k % row.quarters.length]! : null, post = row.posts[k % row.posts.length]!;
+        men.push({ rank: row.rank, part: row.part, skill: row.skill, post, gun: null, quarters, home: row.idle ? row.idle[k % row.idle.length]! : post });
         continue;
       }
       // Round the pairs, skipping any whose places are all taken.
@@ -82,11 +84,12 @@ export function brigRoster(): readonly Man[] {
       const place = free.get(pair)!.shift();
       if (!place) throw new Error('more men posted at the guns than the guns have places');
       next++;
-      men.push({ rank: row.rank, part: row.part, skill: row.skill, post: place.place, gun: place.gun, quarters: null });
+      men.push({ rank: row.rank, part: row.part, skill: row.skill, post: place.place, gun: place.gun, quarters: null, home: row.idle ? row.idle[k % row.idle.length]! : place.place });
     }
   }
   for (const m of men) {
     placeSpot(m.post);
+    placeSpot(m.home);
     for (const side of SIDES) if (m.quarters) placeSpot(atQuartersOf(m.quarters, side));
   }
   built = deepFreeze(men);

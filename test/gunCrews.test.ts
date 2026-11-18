@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openShip } from '../src/sim/crew/closures.ts';
-import { startCrew, stepCrew, type Crew, type Engaged } from '../src/sim/crew/crew.ts';
+import { stepCrew, type Crew, type Engaged } from '../src/sim/crew/crew.ts';
 import { brigRoster, pairOf, placeSpot, quartersPlace } from '../src/sim/crew/roster.ts';
 import { engagedSide, pairHands } from '../src/sim/guns/gunnery.ts';
 import { battery, handsAtGuns, startGuns, stepGuns, gunAt } from '../src/sim/guns/guns.ts';
@@ -15,6 +15,7 @@ import { SPLIT_SHARE } from '../src/sim/rules/guns.ts';
 import { startMotion, toWorld } from '../src/sim/ship/motion.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { startTold } from './support/crew.ts';
+import { musterCrew } from './support/muster.ts';
 
 const ROSTER = brigRoster();
 const STARBOARD = 1, LARBOARD = -1;
@@ -49,7 +50,7 @@ function sameAt(crew: Crew, i: number, place: string): boolean {
 
 /** Crossed once for the file: every gun's man at the starboard guns. */
 const AT_STARBOARD = (() => {
-  const r = cross(startCrew(), STARBOARD);
+  const r = cross(musterCrew(), STARBOARD);
   assert.ok(Number.isFinite(r.seconds), 'the crews went to the starboard guns');
   return r;
 })();
@@ -95,7 +96,7 @@ test('when the other side comes to bear they cross the deck, taking their second
 });
 
 test('a pair split between its guns works each at a little over half pace; one gun with the whole crew at full pace', () => {
-  const split = pairHands(handsAtGuns(startCrew()));
+  const split = pairHands(handsAtGuns(musterCrew()));
   battery().forEach((_, i) => assert.equal(split.shares[i], SPLIT_SHARE));
   const one = pairHands(handsAtGuns(AT_STARBOARD.crew));
   assert.ok(one.shares.every((s) => s === 1));

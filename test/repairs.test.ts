@@ -23,6 +23,7 @@ import { startMatch, type SimState } from '../src/sim/state.ts';
 import { step, type SimEvent } from '../src/sim/step.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { holesUnder } from './support/damage.ts';
+import { musterCrew } from './support/muster.ts';
 
 const roster = brigRoster();
 const BADLY = HARMS.indexOf('badly'), KILLED = HARMS.indexOf('killed');
@@ -31,7 +32,7 @@ const hurtCode = (man: number, harm: number): number => man * HARMS.length + har
 /** One ship lying still in a calm with the damage `damage`. */
 function lying(damage: Partial<Damage>): SimState {
   const state = startMatch({ seed: 5, windForce: 0, windFrom: 0, ships: [{ x: 0, z: 0, heading: Math.PI / 2, canvas: 'bare' }] });
-  return { ...state, ships: state.ships.map((s) => ({ ...s, damage: { ...startDamage(), ...damage } })) };
+  return { ...state, ships: state.ships.map((s) => ({ ...s, crew: musterCrew(), damage: { ...startDamage(), ...damage } })) };
 }
 
 /** A state stepped `seconds`, the orders given in the first step, `each` called after every step. */
@@ -87,6 +88,8 @@ test('the killed and badly wounded leave the quarter bill: the killed lie where 
   const atGuns = roster.flatMap((m, i) => (m.gun !== null && m.part !== 'waist' ? [i] : []));
   const badly = atGuns.slice(0, 6), killed = atGuns[6]!;
   let s = lying({ hurt: [...badly.map((m) => hurtCode(m, BADLY)), hurtCode(killed, KILLED)].sort((p, q) => p - q) });
+  // At quarters: the men stand at their guns, not by in the waist.
+  s = { ...s, ships: s.ships.map((x) => ({ ...x, told: { ...x.told, quarters: true } })) };
   const out = outOf(s.ships[0]!.damage);
   assert.deepEqual([...out].sort((p, q) => p - q), [...badly, killed].sort((p, q) => p - q), 'out of the quarter bill');
   const full = handsAtGuns(s.ships[0]!.crew).reduce((a, b) => a + b, 0);
@@ -96,7 +99,7 @@ test('the killed and badly wounded leave the quarter bill: the killed lie where 
     const crew = st.ships[0]!.crew, parties = crew.tasks.filter((t) => t.job === 'fetch' || t.job === 'carry');
     most = Math.max(most, parties.length);
     for (const t of parties) for (const i of t.hands) assert.equal(roster[i]!.part, 'waist', 'the bearers are waisters');
-    assert.deepEqual(crew.men[killed], { stands: null, going: null, blocked: null }, 'the killed man lies where he fell');
+    assert.deepEqual(crew.men[killed], musterCrew().men[killed], 'the killed man lies where he fell');
     // While four parties are out, the others wait where they lie.
     if (parties.length === CARRY_PARTIES) for (const m of badly.filter((b) => !parties.some((t) => t.on === b))) assert.equal(crew.men[m]!.going, null);
     below = badly.filter((m) => { const h = st.ships[0]!.crew.men[m]!; return !h.going && h.stands !== null && sameSpot(h.stands, placeSpot(SURGEON)); }).length;

@@ -27,10 +27,11 @@ import { toWorld } from '../src/sim/ship/motion.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { hashState, startMatch, type SimState } from '../src/sim/state.ts';
 import { step } from '../src/sim/step.ts';
+import { mustered } from './support/muster.ts';
 
 const SEED = 1805;
 /** Ship 0 fires from far off (she is never traced against her own shot); ship 1 lies still, heading north, at the origin. */
-const MATCH = startMatch({ seed: SEED, windForce: 3, windFrom: 0, ships: [{ x: -3000, z: 0, heading: 0 }, { x: 0, z: 0, heading: 0 }] });
+const MATCH = mustered(startMatch({ seed: SEED, windForce: 3, windFrom: 0, ships: [{ x: -3000, z: 0, heading: 0 }, { x: 0, z: 0, heading: 0 }] }));
 const TARGET = 1;
 const CARRONADE = battery().findIndex((g) => g.gun === 'carronade');
 /** Speeds of round shot from a carronade at the design's ranges, m/s (as rules/damage.ts gives them): 100 m and 400 m. */

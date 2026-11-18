@@ -36,6 +36,11 @@ export interface RankRow {
    * for the side she fights (`s` or `p`; while neither or both sides bear, the men take the sides in turn). None: his post.
    */
   readonly quarters?: readonly string[];
+  /**
+   * Where a man stands by while she is not at quarters, when that is not his post (the list taken in turn; design ruling
+   * 2026-11-18: the quarterdeck at ease holds only the wheel, the officers, the midshipman and the sentries). None: his post.
+   */
+  readonly idle?: readonly string[];
 }
 
 /** A man's skill at the ropes, by what he is (hands: an able seaman is 1). */
@@ -90,18 +95,18 @@ export const ROSTER: readonly RankRow[] = [
       'top-fore-s', 'top-fore-p', 'top-fore-s', 'top-main-s', 'top-main-p', 'top-main-s', ...Array<string>(6).fill('station-forecastle'),
     ],
   },
-  { rank: 'boy', count: 8, part: 'boys', skill: BOY, posts: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-after-ladder-head', 'ladder-magazine-ladder-head'] },
+  { rank: 'boy', count: 8, part: 'boys', skill: BOY, posts: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-after-ladder-head', 'ladder-magazine-ladder-head'], idle: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-fore-ladder-head', 'ladder-magazine-ladder-head'] },
   { rank: 'captain of the foretop', count: 1, part: 'foretop', skill: PETTY, posts: ['top-fore-s'] },
   { rank: 'fore topman', count: 3, part: 'foretop', skill: ABLE, posts: ['top-fore-p', 'top-fore-s', 'top-fore-p'] },
-  { rank: 'fore topman', count: 6, part: 'foretop', skill: ABLE, posts: 'guns' },
+  { rank: 'fore topman', count: 6, part: 'foretop', skill: ABLE, posts: 'guns', idle: ['station-idle-forecastle', 'station-idle-fore-s', 'station-mess-fore'] },
   { rank: 'captain of the maintop', count: 1, part: 'maintop', skill: PETTY, posts: ['top-main-s'] },
   { rank: 'main topman', count: 3, part: 'maintop', skill: ABLE, posts: ['top-main-p', 'top-main-s', 'top-main-p'] },
-  { rank: 'main topman', count: 8, part: 'maintop', skill: ABLE, posts: 'guns' },
-  { rank: 'captain of the forecastle', count: 1, part: 'forecastle', skill: PETTY, posts: 'guns' },
-  { rank: 'forecastle man', count: 11, part: 'forecastle', skill: ABLE, posts: 'guns' },
-  { rank: 'captain of the afterguard', count: 1, part: 'afterguard', skill: PETTY, posts: 'guns' },
-  { rank: 'afterguard', count: 11, part: 'afterguard', skill: ORDINARY, posts: 'guns' },
-  { rank: 'waister', count: 19, part: 'waist', skill: LANDSMAN, posts: 'guns' },
+  { rank: 'main topman', count: 8, part: 'maintop', skill: ABLE, posts: 'guns', idle: ['station-idle-aft-s', 'station-idle-aft-p', 'station-mess-s', 'station-idle-aft-p'] },
+  { rank: 'captain of the forecastle', count: 1, part: 'forecastle', skill: PETTY, posts: 'guns', idle: ['station-idle-forecastle'] },
+  { rank: 'forecastle man', count: 11, part: 'forecastle', skill: ABLE, posts: 'guns', idle: ['station-idle-forecastle', 'station-idle-fore-p', 'station-idle-fore-s'] },
+  { rank: 'captain of the afterguard', count: 1, part: 'afterguard', skill: PETTY, posts: 'guns', idle: ['station-idle-aft-s'] },
+  { rank: 'afterguard', count: 11, part: 'afterguard', skill: ORDINARY, posts: 'guns', idle: ['station-idle-aft-p', 'station-idle-aft-s', 'station-idle-waist-a'] },
+  { rank: 'waister', count: 19, part: 'waist', skill: LANDSMAN, posts: 'guns', idle: ['station-idle-waist-a', 'station-idle-waist-c', 'station-idle-waist-b', 'station-idle-waist-d', 'station-mess-p', 'station-mess-s'] },
 ];
 
 /** How many she carries (ship.md): the roster adds up to it (tested). */

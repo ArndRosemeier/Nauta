@@ -12,6 +12,7 @@ import { encode } from '../src/sim/codec.ts';
 import { openShip } from '../src/sim/crew/closures.ts';
 import { startCrew, stepCrew, taskOf, type Crew } from '../src/sim/crew/crew.ts';
 import { jobWork } from '../src/sim/crew/drill.ts';
+import { battery, handsAtGuns } from '../src/sim/guns/guns.ts';
 import { atQuartersOf, brigRoster, crewPlaces, placeSpot } from '../src/sim/crew/roster.ts';
 import type { Order } from '../src/sim/orders.ts';
 import { COMPLEMENT, FEWEST, GANGS, JOBS, ROSTER } from '../src/sim/rules/crew.ts';
@@ -29,6 +30,9 @@ const STATE_BYTES = 16 * 1024;
 const BUSY_SECONDS = 8;
 /** Long enough for the men of a job to be at their places (a marine from the cabin door below too), s. */
 const WAIT_SECONDS = 15;
+/** Long enough for the gun crews to run to their guns on the side she fights from where they stand by, s, and the fewest men then at each gun. */
+const MUSTER_SECONDS = 40;
+const MUSTERED_AT_GUN = 4;
 
 test('the roster is the brig\'s 121, every man posted at a crew place of the plan, the guns\' men each at a place of his own', () => {
   const roster = brigRoster(), places = crewPlaces();
@@ -62,6 +66,26 @@ test('the marines stand as ruled: two sentries aft, one at the cabin door, the r
     assert.equal(count(at, (p) => p === 'station-forecastle'), 6, 'six to the forecastle');
     assert.equal(count(at, (p) => p === (side > 0 ? 'station-marines-s' : 'station-marines-p')), 5, 'five along the engaged side');
   }
+});
+
+test('standing by, the gun crews are in the waist, on the forecastle and below, and the quarterdeck holds only its officers, helm and sentries; at quarters they run to their guns', () => {
+  const roster = brigRoster(), AT_EASE = new Set(['captain', 'first lieutenant', 'master', "master's mate", 'midshipman', 'quartermaster', 'boatswain', "captain's clerk", 'drummer', 'corporal of marines', 'private of marines']);
+  for (const m of roster) {
+    const spot = placeSpot(m.home);
+    if (m.gun !== null) assert.notEqual(m.home, m.post, `${m.rank} stands by away from his gun`);
+    if (spot.space === 'deck' && spot.along <= BREAKS.quarterdeck) assert.ok(AT_EASE.has(m.rank), `${m.rank} stands by on the quarterdeck`);
+  }
+  // Standing by no gun has a man; beating to quarters (one side bearing) sends them, seen running, and in a while each gun of the side has its crew.
+  const told = startTold(), sailing = startSail(), side = 1;
+  let crew = startCrew(), running = 0;
+  assert.ok(handsAtGuns(crew).every((n) => n === 0));
+  const guns = battery().flatMap((g, i) => (g.side === side ? [i] : []));
+  for (let tick = 0; tick < MUSTER_SECONDS * STEPS_PER_SECOND; tick++) {
+    crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas, quarters: side }).crew;
+    if (tick === 2 * STEPS_PER_SECOND) running = crew.men.filter((h) => h.going).length;
+  }
+  assert.ok(running >= COMPLEMENT / 3, `${running} running two seconds in`);
+  assert.ok(guns.every((i) => handsAtGuns(crew)[i]! >= MUSTERED_AT_GUN), handsAtGuns(crew).join(' '));
 });
 
 test('an order done by a full crew takes the time in the table once its men are there, and none is short-handed', () => {

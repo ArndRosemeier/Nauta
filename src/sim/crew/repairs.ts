@@ -115,7 +115,7 @@ function pick(crew: Crew, jobs: readonly RepairName[], ordered: readonly number[
 /** Whether a man lies below with the surgeon: carried there, or posted there. */
 function below(crew: Crew, man: number, roster: readonly Man[]): boolean {
   const h = crew.men[man]!;
-  return !h.going && sameSpot(h.stands ?? placeSpot(roster[man]!.post), placeSpot(SURGEON));
+  return !h.going && sameSpot(h.stands ?? placeSpot(roster[man]!.home), placeSpot(SURGEON));
 }
 
 /** A ship nothing has struck: nothing to repair. */
@@ -169,7 +169,7 @@ export function repairsDue(d: Damage, told: ShipOrders, crew: Crew, tick: number
   // The badly wounded carried below, as many at once as there are parties.
   const badly = HARMS.indexOf('badly');
   const wounded = d.hurt.flatMap((h) => { const man = Math.floor(h / HARMS.length); return h % HARMS.length === badly && !below(crew, man, roster) ? [man] : []; });
-  for (const man of pick(crew, ['fetch', 'carry'], wounded, CARRY_PARTIES)) out.push({ job: 'fetch', on: man, at: manAt(crew.men[man]!, roster[man]!.post).spot });
+  for (const man of pick(crew, ['fetch', 'carry'], wounded, CARRY_PARTIES)) out.push({ job: 'fetch', on: man, at: manAt(crew.men[man]!, roster[man]!.home).spot });
 
   return out.length > 0 ? out : NONE;
 }

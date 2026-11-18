@@ -278,7 +278,7 @@ function aboardOf(s: HitShip, w: Working, roster: readonly Man[]): Aboard {
   if (w.aboard) return w.aboard;
   const men = s.crew.men.map((hand, i) => {
     if (w.hurt.get(i) === HARMS.indexOf('killed')) return null;
-    const { spot, height } = manAt(hand, roster[i]!.post);
+    const { spot, height } = manAt(hand, roster[i]!.home);
     return [spot.along, spot.across, height] as Place;
   });
   const mounted = Array.from({ length: gunCount(w.battery) }, (_, i) => !gunAt(w.battery, i).dismounted);
@@ -731,7 +731,7 @@ function menBySpace(crew: Crew, d: Damage, roster: readonly Man[]): Map<number, 
   const index = new Map(shipPlan().spaces.map((s, i) => [s.id, i])), out = new Map<number, number>();
   crew.men.forEach((hand, i) => {
     if (!fit(d, i)) return;
-    const space = index.get(manAt(hand, roster[i]!.post).spot.space);
+    const space = index.get(manAt(hand, roster[i]!.home).spot.space);
     if (space !== undefined) out.set(space, (out.get(space) ?? 0) + 1);
   });
   return out;
@@ -743,7 +743,7 @@ function thrownDown(d: Damage, before: Standing, after: Standing, input: Afterma
   const rng = new Rng(deriveSeed(input.seed, 'fall', input.ship, input.tick));
   input.crew.men.forEach((hand, i) => {
     if (hurt.get(i) === HARMS.indexOf('killed')) return;
-    const s = sparUnder(manAt(hand, roster[i]!.post).spot.space);
+    const s = sparUnder(manAt(hand, roster[i]!.home).spot.space);
     if (s < 0 || before.down[s] || !after.down[s]) return;
     const harm = Math.max(hurt.get(i) ?? 0, harmBy('fall', rng));
     hurt.set(i, harm);
