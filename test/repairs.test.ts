@@ -112,8 +112,6 @@ test('the killed and badly wounded leave the quarter bill: the badly wounded are
   assert.ok(below >= CARRY_PARTIES, `${below} carried below to the surgeon in 40 s`);
   const crew = s.ships[0]!.crew;
   assert.ok(crew.tasks.every((t) => t.hands.every((i) => !out.has(i))), 'no man out of the quarter bill has a task');
-  s = run(s, 40, []);
-  assert.ok(s.ships[0]!.crew.men[killed]!.stands !== null && sameSpot(s.ships[0]!.crew.men[killed]!.stands!, deadSpot(killed)) && !s.ships[0]!.crew.men[killed]!.going, 'and the killed man lies in the hold in the end');
 });
 
 test('a man killed is carried to the hold by two waisters to a place of his own in the hold', () => {
