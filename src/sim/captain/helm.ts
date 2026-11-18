@@ -21,6 +21,7 @@ import { HOVE_TO_MAST, MASTER_LOOK } from '../rules/orders';
 import { CLOSE_HAULED } from '../rules/sailing';
 import { MASTS } from '../ship/sailing';
 import type { SimState } from '../state';
+import { foeOf } from '../foes';
 import { bearingDir, KNOT, STEPS_PER_SECOND, wrapBearing } from '../units';
 import { sideIndex, sideSign, sightOf, type Sight } from './sight';
 
@@ -166,11 +167,11 @@ export function keptHeading(sight: Sight, keep: Keep): number {
 /**
  * The master's own helm order for her standing order (steer for her, her on the beam), or null: every `MASTER_LOOK`
  * seconds he looks at her and gives what the computer captain's helm would (`helmOrder`): a course, full and by, a
- * tack or a wear. Only in a duel (the enemy is the other ship).
+ * tack or a wear. Against her foe, the nearest enemy (the other ship in a duel).
  */
 export function masterOrder(state: SimState, ship: number): SailingOrder | null {
   const keep = state.ships[ship]?.told.keep;
-  if (!keep || state.ships.length !== 2 || state.tick % Math.round(MASTER_LOOK * STEPS_PER_SECOND) !== 0) return null;
+  if (!keep || state.tick % Math.round(MASTER_LOOK * STEPS_PER_SECOND) !== 0 || foeOf(state.ships, ship) === null) return null;
   const sight = sightOf(state, ship, MASTER_EYE);
   const order = helmOrder(sight, keptHeading(sight, keep));
   return order && !isGunnery(order) && !isLife(order) && !isKeep(order) && order.kind !== 'sound' ? order : null;

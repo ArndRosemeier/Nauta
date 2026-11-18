@@ -32,6 +32,7 @@ import {
   type Skill, type SkillRow,
 } from '../rules/captain';
 import type { MatchSetup, SimState } from '../state';
+import { foeOf } from '../foes';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../units';
 import { helmOrder, stationOrder, wantedHeading } from './helm';
 import { sideIndex, sightOf, type Sight } from './sight';
@@ -140,10 +141,10 @@ export function crewedBy(setup: MatchSetup, ship: number, skill: Skill): MatchSe
 
 /**
  * The orders the computer captain of `ship`, at `skill`, gives in the step of `state` (most steps none). The duel's
- * enemy is the other ship; after the fight's end he gives nothing.
+ * enemy is the nearest ship of another side (foes.ts; in a duel the other ship), and he gives nothing with none or after the fight's end.
  */
 export function captainOrders(state: SimState, ship: number, skill: Skill): Order[] {
-  if (state.fight.end || state.ships.length !== 2 || !state.ships[ship]) return [];
+  if (state.fight.end || !state.ships[ship] || foeOf(state.ships, ship) === null) return [];
   const row = SKILL[skill], own = state.ships[ship]!.told, look = looks(state, ship, row);
   const strikeDue = own.strike !== null && !own.struck;
   const word = row.word && own.quarters && own.firing === 'hold' && !own.word;

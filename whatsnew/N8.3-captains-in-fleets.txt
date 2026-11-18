@@ -1,0 +1,2 @@
+Computer captains now fight in fleets: each one sails at and fires on the nearest enemy of another side.
+Duels are unchanged; the setup dialog still runs two ships until the rest of the work lands.
