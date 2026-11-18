@@ -20,6 +20,7 @@ import type { JobName } from '../sim/rules/crew';
 import type { Bunk } from '../sim/rules/bunks';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { CrewKnobs } from './quality';
+import { CLIMBED, type CrewClimb } from './ladders';
 import { floorApart } from './officers';
 import { standByClip, standToClip, watchClip } from './standBy';
 import { apartOnWater } from '../sim/units';
@@ -27,6 +28,8 @@ import { BREAKS } from '../sim/rules/ships';
 import { gunClip, gunWork, stepBack, type GunWork } from './gunDrill';
 
 /** The motion a man hauling plays (at a pin, tailing on a fall). */
+/** A man climbing is taken from the route's line to the rungs over this much of the height he climbs from either end of his way, m. */
+const CLIMB_EASE_RISE = 0.5;
 const HAUL = 'pick up';
 /** What a man at work plays, by his job (crewLooks.ts PACK_CLIPS): hauling at the pins, at the wheel, out on a yard, the repairs. */
 export const JOB_CLIPS: Readonly<Record<JobName, string>> = {
@@ -106,13 +109,16 @@ export interface ManDrawn {
   clip: string;
   /** On a way between two floors (a ladder, the shrouds, the climb onto a footrope), its kind; null on a floor or a surface aloft. */
   way: string | null;
+  /** Climbing a ladder or shrouds hand over hand (ladders.ts): which, else null. His feet are on the line the route gives; the drawing puts him on the rungs, `climbEase` of the way (0 at either end of the way, 1 in the middle of it). */
+  climb: CrewClimb | null;
+  climbEase: number;
 }
 
 /** A new, empty man drawn (to be filled by `manDrawn`). */
-export const newManDrawn = (): ManDrawn => ({ x: 0, y: 0, z: 0, yaw: FORWARD, space: '', clip: JOB_CLIPS.tackle, way: null });
+export const newManDrawn = (): ManDrawn => ({ x: 0, y: 0, z: 0, yaw: FORWARD, space: '', clip: JOB_CLIPS.tackle, way: null, climb: null, climbEase: 0 });
 
 /** Where a man is in one state, before the frame's in-between. */
-interface At { along: number; across: number; height: number; space: string; yaw: number; way: string | null; moving: boolean; bunked?: boolean }
+interface At { along: number; across: number; height: number; space: string; yaw: number; way: string | null; moving: boolean; bunked?: boolean; climb?: CrewClimb; climbEase?: number }
 
 /** His spot and height in one state, which way he faces and whether he is on his way. */
 function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
@@ -120,8 +126,14 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
   if (carried) return carried;
   const hand = ship.crew.men[man]!;
   if (hand.going) {
-    const w = goingAt(hand.going), way = w.way === null ? null : goingRoute(hand.going).legs[hand.going.leg]?.kind ?? null;
+    const w = goingAt(hand.going), leg = w.way === null ? undefined : goingRoute(hand.going).legs[hand.going.leg], way = leg?.kind ?? null;
     const out: At = { along: w.along, across: w.across, height: w.height, space: w.space, yaw: Math.atan2(w.facing[1], -w.facing[0]), way, moving: true };
+    if (leg && w.way !== null && CLIMBED.has(leg.kind)) {
+      // Climbing: how far in from either end of the way (CLIMB_EASE_RISE), for the drawing to take him from the route's line to the rungs.
+      const [from, to] = leg.rise, up = to > from;
+      out.climb = { way: w.way, kind: leg.kind, up };
+      out.climbEase = Math.max(0, Math.min(1, Math.min(Math.abs(w.height - from), Math.abs(to - w.height)) / CLIMB_EASE_RISE));
+    }
     const bed = m.bunk ?? m.berth;
     return bed ? outOfBunk(out, bed, placeSpot(bed.station)) : out;
   }
@@ -308,7 +320,7 @@ export function stepAside(at: ManDrawn, eye: { readonly x: number; readonly z: n
 }
 
 /** The turn from `a` to `b` the short way round, rad. */
-const turnBetween = (a: number, b: number): number => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+export const turnBetween = (a: number, b: number): number => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
 /**
  * Man `man` (his place in the roster) of a ship as drawn `f` of the way from her state `from` to `to` (the match's
@@ -325,6 +337,8 @@ export function manDrawn(from: SimShip, to: SimShip, f: number, man: number, m: 
   out.yaw = a.yaw + g * turnBetween(a.yaw, b.yaw);
   out.space = b.space;
   out.way = b.way;
+  out.climb = b.climb ?? null;
+  out.climbEase = out.climb ? a.climb ? a.climbEase! + g * (b.climbEase! - a.climbEase!) : b.climbEase! : 0;
   const gun = !b.moving && !task && !isDown(to, man) ? gunWork(to, man, m) : null;
   // At the report the men at a gun step clear of her (only the drawing moves them).
   if (gun) out.x -= Math.sign(out.x) * stepBack(gun);
@@ -352,7 +366,11 @@ function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, s
   if (isDown(ship, man)) return LYING;
   const hand = ship.crew.men[man]!;
   if (at.bunked && !task) return SLEEPING;
-  if (at.moving) return task?.job === 'carry' || bearsPowder(hand) ? JOB_CLIPS.carry : hand.going?.haste === 'smart' ? RUNNING : WALKING;
+  if (at.moving) {
+    if (task?.job === 'carry' || bearsPowder(hand)) return JOB_CLIPS.carry;
+    // A man runs on a deck, never on a ladder, the shrouds or aloft (his footing there is a climb, or a careful walk).
+    return hand.going?.haste === 'smart' && at.way === null && !routeNetwork().surfaces.has(at.space) ? RUNNING : WALKING;
+  }
   if (task) return task.began === null ? standToClip(m, seed) : JOB_CLIPS[task.job];
   // At his gun he works the drill (gunDrill.ts); the steps that give his part no work, he stands to.
   const work = gun && gunClip(gun);

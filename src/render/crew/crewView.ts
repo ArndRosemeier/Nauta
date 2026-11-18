@@ -36,7 +36,7 @@ import { shipY, shipZ } from '../../sim/ship/section';
 import { belowDeck } from '../../audio/crewHearing';
 import { BUILDS, DRESSES, HAT_ITEMS, PACK, SHIRT_GROUP, SHIRT_GARMENT, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
 import {
-  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, duckTo, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn,
+  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, duckTo, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, turnBetween, type ManDrawn,
 } from '../../app/crewDrawn';
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
@@ -49,6 +49,9 @@ import { EYE } from '../../app/standpoints';
 import { stainOf, stained, coveredOf, TRAIL_EVERY, SHOWN } from '../../app/violence';
 import type { Violence } from '../../app/settings';
 import { NearPool, type PoolChar } from './nearPool';
+import { ClimbRig } from './climbRig';
+import { crewLadder } from '../../app/ladders';
+import type { OnLadder } from '@futuremagic/figure';
 import { Blood } from './blood';
 import { Shrouds } from './shroud';
 import { Hammocks } from './hammocks';
@@ -133,6 +136,10 @@ interface Drawn {
   /** A new hurt to lay blood for once he is placed (he has a place to bleed on), and whether he has been placed. */
   fresh: Harm | null;
   placed: boolean;
+  /** The rungs he climbs and whether up them, while he climbs (the donor posed for him, `climbRig.ts`); else null. His crowd figure is then in a live pose (`posed`), not a clip. */
+  on: OnLadder | null;
+  up: boolean;
+  posed: boolean;
 }
 
 /** How the trial draws the other crew (`?crew`, plan N4.0): on her own deck (`aboard`), or off her bow at `offset` (ship space, m). */
@@ -219,6 +226,7 @@ export class CrewView {
   private constructor(
     private readonly figures: CrowdFigures,
     private readonly pool: NearPool,
+    private readonly climber: ClimbRig,
     private readonly workbench: Character,
     private readonly views: readonly (ShipView | null)[],
     private readonly other: OtherCrewAt,
@@ -231,7 +239,7 @@ export class CrewView {
     }
     this.all = rosters.flatMap((roster, ship) => roster.map((m, man) => {
       const seed = manSeed(ship, man);
-      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false };
+      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false, on: null, up: true, posed: false };
     }));
     this.byShip = rosters.map((_, s) => this.all.filter((d) => d.ship === s));
     this.shrouds = rosters.map((_, s) => new Shrouds(this.groups[s]!));
@@ -258,7 +266,9 @@ export class CrewView {
     const figures = await buildCrowdFigures(workbench, { material: createNodeCrowdFigureMaterial, builds: { ...BUILDS }, kinds, clips, once: ONCE_CLIPS, fps: BAKE_FPS });
     note('the officers come on deck');
     const pool = await NearPool.load(renderer, `${base}${PACK}`, workbench, knobs.pool, knobs.poolFull, fullLook(workbench.catalog, figureOf(0, 1, rosters[0]![1]!)));
-    return new CrewView(figures, pool, workbench, views, other, rosters);
+    note('the climbers learn the shrouds');
+    const climber = await ClimbRig.make(renderer, `${base}${PACK}`, workbench);
+    return new CrewView(figures, pool, climber, workbench, views, other, rosters);
   }
 
   /**
@@ -450,6 +460,7 @@ export class CrewView {
   private placeMan(d: Drawn, from: SimState['ships'][number], to: SimState['ships'][number], fr: CrewFrame): void {
     const at = manDrawn(from, to, fr.state.f, d.man, d.m, d.seed, d.at), mine = d.ship === fr.mine;
     if (mine) this.officerAt(d, fr);
+    this.climbs(d);
     const view = mine || (this.other && 'aboard' in this.other) ? this.views[fr.mine]! : null;
     const eye = this.eyes[d.ship]!;
     // A man at his place on the captain's floor steps aside as the captain walks up to him (the match does not know where he walks).
@@ -480,7 +491,13 @@ export class CrewView {
     this.turn.setFromAxisAngle(UP, at.yaw);
     this.scale.setScalar(d.figure.scale);
     c.matrix.compose(this.local.set(at.x, at.y, at.z), this.turn, this.scale);
-    if (at.clip !== d.clip) {
+    if (d.on) {
+      // On the rungs: the donor, posed for him by `climbs` just now (hands and feet on the holds), faded in from the clip he walked up to them in.
+      this.figures.pose(c, this.climber.actor, d.posed ? undefined : { fade: CLIP_FADE });
+      d.posed = true;
+      d.clip = null;
+    } else if (at.clip !== d.clip || d.posed) {
+      d.posed = false;
       d.clip = at.clip;
       this.figures.play(c, at.clip, { fade: CLIP_FADE, time: at.clip === SLEEPING ? HELD_AT_END : ONCE_CLIPS.includes(at.clip) ? 0 : this.time + clipPhase(d.seed) });
     }
@@ -493,6 +510,19 @@ export class CrewView {
     // The violence setting: his shirt stained by his hurt.
     const stain = d.figure.tints.length > SHIRT_GROUP ? stainOf(fr.violence, d.harm) : 0;
     if (stain !== d.stain) { d.stain = stain; this.figures.setLook(c, { tints: this.tintsOf(d) }); }
+  }
+
+  /** A man climbing a ladder or the shrouds: taken from the route's line onto the rungs (the more, the further along his way), `d.on` the rungs he is on, else null. */
+  private climbs(d: Drawn): void {
+    const at = d.at, c = at.climb;
+    d.on = c ? crewLadder(c, at.y) : null;
+    if (!c || !d.on) return;
+    d.up = c.up;
+    const to = this.climber.cling(d.on, c.up), e = at.climbEase;
+    at.x += (to.x - at.x) * e;
+    at.y += (to.y - at.y) * e;
+    at.z += (to.z - at.z) * e;
+    at.yaw += turnBetween(at.yaw, to.yaw) * e;
   }
 
   /** A man's tint colours with his shirt as stained as the setting shows it. */
@@ -611,6 +641,7 @@ export class CrewView {
       if (p.words && p.words.until > fr.now) { p.ch.lookAt(fr.camera); p.ch.say(p.words.text, SPEAKING_RATE); p.looking = p.words.until - fr.now; }
       p.words = null;
       p.ch.update(dt);
+      if (d.on) { this.climber.cling(d.on, d.up); this.climber.lendTo(p.ch.actor); }
     }
   }
 

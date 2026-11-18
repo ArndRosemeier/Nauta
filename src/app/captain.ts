@@ -6,7 +6,7 @@
  * walking on the tops, the crosstrees and the bowsprit (sim/ship/aloftWalk.ts), and the rig climbed by the same figure
  * (aloftClimb.ts). Gives the eye in ship space and, climbing, the way he faces.
  */
-import { LadderClimb, faceYaw, type ClimbStep, type Ladder } from '@futuremagic/figure';
+import { LadderClimb, faceYaw, type ClimbStep } from '@futuremagic/figure';
 import type { DeckGround, DeckIntent, Vec3 } from '@futuremagic/deck';
 import { BODY, LADDER } from '../sim/rules/ships';
 import { EYE_BELOW_TOP, HEAD_CLEAR } from '../sim/rules/walking';
@@ -18,24 +18,12 @@ import { shutDoors, stepDoors, type Doors } from '../sim/ship/doors';
 import { rigPlan, type RigPlan } from '../sim/ship/rig';
 import { aloftGround, aloftOffered, stepAloftWalker, surfaceOf, walkerAloft } from '../sim/ship/aloftWalk';
 import { AloftClimb, CLIMBER, walkTo as walkOnto } from './aloftClimb';
+import { ladderOf } from './ladders';
 
 /** A floor this near under the feet is the one they stand on, m (a climber's feet are a little over a rung). */
 const FEET_SLACK = 0.3;
 /** His head comes out from under the deck's edge into the opening over this much of his way, m either side of the edge: no jump. */
 const EDGE_EASE = 0.25;
-
-/** A ladder's two halves for the figure, in ship space: from its foot (on at the bottom) and at its head (off at the top). */
-function ladderOf(way: Way): { foot: Ladder; head: Ladder } {
-  const line = way.line!, [fa, fc, fh] = line.foot, [ha, hc, hh] = line.head;
-  const y0 = shipY(fh), y1 = shipY(hh), rung = way.rise;
-  // Into the ladder's "wall" is the way it climbs: toward its head, in ship space (x across, z aft).
-  const nx = line.toward[1], nz = -line.toward[0];
-  const common = { nx, nz, halfWidth: way.width / 2, rung, lean: Math.hypot(ha - fa, hc - fc) / (hh - fh) };
-  return {
-    foot: { ...common, x: fc, z: shipZ(fa), lo: y0 + rung, hi: y1, floor: y0, rim: false },
-    head: { ...common, x: hc, z: shipZ(ha), lo: y1, hi: y1, floor: y1, rim: false },
-  };
-}
 
 /** A walk (the figure's walk to a rim) that ends at a spot of the floor at height y, facing (dx, dz). */
 const walkTo = (x: number, z: number, y: number, dx: number, dz: number): ClimbStep => walkOnto(x, z, y, dx, dz, LADDER.width / 2);
