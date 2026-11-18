@@ -87,9 +87,9 @@ function broadsideByOrders(): void {
   }
 }
 
-/** The crews at quarters in a whole match (orders.md): the most each part may take, s: crossing the deck smartly is about 5 s; beating to quarters from standing by in the waist, on the forecastle and below (design ruling 2026-11-18) about 30 s. */
+/** The crews at quarters in a whole match (orders.md): the most each part may take, s: crossing the deck smartly is about 5 s; beating to quarters from the hammocks below (Arnd, 2026-11-18: about 60 s) at most 65 s. */
 const MANNED_WITHIN = 20;
-const MUSTERED_WITHIN = 40;
+const MUSTERED_WITHIN = 65;
 /** How near a gun with her whole crew reloads to the table's time, s. */
 const RELOAD_SLACK = 1;
 /** The longest the gun crews' check runs, s. */

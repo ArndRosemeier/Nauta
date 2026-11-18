@@ -13,6 +13,8 @@
  * forward of the mainmast. Ship space (src/sim/ship/section.ts) turns both into coordinates.
  */
 
+import { BUNK_STATIONS } from './bunks';
+
 /**
  * The midship section (the dead flat, ⊗): her moulded half-breadth (to the outside of the frames, m) at heights above
  * the base (m), bottom to top, read off the body plan at every second pixel row and averaged over its after and fore
@@ -584,21 +586,8 @@ export const STATIONS: readonly StationRow[] = [
   { id: 'forecastle', name: 'the forecastle', who: 'the marines at quarters', orders: [], space: 'deck', along: 17.5, across: 1.5 },
   { id: 'marines-s', name: 'the waist, starboard rail', who: 'the marines at quarters', orders: [], space: 'deck', along: 3.0, across: 2.5 },
   { id: 'marines-p', name: 'the waist, larboard rail', who: 'the marines at quarters', orders: [], space: 'deck', along: 3.0, across: -2.5 },
-  // Where the hands off watch are until she beats to quarters (design ruling 2026-11-18; Arnd: nobody visible just stands about): about half below at their messes, the rest on deck at their chores.
-  { id: 'idle-waist-a', name: 'the waist, aft of the hatches', who: 'the hands at their chores', orders: [], space: 'deck', along: 4.8, across: -0.9 },
-  { id: 'idle-waist-b', name: 'the waist, aft of the hatches', who: 'the hands at their chores', orders: [], space: 'deck', along: 4.8, across: 0.9 },
-  { id: 'idle-waist-c', name: 'the waist, forward of the hatches', who: 'the hands at their chores', orders: [], space: 'deck', along: 7.5, across: -0.9 },
-  { id: 'idle-waist-d', name: 'the waist, forward of the hatches', who: 'the hands at their chores', orders: [], space: 'deck', along: 7.5, across: 0.9 },
-  { id: 'idle-aft-p', name: 'the waist, at the foot of the quarterdeck ladder', who: 'the hands at their chores', orders: [], space: 'deck', along: 0.2, across: -2.4 },
-  { id: 'idle-aft-s', name: 'the waist, at the foot of the quarterdeck ladder', who: 'the hands at their chores', orders: [], space: 'deck', along: 0.2, across: 2.4 },
-  { id: 'idle-fore-p', name: 'the waist, at the foot of the forecastle ladder', who: 'the hands at their chores', orders: [], space: 'deck', along: 10.5, across: -2.5 },
-  { id: 'idle-fore-s', name: 'the waist, at the foot of the forecastle ladder', who: 'the hands at their chores', orders: [], space: 'deck', along: 10.5, across: 2.0 },
-  { id: 'idle-rail-p', name: 'the waist, by the larboard guns', who: 'the hands at their chores', orders: [], space: 'deck', along: 5.2, across: -2.3 },
-  { id: 'idle-rail-s', name: 'the waist, by the starboard guns', who: 'the hands at their chores', orders: [], space: 'deck', along: 5.2, across: 2.3 },
-  { id: 'idle-forecastle', name: 'the forecastle', who: 'the hands at their chores', orders: [], space: 'deck', along: 16.5, across: 1.5 },
-  { id: 'mess-p', name: 'the berth deck, larboard mess', who: 'the hands at their messes', orders: [], space: 'messdeck', along: 8.0, across: -1.8 },
-  { id: 'mess-s', name: 'the berth deck, starboard mess', who: 'the hands at their messes', orders: [], space: 'messdeck', along: 8.0, across: 1.5 },
-  { id: 'mess-fore', name: 'the berth deck, forward mess', who: 'the hands at their messes', orders: [], space: 'messdeck', along: 9.8, across: -1.8 },
+  // Where the hands off watch are until she beats to quarters: asleep below, the floor under each hammock (rules/bunks.ts).
+  ...BUNK_STATIONS,
 ];
 /**
  * Her lanterns below deck (plan N2.4): [space, m forward of the mainmast, m from the centreline], each hung from the

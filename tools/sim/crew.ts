@@ -29,15 +29,15 @@ import { duelSetup } from '../../test/support/match.ts';
 import { DRILL, EACH, MODERATE, run, underWay } from '../../test/support/orders.ts';
 
 /** The longest any order takes to carry out in a whole match, s (plain sail from battle sail: a course, then a topgallant). */
-const MOST_ORDER_SECONDS = 60;
+const MOST_ORDER_SECONDS = 100;
 /** Long enough for plain sail to be set in full, s. */
 const PLAIN_SECONDS = 90;
 /** The sails plain sail adds to battle sail. */
 const PLAIN_ADDS = ['fore-course', 'fore-topgallant', 'main-course', 'main-topgallant'];
 /** The network's most a state may take, bytes. */
-const STATE_BYTES = 16 * 1024;
+const STATE_BYTES = 20 * 1024;
 /** Long enough for two crews to make plain sail and go back to their posts, s. */
-const BOTH_SECONDS = 60;
+const BOTH_SECONDS = 100;
 /** Fewer men of each ship on their way at the busiest, and the manoeuvre was not the busy one it names. */
 const FEWEST_WALKING = 30;
 

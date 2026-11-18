@@ -316,7 +316,9 @@ function manTasks(tasks: readonly Task[], men: readonly Hand[], roster: readonly
  * is sent, the men of tasks first, then the men going back to their posts, at most `SENT_PER_STEP` a step.
  */
 function sendMen(men: readonly Hand[], roster: readonly Man[], byMan: ReadonlyMap<number, Task>, deck: Deck, struck: ReadonlySet<number>): Hand[] {
-  const out = [...men], order = [...men.keys()].sort((a, b) => Number(byMan.has(b)) - Number(byMan.has(a)) || a - b);
+  // Beating to quarters, the gun crews are called up first: they queue at the ladders ahead of the men whose places are not the guns'.
+  const first = (i: number) => Number(byMan.has(i)) * 2 + Number(deck.quarters !== undefined && roster[i]!.gun !== null);
+  const out = [...men], order = [...men.keys()].sort((a, b) => first(b) - first(a) || a - b);
   let sent = 0;
   for (const i of order) {
     if (sent >= SENT_PER_STEP) break;

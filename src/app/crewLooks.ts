@@ -32,9 +32,9 @@ export const PACK_CLIPS = [
 /**
  * Motion capture (the CMU library, in place: no walking away) for the work the pack's own clips lack, kept in the cut
  * pack (tools/crew/pack.mjs cuts the library to these): the rammer's stroke (pushing a broom), the sponge (washing a
- * window), hauling a tackle (coiling a rope, hand over hand).
+ * window), hauling a tackle (coiling a rope, hand over hand), a man lying down (asleep in his hammock: its last frame held).
  */
-export const PACK_MOCAP = ['cmu 80_19', 'cmu 79_44', 'cmu 62_21'];
+export const PACK_MOCAP = ['cmu 80_19', 'cmu 79_44', 'cmu 62_21', 'cmu 111_12'];
 
 /** Where the build serves the cut pack (`npm run packs` fills public/packs), under the page's base. */
 export const PACK = 'packs/human/manifest.json';
@@ -167,6 +167,8 @@ function hatOf(dress: Dress, navy: Navy): string | null {
   return DRESSES[dress].hats.find((h) => HATS_OF[navy].includes(h)) ?? null;
 }
 const HATS_OF: Readonly<Record<Navy, readonly string[]>> = { british: ['navy-round-hat'], french: ['navy-knit-cap'] };
+/** The hats a seaman wears by his seed, both navies. */
+export const HAT_ITEMS: readonly string[] = Object.values(HATS_OF).flat();
 
 /** A preset of the catalogue; throws for one the catalogue does not have. */
 function preset(catalog: Pick<CharacterCatalog, 'outfits'>, id: string): { garments: readonly string[]; colors: Readonly<Record<string, string>> } {

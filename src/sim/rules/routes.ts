@@ -94,7 +94,7 @@ export const CROWD_SLOWEST = 0.15;
  * wide (WAY_ABREAST, men): a ladder or a door takes one, the shrouds of a side two (they are five or six shrouds
  * wide), an open join between two spaces three. A single-file way is not entered while a man comes the other way on it.
  */
-export const WAY_GAP = 1.0;
+export const WAY_GAP = 0.45;
 export const WAY_ABREAST: Readonly<Record<string, number>> = {
   ladder: 1,
   door: 1,

@@ -24,14 +24,14 @@ import { STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { drive, fullCrewOrder, give, MOST_SECONDS, short, skillOf, startSail, startTold } from './support/crew.ts';
 import { duelSetup } from './support/match.ts';
 
-/** The network's most a state may take, bytes. */
-const STATE_BYTES = 16 * 1024;
+/** The network's most a state may take, bytes (16 KB until the off-watch hands slept below, 2026-11-18: then every hand an order calls comes up through the hatches at once). */
+const STATE_BYTES = 20 * 1024;
 /** Long enough for the men sent first for plain sail to reach their places (the most are on their way about 3 s in), s. */
-const BUSY_SECONDS = 8;
+const BUSY_SECONDS = 12;
 /** Long enough for the men of a job to be at their places (a marine from the cabin door below too), s. */
-const WAIT_SECONDS = 15;
+const WAIT_SECONDS = 40;
 /** Long enough for the gun crews to run to their guns on the side she fights from where they stand by, s, and the fewest men then at each gun. */
-const MUSTER_SECONDS = 40;
+const MUSTER_SECONDS = 80;
 const MUSTERED_AT_GUN = 4;
 
 test('the roster is the brig\'s 121, every man posted at a crew place of the plan, the guns\' men each at a place of his own', () => {

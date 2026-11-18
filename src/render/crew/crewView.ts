@@ -34,9 +34,9 @@ import { STEPS_PER_SECOND } from '../../sim/units';
 import type { Spot } from '../../sim/ship/plan';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { belowDeck } from '../../audio/crewHearing';
-import { BUILDS, DRESSES, PACK, SHIRT_GROUP, SHIRT_GARMENT, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
+import { BUILDS, DRESSES, HAT_ITEMS, PACK, SHIRT_GROUP, SHIRT_GARMENT, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
 import {
-  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn,
+  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn,
 } from '../../app/crewDrawn';
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
@@ -51,6 +51,7 @@ import type { Violence } from '../../app/settings';
 import { NearPool, type PoolChar } from './nearPool';
 import { Blood } from './blood';
 import { Shrouds } from './shroud';
+import { Hammocks } from './hammocks';
 import { geometryBytes } from '../bytes';
 
 /** Actors' crowd level: all the workbench draws (it only bakes the figures). */
@@ -74,6 +75,12 @@ const OVER_SOLES = 2.1;
 const OVER_HEAD = 0.42;
 /** Where the finger finds a man: this far over his feet, m (his chest). */
 const CHEST = 1.25;
+/** A clip that plays once is held at its last frame from this time on, s (longer than any clip). */
+const HELD_AT_END = 1e4;
+/** A hammock is slung athwart her (a quarter turn from her length). */
+const ATHWART = Math.PI / 2;
+/** A hat a seaman wears or not by his seed (crewLooks.ts): the other dresses' hats are their dress's, and stay. */
+const SEAMENS_HATS = HAT_ITEMS;
 /** How long a man looks at the captain once addressed, s. */
 const LOOK_SECONDS = 4;
 /** The midshipman turns to face the captain when this near him, m. */
@@ -105,6 +112,8 @@ interface Drawn {
   clip: string | null;
   /** Whether his figure shows its hat and hair. */
   dressed: boolean;
+  /** Whether he is bareheaded in his hammock (the hat a seaman wears by his seed is taken off to sleep). */
+  bareheaded: boolean;
   distance: number;
   seen: boolean;
   /** Drawn at all: in a room seen, his ship near enough. */
@@ -185,6 +194,7 @@ export class CrewView {
   private readonly blood: Blood[];
   /** The sheets over the killed at the mild level, on each ship. */
   private readonly shrouds: Shrouds[];
+  private readonly hammocks: Hammocks[];
   /** Men who matter now (speaking, addressed) until a page second. */
   private readonly matters = new Map<number, number>();
   /** When the pool last began dressing a man, page seconds. */
@@ -221,10 +231,11 @@ export class CrewView {
     }
     this.all = rosters.flatMap((roster, ship) => roster.map((m, man) => {
       const seed = manSeed(ship, man);
-      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false };
+      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false };
     }));
     this.byShip = rosters.map((_, s) => this.all.filter((d) => d.ship === s));
     this.shrouds = rosters.map((_, s) => new Shrouds(this.groups[s]!));
+    this.hammocks = rosters.map((_, s) => new Hammocks(this.groups[s]!));
     this.blood = rosters.map((_, s) => { const b = new Blood(); b.attach(this.groups[s]!); return b; });
     for (const v of VOICES) this.voices.set(v, voiceMan(v, rosters[0]));
     this.officerMen = OFFICERS.map((o) => this.voices.get(o)!);
@@ -243,7 +254,7 @@ export class CrewView {
     const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, levels: [CROWD_LEVEL] });
     const kinds = crowdKinds(workbench.catalog, rosters);
     note(`baking ${kinds.length} kinds of men`);
-    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, ...GUN_CLIP_NAMES, LYING, WALK, 'jog', 'idle'])];
+    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, ...GUN_CLIP_NAMES, LYING, SLEEPING, WALK, 'jog', 'idle'])];
     const figures = await buildCrowdFigures(workbench, { material: createNodeCrowdFigureMaterial, builds: { ...BUILDS }, kinds, clips, once: ONCE_CLIPS, fps: BAKE_FPS });
     note('the officers come on deck');
     const pool = await NearPool.load(renderer, `${base}${PACK}`, workbench, knobs.pool, knobs.poolFull, fullLook(workbench.catalog, figureOf(0, 1, rosters[0]![1]!)));
@@ -459,6 +470,9 @@ export class CrewView {
     // Mild: the killed are covered, and the canvas goes with him (shroud.ts); once it is over him he is not drawn.
     if (d.shown && d.covered > 0) this.shrouds[d.ship]!.set(d.man, at.x, at.y, at.z, at.yaw, d.covered);
     else this.shrouds[d.ship]!.clear(d.man);
+    // A sleeper's hammock, slung under his back (the cloth is this far under the middle of his body).
+    if (d.shown && at.clip === SLEEPING) this.hammocks[d.ship]!.set(d.man, at.x, at.y, at.z, ATHWART);
+    else this.hammocks[d.ship]!.clear(d.man);
     if (!d.shown || d.covered >= 1) { this.hideMan(d); return; }
     if (!d.crowd) this.showMan(d);
     const c = d.crowd!;
@@ -467,10 +481,14 @@ export class CrewView {
     c.matrix.compose(this.local.set(at.x, at.y, at.z), this.turn, this.scale);
     if (at.clip !== d.clip) {
       d.clip = at.clip;
-      this.figures.play(c, at.clip, { fade: CLIP_FADE, time: ONCE_CLIPS.includes(at.clip) ? 0 : this.time + clipPhase(d.seed) });
+      this.figures.play(c, at.clip, { fade: CLIP_FADE, time: at.clip === SLEEPING ? HELD_AT_END : ONCE_CLIPS.includes(at.clip) ? 0 : this.time + clipPhase(d.seed) });
     }
     const dressed = d.distance <= fr.knobs.dressTo + (d.dressed ? DRESS_STICK : 0);
-    if (dressed !== d.dressed) { d.dressed = dressed; this.figures.setLook(c, { show: dressed ? d.figure.show : [] }); }
+    const bareheaded = at.clip === SLEEPING;
+    if (dressed !== d.dressed || bareheaded !== d.bareheaded) {
+      d.dressed = dressed; d.bareheaded = bareheaded;
+      this.figures.setLook(c, { show: dressed ? (bareheaded ? d.figure.show.filter((x) => !SEAMENS_HATS.includes(x)) : d.figure.show) : [] });
+    }
     // The violence setting: his shirt stained by his hurt.
     const stain = d.figure.tints.length > SHIRT_GROUP ? stainOf(fr.violence, d.harm) : 0;
     if (stain !== d.stain) { d.stain = stain; this.figures.setLook(c, { tints: this.tintsOf(d) }); }
@@ -522,7 +540,7 @@ export class CrewView {
     const pooled = fr.pooled ?? fr.mine, mine = this.byShip[pooled] ?? [], size = this.crews > 0 ? this.poolInUse : 0;
     const at = fr.state.to.tick / STEPS_PER_SECOND;
     // A man just hurt matters too (plan "Faces": speaking, struck or addressed): his face is a living one, near enough to be seen.
-    const candidates = mine.filter((d) => (d.man !== 0 || fr.watching) && d.crowd !== null && d.covered === 0).map((d) => ({
+    const candidates = mine.filter((d) => (d.man !== 0 || fr.watching) && d.crowd !== null && d.covered === 0 && d.clip !== SLEEPING).map((d) => ({
       man: d.man, distance: d.distance, seen: d.seen,
       matters: (this.matters.get(d.man) ?? 0) > fr.now || (at - d.hurtAt < HURT_MATTERS && d.distance <= HURT_REACH),
     }));

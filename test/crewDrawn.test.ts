@@ -6,8 +6,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OUTFITS, type CharacterCatalog } from '@actors/generator';
-import { CAPTAIN_CLEAR, FULL, JOB_CLIPS, MEDIUM, POOL_STICK, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
-import { BREAKS } from '../src/sim/rules/ships.ts';
+import { CAPTAIN_CLEAR, FULL, JOB_CLIPS, MEDIUM, POOL_STICK, SLEEPING, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
+import { BERTH_HEADROOM, BREAKS } from '../src/sim/rules/ships.ts';
+import { shipY } from '../src/sim/ship/section.ts';
+import { heightAt, routeNetwork } from '../src/sim/crew/network.ts';
+import { floorApart } from '../src/app/officers.ts';
 import { crewPlaces, placeSpot } from '../src/sim/crew/roster.ts';
 import { FACES, FEAR_SECONDS, facesNow, stepFace, type FaceState, type FaceWhy } from '../src/app/faces.ts';
 import { PACK_CLIPS, PACK_GARMENTS, PACK_HAIR, crowdKinds, figureOf, fullLook, navyOf, wearing } from '../src/app/crewLooks.ts';
@@ -29,18 +32,20 @@ const ship = startMatch(duelSetup(1805, 4)).ships[0]!;
 const drawnAll = (from: SimShip, to: SimShip, f = 1): ManDrawn[] => roster.map((m, i) => manDrawn(from, to, f, i, m, manSeed(0, i), newManDrawn()));
 /** Two men nearer than this stand in one another, m. */
 const APART = 0.2;
+/** Sleepers in hammocks 14 inches apart (a row), or one tier over another: nearer than this they would lie in one another, m. */
+const SLEEPERS_APART = 0.3;
 
 test('at their posts every man is drawn somewhere of his own, playing a motion of the pack', () => {
   const men = drawnAll(ship, ship);
   for (const d of men) {
     assert.ok([d.x, d.y, d.z, d.yaw].every(Number.isFinite));
-    assert.ok(PACK_CLIPS.includes(d.clip), d.clip);
+    assert.ok(PACK_CLIPS.includes(d.clip) || d.clip === SLEEPING, d.clip);
     assert.equal(d.way, null);
   }
   // Several men share a post: the first stands on it, the rest around it, not inside one another.
   for (let i = 0; i < men.length; i++) for (let j = i + 1; j < men.length; j++) {
     const a = men[i]!, b = men[j]!;
-    if (a.space === b.space) assert.ok(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) > APART, `${roster[i]!.rank} ${i} and ${roster[j]!.rank} ${j} at ${a.x.toFixed(2)}, ${a.z.toFixed(2)}`);
+    if (a.space === b.space) assert.ok(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) > (a.clip === SLEEPING && b.clip === SLEEPING ? SLEEPERS_APART : APART), `${roster[i]!.rank} ${i} and ${roster[j]!.rank} ${j} at ${a.x.toFixed(2)}, ${a.z.toFixed(2)}`);
   }
 });
 
@@ -57,10 +62,42 @@ test('nobody visible just stands about: every man with nothing to do is busy at 
   const men = drawnAll(ship, ship), idle = ['idle', 'arms folded'];
   roster.forEach((m, i) => assert.ok(!idle.includes(men[i]!.clip), `${m.rank} ${i} at ${m.home} plays ${men[i]!.clip}`));
   assert.ok(roster.every((m, i) => m.home.startsWith('station-sentries') || m.home.startsWith('station-cabin-door') || men[i]!.clip !== 'pistol idle'), 'only sentries keep a pistol ready');
-  // The hands below are at their messes, those on deck at their chores.
-  const at = (home: string) => roster.flatMap((m, i) => (m.home === home ? [men[i]!.clip] : []));
-  for (const clip of at('station-mess-p')) assert.ok(['eat or drink', 'talk', 'nod'].includes(clip), clip);
-  for (const clip of at('station-idle-waist-a')) assert.ok(['repair (kneeling)', 'pick up', 'interact'].includes(clip), clip);
+  // The hands off watch sleep below, each in a hammock of his own; the others have a job on deck or at a station below.
+  roster.forEach((m, i) => assert.equal(men[i]!.clip === SLEEPING, m.bunk !== null, `${m.rank} ${i} at ${m.home}`));
+  assert.ok(roster.filter((m) => m.bunk !== null).length >= 80, 'most of the crew is asleep');
+});
+
+test('a sleeper lies athwart her in his hammock under the deck beams, his head inboard, over the floor of his space', () => {
+  const men = drawnAll(ship, ship);
+  roster.forEach((m, i) => {
+    if (!m.bunk) return;
+    const d = men[i]!, floor = placeSpot(m.home);
+    assert.equal(d.space, m.bunk.space);
+    assert.equal(d.space, floor.space, `${m.rank} ${i} sleeps where his home is`);
+    assert.ok(Math.abs(-d.z - m.bunk.along) < 1e-9 && Math.abs(d.x - m.bunk.across) < 1e-9);
+    assert.ok(m.bunk.height >= 0.5 && m.bunk.height + 0.3 <= BERTH_HEADROOM, `${m.rank} ${i} lies ${m.bunk.height} m over the floor`);
+  });
+  // No two hammocks are slung in one place.
+  const taken = new Set(roster.flatMap((m) => (m.bunk ? [`${m.bunk.space}|${m.bunk.along.toFixed(2)}|${m.bunk.across}|${m.bunk.height}`] : [])));
+  assert.equal(taken.size, roster.filter((m) => m.bunk).length);
+});
+
+test('a man called out of his hammock rolls out and drops: lying while he is above the floor, on his feet at the end of the first metre', () => {
+  const i = roster.findIndex((m) => m.bunk && m.bunk.space === 'messdeck'), m = roster[i]!;
+  const first = drawnAll(ship, ship)[i]!, floor = placeSpot(m.home);
+  assert.equal(first.clip, SLEEPING);
+  let crew = ship.crew, onFloor = false, sawWalking = false;
+  const told = startTold(), sailing = startSail(), side = 1;
+  for (let tick = 0; tick < 30 * STEPS_PER_SECOND && !onFloor; tick++) {
+    crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas, quarters: side }).crew;
+    const at = { ...ship, crew }, d = manDrawn(at, at, 1, i, m, manSeed(0, i), newManDrawn());
+    if (!crew.men[i]!.going) continue;
+    if (d.clip === SLEEPING) assert.ok(d.y > shipY(heightAt(routeNetwork(), floor)) - 1e-9, 'lying he is not below the floor');
+    else sawWalking = true;
+    // Far from his hammock he is on the floor.
+    if (floorApart({ ...floor, along: -d.z, across: d.x, space: d.space }, floor) >= 1.5) { assert.ok(Math.abs(d.y - shipY(heightAt(routeNetwork(), { ...floor, along: -d.z, across: d.x, space: d.space }))) < 0.05, 'on the floor'); onFloor = true; }
+  }
+  assert.ok(sawWalking && onFloor, 'he got up and went');
 });
 
 test('at quarters nobody just stands: the gun crews are ready at their guns, the marines armed, the rest alert', () => {

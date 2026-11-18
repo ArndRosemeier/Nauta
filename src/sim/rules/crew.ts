@@ -61,52 +61,53 @@ const BOY = 0.4;
 export const ROSTER: readonly RankRow[] = [
   { rank: 'captain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
   { rank: 'first lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
-  { rank: 'second lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'] },
+  { rank: 'second lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
   { rank: 'master', count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'] },
-  { rank: "master's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'] },
-  { rank: 'midshipman', count: 2, part: 'officers', skill: ABLE, posts: ['station-quarterdeck', 'station-waist'] },
+  { rank: "master's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'], idle: ['station-bunk'] },
+  { rank: 'midshipman', count: 2, part: 'officers', skill: ABLE, posts: ['station-quarterdeck', 'station-waist'], idle: ['station-quarterdeck', 'station-bunk'] },
   { rank: 'surgeon', count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
   { rank: "surgeon's mate", count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
   { rank: 'purser', count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
-  { rank: "captain's clerk", count: 1, part: 'officers', skill: IDLER, posts: ['station-quarterdeck'] },
-  { rank: 'gunner', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'] },
+  { rank: "captain's clerk", count: 1, part: 'officers', skill: IDLER, posts: ['station-quarterdeck'], idle: ['station-bunk'] },
+  { rank: 'gunner', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
   { rank: 'boatswain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
-  { rank: 'carpenter', count: 1, part: 'officers', skill: ABLE, posts: ['station-pumps'] },
-  { rank: "boatswain's mate", count: 2, part: 'officers', skill: ABLE, posts: ['station-waist', 'pin-bow-pins-s6'] },
+  { rank: 'carpenter', count: 1, part: 'officers', skill: ABLE, posts: ['station-pumps'], idle: ['station-bunk'] },
+  { rank: "boatswain's mate", count: 2, part: 'officers', skill: ABLE, posts: ['station-waist', 'pin-bow-pins-s6'], idle: ['station-bunk'] },
   { rank: "gunner's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-magazine'] },
-  { rank: "carpenter's mate", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
-  { rank: 'quartermaster', count: 4, part: 'helm', skill: ABLE, posts: ['station-wheel'] },
+  { rank: "carpenter's mate", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
+  { rank: 'quartermaster', count: 4, part: 'helm', skill: ABLE, posts: ['station-wheel'], idle: ['station-wheel', 'station-wheel', 'station-bunk'] },
   { rank: 'cook', count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-fore-ladder-foot'] },
   { rank: "captain's steward", count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-companion-ladder-foot'] },
-  { rank: 'sailmaker', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
-  { rank: 'armourer', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
-  { rank: "carpenter's crew", count: 2, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
+  { rank: 'sailmaker', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
+  { rank: 'armourer', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
+  { rank: "carpenter's crew", count: 2, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
   // The marines (design ruling 2026-11-18: the quarterdeck is the captain's). Before quarters two sentries aft by the
   // taffrail, one at the cabin door, the rest in the waist or below on the berth deck; at quarters the two stay aft,
   // six go to the tops, six to the forecastle and five line the waist's engaged side.
-  { rank: 'sergeant of marines', count: 1, part: 'marines', skill: MARINE, posts: ['station-marines-waist'], quarters: ['station-marines-*'] },
+  { rank: 'sergeant of marines', count: 1, part: 'marines', skill: MARINE, posts: ['station-marines-waist'], quarters: ['station-marines-*'], idle: ['station-bunk'] },
   { rank: 'corporal of marines', count: 1, part: 'marines', skill: MARINE, posts: ['station-sentries'], quarters: ['station-sentries'] },
-  { rank: 'drummer', count: 1, part: 'officers', skill: MARINE, posts: ['station-quarterdeck'] },
+  { rank: 'drummer', count: 1, part: 'officers', skill: MARINE, posts: ['station-quarterdeck'], idle: ['station-bunk'] },
   {
     rank: 'private of marines', count: 17, part: 'marines', skill: MARINE,
     posts: ['station-sentries', 'station-cabin-door', ...Array<string>(7).fill('station-marines-waist'), ...Array<string>(8).fill('station-marines-below')],
+    idle: ['station-sentries', 'station-cabin-door', ...Array<string>(15).fill('station-bunk')],
     quarters: [
       'station-sentries', ...Array<string>(4).fill('station-marines-*'),
       'top-fore-s', 'top-fore-p', 'top-fore-s', 'top-main-s', 'top-main-p', 'top-main-s', ...Array<string>(6).fill('station-forecastle'),
     ],
   },
-  { rank: 'boy', count: 8, part: 'boys', skill: BOY, posts: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-after-ladder-head', 'ladder-magazine-ladder-head'], idle: ['station-magazine', 'station-mess-fore'] },
+  { rank: 'boy', count: 8, part: 'boys', skill: BOY, posts: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-after-ladder-head', 'ladder-magazine-ladder-head'], idle: ['station-magazine', 'station-bunk'] },
   { rank: 'captain of the foretop', count: 1, part: 'foretop', skill: PETTY, posts: ['top-fore-s'] },
-  { rank: 'fore topman', count: 3, part: 'foretop', skill: ABLE, posts: ['top-fore-p', 'top-fore-s', 'top-fore-p'] },
-  { rank: 'fore topman', count: 6, part: 'foretop', skill: ABLE, posts: 'guns', idle: ['station-idle-forecastle', 'station-mess-fore', 'station-idle-fore-s'] },
+  { rank: 'fore topman', count: 3, part: 'foretop', skill: ABLE, posts: ['top-fore-p', 'top-fore-s', 'top-fore-p'], idle: ['station-bunk'] },
+  { rank: 'fore topman', count: 6, part: 'foretop', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
   { rank: 'captain of the maintop', count: 1, part: 'maintop', skill: PETTY, posts: ['top-main-s'] },
-  { rank: 'main topman', count: 3, part: 'maintop', skill: ABLE, posts: ['top-main-p', 'top-main-s', 'top-main-p'] },
-  { rank: 'main topman', count: 8, part: 'maintop', skill: ABLE, posts: 'guns', idle: ['station-idle-aft-s', 'station-idle-aft-p', 'station-mess-s', 'station-idle-rail-s'] },
-  { rank: 'captain of the forecastle', count: 1, part: 'forecastle', skill: PETTY, posts: 'guns', idle: ['station-idle-forecastle'] },
-  { rank: 'forecastle man', count: 11, part: 'forecastle', skill: ABLE, posts: 'guns', idle: ['station-idle-forecastle', 'station-idle-fore-p', 'station-idle-fore-s', 'station-mess-fore'] },
-  { rank: 'captain of the afterguard', count: 1, part: 'afterguard', skill: PETTY, posts: 'guns', idle: ['station-idle-aft-s'] },
-  { rank: 'afterguard', count: 11, part: 'afterguard', skill: ORDINARY, posts: 'guns', idle: ['station-idle-aft-p', 'station-idle-aft-s', 'station-mess-p', 'station-idle-rail-p'] },
-  { rank: 'waister', count: 19, part: 'waist', skill: LANDSMAN, posts: 'guns', idle: ['station-idle-waist-a', 'station-idle-waist-c', 'station-mess-p', 'station-idle-waist-b', 'station-idle-waist-d', 'station-mess-s'] },
+  { rank: 'main topman', count: 3, part: 'maintop', skill: ABLE, posts: ['top-main-p', 'top-main-s', 'top-main-p'], idle: ['station-bunk'] },
+  { rank: 'main topman', count: 8, part: 'maintop', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'captain of the forecastle', count: 1, part: 'forecastle', skill: PETTY, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'forecastle man', count: 11, part: 'forecastle', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'captain of the afterguard', count: 1, part: 'afterguard', skill: PETTY, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'afterguard', count: 11, part: 'afterguard', skill: ORDINARY, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'waister', count: 19, part: 'waist', skill: LANDSMAN, posts: 'guns', idle: ['station-bunk'] },
 ];
 
 /** How many she carries (ship.md): the roster adds up to it (tested). */
@@ -273,3 +274,8 @@ export const SURGEON = 'station-surgeon';
 export const DEAD_ROOM = { space: 'hold', along: 3, step: 0.5 } as const;
 /** Where the relieving tackles are rigged: the tiller, in the space over the rudder head (the plan's space). */
 export const TILLER_SPACE = 'breadroom';
+
+/** The parts of the ship's work in the order they are given the bunks nearest the ladders: the hands sail work and the guns call first. */
+export const BUNK_PRIORITY: readonly Part[] = ['forecastle', 'afterguard', 'foretop', 'maintop', 'waist', 'helm', 'marines', 'boys', 'idlers', 'officers'];
+/** The placeholder in a row's `idle` list for "a bunk": roster.ts gives each man his own. */
+export const BUNK_PLACE = 'station-bunk';

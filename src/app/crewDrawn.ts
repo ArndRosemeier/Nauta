@@ -17,6 +17,7 @@ import { brigRoster, crewPlaces, placeSpot, type Man } from '../sim/crew/roster'
 import { heightAt, routeNetwork, standable } from '../sim/crew/network';
 import type { Spot } from '../sim/ship/plan';
 import type { JobName } from '../sim/rules/crew';
+import type { Bunk } from '../sim/rules/bunks';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { CrewKnobs } from './quality';
 import { floorApart } from './officers';
@@ -39,8 +40,10 @@ export const WALKING = 'walk';
 export const RUNNING = 'jog';
 /** Killed, or badly hurt and lying where he fell (the badly hurt are carried below by others, `carriedAt`). */
 export const LYING = 'death';
+/** Asleep in his hammock: the mocap of a man lying down (CMU 111_12), its last frame held (crewLooks.ts PACK_MOCAP). */
+export const SLEEPING = 'cmu 111_12';
 /** Clips that play once and hold their last frame. */
-export const ONCE_CLIPS = [LYING];
+export const ONCE_CLIPS = [LYING, SLEEPING];
 
 /** Jobs where the men tail on a fall: they spread along it inboard of the pin, a row aft for every so many. */
 const HAULING: ReadonlySet<JobName> = new Set(['brace', 'sheet', 'clew', 'hoist', 'douse']);
@@ -96,7 +99,7 @@ export interface ManDrawn {
 export const newManDrawn = (): ManDrawn => ({ x: 0, y: 0, z: 0, yaw: FORWARD, space: '', clip: JOB_CLIPS.tackle, way: null });
 
 /** Where a man is in one state, before the frame's in-between. */
-interface At { along: number; across: number; height: number; space: string; yaw: number; way: string | null; moving: boolean }
+interface At { along: number; across: number; height: number; space: string; yaw: number; way: string | null; moving: boolean; bunked?: boolean }
 
 /** His spot and height in one state, which way he faces and whether he is on his way. */
 function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
@@ -104,9 +107,11 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
   if (carried) return carried;
   const hand = ship.crew.men[man]!;
   if (hand.going) {
-    const w = goingAt(hand.going);
-    return { along: w.along, across: w.across, height: w.height, space: w.space, yaw: Math.atan2(w.facing[1], -w.facing[0]), way: w.way === null ? null : goingRoute(hand.going).legs[hand.going.leg]?.kind ?? null, moving: true };
+    const w = goingAt(hand.going), way = w.way === null ? null : goingRoute(hand.going).legs[hand.going.leg]?.kind ?? null;
+    const out: At = { along: w.along, across: w.across, height: w.height, space: w.space, yaw: Math.atan2(w.facing[1], -w.facing[0]), way, moving: true };
+    return m.bunk ? outOfBunk(out, m.bunk, placeSpot(m.home)) : out;
   }
+  if (!task && !hand.stands && m.bunk) return inBunk(m.bunk, placeSpot(m.home));
   const at = manAt(hand, m.home), own = !task && !hand.stands ? postSpots().get(man) : undefined;
   let { along, across } = own ?? at.spot, yaw = FORWARD, height = own?.height ?? at.height;
   const place = task ? placeOf(task, man) : hand.stands ? null : { id: m.home, rank: 0 };
@@ -131,6 +136,30 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
   }
   return { along, across, height, space: at.spot.space, yaw, way: null, moving: false };
 }
+
+/**
+ * A sleeper lies athwart her in his hammock, his head inboard; the lying clip ends with the man's head this far round from
+ * the way he faced when it began (CMU 111_12, measured from its last frame: 50 degrees toward his left), so he is turned
+ * by that much less. His feet are on the floor under the hammock's middle (`Man.home`) and he lies this high over it.
+ */
+const LIES_HEAD = (50 * Math.PI) / 180;
+/** A man getting into or out of his hammock is lifted or dropped over this much of his way to or from his home place, m. */
+const BUNK_DROP = 1;
+/** A sleeper in his hammock (his home place, with his bunk's tier). */
+function inBunk(bunk: Bunk, home: Spot): At {
+  const inboard = bunk.across > 0 ? -QUARTER : bunk.across < 0 ? QUARTER : QUARTER;
+  return { along: bunk.along, across: bunk.across, height: heightAt(routeNetwork(), home) + bunk.height, space: bunk.space, yaw: inboard - LIES_HEAD, way: null, moving: false, bunked: true };
+}
+/** A man on his way from or to his hammock, the first and last metre eased out of and into it (he rolls out and drops, or climbs in). */
+function outOfBunk(on: At, bunk: Bunk, home: Spot): At {
+  if (on.space !== home.space || on.way !== null) return on;
+  const apart = floorApart(on, home);
+  if (apart >= BUNK_DROP) return on;
+  const lying = inBunk(bunk, home), k = 1 - apart / BUNK_DROP;
+  return { ...on, along: on.along + k * (lying.along - home.along), across: on.across + k * (lying.across - home.across), height: on.height + k * bunk.height, bunked: k > BUNKED_SHARE };
+}
+/** While this much of the way into or out of the hammock is left (0..1) he is still lying. */
+const BUNKED_SHARE = 0.6;
 
 /** A man stands this far from the foot of a raised deck's face, m: a body nearer sinks into it (N2.12). */
 const BREAK_CLEAR = 0.5;
@@ -297,6 +326,7 @@ const isDown = (ship: SimShip, man: number): boolean => {
 function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, seed: number, gun: GunWork | null): string {
   if (isDown(ship, man)) return LYING;
   const hand = ship.crew.men[man]!;
+  if (at.bunked && !task) return SLEEPING;
   if (at.moving) return task?.job === 'carry' ? JOB_CLIPS.carry : hand.going?.haste === 'smart' ? RUNNING : WALKING;
   if (task) return task.began === null ? standToClip(m, seed) : JOB_CLIPS[task.job];
   // At his gun he works the drill (gunDrill.ts); the steps that give his part no work, he stands to.

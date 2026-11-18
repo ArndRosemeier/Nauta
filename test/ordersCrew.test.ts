@@ -17,7 +17,7 @@ import { DRILL, EACH, MODERATE, run, underWay } from './support/orders.ts';
 const SETTLE = 2;
 /** Long enough for the helm put over, and for the main yards braced aback (the men come up the quarterdeck ladders from where they stand by in the waist), s. */
 const HELM_SECONDS = 5;
-const BACK_SECONDS = 22;
+const BACK_SECONDS = 45;
 /** Plain sail stopped this soon, before any sail is set, and how long she is followed after, s. */
 const EARLY = 2;
 const AFTER = 20;
