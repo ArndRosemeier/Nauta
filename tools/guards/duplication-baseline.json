@@ -8,19 +8,19 @@
     "reason": "False alarm: reading a space's or an opening's aft and fore bounds (o.aft, o.fore) from the ship plan's own rectangles is how those files use the plan, not a copied routine. It shows or not as other files change the finder's word weights (gone with stern.ts, back with the speech bubbles' files, N4.5; damageMarks.ts reads a damage cell's the same way, N6.5)."
   },
   {
-    "key": "same name: app/settingsPanel.ts#say + render/speech/characterSpeaker.ts#say",
-    "reason": "False alarm: the settings panel's say gives the interface's words in the chosen language; a speaker's say (N4.5, the Speaker seam) moves a drawn man's mouth with a bubble's words."
-  },
-  {
     "key": "idiom: [.across .along .hypot Math] in app/officers.ts + render/ship/ship.ts + sim/ship/spars.ts",
     "reason": "False alarm: officers.ts floorApart is the one distance on one floor between two spots; spars.ts measures between rig points in three dimensions, ship.ts between a deck's middle and a point with its height."
   },
   {
-    "key": "same name: render/crew/crewView.ts#afterWarm + render/crew/officersView.ts#afterWarm",
-    "reason": "False alarm: only the name matches the Stage warm-up's convention (warmObjects, then afterWarm puts the men back): the trial crew resets 240 men to the crowd level, the officers go back into their places."
+    "key": "same name: render/captain/captainView.ts#load + render/crew/nearPool.ts#load",
+    "reason": "Only the name of an async factory matches: the captain is one figure posed by the player's body; the near pool is a dozen characters sharing the crew's workbench, handed from man to man."
   },
   {
-    "key": "same name: render/crew/crewView.ts#load + render/crew/officersView.ts#load",
-    "reason": "Only the name and the Actors loading call match: the trial musters 240 men in lanes of workers with progress; the officers are six with living faces. N4.3's near pool replaces both with one muster."
+    "key": "same name: render/crew/crewView.ts#load + render/crew/nearPool.ts#load",
+    "reason": "The crew view's load builds the crowd figures and calls the near pool's load for its characters: one muster, two parts, each loading its own."
+  },
+  {
+    "key": "same name: render/crew/crewView.ts#warm + render/crew/nearPool.ts#warm",
+    "reason": "The crew view's warm builds the crowd figures' shaders and hands the pool the dresses to warm; the pool's warm dresses its characters in each and gives them to the Stage's warm-up."
   }
 ]

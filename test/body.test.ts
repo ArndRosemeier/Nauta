@@ -11,7 +11,7 @@ import { CALM_LEAST } from '../src/sim/rules/body.ts';
 import { OUTFITS } from '@actors/generator';
 import { BODY } from '../src/sim/rules/ships.ts';
 import { EYE_BELOW_TOP } from '../src/sim/rules/walking.ts';
-import { CAPTAIN_UNSEEN, DRESS, PACK_GARMENTS, captainLook, navyLook, navyOf } from '../src/app/crewLooks.ts';
+import { PACK_GARMENTS, captainLook, navyOf } from '../src/app/crewLooks.ts';
 import { NAVIES } from '../src/app/terms.ts';
 import { WALK_PACE } from '../src/sim/rules/walking.ts';
 
@@ -191,16 +191,14 @@ test('his drawn body leans as far as the view\'s eye moves: the eye it carries i
   assert.ok(calm < full * 0.15, `calm ${calm.toFixed(3)} of ${full.toFixed(3)}`);
 });
 
-test('the captain wears Actors\' post captain\'s uniform of his navy from the crew\'s pack, the same on every machine; every dress of both navies is in the pack', () => {
-  const catalog = { outfits: OUTFITS };
+test('the captain wears Actors\' post captain\'s uniform of his navy from the crew\'s pack, the same on every machine', () => {
+  const catalog = { outfits: OUTFITS, hair: [] };
   for (const navy of NAVIES) {
     const look = captainLook(catalog, navy);
     assert.deepEqual(look, captainLook(catalog, navy));
     for (const g of look.outfit!) assert.ok(PACK_GARMENTS.includes(g), g);
     assert.ok(look.outfit!.includes('navy-tailcoat') && look.outfit!.includes('navy-epaulettes'), 'coat and epaulettes');
     assert.equal(look.beard, 'none');
-    // navyLook throws for a piece the pack lacks.
-    for (const preset of Object.values(DRESS[navy])) navyLook(catalog, preset, 1, 'officer', preset === DRESS[navy].captain ? CAPTAIN_UNSEEN : [], navy);
   }
   assert.notDeepEqual(captainLook(catalog, 'french').garmentColors, captainLook(catalog).garmentColors);
   assert.deepEqual([navyOf(0), navyOf(1), navyOf(0, 'french'), navyOf(1, 'french')], ['british', 'french', 'french', 'british']);

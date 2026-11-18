@@ -11,7 +11,7 @@ import { keyCap, onKeyPress } from './app/dom';
 import { standpoint, type Standpoint } from './app/standpoints';
 import { showStandpoints } from './app/standpointBar';
 import { Walking } from './app/walking';
-import { QUALITY_LEVELS, QualityChooser, type QualityKnobs } from './app/quality';
+import { QUALITY_LEVELS, QualityChooser, levelNamed, type QualityKnobs } from './app/quality';
 import { SettingsStore } from './app/settingsStore';
 import { matchMinutes } from './app/terms';
 import { SettingsMenu } from './app/settingsPanel';
@@ -22,15 +22,12 @@ import { Channel } from './audio/channel';
 import { OrderPanel } from './app/orderPanel';
 import { Speech } from './app/speaking';
 import { ReportsPanel } from './app/reportsPanel';
-import { standIns } from './render/speech/standIns';
 import { OrderFan } from './app/orderFan';
 import { Midshipman } from './app/midshipman';
-import { OFFICERS, midshipmanStart, quarterdeck, type Officer } from './app/officers';
+import { midshipmanStart, quarterdeck, type Officer } from './app/officers';
 import { lookBearing } from './app/look';
-import { OfficersView } from './render/crew/officersView';
 import { spotOf } from './sim/ship/deckWalk';
 import type { Spot } from './sim/ship/plan';
-import { characterSpeaker } from './render/speech/characterSpeaker';
 import { sailsSeen } from './app/sailsSeen';
 import { PageMatch, pageSeconds, rudderAngle, sparAngles } from './app/pageMatch';
 import { RoomPanel } from './app/roomPanel';
@@ -77,9 +74,9 @@ import { SailSound } from './audio/sailSound';
 import { GunSound } from './audio/gunSound';
 import { DamageSound } from './audio/damageSound';
 import { OPEN_AIR } from './audio/acoustics';
-import { CrewView } from './render/crew/crewView';
+import { CrewView, type OtherCrewAt } from './render/crew/crewView';
+import { VOICES } from './app/speech/speakers';
 import { CaptainView } from './render/captain/captainView';
-import { TWIN_OFFSET, musterCrews } from './app/crew';
 import { CrewTrialRun } from './app/crewTrialRun';
 import { formatBytes } from './probe/report';
 import { Vector3 } from 'three/webgpu';
@@ -115,6 +112,8 @@ const SCENE_FRAMES = 1;
 const SHOT_SEA_TIME = 60;
 /** Where the crew trial looks from her quarterdeck: forward over her waist, her twin's crew off the starboard bow in view. */
 const CREW_LOOK: Look = { yaw: -0.25, pitch: -0.1 };
+/** Where the trial draws the other crew (`?crew`): off her starboard bow, about 80 m off, in her ship space (x, z), m. */
+const TWIN_OFFSET = { x: 40, z: -70 } as const;
 /** The browser checks' jumps run the match on by this much at a time, s: within what one pump of the match catches up (net/duel.ts MOST_STEPS). */
 const JUMP_PIECE = 1;
 /** The checks aim the glass this high over the other ship's waterline, m: about her lower yards, so hull and sails are in the field. */
@@ -164,6 +163,8 @@ declare global {
       /** Where the officers are on the view now, CSS px from its top left (the checks put the mouse on one). */
       men: () => readonly { who: Officer; x: number; y: number; seen: boolean }[];
     };
+    /** The crews drawn (N4.3), for the browser checks: what they hold and where. */
+    __nautaCrew?: CrewView;
     __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string };
   }
 }
@@ -182,7 +183,7 @@ async function start(): Promise<void> {
   const walking = params.walk !== null || params.menu ? new Walking(canvas, params.walk || undefined) : null;
   // `?sail`: the brig under way in a match, where the ship view lays her, commanded from the order panel (plan N3.5);
   // alone at first, or with a second captain in a room (`?room` opens one, `?join=K7Q2ZP` joins one; plan N3.7).
-  const sailing = params.sail || params.room || params.join !== null || params.menu;
+  const sailing = params.sail || params.room || params.join !== null || params.menu || params.crew !== null;
   const build = params.ship !== null || walking || sailing ? await loadShip(import.meta.env.BASE_URL) : null;
   const ship = build ? new ShipView(build) : null;
   /**
@@ -225,18 +226,19 @@ async function start(): Promise<void> {
   if (ship && guns) ship.addMoving(guns.draws.group);
   const herGuns = other && fittings ? new GunsView(view.renderer, fittings, furnish(shipPlan()), 1) : null;
   if (other && herGuns) other.addMoving(herGuns.draws.group);
-  // `?crew`: the trial's 240 men (plan N4.0), mustered behind the loading screen; how long that takes is part of the trial.
-  const mustered = performance.now();
-  const men = ship && params.crew ? musterCrews(params.crew === 'aboard').filter((m, i, all) => i - all.findIndex((o) => o.crew === m.crew) < params.men) : [], note = loading.querySelector('.title-note')!;
-  const crew = ship && params.crew ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, ship, men, params.crew === 'aboard' ? null : TWIN_OFFSET,
-    (n) => { note.textContent = `mustering the crews: ${n} of ${men.length} (${((performance.now() - mustered) / MS_PER_SECOND).toFixed(0)} s)`; }) : null;
-  const musterSeconds = (performance.now() - mustered) / MS_PER_SECOND;
+  const note = loading.querySelector('.title-note')!;
   // Walking, his own body (plan N2.7): an Actors figure from the crew's pack, his head not drawn.
   if (walking && ship) note.textContent = 'dressing the captain';
   const captain = walking && ship ? await CaptainView.load(view.renderer, import.meta.env.BASE_URL, ship.group) : null;
-  // Sailing, the men the captain gives his orders to (plan N4.4): six full characters at their posts, the midshipman at his side.
-  if (match && ship) note.textContent = 'the officers come on deck';
-  const officers = match && ship ? await OfficersView.load(view.renderer, import.meta.env.BASE_URL, ship) : null;
+  // Sailing, both crews (plan N4.3): crowd figures for every man, a near pool of full characters for the men of hers
+  // near the captain; the six he gives orders to among them. Mustering is timed for the trial (`?crew`, N4.0).
+  const mustered = performance.now();
+  const otherCrew: OtherCrewAt = params.crew === 'aboard' ? { aboard: true } : params.crew ? { offset: TWIN_OFFSET } : null;
+  const startCrew = QUALITY_LEVELS[Math.max(0, levelNamed(params.quality ?? settings.now.quality))]!.crew;
+  const crew = match && ship ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, match.state.ships.map((_, i) => (i === match.ship ? ship : i === match.other ? other : null)), startCrew, otherCrew,
+    (what) => { note.textContent = what; }) : null;
+  const musterSeconds = (performance.now() - mustered) / MS_PER_SECOND;
+  if (crew) window.__nautaCrew = crew;
   view.camera.position.set(0, params.eye, 0);
   const startLook = params.look ?? START_LOOK;
   view.camera.rotation.set(startLook.pitch, startLook.yaw, 0);
@@ -271,6 +273,7 @@ async function start(): Promise<void> {
   const smoke = match ? new SmokeView(SMOKE.make()) : null;
   const shots = match ? new ShotsSeen() : null;
   if (match && shots) match.on('events', (events) => shots.take(events));
+  if (match && crew) match.on('events', (events) => crew.onEvents(events));
   await furnished?.ready();
   await herFittings?.ready();
   await guns?.ready();
@@ -283,40 +286,24 @@ async function start(): Promise<void> {
   // The cap stays open (share 1) until the crews are in: before the first frame no frame frees a slot.
   // (Set through Object.assign: the owner guard keeps the name `share` for N4.2's men on their way, not the Stage's cap.)
   const capShare = view.stage.cap.share, capTo = (share: number) => Object.assign(view.stage.cap, { share });
-  if (crew) {
-    const warm = crew.warmObjects();
-    capTo(1);
-    for (const [k, o] of warm.entries()) {
-      note.textContent = `building the crews' shaders: ${k + 1} of ${warm.length}`;
-      await view.stage.prepare(o, { everyCaster: true });
-    }
-    crew.afterWarm();
-  }
   if (captain) {
     capTo(1);
     note.textContent = 'building the captain\'s shaders';
     await view.stage.prepare(captain.group);
   }
-  if (officers) {
+  if (crew) {
     capTo(1);
-    note.textContent = 'building the officers\' shaders';
-    for (const o of officers.warmObjects()) await view.stage.prepare(o, { everyCaster: true });
-    officers.afterWarm();
+    await crew.warm((o) => view.stage.prepare(o, { everyCaster: true }), (what) => { note.textContent = what; });
   }
   // The other navy's coats too, when the menu may choose it (menu.md, "Your navy"): dressed in them, built, and back,
   // so a match of either navy builds nothing while it is drawn.
-  if (params.menu && (captain || officers)) {
+  // (The crews' are built for both navies in crew.warm.)
+  if (params.menu && captain) {
     capTo(1);
     note.textContent = 'building the other navy\'s coats';
-    await captain?.changeCoat('french');
-    await officers?.changeCoats('french');
-    if (captain) await view.stage.prepare(captain.group);
-    if (officers) {
-      for (const o of officers.warmObjects()) await view.stage.prepare(o, { everyCaster: true });
-      officers.afterWarm();
-    }
-    await captain?.changeCoat('british');
-    await officers?.changeCoats('british');
+    await captain.changeCoat('french');
+    await view.stage.prepare(captain.group);
+    await captain.changeCoat('british');
   }
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
@@ -336,11 +323,9 @@ async function start(): Promise<void> {
   } else if (smoke) await view.stage.add(smoke.mesh);
   if (crew) {
     note.textContent = 'bringing the crews aboard';
-    await view.stage.add(crew.aboard);
-    await view.stage.add(crew.twin);
+    for (const g of crew.groups) await view.stage.add(g);
   }
   if (captain) await view.stage.add(captain.group);
-  if (officers) await view.stage.add(officers.group);
   capTo(capShare);
   const crewMemory = crew?.memory();
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
@@ -389,7 +374,7 @@ async function start(): Promise<void> {
   // The settings that need no more than the page above: the HUD, the calm view (plan N2.7), the walking thumb and
   // keys, the glass button's word.
   settings.watch((s) => {
-    showHud = s.frameTimes || crew !== null;
+    showHud = s.frameTimes || params.crew !== null;
     hud.style.display = showHud ? 'block' : 'none';
     if (walking) { walking.body.strength = s.motion; walking.input.layout(walkKeys(s.keys), s.thumb); }
     glassButton.replaceChildren(words(s.language).glass, keyCap(s.keys.glass));
@@ -399,24 +384,20 @@ async function start(): Promise<void> {
   /** Where the captain stands on her: his walker's spot; at a standpoint aboard, the quarterdeck; off her, nowhere. */
   const captainSpot = (): Spot | null => (walking ? spotOf(walking.captain.walker) : where.off ? null : quarterdeck());
   // The men speaking (plan N4.5): bubbles over them for answers, orders passed down, reports and cries, spoken by the
-  // officers drawn (N4.4); faceless stand-ins at the stations for the voices not drawn (the boatswain, the surgeon).
+  // men of her crew who have those voices (N4.3): the six the captain addresses, the boatswain, the surgeon.
   const speech = match && ship ? new Speech(document.body, match, settings.now.language, matchClock) : null;
-  if (speech && ship) {
-    standIns(speech.speakers, match!.ship, ship.group, view.camera);
-    // The last put speaks: each drawn officer takes his voice over from his stand-in.
-    if (officers) for (const who of OFFICERS) speech.speakers.put(characterSpeaker(officers.men.get(who)!, who, match!.ship, view.camera));
-  }
+  if (speech && crew) for (const voice of VOICES) speech.speakers.put(crew.speaker(voice, match!.ship));
   settings.watch((s) => { if (speech) speech.language = s.language; });
   const midshipman = new Midshipman(midshipmanStart());
-  if (match && ship && officers) fan = new OrderFan(canvas, {
+  if (match && ship && crew) fan = new OrderFan(canvas, {
     session: match,
-    men: () => officers.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight),
+    men: () => crew.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight),
     captain: captainSpot,
     bearingLooked: () => lookBearing(input.look, ship.drawn.heading),
     heel: () => ship.drawn.roll,
     closures: () => match.state.ships[match.ship]!.closures,
     midshipman,
-    addressed: (who) => officers.addressed(who),
+    addressed: (who) => crew.addressed(who, pageSeconds()),
     thumb: (e) => walking?.input.owns(e) ?? false,
     settings: () => settings.now,
     wording: () => words(settings.now.language),
@@ -425,7 +406,7 @@ async function start(): Promise<void> {
   mouse.whenTakenOrFreed((taken) => { if (!taken) fan?.freed(); });
   fan?.onSent((e) => speech?.sent(e));
   const pointing = new Vector3();
-  if (fan && officers) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id), men: () => officers.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) }; }
+  if (fan && crew) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id), men: () => crew.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) }; }
   // Every line the men said, in a sheet opened by the Reports tag or its key (Arnd, 2026-11-18).
   if (speech) new ReportsPanel(speech.log, settings);
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
@@ -504,7 +485,7 @@ async function start(): Promise<void> {
   // Your first command (plan N7.4): the first lieutenant's lessons over the match the menu starts for it.
   const first = params.menu && match && speech ? new FirstCommand({
     speech, fan, myShip: () => match.ship, captain: captainSpot, yaw: () => input.look.yaw, glassUp: () => glass?.up ?? false, glassButton,
-    officersSeen: () => officers?.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) ?? [], wording: () => words(settings.now.language),
+    officersSeen: () => crew?.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) ?? [], wording: () => words(settings.now.language),
   }) : null;
   const menu = params.menu && match ? new Menu({
     params, build: VERSION, settings, settingsMenu, match, now: matchClock, engine: sound.engine,
@@ -516,8 +497,8 @@ async function start(): Promise<void> {
     },
     firstCommand: (session) => { if (session) first?.start(session); else first?.stop(); },
   }) : null;
-  // Her navy's coats and colours (menu.md, "Your navy"): the flags of both ships, and his own coat and the officers'
-  // changed when a match of the other navy begins (the warm-up built the British ones; the French use the same kinds).
+  // Her navy's coats and colours (menu.md, "Your navy"): the flags of both ships, his own coat and both crews' dress
+  // changed when a match of the other navy begins (the warm-up built both navies' coats, so nothing compiles).
   if (match) {
     let dressed: Navy = 'british';
     match.onChange(() => {
@@ -526,7 +507,7 @@ async function start(): Promise<void> {
       if (navy === dressed) return;
       dressed = navy;
       void captain?.changeCoat(navy);
-      void officers?.changeCoats(navy);
+      crew?.changeNavy(match.ship === 0 ? navy : match.herNavy);
     });
   }
   // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
@@ -564,7 +545,7 @@ async function start(): Promise<void> {
   // The bench's sky stands still, so runs at one hour compare.
   if (bench) sky.dayMinutes = 0;
   // `?crew`: the trial's measured run, started by its button or by `?trial` (plan N4.0).
-  const trial = crew ? new CrewTrialRun(el('bench'), {
+  const trial = crew && params.crew ? new CrewTrialRun(el('bench'), {
     settled: () => quality.chosen,
     about: () => { const px = view.drawnSize(); return `${view.backend} · quality ${quality.knobs.name}, ${px.x}×${px.y} px · ${sky.clock} · force ${wind.windForce} · crews ${params.crew}`; },
     shaders: () => view.stage.hudLine(),
@@ -579,9 +560,10 @@ async function start(): Promise<void> {
     if (window.__nautaReady && quality.frame(now - last)) apply(quality.knobs);
     last = now;
     const flight = bench?.fly(now);
-    if (match) {
+    const between = match?.frame() ?? null;
+    if (match && between) {
       // The match's clock is the page's: the sea, the wind and both ships drawn at the moment the match is drawn at.
-      seaTime = match.frame().time;
+      seaTime = between.time;
       wind = match.state.wind;
       meanWind(wind, seaTime, blowing);
       sea = match.state.sea;
@@ -646,13 +628,15 @@ async function start(): Promise<void> {
       ship.shade(view.sun, sky.lightDirection, other);
       // The orders: the midshipman on his way, the fan judged anew; the officers drawn; the captain's arm pointing or his hand at his mouth.
       fan?.onFrame(now, dt);
-      officers?.animate(dt, view.camera, midshipman.where(), captainSpot());
       const arm = fan?.arm;
       if (captain && walking?.drawnBody) captain.draw(dt, walking.drawnBody, walking.captain.walker, walking.captain.climber, view.camera, arm ? { ...arm, toward: view.camera.getWorldDirection(pointing) } : null);
-      if (crew) {
+      // Both crews (N4.3): every man as the match has him, the pool near the captain.
+      if (crew && match && between) {
         crew.crews = phase?.crews ?? 2;
-        crew.override = phase?.override ?? {};
-        crew.animate(dt, view.camera, quality.knobs.crew);
+        crew.poolInUse = phase && !phase.pool ? 0 : startCrew.pool;
+        crew.everyFrame = phase?.everyFrame ?? false;
+        crew.noShadows = phase?.noShadows ?? false;
+        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds() });
       }
       jump = 0;
       sky.below = ship.below;
@@ -746,12 +730,12 @@ function strikeInWorld(s: Strike, pose: ShipPose | null): { s: Strike; at: Vecto
   return { s, at, out: side };
 }
 
-/** The crew trial's HUD line (plan N4.0): the men by level, how many animate, the crew's page time, what was fetched and how long mustering took. */
+/** The crew's HUD line (plans N4.0, N4.3): men drawn, the pool, men placed this frame, the crew's page time, what the crew holds and how long mustering took. */
 function crewLine(crew: CrewView, musterSeconds: number, held: ReturnType<CrewView['memory']>, gpuBytes: number): string {
   const s = crew.stats;
   const pack = performance.getEntriesByType('resource').filter((e) => e.name.includes('/packs/')).reduce((n, e) => n + ((e as PerformanceResourceTiming).encodedBodySize || 0), 0);
-  return `crew ${s.mustered} men · ${s.seen} seen · full ${s.full}, medium ${s.medium}, crowd ${s.crowd} · animated ${Math.round(s.animated)} a frame · shadows ${s.shadows} · ${Math.round(crew.trianglesDrawn() / THOUSAND)}k tris · crew work ${s.ms.toFixed(1)} ms\n`
-    + `pack ${formatBytes(pack)} fetched · mustered in ${musterSeconds.toFixed(1)} s · men hold ${formatBytes(held.geometry)} geometry, ${formatBytes(held.textures)} in ${held.textureCount} textures · GPU memory ${formatBytes(gpuBytes)}${performance.memory ? ` · heap ${formatBytes(performance.memory.usedJSHeapSize)}` : ''}`;
+  return `crew ${s.total} men · ${s.drawn} drawn · pool ${s.pool} · ${s.placed} placed this frame · crew work ${s.ms.toFixed(1)} ms\n`
+    + `pack ${formatBytes(pack)} fetched · mustered in ${musterSeconds.toFixed(1)} s · figures ${formatBytes(held.figures)} + atlas ${formatBytes(held.atlas)} · pool ${formatBytes(held.pool)} · workbench ${formatBytes(held.workbench)} · GPU memory ${formatBytes(gpuBytes)}${performance.memory ? ` · heap ${formatBytes(performance.memory.usedJSHeapSize)}` : ''}`;
 }
 
 /**

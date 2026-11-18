@@ -1,28 +1,29 @@
 /**
- * The crew trial's run (plan N4.0): the same view drawn in phases, without the crew, with her crew, with both, and with
- * both under one knob changed at a time, each measured for a few seconds, so the crew's share of the frame can be read
+ * The crew trial's run (plans N4.0, N4.3): the same view drawn in phases, without the crew, with her crew, with both, with
+ * the near pool, and under one knob changed at a time, each measured for a few seconds, so the crew's share of the frame can be read
  * off the tablet as the difference between phases. Pure: the phases, the clock through them and the result's lines;
  * crewTrialRun.ts measures on the page.
  */
 import { frameStats, msText, percentile, type FrameStats } from './bench';
-import { CROWD, type CrewOverride } from './crewLevels';
-import { CREW_SIZE } from './crew';
 
-/** One phase: how many crews are drawn, and what is overridden. */
+/** One phase: how many crews are drawn, whether the near pool is, and what else is changed. */
 export interface TrialPhase {
   readonly name: string;
   readonly crews: 0 | 1 | 2;
-  readonly override: CrewOverride;
+  /** The near pool of full characters drawn (as the quality level's knobs say); false: crowd figures only. */
+  readonly pool: boolean;
+  readonly everyFrame?: boolean;
+  readonly noShadows?: boolean;
 }
 
-/** The phases, in order. */
+/** The phases, in order: each differs from one before it in one thing, so its cost is the difference. */
 export const TRIAL_PHASES: readonly TrialPhase[] = [
-  { name: 'no crew (sea and ship)', crews: 0, override: {} },
-  { name: `her crew (${CREW_SIZE})`, crews: 1, override: {} },
-  { name: `both crews (${2 * CREW_SIZE})`, crews: 2, override: {} },
-  { name: 'both, every man every frame', crews: 2, override: { everyFrame: true } },
-  { name: 'both, all at crowd level', crews: 2, override: { level: CROWD } },
-  { name: 'both, no crew shadows', crews: 2, override: { shadows: false } },
+  { name: 'no crew (sea and ship)', crews: 0, pool: false },
+  { name: 'her crew, crowd figures only', crews: 1, pool: false },
+  { name: 'both crews, crowd figures only', crews: 2, pool: false },
+  { name: 'both crews and the near pool', crews: 2, pool: true },
+  { name: 'both, every man placed every frame', crews: 2, pool: true, everyFrame: true },
+  { name: 'both, no crew shadows', crews: 2, pool: true, noShadows: true },
 ];
 /** Each phase settles this long before it is measured, s (a change of level costs a rebuild), and is measured this long. */
 export const TRIAL_SETTLE_SECONDS = 2;
@@ -31,6 +32,8 @@ const PHASE_SECONDS = TRIAL_SETTLE_SECONDS + TRIAL_MEASURE_SECONDS;
 /** The crew's share of the frame (implementation plan, Budgets): both crews, animation and drawing, ms. */
 export const CREW_BUDGET_MS = 4;
 const PERCENT = 100;
+/** The phase with both crews drawn as in play (the pool too): what the crew costs. */
+const POOLED = 3;
 
 /** Where the run is `t` seconds after it started: the phase (its index; the phases' length once done) and whether it is being measured. */
 export function trialAt(t: number): { phase: number; measuring: boolean } {
@@ -46,7 +49,7 @@ export interface PhaseSamples {
   readonly frames: number[];
   /** The page's own work each frame, ms. */
   readonly work: number[];
-  /** The crew's part of it (placing, levels, Actors' updates), ms. */
+  /** The crew's part of it (placing every man, the pool, Actors' updates), ms. */
   readonly crew: number[];
   readonly draws: number[];
 }
@@ -63,8 +66,8 @@ export function trialLines(samples: readonly PhaseSamples[]): string[] {
     const f = stats[i]!;
     lines.push(`${TRIAL_PHASES[i]!.name} · ${msText(f.median)} / ${msText(f.p95)} · ${Math.round(f.onTime * PERCENT)}% · ${msText(f.workMedian)} · ${msText(median(s.crew))} · ${Math.round(median(s.draws))}`);
   });
-  const none = stats[0], both = stats[2];
-  if (none && both && samples[2]) {
+  const none = stats[0], both = stats[POOLED];
+  if (none && both && samples[POOLED]) {
     const work = both.workMedian - none.workMedian, late = Math.round((none.onTime - both.onTime) * PERCENT);
     lines.push(`both crews add ${msText(work)} of page work (budget ${CREW_BUDGET_MS} ms for animation and drawing) and ${Math.max(0, late)}% more late frames`);
   }

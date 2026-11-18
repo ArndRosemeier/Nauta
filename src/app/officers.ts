@@ -5,11 +5,12 @@
  * each stands in her plan, whom an order goes to, whether the captain's voice reaches them, and where the midshipman
  * delivers a message to each.
  *
- * Their names are the speech bubbles' voices (N4.5, src/app/speech/speakers.ts): the drawn men (render/crew/
- * officersView.ts) are put into its registry by these names. N4.3's near pool takes their places over later.
+ * Their names are the speech bubbles' voices (N4.5, src/app/speech/speakers.ts); each is a man of the roster
+ * (`voiceMan`), drawn with the rest of the crew (render/crew/crewView.ts, N4.3) and put into the registry by his voice.
  */
 import { VOCABULARY, type Order } from '../sim/orders';
-import { crewPlaces } from '../sim/crew/roster';
+import { brigRoster, crewPlaces, type Man } from '../sim/crew/roster';
+import type { Voice } from './speech/speakers';
 import { routeNetwork, standable } from '../sim/crew/network';
 import { bareSpot, type Spot } from '../sim/ship/plan';
 
@@ -25,7 +26,7 @@ const WEATHER_DECK = 'deck';
 
 /**
  * Where each man stands: a crew place of her plan or rig (roster.ts `crewPlaces`), shifted m forward and m to
- * starboard off it, and the way he faces (rad about +y as app/crew.ts: 0 aft, a half turn forward). The first
+ * starboard off it, and the way he faces (rad about +y as app/crewDrawn.ts: 0 aft, a half turn forward). The first
  * lieutenant stands to larboard of the quarterdeck station, where the captain comes on deck.
  */
 const POSTS: Readonly<Record<Taker, { readonly place: string; readonly forward: number; readonly starboard: number }>> = {
@@ -89,4 +90,19 @@ export function inVoice(captain: Spot | null, post: Spot): boolean {
   if (!captain) return false;
   const open = (s: Spot) => s.space === WEATHER_DECK || !onDecks(s);
   return open(captain) && open(post);
+}
+
+/**
+ * The man of the roster (rules/crew.ts ROSTER) each voice is (N4.3: the crew drawn speaks): his rank, and for the
+ * lookout the post he keeps (a main topman in the main top). The boatswain and the surgeon speak too (N4.5).
+ */
+const VOICE_MEN: Readonly<Record<Voice, { readonly rank: string; readonly post?: string }>> = {
+  master: { rank: 'master' }, 'first lieutenant': { rank: 'first lieutenant' }, gunner: { rank: 'gunner' }, carpenter: { rank: 'carpenter' },
+  lookout: { rank: 'main topman', post: 'top-main-p' }, midshipman: { rank: 'midshipman' }, boatswain: { rank: 'boatswain' }, surgeon: { rank: 'surgeon' },
+};
+/** The place in the roster of the man who speaks with `voice`. */
+export function voiceMan(voice: Voice, roster: readonly Man[] = brigRoster()): number {
+  const v = VOICE_MEN[voice], i = roster.findIndex((m) => m.rank === v.rank && (v.post === undefined || m.post === v.post));
+  if (i < 0) throw new Error(`no ${v.rank} on the roster for the ${voice}`);
+  return i;
 }

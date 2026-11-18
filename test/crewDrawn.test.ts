@@ -1,0 +1,143 @@
+/**
+ * The crew drawn (implementation plan N4.3): every man of the match drawn on her, apart from his shipmates, playing a
+ * motion of the pack by what he does; the animation rate and the near pool by the quality table's knobs; faces from
+ * what the simulation says; the looks of both crews from the roster, the same on every machine; the voices are men.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { OUTFITS, type CharacterCatalog } from '@actors/generator';
+import { FULL, JOB_CLIPS, MEDIUM, POOL_STICK, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
+import { FACES, FEAR_SECONDS, facesNow, stepFace, type FaceState, type FaceWhy } from '../src/app/faces.ts';
+import { PACK_CLIPS, PACK_GARMENTS, PACK_HAIR, crowdKinds, figureOf, fullLook, navyOf, wearing } from '../src/app/crewLooks.ts';
+import { voiceMan } from '../src/app/officers.ts';
+import { VOICES } from '../src/app/speech/speakers.ts';
+import { QUALITY_LEVELS } from '../src/app/quality.ts';
+import { openShip } from '../src/sim/crew/closures.ts';
+import { stepCrew, taskOf, type Crew } from '../src/sim/crew/crew.ts';
+import { brigRoster } from '../src/sim/crew/roster.ts';
+import { startMatch, type SimShip } from '../src/sim/state.ts';
+import { STEPS_PER_SECOND } from '../src/sim/units.ts';
+import { give, startSail, startTold } from './support/crew.ts';
+import { duelSetup } from './support/match.ts';
+
+const roster = brigRoster(), knobs = QUALITY_LEVELS[0]!.crew;
+const ship = startMatch(duelSetup(1805, 4)).ships[0]!;
+const drawnAll = (from: SimShip, to: SimShip, f = 1): ManDrawn[] => roster.map((m, i) => manDrawn(from, to, f, i, m, manSeed(0, i), newManDrawn()));
+/** Two men nearer than this stand in one another, m. */
+const APART = 0.2;
+
+test('at their posts every man is drawn somewhere of his own, playing a motion of the pack', () => {
+  const men = drawnAll(ship, ship);
+  for (const d of men) {
+    assert.ok([d.x, d.y, d.z, d.yaw].every(Number.isFinite));
+    assert.ok(PACK_CLIPS.includes(d.clip), d.clip);
+    assert.equal(d.way, null);
+  }
+  // Several men share a post: the first stands on it, the rest around it, not inside one another.
+  for (let i = 0; i < men.length; i++) for (let j = i + 1; j < men.length; j++) {
+    const a = men[i]!, b = men[j]!;
+    if (a.space === b.space) assert.ok(Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z) > APART, `${roster[i]!.rank} ${i} and ${roster[j]!.rank} ${j} at ${a.x.toFixed(2)}, ${a.z.toFixed(2)}`);
+  }
+});
+
+test('making sail, men on their way walk or run and men at work play their job\'s motion; between two steps they are between', () => {
+  const sailing = startSail(), told = give(startTold(), sailing, { kind: 'sail', ship: 0, canvas: 'plain' });
+  let crew: Crew = ship.crew, before = crew;
+  const seconds = 4;
+  for (let tick = 0; tick < seconds * STEPS_PER_SECOND; tick++) {
+    before = crew;
+    crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas }).crew;
+  }
+  const from = { ...ship, crew: before }, to = { ...ship, crew };
+  const men = drawnAll(from, to);
+  const going = men.filter((_, i) => crew.men[i]!.going);
+  assert.ok(going.length > 0 && going.every((d) => d.clip === 'walk' || d.clip === 'jog'));
+  crew.tasks.filter((t) => t.began !== null).forEach((t) => t.hands.forEach((i) => { if (!crew.men[i]!.going) assert.equal(men[i]!.clip, JOB_CLIPS[t.job]); }));
+  // Halfway between the two steps, a man walking on one floor is halfway between where each step has him.
+  const a = drawnAll(from, from), b = drawnAll(to, to), half = drawnAll(from, to, 1 / 2);
+  half.forEach((h, i) => {
+    if (a[i]!.space !== b[i]!.space || a[i]!.way !== b[i]!.way) return;
+    assert.ok(Math.abs(h.z - (a[i]!.z + b[i]!.z) / 2) < 1e-9 && Math.abs(h.x - (a[i]!.x + b[i]!.x) / 2) < 1e-9);
+  });
+  assert.ok(taskOf(crew, crew.tasks[0]!.hands[0]!));
+});
+
+test('men are placed again less often far off and out of sight, spread evenly over the frames', () => {
+  assert.equal(stepAt(knobs, 1, true), knobs.steps[0]);
+  assert.equal(stepAt(knobs, 1e4, true), knobs.steps[knobs.steps.length - 1]);
+  assert.equal(stepAt(knobs, 1, false), knobs.hiddenStep);
+  const step = 4, due = Array.from({ length: step }, (_, frame) => roster.filter((_, i) => dueThisFrame(frame, step, i)).length);
+  assert.equal(due.reduce((s, n) => s + n, 0), roster.length);
+  assert.ok(Math.max(...due) - Math.min(...due) <= 1, 'the same few each frame');
+});
+
+test('the near pool takes the men who matter first, then the nearest seen within reach, at most its size; a man in it keeps his place a little longer', () => {
+  const man = (i: number, distance: number, seen = true, matters = false): PoolCandidate => ({ man: i, distance, seen, matters });
+  const men = [man(1, 2), man(2, 1), man(3, knobs.poolTo + 1), man(4, 0.5, false), man(5, 30, true, true)];
+  assert.deepEqual(choosePool(men, knobs, new Set(), knobs.pool), [5, 2, 1]);
+  assert.deepEqual(choosePool(men, knobs, new Set([3]), knobs.pool), [5, 2, 1, 3]);
+  assert.deepEqual(choosePool(men, knobs, new Set(), 2), [5, 2]);
+  const many = Array.from({ length: knobs.pool * 2 }, (_, i) => man(i, i / 10));
+  assert.equal(choosePool(many, knobs, new Set(), knobs.pool * 2).length, knobs.pool);
+  assert.equal(poolLevel(knobs, knobs.fullTo / 2, MEDIUM), FULL);
+  assert.equal(poolLevel(knobs, knobs.fullTo + POOL_STICK / 2, MEDIUM), MEDIUM);
+  assert.equal(poolLevel(knobs, knobs.fullTo + POOL_STICK / 2, FULL), FULL);
+  assert.equal(poolLevel({ ...knobs, fullTo: 0 }, 0, MEDIUM), MEDIUM);
+});
+
+const calm: FaceWhy = { job: null, aloft: false, sinceStruck: Infinity, fighting: false, harm: null, shouting: false, ended: null };
+
+test('a face shows what is happening to the man, the strongest feeling winning, and comes and goes at its own pace', () => {
+  assert.deepEqual(facesNow(calm), []);
+  assert.deepEqual(facesNow({ ...calm, harm: 'killed', job: 'brace' }), ['slack']);
+  assert.ok(facesNow({ ...calm, job: 'brace', aloft: true }).includes('strain'));
+  assert.ok(facesNow({ ...calm, sinceStruck: 0 }).includes('flinch') && !facesNow({ ...calm, sinceStruck: FEAR_SECONDS }).includes('fear'));
+  assert.deepEqual(facesNow({ ...calm, fighting: true, ended: 'lost' }), ['dismay']);
+  const state: FaceState = {}, units: Record<string, number> = {};
+  const dt = FACES.strain.rise / 2;
+  stepFace(state, ['strain', 'squint'], dt, units);
+  assert.ok(Math.abs(state.strain! - FACES.strain.strength / 2) < 1e-9, 'half risen');
+  assert.equal(state.squint, undefined, 'the weaker cause does not show');
+  assert.ok(units['mouth-compression']! > 0);
+  for (let t = 0; t < FACES.strain.fall * 2; t += dt) stepFace(state, [], dt, units);
+  assert.deepEqual(state, {});
+  assert.ok(Object.values(units).every((w) => w === 0));
+});
+
+const catalog = { outfits: OUTFITS, hair: PACK_HAIR.map((id) => ({ id })) as unknown as CharacterCatalog['hair'] };
+
+test('both crews\' looks come from the roster and their seed, tell rank and navy apart, and wear only what the pack holds', () => {
+  const kinds = crowdKinds(catalog, [roster, roster]);
+  // Room in its kind for every man, whichever navy the first ship is given.
+  for (const first of ['british', 'french'] as const) {
+    const wanted = new Map<string, number>();
+    for (const ship of [0, 1]) roster.forEach((m, i) => { const k = figureOf(ship, i, m, navyOf(ship, first)).kind; wanted.set(k, (wanted.get(k) ?? 0) + 1); });
+    for (const [id, n] of wanted) assert.ok((kinds.find((k) => k.id === id)?.max ?? 0) >= n, `${id} holds ${n}`);
+  }
+  // Another navy changes a man's dress, never his build or skin.
+  const british = figureOf(0, 7, roster[7]!, 'british'), french = figureOf(0, 7, roster[7]!, 'french');
+  assert.notEqual(british.kind, french.kind);
+  assert.deepEqual([british.build, british.skinTone, british.scale], [french.build, french.skinTone, french.scale]);
+  for (const k of kinds) for (const g of k.look.outfit!) assert.ok(PACK_GARMENTS.includes(g), g);
+  for (const ship of [0, 1]) roster.forEach((m, i) => {
+    const f = figureOf(ship, i, m), look = fullLook(catalog, f);
+    assert.deepEqual(f, figureOf(ship, i, m));
+    assert.ok(kinds.some((k) => k.id === f.kind));
+    for (const g of look.outfit!) assert.ok(PACK_GARMENTS.includes(g), g);
+    assert.ok(look.hair === null || PACK_HAIR.includes(look.hair!), String(look.hair));
+  });
+  const captain = (ship: number) => figureOf(ship, 0, roster[0]!);
+  assert.notEqual(captain(0).kind, captain(1).kind, 'the navies dress apart');
+  assert.notEqual(figureOf(0, 0, roster[0]!).dress, figureOf(0, roster.length - 1, roster[roster.length - 1]!).dress);
+  // Two men who wear the same differ in their colours alone.
+  const byWear = new Map<string, number>();
+  roster.forEach((m, i) => byWear.set(wearing(figureOf(0, i, m)), i));
+  assert.ok(byWear.size < roster.length);
+});
+
+test('every voice of the bubbles is a man of the roster of his rank', () => {
+  const men = VOICES.map((v) => voiceMan(v));
+  assert.equal(new Set(men).size, VOICES.length);
+  assert.equal(roster[voiceMan('lookout')]!.post, 'top-main-p');
+  assert.equal(roster[voiceMan('master')]!.rank, 'master');
+});

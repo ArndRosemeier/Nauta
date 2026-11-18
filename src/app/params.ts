@@ -4,7 +4,6 @@
  * `?room`, `?join=K7Q2ZP`, `?key=`, `?hub=`, `?seed=`, `?netcheck`). Pure: it takes the query string.
  */
 import { SKILLS, type Skill } from '../sim/rules/captain';
-import { CREW_SIZE } from './crew';
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
@@ -45,7 +44,7 @@ const SEED_MOST = 2 ** 32 - 1;
  * `?motion=`, `?smoke=`, `?key=`, `?hub=`, `?notitle` and a room's `?join=` keep the menu.)
  */
 export const TOOL_SWITCHES = [
-  'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'trial', 'men', 'bench', 'probe', 'netcheck', 'title', 'rig',
+  'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'trial', 'bench', 'probe', 'netcheck', 'title', 'rig',
   'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed', 'scars',
 ] as const;
 
@@ -105,12 +104,10 @@ export interface Params {
   /** The network check's bare page (`?netcheck`, tools/net/room.mjs): a match through the hub without drawing. */
   readonly netcheck: boolean;
   /**
-   * The crew trial (`?crew`, plan N4.0): 240 men on her, the other crew where her twin would lie off her bow
-   * (`?crew` or `?crew=twin`) or on her own deck too (`?crew=aboard`); null: no crew.
+   * The crew trial (`?crew`, plans N4.0 and N4.3): both crews of a match as they are drawn, the other crew where her
+   * twin would lie off her bow (`?crew` or `?crew=twin`) or on her own deck too (`?crew=aboard`); null: no trial.
    */
   readonly crew: 'twin' | 'aboard' | null;
-  /** Men in each crew (`?men=60`): fewer than the full 120 where a whole crew of characters does not fit the tablet's memory. */
-  readonly men: number;
   /** Start the crew trial's measured run at once (`?trial`), instead of on its button. */
   readonly trial: boolean;
   /** The spyglass raised from the start, drawn out to this magnification (`?glass=12`; `?glass` alone: as it starts); null: lowered. */
@@ -150,7 +147,7 @@ export function readParams(query: string): Params {
     sail: q.has('sail'), panel: q.has('panel'),
     room: q.has('room'), join: q.get('join') || null, key: q.get('key') || null, hub: q.get('hub') || null,
     seed: q.has('seed') ? Math.round(num('seed', 0, 0, SEED_MOST)) : null, netcheck: q.has('netcheck'),
-    crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'), men: Math.round(num('men', CREW_SIZE, 1, CREW_SIZE)),
+    crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'),
     glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
     foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
     halfSmoke: q.get('smoke') === 'half',

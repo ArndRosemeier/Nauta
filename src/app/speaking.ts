@@ -2,7 +2,7 @@
  * The men speaking on the page (implementation plan N4.5): the match's events of each step and what her officers
  * notice between steps (sim/notices.ts) go through the reports table (speech/reports.ts) into the bubble queue
  * (speech/bubbles.ts), and the bubble layer puts them over the men (bubbleLayer.ts). The men are whoever the drawing
- * put in `speakers`: faceless stand-ins at their stations first (render/speech/standIns.ts), the drawn officers after.
+ * put in `speakers`: the men of the crew drawn (render/crew/crewView.ts), each brought into the near pool to speak.
  * Every line said also goes to the report log (`log`), which the reports sheet shows.
  */
 import type { Camera } from 'three';
