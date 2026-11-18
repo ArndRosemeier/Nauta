@@ -1,6 +1,6 @@
 /** The one renderer, scene and camera, and the Stage everything enters the scene through (docs/SHADERS.md). */
 import { DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, Vector2, type WebGPURenderer } from 'three/webgpu';
-import { Stage, createRenderer } from '@futuremagic/stage';
+import { Stage, createPost, createRenderer, type Post, type PostOptions } from '@futuremagic/stage';
 import { allKinds, standInAttribute } from './materials';
 import { shadowingSun } from './ship/shipView';
 import { DEGREE } from '../sim/units';
@@ -10,6 +10,8 @@ const FOV = 60;
 /** The nearest and farthest the camera draws, metres: a rail under the hand, and the sky's dome. */
 const NEAR = 0.2;
 const FAR = 120000;
+/** Samples a pixel of the scene drawn into the post chain's target: as many as the canvas's own multisampling. */
+const MULTISAMPLES = 4;
 
 export interface View {
   readonly renderer: WebGPURenderer;
@@ -28,11 +30,23 @@ export interface View {
   setRenderScale(scale: number): void;
   /** The pixels drawn now, width × height. */
   drawnSize(): Vector2;
+  /**
+   * The post chain the scene is drawn through (`?smoke=half`: into a multisampled target whose depth the smoke reads),
+   * or null: the scene drawn straight to the canvas.
+   */
+  readonly post: Post | null;
+  /** Draws the frame; `between`: drawn into the post chain's target after the scene, before its tone curve (with a chain only). */
+  draw(between?: () => void): void;
 }
 
 /** The camera stands at zero until the caller places it. */
-/** `shadows`: the sun casts shadows (a ship is drawn); decided before the warm-up, as it is part of every lit shader's key. */
-export async function createView(canvas: HTMLCanvasElement, shadows = false): Promise<View> {
+/**
+ * `shadows`: the sun casts shadows (a ship is drawn); `veil`: the scene is drawn through the post chain, into a target
+ * multisampled as the canvas is, with no edge filter after, and `veil` laid over it before the tone curve (the smoke's
+ * half-resolution trial, halfSmoke.ts). Both decided before the
+ * warm-up: they are part of every shader's key.
+ */
+export async function createView(canvas: HTMLCanvasElement, shadows = false, veil?: PostOptions['veil']): Promise<View> {
   // WebGPU only: the fine sea is computed on the GPU (plan N1.2). A browser without it gets a plain page (main.ts).
   const { renderer } = await createRenderer(canvas, { backends: 'webgpu', depth: 'reversed', tone: 'agx' });
   const backend = 'webgpu' as const;
@@ -46,7 +60,10 @@ export async function createView(canvas: HTMLCanvasElement, shadows = false): Pr
     renderer.shadowMap.enabled = true;
     shadowingSun(sun);
   }
-  const stage = new Stage(renderer, scene, camera, { kinds: allKinds, attribute: standInAttribute });
+  const chain = veil ? createPost(renderer, scene, camera, { samples: MULTISAMPLES, fxaa: false, veil }) : null;
+  const stage = new Stage(renderer, scene, camera, {
+    kinds: allKinds, attribute: standInAttribute, ...(chain ? { target: () => chain.target(), draw: () => chain.draw() } : {}),
+  });
   if (shadows) stage.shadowCamera = sun.shadow.camera;
   const fit = () => {
     const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -72,5 +89,7 @@ export async function createView(canvas: HTMLCanvasElement, shadows = false): Pr
     },
     setRenderScale: (scale) => renderer.setPixelRatio(devicePixels * scale),
     drawnSize: () => renderer.getDrawingBufferSize(drawn),
+    post: chain,
+    draw: (between) => (chain ? chain.draw(between ? { between } : undefined) : renderer.render(scene, camera)),
   };
 }

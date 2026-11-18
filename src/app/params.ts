@@ -106,6 +106,12 @@ export interface Params {
   readonly glass: number | null;
   /** The other ship of a match sailed alone commanded by a computer captain at this skill (`?foe=master`; `?foe` alone: seasoned, plan N7.1); null: she sails on as she started. */
   readonly foe: Skill | null;
+  /**
+   * Powder smoke drawn at half resolution (`?smoke=half`, the trial of N5.5's next step): the scene into a
+   * multisampled target of the shared post chain, its depth brought down to half resolution for the smoke; else the
+   * smoke is drawn at full resolution in the main pass, straight to the canvas.
+   */
+  readonly halfSmoke: boolean;
 }
 
 export function readParams(query: string): Params {
@@ -132,6 +138,7 @@ export function readParams(query: string): Params {
     crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'), men: Math.round(num('men', CREW_SIZE, 1, CREW_SIZE)),
     glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
     foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
+    halfSmoke: q.get('smoke') === 'half',
   };
 }
 

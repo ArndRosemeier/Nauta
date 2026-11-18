@@ -1,5 +1,5 @@
 /**
- * A broadside drawn (plan N5.4a), by hand: `npm run shot:guns [-- <out dir> [dusk] [foe]]` (run `npm run build` first;
+ * A broadside drawn (plan N5.4a), by hand: `npm run shot:guns [-- <out dir> [dusk] [foe] [half]]` (run `npm run build` first;
  * not part of CI's slow checks). One page of the duel sailed alone (`?sail`, seed 1: force 3), run on only by the
  * check (`__nautaSail.onward`): her guns housed and lids shut from the gun standpoint; she beats to quarters and holds
  * for the word, closes to about 450 m, turns to bring the other brig abeam to starboard and runs on a minute (lids up,
@@ -22,6 +22,8 @@ mkdirSync(out, { recursive: true });
 const SEED = 1;
 const HOUR = words.includes('dusk') ? 20 : 11;
 const FOE = words.includes('foe');
+/** `half`: the smoke drawn at half resolution through the post chain (`?smoke=half`, N5.5's trial). */
+const HALF = words.includes('half');
 /** Which side she fires: +1 the other brig abeam to starboard, -1 to larboard. */
 const SIDE = words.includes('larboard') ? -1 : 1;
 /** She turns to bring the other abeam once within this far, m, and runs on so long, s, for the guns to be run out. */
@@ -42,7 +44,7 @@ const FIRED = SIDE > 0
 const RECEIVED = [['glass-crosstrees', 0], ['glass-crosstrees', 0.3], ['50-m-off', 0.4], ['rail', 0.4], ['50-m-off', 0.6]];
 
 const t0 = performance.now(), served = await openBrowser();
-const game = await openGame(served, `?ship&sail&seed=${SEED}&day=0&quality=high&hud${FOE ? '&foe=master' : ''}`, shotSize('800x500'));
+const game = await openGame(served, `?ship&sail&seed=${SEED}&day=0&quality=high&hud${FOE ? '&foe=master' : ''}${HALF ? '&smoke=half' : ''}`, shotSize('800x500'));
 const { page } = game;
 await page.addStyleTag({ content: '#version,#standpoints,#orders,#room{display:none!important}' });
 const sail = (f, ...a) => page.evaluate(([fn, args]) => window.__nautaSail[fn](...args), [f, a]);
