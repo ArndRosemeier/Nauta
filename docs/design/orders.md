@@ -31,7 +31,7 @@ Stations and people are those of [ship.md](ship.md) ("Where orders are given"). 
 
 | To | Order | What happens | From |
 | --- | --- | --- | --- |
-| **The master**, at the wheel | Steer there | The captain's arm points where he looks; she comes to that heading. Refused closer than close-hauled: the master says so and steers close-hauled on the nearer tack | N4 |
+| **The master**, at the wheel | Steer there | The captain's arm points where he looks; she comes to that heading. Refused closer than close-hauled: the master says so and steers close-hauled on the tack that course falls on. A course order never takes her through the wind: a course on the other tack is reached by wearing, and the master says "Wearing round, sir" | N4 |
 | | Come up a point, Bear away a point | Eleven and a quarter degrees toward or off the wind; repeated taps add up | N4 |
 | | Full and by | As close to the wind as she will lie, following the wind as it shifts | N4 |
 | | Steer for her, Keep her on the beam | Follow the enemy: head for her, or hold her abeam on the engaged side at the distance now | N5 |
