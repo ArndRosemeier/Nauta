@@ -48,7 +48,8 @@ import { shipPlan } from './sim/ship/plan';
 import { Spyglass } from './app/glass';
 import { watchGlass } from './app/glassInput';
 import { earthDrop } from './render/earth';
-import { VERSION } from 'virtual:nauta/version';
+import { DEV, VERSION } from 'virtual:nauta/version';
+import { Offline } from './offline/register';
 import { SprayView } from './render/spray';
 import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
@@ -179,6 +180,8 @@ async function start(): Promise<void> {
   const visit: Partial<Settings> = { ...(params.quality ? { quality: params.quality } : {}), ...(params.motion !== null ? { motion: params.motion } : {}), ...(params.hud ? { frameTimes: true } : {}) };
   const settings = new SettingsStore(visit);
   const canvas = el<HTMLCanvasElement>('view'), hud = el('hud'), loading = el('loading');
+  // The game kept on the device for use without a network (plan N7.6): begun once the game has started, so its fetches never compete with the start.
+  const offline = new Offline(!DEV, titleWaits);
   // `?ship`: the whole brig, built in a worker behind the loading screen (plan N2.4); the sun casts shadows then.
   // `?walk`: the captain walks her decks with two thumbs (plan N2.3), on the whole brig.
   // The plain address (plan N7.2): the game itself, the captain walking her decks in every match the menu starts.
@@ -497,7 +500,7 @@ async function start(): Promise<void> {
     officersSeen: () => crew?.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) ?? [], wording: () => words(settings.now.language),
   }) : null;
   const menu = params.menu && match ? new Menu({
-    params, build: VERSION, settings, settingsMenu, match, now: matchClock, engine: sound.engine,
+    params, build: VERSION, settings, settingsMenu, match, now: matchClock, engine: sound.engine, offline,
     sky: (hour, dayMinutes) => { sky.hour = hour; sky.dayMinutes = skyMinutes = dayMinutes; },
     pause: (on) => {
       if (on && pausedAt === null) pausedAt = pageSeconds();
@@ -732,10 +735,11 @@ async function start(): Promise<void> {
     if (showHud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''}${other?.group.visible ? ` · other ship ${Math.round(other.trianglesDrawn / THOUSAND)}k drawn` : ''}${glass?.up ? ` · glass ×${glass.power.toFixed(0)}` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''}${other?.group.visible ? ` · other ship ${Math.round(other.trianglesDrawn / THOUSAND)}k drawn` : ''}${glass?.up ? ` · glass ×${glass.power.toFixed(0)}` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}\n${offline.line(formatBytes)}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
+      void offline.start();
       // The title fades into the deck (plan N7.7), or with the menu to come asks for a tap first (N7.2).
       if (menu) menu.ready(); else handOver();
     }
@@ -758,6 +762,11 @@ function crewLine(crew: CrewView, musterSeconds: number, held: ReturnType<CrewVi
     + `pack ${formatBytes(pack)} fetched · mustered in ${musterSeconds.toFixed(1)} s · figures ${formatBytes(held.figures)} + atlas ${formatBytes(held.atlas)} · pool ${formatBytes(held.pool)} · workbench ${formatBytes(held.workbench)} · GPU memory ${formatBytes(gpuBytes)}${performance.memory ? ` · heap ${formatBytes(performance.memory.usedJSHeapSize)}` : ''}`;
 }
 
+/** Whether the title still waits for its tap: a newer version of the game may restart the page now (offline/register.ts). */
+function titleWaits(): boolean {
+  return document.getElementById('loading') !== null;
+}
+
 /**
  * `?probe` shows what the device offers instead of the game (plan N0.5), `?netcheck` runs a match through the hub
  * without drawing (the network check, plan N3.7); their code loads only when asked for.
@@ -767,7 +776,7 @@ keepBrowserMenusAway();
 const asked = readParams(location.search);
 // `?title`: the title alone (title/boot.ts), nothing behind it.
 const titleAlone = new URLSearchParams(location.search).has('title');
-const run = titleAlone ? () => Promise.resolve() : asked.probe ? () => import('./probe/page').then((p) => p.runProbe())
+const run = titleAlone ? () => { void new Offline(!DEV, titleWaits).start(); return Promise.resolve(); } : asked.probe ? () => import('./probe/page').then((p) => p.runProbe())
   : asked.netcheck ? () => import('./app/netCheck').then((p) => p.runNetCheck(asked)) : start;
 
 run().catch((err: unknown) => {
