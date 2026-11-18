@@ -555,6 +555,8 @@ export class CrewView {
     const k = this.officerMen.indexOf(d.man);
     if (k < 0) return;
     const who = OFFICERS[k]!, at = d.at;
+    // One asleep in his hammock (off watch) is not brought up to his post: he stays below until the match turns him out.
+    if (at.clip === SLEEPING) return;
     if (who === 'midshipman') {
       const w = fr.midshipman;
       if (!w) return;
