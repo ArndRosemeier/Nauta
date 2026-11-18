@@ -8,6 +8,7 @@ import { MOST_FRAMES, swingMatrix, swingsOf } from '../src/render/ship/swings.ts
 import { ROW_FLOATS, bilerp, clothAt, sailForms, sailPoints, shiftFrame } from '../src/render/ship/sailForm.ts';
 import { FLAGS, SAIL_ATLAS_SIZE, SAIL_DETAIL, buildSailGrids, sailAtlas } from '../src/render/ship/sailGrid.ts';
 import { SailsView } from '../src/render/ship/sailsView.ts';
+import { HANGING } from '../src/sim/rules/rig.ts';
 import { shipPoint } from '../src/render/ship/swings.ts';
 
 const RIG = rigPlan(shipPlan()), SWINGS = swingsOf(RIG), FORMS = sailForms(RIG);
@@ -15,8 +16,7 @@ const RIG = rigPlan(shipPlan()), SWINGS = swingsOf(RIG), FORMS = sailForms(RIG);
 const SAME = 0.01;
 /** A moment, s. */
 const T = 3.7;
-/** A long time for the crew, s: every change done. */
-const LONG = 120;
+/** A frame's step, s. */
 const STEP = 0.1;
 
 /** A sail view with every sail set as `set` (a square sail drawing, the others to starboard), stepped until it is so. */
@@ -80,20 +80,25 @@ test('furled, a square sail lies rolled on its yard, a headsail down its stay, t
   }
 });
 
-test('setting a sail is seen: the gaskets let go, then sheeted home and her topsail yards hoisted; taken in, clewed up then rolled up', () => {
-  const v = viewWith(false), topsail = FORMS.find((f) => f.sail.id === 'main-topsail')!;
+test('a sail is drawn as far set as the crew has got it: let fall, hanging in its gear, sheeted home and its yard hoisted; reefed, the yard lower', () => {
+  const v = viewWith(false), topsail = FORMS.find((f) => f.sail.id === 'main-topsail')!, jib = FORMS.find((f) => f.sail.id === 'jib')!;
   assert.ok(v.hoists().every(([, h]) => h === 0), 'furled, the topsail and topgallant yards lie on their caps');
-  v.stand(null, FORMS.map(() => ({ set: true, reefs: 0 })));
-  const foot = () => { write(v); return clothAt(rowOf(v, topsail.index), 1 / 2, 1, T).y; };
-  const furledFoot = foot();
-  const seen: number[] = [];
-  for (let t = 0; t < LONG; t += 1) { v.follow(1); seen.push(foot()); }
-  // The foot comes down over many seconds, not at once, and ends at the sheeted clews' height.
-  assert.ok(seen[2]! > seen[seen.length - 1]! + 1, 'still coming down after two seconds');
-  assert.ok(Math.abs(seen[seen.length - 1]! - topsail.rest[2].y) < 0.5 && seen[seen.length - 1]! < furledFoot - 5);
-  assert.ok(v.hoists().every(([, h]) => h === 1), 'set, the yards are hoisted');
+  const at = (share: number) => {
+    v.stand(null, FORMS.map(() => ({ set: share > 0, reefs: 0, share })));
+    v.follow(STEP);
+    write(v);
+    return { foot: clothAt(rowOf(v, topsail.index), 1 / 2, 1, T).y, head: clothAt(rowOf(v, jib.index), 0, 1, T).y, hoist: v.hoists().find(([id]) => id === topsail.hoisted!.yard)![1] };
+  };
+  const furled = at(0), loosing = at(HANGING / 2), hanging = at(HANGING), sheeting = at((HANGING + 1) / 2), home = at(1);
+  // Let fall: the roll drops into a hanging bunt below the yard; sheeted home, the foot comes down to the clews' height.
+  assert.ok(loosing.foot < furled.foot && hanging.foot < loosing.foot, 'the bunt falls out of its roll');
+  assert.ok(sheeting.foot < hanging.foot - 1 && home.foot < sheeting.foot - 1, 'sheeted home a share at a time');
+  assert.ok(Math.abs(home.foot - topsail.rest[2].y) < 0.5);
+  assert.ok(hanging.hoist === 0 && sheeting.hoist > 0 && sheeting.hoist < 1 && home.hoist === 1, 'the yard is hoisted as the sail is sheeted home');
+  // A headsail is hoisted up its stay along the whole share.
+  assert.ok(furled.head < loosing.head && loosing.head < home.head, 'the jib goes up its stay');
   v.stand(null, FORMS.map((f) => ({ set: f.sail.id === 'main-topsail', reefs: f.sail.id === 'main-topsail' ? 2 : 0 })));
-  for (let t = 0; t < LONG; t += 1) v.follow(1);
+  v.follow(STEP);
   const reefed = v.hoists().find(([id]) => id === topsail.hoisted!.yard)![1];
   assert.ok(reefed < 1 && reefed > 1 / 2, `two reefs lower the topsail yard a little (${reefed})`);
 });

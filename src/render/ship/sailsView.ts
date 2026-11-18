@@ -4,16 +4,16 @@
  * furled, reefs, brace or sheet, pressure, aback, shivering) and the spars it is bent to as they lie now; the flags
  * from the true wind; and the moving frames that carry each line made fast to a sail to where its corner is drawn.
  *
- * Setting and furling are seen happening: when a sail is set the drawing lets its gaskets go (the roll drops into a
- * hanging bunt), then sheets it home and hoists its yard; taken in, it is clewed up into its bunt and rolled up on its
- * yard; a headsail is hauled down its stay, the boom sail brailed in to the mast; a reef is rolled up at the head.
- * The simulation says what stands; the drawing takes the seconds a crew takes to show the change (N4 brings the men
- * aloft who do it).
+ * Setting and furling are seen happening, as far as the crew has got (the simulation's share of each sail, sails.ts
+ * `sailShare`; the drawing keeps no clock of its own): a square sail being set has its gaskets let go (the roll drops
+ * into a hanging bunt), then is sheeted home and its yard hoisted; taken in, it is clewed up into its bunt and rolled
+ * up on its yard; a headsail is hauled down its stay, the boom sail brailed in to the mast; a reef is rolled up at the head.
  */
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import type { SailStanding } from '../../sim/ship/sailing';
-import type { SailSetting } from '../../sim/ship/sails';
+import { sailShare, type SailSetting } from '../../sim/ship/sails';
+import { HANGING } from '../../sim/rules/rig';
 import { sparOf, type RigPlan } from '../../sim/ship/rig';
 import { FLAG, FORE_AFT, ROW, ROW_FLOATS, SQUARE, clothAt, sailForms, sailPoints, shiftFrame, type SailForm, type SailPoint } from './sailForm';
 import { FLAGS } from './sailGrid';
@@ -43,8 +43,6 @@ const HAULED_DOWN = { luff: 0.12, foot: 0.2 } as const;
 const STOWED = 0.7;
 /** A headsail's clew, its sheet slack (hauled down, or not yet sheeted home), hangs this share of its foot lower. */
 const SLACK_CLEW = 0.35;
-/** How long the crew takes, s: to let a furled sail's gaskets go, to sheet it home and hoist, to clew it up, to roll it up on the yard; to take a reef in or shake it out. */
-const SECONDS = { loose: 5, sheet: 12, clew: 10, furl: 25, reef: 30 } as const;
 /** How quickly the drawn belly and shiver follow the wind, s (a gust fills a sail, it does not jump). */
 const FOLLOW = { belly: 0.5, shiver: 0.6 } as const;
 /** The flags: they stream fully out from this wind (m/s), hang limp below this; their waves' depth as a share of the fly, how many along it, and their rate (Hz, and more per m/s). */
@@ -183,28 +181,24 @@ export class SailsView {
     return out;
   }
 
-  /** Steps the drawn sails `dt` s toward how they stand. */
+  /** Draws the sails as set as the simulation says, and eases their belly and shiver `dt` s toward the wind on them. */
   follow(dt: number): void {
     const first = !this.started;
     this.started = true;
     for (const f of this.forms) {
       const d = this.drawn[f.index]!, setting = this.canvas?.[f.index], st = this.standing?.[f.index];
-      const set = setting?.set ?? false, taken = set ? setting!.reefs * f.sail.reefShare : d.taken;
-      if (first) {
-        d.drop = set ? 1 : 0; d.roll = set ? 0 : 1; d.taken = taken;
-      } else if (set) {
-        // Let fall, then sheeted home: a long step (a jump of the browser checks) goes on into the next part.
-        const loosed = Math.min(d.roll, dt / SECONDS.loose);
-        d.roll -= loosed;
-        if (d.roll <= 0) d.drop = Math.min(1, d.drop + (dt - loosed * SECONDS.loose) / SECONDS.sheet);
+      // How far it is set is the simulation's one share (sails.ts `sailShare`, moved by the crew): a square sail is let
+      // fall out of its roll up to hanging in its gear, then sheeted home; coming in the other way. A fore-and-aft sail is
+      // hoisted or doused along the whole share. A reef is taken while it hangs.
+      const share = setting ? sailShare(setting) : 0;
+      if (f.kind === SQUARE) {
+        d.roll = share < HANGING ? 1 - share / HANGING : 0;
+        d.drop = share > HANGING ? (share - HANGING) / (1 - HANGING) : 0;
       } else {
-        const clewed = Math.min(d.drop, dt / SECONDS.clew);
-        d.drop -= clewed;
-        if (d.drop <= 0) d.roll = Math.min(1, d.roll + (dt - clewed * SECONDS.clew) / SECONDS.furl);
+        d.drop = share;
+        d.roll = 1 - share;
       }
-      const reefRate = (f.sail.reefShare * dt) / SECONDS.reef;
-      d.taken += Math.max(-reefRate, Math.min(reefRate, taken - d.taken));
-      if (first) d.taken = taken;
+      if (setting?.set) d.taken = setting.reefs * f.sail.reefShare;
       // The belly as the wind fills it, and the shiver, eased.
       const square = f.kind === SQUARE, full = Math.min(1, Math.sqrt((st?.pressure ?? 0) / FULL_PRESSURE));
       const aback = st?.aback ?? false, shivering = st?.shivering ?? false;
