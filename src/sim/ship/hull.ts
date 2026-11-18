@@ -157,8 +157,19 @@ export function designWaterline(along: number): number {
  * girth) and the keel below the rabbet.
  */
 export function displacedVolume(waterlineAt: (along: number) => number = designWaterline, stepAlong = DISPLACEMENT_STEP, stepUp = DISPLACEMENT_STEP): number {
+  return displaced(waterlineAt, stepAlong, stepUp).volume;
+}
+
+/** Her centre of buoyancy below a waterline (the draught's own by default): m forward of the mainmast. */
+export function buoyancyAlong(waterlineAt: (along: number) => number = designWaterline): number {
+  const d = displaced(waterlineAt, DISPLACEMENT_STEP, DISPLACEMENT_STEP);
+  return d.moment / d.volume;
+}
+
+/** Her displaced volume below a waterline, and its moment about the mainmast (m⁴, forward positive). */
+function displaced(waterlineAt: (along: number) => number, stepAlong: number, stepUp: number): { volume: number; moment: number } {
   const along = simpsonPoints(HULL_AFT, HULL_FORE, stepAlong);
-  let volume = 0;
+  let volume = 0, moment = 0;
   for (const [a, wa] of along) {
     const bottom = hullBottom(a), waterline = waterlineAt(a);
     if (bottom >= waterline) continue;
@@ -172,9 +183,11 @@ export function displacedVolume(waterlineAt: (along: number) => number = designW
       lastH = h;
     }
     const keel = 2 * KEEL_HALF_SIDING * Math.max(0, Math.min(KEEL_DEPTH, bottom - keelBottom(a)));
-    volume += (area + girth * PLANKING.side + keel) * wa;
+    const slice = (area + girth * PLANKING.side + keel) * wa;
+    volume += slice;
+    moment += slice * a;
   }
-  return volume;
+  return { volume, moment };
 }
 /** The step of the displacement's integration, m. */
 const DISPLACEMENT_STEP = 0.1;

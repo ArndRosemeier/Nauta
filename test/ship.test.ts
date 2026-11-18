@@ -6,9 +6,6 @@ import {
   BERTH_HEADROOM, DECK_AT_SIDE, DECK_BEAM, DECK_CAMBER, KEEL_HALF_SIDING, LOAD_WATERLINE, MIDSHIP_SECTION, PLANKING, RAIL_TOP,
 } from '../src/sim/rules/ships.ts';
 import { deckY, halfBreadth, sectionOutline, shipY, shipZ } from '../src/sim/ship/section.ts';
-import { followWater, restingPose, waterPlane } from '../src/sim/ship/standIn.ts';
-import { startSea } from '../src/sim/sea/sea.ts';
-import { beaufortSpeed } from '../src/sim/rules/beaufort.ts';
 import { STANDPOINTS, standpoint } from '../src/app/standpoints.ts';
 import { buildSlice, SLICE_AFT, SLICE_FORE } from '../src/render/ship/slice.ts';
 
@@ -47,27 +44,6 @@ test('ship space: the load waterline is y 0, the deck is cambered, forward is -z
   assert.equal(shipZ(2), -2);
   assert.ok(Math.abs(deckY(0) - shipY(DECK_AT_SIDE + DECK_CAMBER)) < 1e-12);
   assert.ok(Math.abs(deckY(halfBreadth(DECK_AT_SIDE)) - shipY(DECK_AT_SIDE)) < 1e-12);
-});
-
-test('she eases toward the water without overshooting, the same at any frame rate', () => {
-  const target = { heave: 0.4, pitch: 0.05, roll: -0.08 };
-  const run = (dt: number, seconds: number) => {
-    let p = restingPose(), most = 0;
-    for (let t = 0; t < seconds - 1e-9; t += dt) { p = followWater(p, target, dt); most = Math.max(most, p.heave); }
-    return { p, most };
-  };
-  const slow = run(1 / 30, 6), fast = run(1 / 120, 6);
-  assert.ok(slow.most <= target.heave + 1e-9, 'no overshoot');
-  assert.ok(Math.abs(slow.p.heave - target.heave) < 0.01 && Math.abs(slow.p.roll - target.roll) < 0.01);
-  assert.ok(Math.abs(slow.p.heave - fast.p.heave) < 1e-9, 'frame rate does not change the path');
-});
-
-test('on a moderate sea she pitches and rolls a little, not wildly', () => {
-  const sea = startSea(1805, { speed: beaufortSpeed(4), toward: 0.4 }, 0);
-  for (let t = 0; t < 120; t += 7) {
-    const w = waterPlane(sea, 0, 0, 0, t);
-    assert.ok(Math.abs(w.pitch) < 0.1 && Math.abs(w.roll) < 0.2 && Math.abs(w.heave) < 2, `at ${t} s: ${JSON.stringify(w)}`);
-  }
 });
 
 test('every standpoint stands inside the slice, and below deck between the berth deck and the beams', () => {

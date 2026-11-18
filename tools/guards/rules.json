@@ -64,8 +64,8 @@
     },
     {
       "field": "pose",
-      "owner": "src/render/ship/shipView.ts",
-      "what": "how she lies on the water (the stand-in motion until N2.2 computes it)"
+      "owner": "src/sim/ship/motion.ts",
+      "what": "how a ship lies on the water: her centre, heading, heave, pitch and roll (floating, N2.2)"
     }
   ]
 }

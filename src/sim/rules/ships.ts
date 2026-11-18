@@ -526,3 +526,33 @@ export const LOADS: readonly (readonly [what: string, tonnes: number, height: nu
   ['galley stove, coals and wood', 4, 4],
   ['ballast: iron pigs and shingle', 65, 1.5],
 ];
+
+// ---------------------------------------------------------------------------------------------------------------
+// Floating (N2.2): what her hull's pressure points alone do not give, the water moving with her and taking her
+// motion's energy away, and the range her roll must fall in. src/sim/ship/motion.ts floats her on these.
+// ---------------------------------------------------------------------------------------------------------------
+
+/**
+ * Her radius of gyration in roll as a share of her beam, the water rolling with her included. Ships run 0.35 to 0.4;
+ * a brig's tall rig (30 t about 8 m over her centre) puts her at the top, and IMO's roll-period rule (Intact
+ * Stability Code: T = 2·C·B/√GM, C = 0.373 + 0.023·B/d − 0.043·L/100) gives 0.42 for her proportions.
+ */
+export const ROLL_GYRATION = 0.42;
+/** Her radius of gyration in pitch as a share of her length on the load waterline (0.25 for most hulls). */
+export const PITCH_GYRATION = 0.25;
+/** The water that heaves and pitches with her, as a share of her own mass and of her own pitch inertia (strip theory gives 0.7 to 1 for a hull of her form). */
+export const HEAVE_ADDED_MASS = 0.8;
+export const PITCH_ADDED_INERTIA = 0.8;
+/**
+ * How hard the water resists her hull moving across its own surface, per m² of wetted hull, t/(m²·s), for motion up
+ * and down and for motion sideways. Up and down is the waves her heaving and pitching make, which carry their energy
+ * away fast: they die out in about three swings. Sideways is the eddies off her keel and bilges as she rolls, far
+ * weaker (her sway, which would let her keel give way, is not simulated, so it stands in for that too). Heeled and let
+ * go she rolls five or six times before she is still: a deep keel and deadwood damp a brig's roll more than a modern hull's.
+ */
+export const HULL_DAMPING = { upward: 3, sideways: 0.4 } as const;
+/**
+ * The range her natural roll period must fall in, s: IMO's rule (above) for her beam and draught with the metacentric
+ * height a sloop of war carried laden, about 0.7 to 1.5 m.
+ */
+export const ROLL_PERIOD = { least: 6, most: 10 } as const;
