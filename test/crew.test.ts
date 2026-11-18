@@ -17,6 +17,8 @@ import { atQuartersOf, brigRoster, crewPlaces, placeSpot } from '../src/sim/crew
 import type { Order } from '../src/sim/orders.ts';
 import { COMPLEMENT, FEWEST, GANGS, JOBS, ROSTER } from '../src/sim/rules/crew.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
+import { routeNetwork } from '../src/sim/crew/network.ts';
+import { nodeAt } from '../src/sim/ship/walk.ts';
 import { SIDES } from '../src/sim/ship/spars.ts';
 import { BREAKS } from '../src/sim/rules/ships.ts';
 import { decodeState, encodeState, startMatch } from '../src/sim/state.ts';
@@ -65,6 +67,27 @@ test('the officers of the watch pace the quarterdeck: out to the other end of th
     }
   }
   for (const [i, s] of seen) assert.ok(s.ends.size === 2 && s.walked > 0 && s.stood > s.walked, `${roster[i]!.rank} paces: ${[...s.ends]}, ${s.walked} steps walking, ${s.stood} standing`);
+});
+
+test('at quarters the powder boys carry cartridges: each goes from his post to a powder place by a gun of the side she fights and back, and every powder place can be walked to', () => {
+  const roster = brigRoster(), boys = roster.flatMap((m, i) => (m.powderBoy !== null ? [i] : []));
+  assert.equal(boys.length, 8);
+  const powder = [...crewPlaces().values()].filter((p) => p.kind === 'powder');
+  assert.equal(powder.length, shipPlan().guns.filter((g) => !g.chase).length);
+  const graph = routeNetwork().graph;
+  for (const p of powder) assert.ok(nodeAt(graph, p) >= 0, `${p.id} stands on a clear deck`);
+  let crew = startCrew(roster);
+  const seen = new Map(boys.map((i) => [i, new Set<string>()]));
+  for (let tick = 0; tick < 150 * STEPS_PER_SECOND; tick++) {
+    crew = stepCrew(crew, startTold(), { tick, heel: 0, closures: openShip(), captain: null, canvas: startSail().canvas, quarters: 1 }, roster).crew;
+    for (const i of boys) {
+      const h = crew.men[i]!;
+      if (h.going) continue;
+      const at = h.stands ?? placeSpot(roster[i]!.home), place = powder.find((p) => sameSpot(at, placeSpot(p.id)));
+      seen.get(i)!.add(place ? 'gun' : sameSpot(at, placeSpot(roster[i]!.post)) ? 'post' : 'elsewhere');
+    }
+  }
+  for (const [i, s] of seen) assert.ok(s.has('gun') && s.has('post'), `boy ${i} stood at a gun and at his post: ${[...s]}`);
 });
 
 test('the marines stand as ruled: two sentries aft, one at the cabin door, the rest below or in the waist; at quarters two aft, six aloft, six forward, five on the engaged side', () => {

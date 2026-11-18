@@ -53,6 +53,13 @@ export interface RankRow {
 export const PACE_SECONDS = 15;
 /** The seconds each pacer's round is put on from the last, so the officers do not turn together. */
 export const PACE_STAGGER = 7;
+/**
+ * The powder boys at quarters (Arnd 2026-11-18, crew realism: show the cartridges coming up): with her fighting one side,
+ * each boy in turn carries a cartridge from his post to a gun of that side and goes back for the next. He stays at each
+ * end this long, s (the walk between is as long as the ladders take), each boy's round put on from the last by the stagger.
+ */
+export const POWDER_SECONDS = 22;
+export const POWDER_STAGGER = 5;
 /** The quarterdeck's two walks, one each side of the capstan and the skylight: the aft and the fore end of each (stations of rules/ships.ts). */
 export const QUARTERDECK_WALKS = { starboard: ['station-pace-s-aft', 'station-pace-s-fore'], larboard: ['station-pace-p-aft', 'station-pace-p-fore'] } as const;
 

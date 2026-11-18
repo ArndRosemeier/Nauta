@@ -12,9 +12,9 @@
  * order) frees its men at once. A man with no task goes back to his post at a walk. Plain data; every step decides
  * from the state alone, in the roster's order, so every machine steps the same crew.
  */
-import { CLIMB_METRES, FEWEST, PACE_SECONDS, PACE_STAGGER, PASSED, REPAIRS, SENT_PER_STEP, SURGEON, type RepairName } from '../rules/crew';
+import { CLIMB_METRES, FEWEST, PACE_SECONDS, PACE_STAGGER, PASSED, POWDER_SECONDS, POWDER_STAGGER, REPAIRS, SENT_PER_STEP, SURGEON, type RepairName } from '../rules/crew';
 import { VOCABULARY, type ShipOrders } from '../orders';
-import { bareSpot, type Spot } from '../ship/plan';
+import { bareSpot, shipPlan, type Spot } from '../ship/plan';
 import { sailShare, type SailSetting } from '../ship/sails';
 import type { SailWork } from '../ship/sailing';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../units';
@@ -164,6 +164,7 @@ function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged
   // sides bear, the men take the sides in turn.
   if (quarters !== undefined && marine !== null) return atQuartersOf(marine, typeof quarters === 'number' ? quarters : SIDES[i % SIDES.length]!);
   if (quarters === undefined) return roster[i]!.home;
+  if (typeof quarters === 'number' && roster[i]!.powderBoy !== null) return powderRound(roster[i]!.powderBoy!, quarters, post, tick);
   if (quarters === 'both' || roster[i]!.gun === null) return post;
   if (quarters !== 'none') return quartersPlace(i, quarters, roster) ?? post;
   const at = h.going?.path.to ?? h.stands;
@@ -174,6 +175,16 @@ function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged
 /** The end of his walk a pacing officer is to be at in the match's `tick`: the ends in turn, each for `PACE_SECONDS`, each man's round put on by `PACE_STAGGER`. */
 const pacePlace = (paces: readonly [string, string], i: number, tick: number): string =>
   paces[Math.floor((tick / STEPS_PER_SECOND + i * PACE_STAGGER) / PACE_SECONDS) % paces.length]!;
+
+/** The guns of each side that a powder boy serves (not the chase guns), in the plan's order, by side. */
+const servedGuns = (side: number): readonly string[] => shipPlan().guns.filter((g) => !g.chase && g.side === side).map((g) => g.id);
+/** A powder boy's place in the match's `tick` with her fighting `side`: his post (the magazine, a hatch) and the powder place of his gun in turn, each for `POWDER_SECONDS`, the boys' rounds put on by `POWDER_STAGGER`. */
+function powderRound(boy: number, side: number, post: string, tick: number): string {
+  const guns = servedGuns(side);
+  if (guns.length === 0) return post;
+  const carrying = Math.floor((tick / STEPS_PER_SECOND + boy * POWDER_STAGGER) / POWDER_SECONDS) % 2 === 1;
+  return carrying ? `powder-${guns[boy % guns.length]!}` : post;
+}
 
 /** Whether a man is where he must be, standing. */
 const there = (h: Hand, i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Task>): boolean =>
