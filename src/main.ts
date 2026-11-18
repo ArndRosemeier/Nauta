@@ -108,7 +108,7 @@ async function start(): Promise<void> {
   const ship = build ? new ShipView(build) : null;
   /** Seconds the browser checks have run the match on ahead of the page's clock (`__nautaSail.onward`). */
   let ahead = 0;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => pageSeconds() + ahead) : null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => pageSeconds() + ahead, params.windAsked ? params.wind : null) : null;
   // The other captain's ship, where the match has her (until N3.8 draws her whole).
   const other = build && match ? new OtherShipView(build) : null;
   if (ship && match) ship.poseFrom = () => match.pose(match.ship)!;

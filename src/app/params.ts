@@ -55,6 +55,8 @@ export interface Params {
   readonly eye: number;
   /** The wind's force on the Beaufort scale, a whole number (`?wind=7`). */
   readonly wind: number;
+  /** Whether the address names the wind (`?wind=`, or `?sea=` by its wind): then it wins over a match's own, sailing alone too. */
+  readonly windAsked: boolean;
   /** Show the light rig's test bodies ahead of the captain (`?rig`, plan N1.5). */
   readonly rig: boolean;
   /** Where the captain looks at the start (`?yaw=70&pitch=-10`, degrees: yaw to the left of north, pitch up); null for the game's own start. */
@@ -108,7 +110,7 @@ export function readParams(query: string): Params {
   return {
     hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
     dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
-    ship: q.get('ship') ?? q.get('slice') ?? (q.has('crew') ? '' : null), quality: q.get('quality'), walk: q.get('walk'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(force),
+    ship: q.get('ship') ?? q.get('slice') ?? (q.has('crew') ? '' : null), quality: q.get('quality'), walk: q.get('walk'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(force), windAsked: q.has('wind') || named !== undefined,
     look: q.has('yaw') || q.has('pitch')
       ? { yaw: num('yaw', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE, pitch: num('pitch', 0, -PITCH_LIMIT / DEGREE, PITCH_LIMIT / DEGREE) * DEGREE }
       : null,

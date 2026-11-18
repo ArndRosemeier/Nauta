@@ -73,6 +73,8 @@ export interface DuelOptions {
   readonly seed?: number;
   /** A match played alone from this setup instead of the duel's start from `seed` (tests, a chosen start). */
   readonly setup?: MatchSetup;
+  /** The wind's force of a match played alone, over its start's (the page's `?wind=`); none: the start's own. */
+  readonly windForce?: number;
   /** The clock, s (the page's `performance.now() / 1000`; tests give a fake one). */
   readonly now: () => number;
 }
@@ -132,7 +134,8 @@ export class DuelSession {
     this.build = options.build;
     if (!this.hub) {
       this.role = 'solo';
-      this.begin(startMatch(options.setup ?? duelStart(options.seed ?? SOLO_SEED)), [SOLO_PLAYER, null]);
+      const start = options.setup ?? duelStart(options.seed ?? SOLO_SEED);
+      this.begin(startMatch(options.windForce === undefined ? start : { ...start, windForce: options.windForce }), [SOLO_PLAYER, null]);
       return;
     }
     this.role = 'joining';

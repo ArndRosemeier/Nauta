@@ -154,3 +154,11 @@ test('alone, the page is its own host: the match steps by the clock and the capt
   assert.equal(solo.state.ships[0]!.told.canvas, 'plain');
   await assert.rejects(solo.create('x'), /no room/);
 });
+
+test('alone, the address\'s wind wins over the start\'s own; the rest of the start stays', () => {
+  const own = new DuelSession({ build: BUILD, now: () => 0, seed: 7 }).state.wind;
+  const force = own.windForce === 6 ? 2 : 6;
+  const asked = new DuelSession({ build: BUILD, now: () => 0, seed: 7, windForce: force }).state.wind;
+  assert.equal(asked.windForce, force);
+  assert.equal(asked.windFrom, own.windFrom, 'from the same quarter');
+});

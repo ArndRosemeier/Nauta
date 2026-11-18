@@ -136,7 +136,7 @@ export class RoomPanel {
       s.close();
       this.hub = null;
       this.pendingSession = null;
-      this.chosen(new DuelSession({ build: this.build, now: this.now, seed: this.params.seed ?? undefined }));
+      this.chosen(new DuelSession({ build: this.build, now: this.now, seed: this.params.seed ?? undefined, windForce: this.params.windAsked ? this.params.wind : undefined }));
       shut();
     });
     const row = make('div', 'room-row');
