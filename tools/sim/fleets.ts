@@ -10,7 +10,7 @@
 import { deflateSync } from 'fflate';
 import { captainOrders, crewedBy } from '../../src/sim/captain/captain.ts';
 import { warmGunnery } from '../../src/sim/guns/gunnery.ts';
-import { SKILL, type Skill } from '../../src/sim/rules/captain.ts';
+import type { Skill } from '../../src/sim/rules/captain.ts';
 import { fleetStart, withSides } from '../../src/sim/start.ts';
 import { encodeState, startMatch, type SimState } from '../../src/sim/state.ts';
 import { step } from '../../src/sim/step.ts';
