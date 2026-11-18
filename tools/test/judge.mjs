@@ -3,8 +3,7 @@
 /**
  * `tests`: { file, name, seconds }[]; `wall`: the whole run, seconds. Returns the lines to print and whether the
  * run is over a budget: a test past its limit, a file past its own (its tests added up), or the suite past its own.
- * The runner's `--test-timeout` is the file's limit: Node holds a test file's own process to that timeout, so it
- * cannot be one test's limit without also being the file's. A test that hangs is stopped when its file is.
+ * The runner's `--test-timeout` is the file's limit, held for each test: a test that hangs is stopped there and fails.
  */
 export function judge(tests, wall, budgets) {
   const lines = [], failures = [], warnings = [];

@@ -13,6 +13,10 @@
  * filling to get under way again, and the order panel's eight compass points from a start under way, each reached
  * or answered with full and by.
  *
+ * Last her roll on the sea (N2.2, N3.3, moved here from npm test for its time, docs/CHECKS.md): ten minutes of floating
+ * in the strongest preset never blow up; under all the sail the crew will carry in it she heels below the limit; and in
+ * a force 5 beam sea her sails steady her roll against bare poles.
+ *
  *   npm run check:sailing
  */
 import {
@@ -30,7 +34,11 @@ import { simTime } from '../../src/sim/state.ts';
 import { STEER_POINTS, steerPoint } from '../../src/app/orderReport.ts';
 import { angleDiff } from '@futuremagic/core';
 import { step, type SimEvent } from '../../src/sim/step.ts';
-import { DEGREE, KNOT, STEPS_PER_SECOND } from '../../src/sim/units.ts';
+import { DEGREE, KNOT, STEP_SECONDS, STEPS_PER_SECOND } from '../../src/sim/units.ts';
+import { beaufortSpeed } from '../../src/sim/rules/beaufort.ts';
+import { startSea } from '../../src/sim/sea/sea.ts';
+import { lyingStill, startMotion, stepMotion, type ShipMotion } from '../../src/sim/ship/motion.ts';
+import { deg, rolling } from '../../test/support/sail.ts';
 
 const SEED = 1805;
 const FROM = 0;
@@ -209,6 +217,51 @@ function orderScenarios(): string[] {
   return out;
 }
 console.log(`orders: ${orderScenarios().join('; ')}`);
+
+// Her roll on the sea.
+/** Ten simulated minutes of floating in the strongest preset, her heading swinging round every 150 s. */
+const GALE_MINUTES = 10;
+const GALE_LEGS = 4;
+function galeFloating(): string {
+  const gale = startSea(SEED, { speed: beaufortSpeed(WIND_PRESETS.length - 1), toward: 0.4 }, 0);
+  const trim = startMotion(0, 0, 0).pose.pitch, leg = (GALE_MINUTES * 60) / GALE_LEGS, most = { roll: 0, pitch: 0, heave: 0 };
+  let m: ShipMotion = startMotion(0, 0, 0);
+  for (let i = 0; i < GALE_MINUTES * 60 * STEPS_PER_SECOND; i++) {
+    const t = i * STEP_SECONDS;
+    m = stepMotion(m, gale, t, { ...lyingStill(Math.floor(t / leg) * 1.7), ahead: 3 });
+    const p = m.pose;
+    if (![p.heave, p.pitch, p.roll, p.heaveRate, p.pitchRate, p.rollRate, p.x, p.z].every(Number.isFinite)) { problems.push('gale: her motion is no longer a number'); break; }
+    most.roll = Math.max(most.roll, Math.abs(p.roll));
+    most.pitch = Math.max(most.pitch, Math.abs(p.pitch - trim));
+    most.heave = Math.max(most.heave, Math.abs(p.heave));
+  }
+  // She works hard but never goes over, stands on end or leaves the water; and the gale does move her.
+  if (!(most.roll < 40 * DEGREE && most.pitch < 25 * DEGREE && most.heave < 8)) problems.push(`gale: she went too far (roll ${deg(most.roll)}, pitch ${deg(most.pitch)}, heave ${most.heave.toFixed(2)} m)`);
+  if (!(most.roll > 3 * DEGREE && most.heave > 1)) problems.push(`gale: the gale hardly moved her (roll ${deg(most.roll)}, heave ${most.heave.toFixed(2)} m)`);
+  return `${GALE_MINUTES} min floating in the gale: roll up to ${deg(most.roll)}, pitch ${deg(most.pitch)}, heave ${most.heave.toFixed(2)} m`;
+}
+/** Under all the sail the crew will carry in the strongest preset, her heel on the beam and close-hauled. */
+function galeHeel(): string {
+  return ([[90 * DEGREE, 'beam'], [CLOSE_HAULED, 'close-hauled']] as const).map(([angle, name]) => {
+    const r = rolling(WIND_PRESETS.length - 1, 'all', angle);
+    if (!(r.mean > 2 * DEGREE && r.mean < HEEL_LIMIT) || !(r.most < 2 * HEEL_LIMIT)) problems.push(`gale, all sail ${name}: mean heel ${deg(r.mean)}, most ${deg(r.most)} (limit ${deg(HEEL_LIMIT)})`);
+    return `${name} mean ${deg(r.mean)}, most ${deg(r.most)}`;
+  }).join(', ');
+}
+/** A force 5 beam sea, the wind and the sea it raised square across her: bare poles roll her hard, battle sail steadies her. */
+const BEAM_FORCE = 5;
+function beamSea(): string {
+  const bare = rolling(BEAM_FORCE, 'bare', 90 * DEGREE), battle = rolling(BEAM_FORCE, 'battle', 90 * DEGREE);
+  const why = `battle sail mean ${deg(battle.mean)}, swing ${deg(battle.swing)}, most ${deg(battle.most)}; bare poles swing ${deg(bare.swing)}, most ${deg(bare.most)}`;
+  if (!(bare.most > 12 * DEGREE)) problems.push(`beam sea: under bare poles she rolled only ${deg(bare.most)}`);
+  if (!(battle.swing < 0.7 * bare.swing && battle.most < 0.8 * bare.most)) problems.push(`beam sea: battle sail did not steady her (${why})`);
+  // The wind on her larboard beam heels her to starboard.
+  if (!(battle.mean > 1 * DEGREE)) problems.push(`beam sea: under battle sail she is not heeled to leeward (${why})`);
+  return why;
+}
+console.log(galeFloating());
+console.log(`all sail in the gale: ${galeHeel()}`);
+console.log(`force ${BEAM_FORCE} beam sea: ${beamSea()}`);
 console.log(`sailing: ${FORCES.length} winds × ${CANVASES.length} canvases, ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 for (const p of problems) console.log(`PROBLEM: ${p}`);
 process.exit(problems.length ? 1 : 0);

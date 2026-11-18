@@ -2,7 +2,7 @@
  * The sailing model (implementation plan N3.3): her speed on each point of sail against the table, tacking at speed
  * in under a minute, missing stays without way and falling back, wearing, being taken aback, the canvas set for the
  * wind. The sailing model alone, in a steady wind, her pose level (test/support/sail.ts); the sea and her roll are in
- * test/sailingSea.test.ts.
+ * `npm run check:sailing`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

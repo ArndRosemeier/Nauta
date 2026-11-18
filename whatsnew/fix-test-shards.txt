@@ -1,0 +1,1 @@
+Behind the scenes: the automatic tests run about twice as fast (several test files now share a process), and the longest rolling-sea runs moved to the sailing check, so new work can keep adding tests.
