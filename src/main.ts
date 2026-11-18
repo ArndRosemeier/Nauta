@@ -270,7 +270,7 @@ async function start(): Promise<void> {
   const mustered = performance.now();
   const otherCrew: OtherCrewAt = params.crew === 'aboard' ? { aboard: true } : params.crew ? { offset: TWIN_OFFSET } : null;
   const startCrew = QUALITY_LEVELS[Math.max(0, levelNamed(params.quality ?? settings.now.quality))]!.crew;
-  const crew = match && ship ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, match.state.ships.map((_, i) => (i === match.ship ? ship : i === match.other ? other : null)), startCrew, otherCrew,
+  const crew = match && ship && !params.noCrew ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, match.state.ships.map((_, i) => (i === match.ship ? ship : i === match.other ? other : null)), startCrew, otherCrew,
     (what) => { note.textContent = what; }) : null;
   const musterSeconds = (performance.now() - mustered) / MS_PER_SECOND;
   if (crew) window.__nautaCrew = crew;

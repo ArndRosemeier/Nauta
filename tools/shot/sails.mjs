@@ -26,19 +26,27 @@ const BEFORE_TACK = 75;
 const COMPASS = 360;
 /**
  * Seconds the match runs on after an order before a picture: a canvas order takes the crew a while, a course settles; a
- * sail being clewed up (all off their sheets from 15 s, the next furled after 30 s); furled. The match
+ * sail being clewed up (none set from 25 s, six of the twelve rolled up on their yards by then, since the hands stand by
+ * in the waist and below, PR 110); furled. The match
  * moves only by these jumps (main.ts `__nautaSail.onward`), not by the page's clock, so they hold on any machine.
  */
-const SETTLE = { canvas: 150, course: 75, clew: 18, furl: 200 };
-/** Through a tack the match runs on by this many seconds at a time until a sail is aback, at most this long. */
-const STAYS = { step: 2, most: 60 };
+const SETTLE = { canvas: 150, course: 75, clew: 28, furl: 200 };
+/**
+ * Through a tack the match runs on by this many seconds at a time (`step`; `long` while she comes back to full sail) until the sails stand as the step names, at most this
+ * long (the hands stand by in the waist and below, PR 110, and walk to their stations first: a tack waits for them, and
+ * the courses can stay aback minutes after a course change from the beam).
+ */
+const STAYS = { step: 2, long: 6, most: 240 };
+
+/** A sail still set at the clewing-up picture: the match runs on this many s more, at most this many times, and the picture is taken again. */
+const CLEW_LATE = { step: 10, times: 3 };
 
 const { width, height } = shotSize('800x500');
 const served = await openBrowser();
-const game = await openGame(served, '?sail&ship=50-m-off&hud&quality=high&wind=4', { width, height });
+const game = await openGame(served, '?sail&nocrew&ship=50-m-off&hud&quality=high&wind=4', { width, height });
 const { page } = game;
-// The panels would hide her: only the standpoints stay, as the check clicks them.
-await page.addStyleTag({ content: '#version,#orders,#room{display:none!important}' });
+// The panels would hide her: only the standpoints stay, as the check clicks them (the officer row lies over their buttons).
+await page.addStyleTag({ content: '#version,#orders,#room,.nt-officers{display:none!important}' });
 const problems = [];
 const say = async (words) => { const why = await page.evaluate((w) => window.__nautaSail.say(w), words); if (why) problems.push(`"${words}" refused: ${why}`); };
 /** The match runs on at once; the software GPU draws only the pictures (each `shot` draws the frame that catches the sails up). */
@@ -73,25 +81,29 @@ if (all) {
 await view('50 m off');
 await say(course(await page.evaluate(() => window.__nautaSail.windFrom()), BEFORE_TACK));
 /** Runs the match on, a step at a time, until `done(sails aback)` or the most it waits; the seconds waited. */
-const until = async (done) => {
+const until = async (done, step = STAYS.step) => {
   let waited = 0;
-  while (waited < STAYS.most && !done(await page.evaluate(() => window.__nautaSail.aback()))) { await onward(STAYS.step); waited += STAYS.step; }
+  while (waited < STAYS.most && !done(await page.evaluate(() => window.__nautaSail.aback()))) { await onward(step); waited += step; }
   return waited;
 };
 await onward(SETTLE.course);
 // Full on the port tack first (her sheets crossed from running before the wind), so the sails aback come from the tack.
-const full = await until((n) => n === 0);
-if (full >= STAYS.most) problems.push(`before the tack, sails were still aback ${full} s on`);
+// With gusts the courses can stay aback minutes after a course change whatever the hands do (the wind they were braced for has gone round), so this waits a while and goes on.
+const full = await until((n) => n === 0, STAYS.long);
+const before = await page.evaluate(() => window.__nautaSail.aback());
+if (before > 0) console.log(`${before} sails still aback ${full} s after the course: the tack is judged by sails going further aback`);
 await say('tack');
-// In stays: the match runs on until it has a sail aback (the drawing follows on the next frame).
-const waited = await until((n) => n > 0);
+// In stays: the match runs on until it has more sail aback (the drawing follows on the next frame).
+const waited = await until((n) => n > before);
 console.log(`full ${full} s after the course, in stays ${waited} s after "tack"`);
 const stays = await shot('in-stays');
-if (!stays.aback) problems.push(`in stays (${waited} s after "tack") no sail was drawn aback`);
+if (waited >= STAYS.most || !stays.aback) problems.push(`in stays (${waited} s after "tack", ${before} aback before) no more sail was aback`);
 // Each 'take in sail' is one step down: all, plain, battle, bare poles.
 for (let i = 0; i < 3; i++) await say('take in sail');
 await onward(SETTLE.clew);
-const clewing = await shot('clewing-up');
+// None is drawn set once every sail is clewed up and some are rolled up on their yards; a sail kept aback by the tack is clewed up last, so wait a little for it.
+let clewing = await shot('clewing-up');
+for (let late = 0; late < CLEW_LATE.times && clewing.set > 0 && clewing.furled < clewing.sails; late++) { await onward(CLEW_LATE.step); clewing = await shot('clewing-up'); }
 if (clewing.set > 0 || clewing.furled === clewing.sails) problems.push(`taking in: ${clewing.set} sails still drawn set, ${clewing.furled} already furled`);
 await onward(SETTLE.furl);
 await view('500 m off');
