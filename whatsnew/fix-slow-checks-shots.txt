@@ -1,1 +1,1 @@
-Behind the scenes: the automatic checks on the fall of shot and on the ship's water pass again; nothing changes in the game.
+Behind the scenes: the automatic checks on the fall of shot, the ship's water and the sails pass again; the game itself is unchanged (a new address switch, ?nocrew, leaves the crews out for those checks).

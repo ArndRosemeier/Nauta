@@ -23,8 +23,8 @@ const SAIL_FIRST_MS = 10000;
 
 /**
  * The picture CI takes: a frame of the whole brig (about 60 s on CI's software GPU, the crowd and the sea in view):
- * her wake under way, from above. The page took 103 s to get ready on CI (2026-11-18, the crews drawn), so two pictures
- * ran 203 s past the step's 180 s; the berth deck (no water inside her), the water along her side (`rail`), the
+ * her wake under way, from above. The page took 103 to 121 s to get ready on CI (2026-11-18, the crews drawn), so two
+ * pictures ran 203 s past the step's 180 s and the page is `?nocrew` now (no crew: this check is of the ship and the water); the berth deck (no water inside her), the water along her side (`rail`), the
  * bowsprit, astern and 50 m off go by hand (`all`), as the sea's and the sails' full sets (docs/CHECKS.md, "Browser
  * checks: the rule").
  */
@@ -58,7 +58,7 @@ async function main() {
   if (!shots.length) { console.error(`no shot's name holds ${words.join(' and ')}`); process.exit(2); }
   mkdirSync(outDir, { recursive: true });
   const t0 = performance.now(), served = await openBrowser();
-  const game = await openGame(served, `?ship&sail&seed=${SEED}&day=0&quality=high`, shotSize(SHIP_SHOT_SIZE));
+  const game = await openGame(served, `?ship&sail&nocrew&seed=${SEED}&day=0&quality=high`, shotSize(SHIP_SHOT_SIZE));
   const { page } = game;
   await page.addStyleTag({ content: '#version,#standpoints,#orders,#room{display:none!important}' });
   console.log(`page ready in ${((performance.now() - t0) / 1000).toFixed(0)} s; she sails ${SAIL_FIRST_MS / 1000} s`);

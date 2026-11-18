@@ -46,7 +46,7 @@ const SEED_MOST = 2 ** 32 - 1;
  * `?motion=`, `?smoke=`, `?key=`, `?hub=`, `?notitle` and a room's `?join=` keep the menu.)
  */
 export const TOOL_SWITCHES = [
-  'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'trial', 'bench', 'probe', 'netcheck', 'title', 'rig',
+  'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'nocrew', 'trial', 'bench', 'probe', 'netcheck', 'title', 'rig',
   'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed', 'scars', 'casualties', 'down', 'watch',
 ] as const;
 
@@ -112,6 +112,8 @@ export interface Params {
   readonly crew: 'twin' | 'aboard' | null;
   /** Start the crew trial's measured run at once (`?trial`), instead of on its button. */
   readonly trial: boolean;
+  /** No crew drawn (`?sail&nocrew`): the match has its men, the page draws none and loads no crew pack, for the browser checks of the ship and the water, which a crowd only slows on the software GPU. */
+  readonly noCrew: boolean;
   /** The spyglass raised from the start, drawn out to this magnification (`?glass=12`; `?glass` alone: as it starts); null: lowered. */
   readonly glass: number | null;
   /** The other ship of a match sailed alone commanded by a computer captain at this skill (`?foe=master`; `?foe` alone: seasoned, plan N7.1); null: she sails on as she started. */
@@ -159,7 +161,7 @@ export function readParams(query: string): Params {
     sail: q.has('sail'), panel: q.has('panel'),
     room: q.has('room'), join: q.get('join') || null, key: q.get('key') || null, hub: q.get('hub') || null,
     seed: q.has('seed') ? Math.round(num('seed', 0, 0, SEED_MOST)) : null, netcheck: q.has('netcheck'),
-    crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'),
+    crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'), noCrew: q.has('nocrew'),
     glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
     foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
     watch: q.has('watch') ? readWatch(q.get('watch') ?? '') : null,
