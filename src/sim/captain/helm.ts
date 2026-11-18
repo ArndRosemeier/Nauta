@@ -12,16 +12,17 @@
  * (`TURN_AT`) is not given.
  */
 import { angleDiff } from '@futuremagic/core';
-import { goingAbout, tackOf, type Order } from '../orders';
+import { goingAbout, isGunnery, isKeep, isLife, tackOf, type Keep, type Order, type SailingOrder } from '../orders';
 import {
   BACK_ABAFT, BACK_MOST, BEARS_WITHIN, CLOSEST, LAYING_SPARE, WORD_READY, CLOSING_PER_RANGE, FILL_ABAFT, HYSTERESIS, OFF_BEARING, STATION_RANGES, ENGAGE_BEYOND, LEAD_MOST, MOST_CLOSING, OFF_CLOSE, RAKE_WITHIN, READY_SIDE, SAME_SIDE, SKILL, TACK_GAIN, TACK_WAY,
   TURN_AT, type Skill,
 } from '../rules/captain';
-import { HOVE_TO_MAST } from '../rules/orders';
+import { HOVE_TO_MAST, MASTER_LOOK } from '../rules/orders';
 import { CLOSE_HAULED } from '../rules/sailing';
 import { MASTS } from '../ship/sailing';
-import { bearingDir, KNOT, wrapBearing } from '../units';
-import { sideIndex, sideSign, type Sight } from './sight';
+import type { SimState } from '../state';
+import { bearingDir, KNOT, STEPS_PER_SECOND, wrapBearing } from '../units';
+import { sideIndex, sideSign, sightOf, type Sight } from './sight';
 
 /** A quarter turn, rad: her beam. */
 const BEAM = Math.PI / 2;
@@ -54,28 +55,40 @@ function inHerRake(sight: Sight): boolean {
   return a < RAKE_WITHIN || a > Math.PI - RAKE_WITHIN;
 }
 
-/** Where he steers while closing: for where she will be, to windward of her and astern of her by his skill. */
-function closing(sight: Sight, skill: Skill): number {
-  const row = SKILL[skill], me = sight.own.motion.pose;
+/**
+ * The heading for a point by her: where she will be (her way times the time to reach her, at most `LEAD_MOST`, by
+ * `lead`), `astern` m back along her wake and `gauge` m to windward of her.
+ */
+function toward(sight: Sight, lead: number, astern: number, gauge: number): number {
+  const me = sight.own.motion.pose;
   const [bx, bz] = bearingDir(sight.bearing), [hx, hz] = bearingDir(sight.enemy.heading), [wx, wz] = bearingDir(sight.windFrom);
-  const lead = Math.min(LEAD_MOST, sight.range / Math.max(sight.own.sailing.ahead, KNOT)) * row.lead * sight.enemy.ahead;
-  const astern = row.rake * row.range;
-  const x = me.x + bx * sight.range + hx * (lead - astern) + wx * row.gauge;
-  const z = me.z + bz * sight.range + hz * (lead - astern) + wz * row.gauge;
+  const ahead = Math.min(LEAD_MOST, sight.range / Math.max(sight.own.sailing.ahead, KNOT)) * lead * sight.enemy.ahead;
+  const x = me.x + bx * sight.range + hx * (ahead - astern) + wx * gauge;
+  const z = me.z + bz * sight.range + hz * (ahead - astern) + wz * gauge;
   return wrapBearing(Math.atan2(x - me.x, -(z - me.z)));
 }
 
+/** Where he steers while closing: for where she will be, to windward of her and astern of her by his skill. */
+function closing(sight: Sight, skill: Skill): number {
+  const row = SKILL[skill];
+  return toward(sight, row.lead, row.rake * row.range, row.gauge);
+}
+
 /**
- * Laying his broadside on her: the heading that puts her on side `k`, turned toward her by how far he is beyond his
- * range; while that side stands ready he turns toward her no more than its guns still bear (fire, then close).
+ * Laying a broadside on her at `range`, m: the heading that puts her on side `k`, turned toward her by how far she is
+ * beyond the range (away inside it); while that side stands ready it turns toward her no more than its guns still
+ * bear (fire, then close). One who works for her stern (`rake`) holds on while he lies in her rake.
  */
-function broadside(sight: Sight, skill: Skill, k: 0 | 1): number {
-  const row = SKILL[skill], sign = sideSign(k), side = sight.sides[k];
-  const hold = row.rake > 0 && inHerRake(sight) && sight.range > CLOSEST;
+function broadside(sight: Sight, range: number, rake: boolean, k: 0 | 1): number {
+  const sign = sideSign(k), side = sight.sides[k];
+  const hold = rake && inHerRake(sight) && sight.range > CLOSEST;
   const most = side.mounted > 0 && side.ready >= WORD_READY * side.mounted ? BEARS_WITHIN - LAYING_SPARE : MOST_CLOSING;
-  const closingBy = hold ? 0 : Math.max(-MOST_CLOSING, Math.min(most, ((sight.range - row.range) / row.range) * CLOSING_PER_RANGE));
+  const closingBy = hold ? 0 : Math.min(most, closingFor(sight.range, range));
   return wrapBearing(sight.bearing - sign * (BEAM - closingBy));
 }
+
+/** How far to turn toward her to hold `range`, m, at `now`, m: `CLOSING_PER_RANGE` for each range beyond it, as much away inside it, at most `MOST_CLOSING` either way. */
+const closingFor = (now: number, range: number): number => Math.max(-MOST_CLOSING, Math.min(MOST_CLOSING, ((now - range) / range) * CLOSING_PER_RANGE));
 
 /** Where he wants her head now (see the file's head). */
 export function wantedHeading(sight: Sight, skill: Skill): Wanted {
@@ -83,7 +96,7 @@ export function wantedHeading(sight: Sight, skill: Skill): Wanted {
   if (sight.range > row.range + ENGAGE_BEYOND) return { heading: closing(sight, skill), side: null };
   let best: Wanted = { heading: own.heading, side: now }, bestScore = Infinity;
   for (const k of [0, 1] as const) {
-    const heading = broadside(sight, skill, k);
+    const heading = broadside(sight, row.range, row.rake > 0, k);
     const can = sailableOn(tackOf(heading, sight.windFrom, 1), heading, sight.windFrom);
     const report = sight.sides[k];
     const score = Math.abs(angleDiff(own.heading, can)) + OFF_BEARING * Math.abs(angleDiff(can, heading)) - (report.mounted > 0 ? (report.ready / report.mounted) * READY_SIDE : -READY_SIDE) - (k === now ? SAME_SIDE : 0);
@@ -131,4 +144,30 @@ export function stationOrder(sight: Sight, skill: Skill, wanted: Wanted): Order 
 function farFrom(helm: Sight['own']['told']['helm'], heading: number, tack: number, from: number): boolean {
   const told = helm.by ? byOn(helm.by, from) : helm.heading;
   return helm.by !== 0 && helm.by !== tack ? true : Math.abs(angleDiff(told, heading)) >= TURN_AT;
+}
+
+/** The master's eye (rules/captain.ts): how well he judges her range and bearing when he steers by a standing order. */
+const MASTER_EYE: Skill = 'master';
+
+/**
+ * Where the master wants her head for a standing order (orders.ts `Keep`): for her, at where she will be; her on the
+ * beam, her own course, turned toward her on the side she lies on as the computer captain closes on a broadside (or
+ * away), to hold the range the order was given at.
+ */
+export function keptHeading(sight: Sight, keep: Keep): number {
+  if (keep.kind === 'follow') return toward(sight, 1, 0, 0);
+  return wrapBearing(sight.enemy.heading + sideSign(sideIndex(sight.off)) * closingFor(sight.range, Math.max(keep.range, CLOSEST)));
+}
+
+/**
+ * The master's own helm order for her standing order (steer for her, her on the beam), or null: every `MASTER_LOOK`
+ * seconds he looks at her and gives what the computer captain's helm would (`helmOrder`): a course, full and by, a
+ * tack or a wear. Only in a duel (the enemy is the other ship).
+ */
+export function masterOrder(state: SimState, ship: number): SailingOrder | null {
+  const keep = state.ships[ship]?.told.keep;
+  if (!keep || state.ships.length !== 2 || state.tick % Math.round(MASTER_LOOK * STEPS_PER_SECOND) !== 0) return null;
+  const sight = sightOf(state, ship, MASTER_EYE);
+  const order = helmOrder(sight, keptHeading(sight, keep));
+  return order && !isGunnery(order) && !isLife(order) && !isKeep(order) && order.kind !== 'sound' ? order : null;
 }

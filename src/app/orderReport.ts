@@ -17,7 +17,7 @@ import { rigPlan, sparOf } from '../sim/ship/rig';
 import { MASTS } from '../sim/ship/sailing';
 import { simTime, type SimState } from '../sim/state';
 import type { LostHow } from '../sim/end';
-import type { SimEvent } from '../sim/step';
+import { orderMoment, type SimEvent } from '../sim/step';
 import { DEGREE, KNOT, SECONDS_PER_MINUTE, STEPS_PER_SECOND, wrapBearing } from '../sim/units';
 import { meanWind } from '../sim/wind';
 
@@ -200,7 +200,8 @@ function endWords(lost: readonly (LostHow | null)[], ship: number): string {
 export function isStanding(order: Order, told: ShipOrders): boolean {
   switch (order.kind) {
     case 'sail': return told.canvas === order.canvas;
-    case 'by': return told.helm.by !== 0;
+    case 'by': return told.helm.by !== 0 && !told.keep;
+    case 'follow': case 'abeam': return told.keep?.kind === order.kind;
     case 'heave': return told.hove;
     case 'back': return told.backed[MASTS.indexOf(order.mast)] === true;
     case 'quarters': return told.quarters;
@@ -221,6 +222,6 @@ export function isStanding(order: Order, told: ShipOrders): boolean {
 export function wouldRefuse(state: SimState, order: Order): boolean {
   const s = state.ships[order.ship];
   if (!s) return true;
-  const answer = giveOrder(s.told, s.sailing, order, { tick: state.tick, wind: meanWind(state.wind, simTime(state)), force: state.wind.windForce });
+  const answer = giveOrder(s.told, s.sailing, order, orderMoment(state, order.ship));
   return answer.refused;
 }

@@ -20,8 +20,9 @@
 import { stepCrew } from './crew/crew';
 import { repairsDue } from './crew/repairs';
 import { launch, outOf, stepAftermath, stepHits, type Aftermath, type Hit } from './damage';
-import { carryOut, giveOrder, heard, wordSpent, type AnswerCode, type Order, type RefusalCode, type SailingOrder } from './orders';
-import { stepFight, type FightEvent } from './end';
+import { carryOut, giveOrder, heard, masterSteers, wordSpent, type AnswerCode, type Order, type OrderMoment, type RefusalCode, type SailingOrder } from './orders';
+import { stepFight, waterIn, type FightEvent } from './end';
+import { masterOrder } from './captain/helm';
 import { stepGunnery } from './guns/gunnery';
 import type { GunFired } from './guns/shot';
 import { followWind } from './sea/sea';
@@ -30,6 +31,7 @@ import { setShares, stepSailing, type SailingEvent } from './ship/sailing';
 import { touch, type TouchEvent } from './ship/touch';
 import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
+import { apartOnWater } from './units';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
 export type SimEvent = OrderRefused | OrderTaken | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit | Aftermath | FightEvent;
@@ -64,6 +66,8 @@ export interface OrderAnswered {
   readonly order: Order;
   readonly code: AnswerCode;
   readonly reason: string;
+  /** What he answers with, where the answer is a measure (the water in her, t, for "Sound the well"). */
+  readonly amount?: number;
 }
 
 /** An order carried out: its last act done by the men (the helm put over, the last sail set, the yards swung). */
@@ -97,6 +101,15 @@ export interface StepResult {
   readonly events: readonly SimEvent[];
 }
 
+/** What an order to `ship` is given against in `state`: the tick, the mean wind, the force, the range to the enemy (a duel's other ship) and the water in her. */
+export function orderMoment(state: SimState, ship: number): OrderMoment {
+  const own = state.ships[ship], other = state.ships.length === 2 ? state.ships[1 - ship] : undefined;
+  return {
+    tick: state.tick, wind: meanWind(state.wind, simTime(state)), force: state.wind.windForce,
+    enemy: own && other ? apartOnWater(own.motion.pose, other.motion.pose) : null, water: own ? waterIn(own.damage) : 0,
+  };
+}
+
 /** The match one step on, after the `orders` given for this step. */
 export function step(state: SimState, orders: readonly Order[] = []): StepResult {
   const events: SimEvent[] = [];
@@ -113,11 +126,18 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
       events.push({ kind: 'refused', tick, order, code: 'fight over', reason: 'the fight is over' });
       continue;
     }
-    const answer = giveOrder(ship.told, ship.sailing, order, { tick, wind, force: state.wind.windForce });
+    const answer = giveOrder(ship.told, ship.sailing, order, orderMoment(state, order.ship));
     if (answer.refused) events.push({ kind: 'refused', tick, order, code: answer.code, reason: answer.reason });
-    else if (answer.code) events.push({ kind: 'answered', tick, ship: order.ship, order, code: answer.code, reason: answer.reason });
+    else if (answer.code) events.push({ kind: 'answered', tick, ship: order.ship, order, code: answer.code, reason: answer.reason, ...(answer.amount === undefined ? {} : { amount: answer.amount }) });
     else events.push({ kind: 'taken', tick, ship: order.ship, order });
     if (answer.told !== ship.told) ships = ships.map((s, i) => (i === order.ship ? { ...s, told: answer.told } : s));
+  }
+  // The master steering by a standing order (steer for her, her on the beam): his own helm orders, said to no one.
+  for (let i = 0; i < ships.length; i++) {
+    const own = { ...state, ships }, order = masterOrder(own, i), ship = ships[i]!;
+    if (!order) continue;
+    const answer = masterSteers(ship.told, ship.sailing, order, orderMoment(own, i));
+    if (!answer.refused && answer.told !== ship.told) ships = ships.map((s, k) => (k === i ? { ...s, told: answer.told } : s));
   }
   // The shots in flight, each ball's piece of this step traced through the ships as they lie now (damage.ts).
   const hits = stepHits({ seed: state.matchSeed, tick, flying: state.flying, ships: ships.map((s) => ({ pose: s.motion.pose, crew: s.crew, canvas: s.sailing.canvas, guns: s.guns, damage: s.damage })) });

@@ -26,6 +26,7 @@ const say = async (name, who, choose = [], light = null) => {
 await say('first-lieutenant', 'first lieutenant', [], 'shorten');
 await say('make-sail', 'first lieutenant', ['sail'], 'sail-plain');
 await say('master', 'master', [], 'about');
+await say('keep-her', 'master', ['keep'], 'follow');
 await say('midshipman', 'midshipman', ['to-master'], 'steer');
 await page.keyboard.press('Escape');
 // Steer there: the arm up, the mark and the word by the thumb.
@@ -35,6 +36,7 @@ await snap(page, `${out}/steer-there.png`);
 await page.keyboard.press('Escape');
 // N5.3b: at quarters the gunner's fan; held for the captain's word, the large Fire! by the thumb.
 await page.evaluate(() => window.__nautaSail.say('beat to quarters'));
+await frames(page, 2);
 await say('gunner', 'gunner', [], 'hold');
 await page.keyboard.press('Escape');
 await page.evaluate(() => window.__nautaSail.say('hold for my word'));
