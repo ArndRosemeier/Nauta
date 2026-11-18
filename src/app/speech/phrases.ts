@@ -114,6 +114,8 @@ export const PHRASES = {
   'wind eases': p(["It's easing, sir.", "Wind's falling light, sir."], ['Es flaut ab, Herr Kapitän.', 'Der Wind lässt nach, Herr Kapitän.']),
   'her ahead of the beam': p(["She's drawing ahead, sir.", "We're dropping astern of her, sir."], ['Sie zieht voraus, Herr Kapitän.', 'Wir fallen achteraus, Herr Kapitän.']),
   'her astern of the beam': p(["She's dropping astern, sir.", "We're running ahead of her, sir."], ['Sie fällt achteraus, Herr Kapitän.', 'Wir laufen ihr voraus, Herr Kapitän.']),
+  'losing': p(["We're losing her, sir.", "She's drawing out of range, sir."], ['Wir verlieren sie, Herr Kapitän.', 'Sie kommt außer Sicht, Herr Kapitän.']),
+  'apart': p(['We have sailed apart, sir. The action is broken off.'], ['Wir sind auseinandergesegelt, Herr Kapitän. Das Gefecht ist abgebrochen.']),
   'light': p(['The light is failing, sir.', "We'll lose the light soon, sir."], ['Das Licht schwindet, Herr Kapitän.', 'Bald wird es dunkel, Herr Kapitän.']),
   'short-handed': p(["Too few hands for that, sir. It'll be slow.", "We're short of hands, sir."], ['Zu wenig Leute dafür, Herr Kapitän. Das dauert.', 'Uns fehlen Hände, Herr Kapitän.']),
   // ---- Reports: the lookout on her ----
@@ -127,6 +129,7 @@ export const PHRASES = {
   'her mast': p(["Deck there! Her {mast}mast's gone!", 'Her {mast}mast is down!'], ['An Deck! Ihr {mast}mast ist weg!', 'Ihr {mast}mast ist gefallen!']),
   'her struck': p(["She strikes! She's hauled down her colours!", 'She strikes, sir!'], ['Sie streicht die Flagge!', 'Sie streicht, Herr Kapitän!']),
   'her sinking': p(["She's going down, sir!"], ['Sie sinkt, Herr Kapitän!']),
+  'her broke off': p(["She's run, sir! She has broken off the action."], ['Sie läuft davon, Herr Kapitän! Sie bricht das Gefecht ab.']),
   'her burning': p(["She's burning, sir! She's done for!"], ['Sie brennt aus, Herr Kapitän!']),
   'her blew up': p(['God help them, she has blown up!'], ['Gott steh ihnen bei, sie ist in die Luft geflogen!']),
   'nightfall': p(["We've lost her in the dark, sir."], ['Wir haben sie in der Dunkelheit verloren, Herr Kapitän.']),

@@ -138,8 +138,9 @@ function crewsAtQuarters(): void {
 
 /**
  * A headless duel always ends (N6.4): the duel's start as `?sail` gives it, both ships at quarters firing as they bear
- * and nothing more ordered, stepped until the fight is over: a ship lost, or drawn at nightfall. Fails if it is not
- * over by then, or the end is not what the state says.
+ * and nothing more ordered, stepped until the fight is over: a ship lost, drawn at nightfall, or (as now, steering
+ * straight at each other, they pass bow to bow and sail on) drawn when both have sailed apart (end.ts `parting`).
+ * Fails if it is not over by then, or the end is not what the state says.
  */
 function headlessDuel(): void {
   let s = startMatch(duelStart(SEED));
@@ -156,10 +157,11 @@ function headlessDuel(): void {
   }
   const end = s.fight.end, minutes = (t: number) => (t / STEPS_PER_SECOND / SECONDS_PER_MINUTE).toFixed(1);
   if (!end || ended < 0) { problems.push('headless duel: not over at nightfall'); return; }
-  const how = end.lost.every((l) => l === null) ? 'drawn at nightfall' : end.lost.map((l, i) => `ship ${i} ${l ?? 'not lost'}`).join(', ');
+  const drawn = end.lost.every((l) => l === null);
+  const how = drawn ? (end.apart ? 'drawn, both sailed apart' : 'drawn at nightfall') : end.lost.map((l, i) => `ship ${i} ${l ?? 'not lost'}`).join(', ');
   console.log(`headless duel at quarters: ${fired} guns fired, over at ${minutes(end.tick)} min: ${how}${light >= 0 ? `; the light failing at ${minutes(light)} min` : ''}`);
   if (end.tick !== ended) problems.push('headless duel: the end event and the state disagree');
-  if (end.lost.every((l) => l === null) && light < 0) problems.push('headless duel: drawn without the master\'s warning');
+  if (drawn && !end.apart && light < 0) problems.push('headless duel: drawn at nightfall without the master\'s warning');
 }
 
 /** Whether a ball's path passes through her larboard side (the side toward the firing ship) as she lies at `pose`. */

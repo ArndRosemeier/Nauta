@@ -72,7 +72,7 @@ const MANY = 50;
  * many duels, and struck nearly always (sunk is a player's ending, judged in play). Blown up alone is rarer than 1 in
  * 100 duels (the magazine lies deep in the hold, joined only to the light room), so the two are judged together.
  */
-const ENDINGS: readonly string[] = ['struck', 'sunk', 'burnt', 'blew up'];
+const ENDINGS: readonly string[] = ['struck', 'sunk', 'burnt', 'blew up', 'broke off'];
 const BY_FIRE: readonly string[] = ['burnt', 'blew up'];
 
 /** What one duel came to. */
@@ -254,6 +254,7 @@ function sheet(records: readonly Record[]): string[] {
   console.log(`  how ships were lost (struck nearly always; burnt or blown up seen now and then, none over a quarter): ${[...endings].map(([k, c]) => `${c} ${k}`).join(', ')}`);
   for (const [k, c] of endings) {
     if (k === 'struck') continue;
+    if (k === 'broke off' && c > 0) p.push(`${c} ships broke off the action (a computer captain never runs, menu.md)`);
     if (c > struck) p.push(`more ships ${k} (${c}) than struck (${struck})`);
     if (c > SHEET.other * lost) p.push(`${c} of ${lost} ships lost ${k}, more than a quarter`);
   }

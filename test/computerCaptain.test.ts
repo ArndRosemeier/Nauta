@@ -58,7 +58,7 @@ function tell(s: SimState, orders: readonly Order[]): SimState {
 
 test('nothing once the fight is over', () => {
   const over = startMatch(duelStart(1));
-  assert.deepEqual(captainOrders({ ...over, fight: { ...over.fight, end: { tick: 0, lost: [null, null] } } }, 0, 'master'), []);
+  assert.deepEqual(captainOrders({ ...over, fight: { ...over.fight, end: { tick: 0, lost: [null, null], apart: false } } }, 0, 'master'), []);
 });
 
 test('he looks round as often as his skill says, gives nothing between his looks, the same orders from the same state, none refused', () => {

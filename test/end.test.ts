@@ -12,11 +12,11 @@ import { startDamage, type Damage } from '../src/sim/damage.ts';
 import { founderTonnes } from '../src/sim/damage/flood.ts';
 import { sparParts } from '../src/sim/damage/meet.ts';
 import { brigRoster } from '../src/sim/crew/roster.ts';
-import { winner, type Fight } from '../src/sim/end.ts';
+import { stepFight, winner, type Fight } from '../src/sim/end.ts';
 import { battery, dismountGun } from '../src/sim/guns/guns.ts';
 import { parseOrder, type Order } from '../src/sim/orders.ts';
 import { HARMS } from '../src/sim/rules/damage.ts';
-import { ASK_AGAIN, BEATEN, LIGHT_WARNING_MINUTES } from '../src/sim/rules/end.ts';
+import { ASK_AGAIN, BEATEN, LIGHT_WARNING_MINUTES, PARTING } from '../src/sim/rules/end.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import { duelStart } from '../src/sim/start.ts';
@@ -45,8 +45,8 @@ test('each way of being lost ends the fight as one record: sunk, burnt out, blow
   ];
   for (const [damage, how] of cases) {
     const r = once(pair(damage));
-    assert.deepEqual(r.state.fight.end, { tick: 0, lost: [how, null] }, how);
-    assert.deepEqual(ofKind(r.events, 'end'), [{ kind: 'end', tick: 0, lost: [how, null] }]);
+    assert.deepEqual(r.state.fight.end, { tick: 0, lost: [how, null], apart: false }, how);
+    assert.deepEqual(ofKind(r.events, 'end'), [{ kind: 'end', tick: 0, lost: [how, null], apart: false }]);
     assert.equal(winner(r.state.fight), 1, 'the other ship wins');
   }
   // Not yet past saving: two spaces at over half, or the light room not wholly alight.
@@ -102,7 +102,7 @@ test('drawn at nightfall, the master warning five minutes before; a headless due
   let r = once(s);
   assert.equal(r.state.fight.end, null);
   r = once(r.state);
-  assert.deepEqual(r.state.fight.end, { tick: s.fight.nightfall - 1, lost: [null, null] }, 'they part at nightfall');
+  assert.deepEqual(r.state.fight.end, { tick: s.fight.nightfall - 1, lost: [null, null], apart: false }, 'they part at nightfall');
   assert.equal(winner(r.state.fight), null);
   // A whole headless duel of a minute: over when its time runs out.
   let h = startMatch({ ...duelStart(4), minutes: 1 });
@@ -135,4 +135,44 @@ test('beaten by the rule, said once: a quarter of her men out; the water gaining
   for (let g = 0; g <= halfGuns; g++) fewer = dismountGun(fewer, g);
   assert.deepEqual(once({ ...masts, ships: masts.ships.map((s, i) => (i === 1 ? { ...s, guns: fewer } : s)) }).state.fight.beaten, [false, false], 'dismasted with her guns manned, facing a ship with fewer than half hers, fights on');
   assert.deepEqual(once({ ...masts, ships: masts.ships.map((s, i) => (i === 0 ? { ...s, guns } : { ...s, guns: fewer })) }).state.fight.beaten, [true, false], 'dismasted and every gun dismounted');
+});
+
+/** The ships of `s` with each moved `dz[i]` m along z (the second lies to the south of the first). */
+const movedBy = (s: SimState, dz: readonly number[]) => s.ships.map((sh, i) => ({ ...sh, motion: { ...sh.motion, pose: { ...sh.motion.pose, z: sh.motion.pose.z + dz[i]! } } }));
+
+/**
+ * Sailing out of the fight from `apart` m, each ship moving `dz` m a step along z (no stepping: the fight's own rule,
+ * end.ts `stepFight`): the fight's events in order and its end.
+ */
+function sailApart(apart: number, dz: readonly number[], steps: number) {
+  let s = pair();
+  s = { ...s, ships: movedBy(s, [0, apart - 300]) };
+  let f = s.fight;
+  const kinds: string[] = [];
+  for (let t = 0; t < steps && !f.end; t++) {
+    const after = movedBy(s, dz), r = stepFight(f, s.ships, after, t);
+    kinds.push(...r.events.map((e) => e.kind));
+    f = r.fight;
+    s = { ...s, ships: after };
+  }
+  return { kinds, fight: f };
+}
+
+test('sailing out of the fight: losing her past 3 km; 4 km apart for a minute, the ship that opened it broke off, or drawn when both sailed apart', () => {
+  const minute = PARTING.seconds * STEPS_PER_SECOND, run = PARTING.gone - PARTING.losing;
+  // The second runs at 3 m a step from just inside losing her: the master says so once, and a minute past 4 km she has broken off.
+  const ran = sailApart(PARTING.losing - 10, [0, 3], run / 3 + minute + 10);
+  assert.deepEqual(ran.kinds, ['losing', 'end']);
+  assert.deepEqual(ran.fight.end?.lost, [null, 'broke off']);
+  assert.equal(ran.fight.end?.apart, true);
+  assert.equal(winner(ran.fight), 0, 'the ship that held on wins');
+  // Both sail apart alike: drawn.
+  const both = sailApart(PARTING.losing - 10, [-2, 2], run / 4 + minute + 10);
+  assert.deepEqual(both.fight.end?.lost, [null, null]);
+  assert.equal(both.fight.end?.apart, true);
+  assert.equal(winner(both.fight), null);
+  // Past 4 km but not yet for a minute: not over; and back within 3 km what was opened is forgotten.
+  assert.equal(sailApart(PARTING.gone + 10, [0, 0], minute - 1).fight.end, null);
+  const back = sailApart(PARTING.losing + 10, [0, -5], 4);
+  assert.equal(back.fight.opened, null, 'within 3 km again');
 });
