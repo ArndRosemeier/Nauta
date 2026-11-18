@@ -1,0 +1,2 @@
+On the PC the mouse now turns the view the way it moves: mouse right, look right. Hold a button and move the mouse to look around.
+On the iPad a finger still drags the picture as before.

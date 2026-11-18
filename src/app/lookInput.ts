@@ -1,6 +1,7 @@
 /**
  * Dragging on the view turns the look: one finger on a tablet, the held mouse button on a desk. Pointer events
- * cover both, so there is one path (docs/design/nauta-plan.md, Tablets: touch is designed first).
+ * cover both, so there is one path (docs/design/nauta-plan.md, Tablets: touch is designed first). The finger drags the
+ * picture, the mouse turns the head (look.ts#turn).
  */
 import { turn, type Look } from './look';
 
@@ -26,7 +27,7 @@ export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => numbe
   });
   el.addEventListener('pointermove', (e) => {
     if (e.pointerId !== id) return;
-    if (!waits()) state.look = turn(state.look, e.clientX - x, e.clientY - y, radPerPixel());
+    if (!waits()) state.look = turn(state.look, e.clientX - x, e.clientY - y, radPerPixel(), e.pointerType === 'mouse' ? 'mouse' : 'finger');
     x = e.clientX; y = e.clientY;
   });
   const end = (e: PointerEvent) => { if (e.pointerId === id) id = null; };

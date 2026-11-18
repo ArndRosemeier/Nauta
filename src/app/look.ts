@@ -13,12 +13,17 @@ export interface Look {
   pitch: number;
 }
 
+/** What drags the look: a finger (or pen) on the glass, or the mouse on a desk. */
+export type Dragger = 'finger' | 'mouse';
+
 /**
- * Turn by a drag of (dx, dy) pixels. The picture follows the finger: `radPerPixel` is the view's vertical angle
- * over its height in pixels, so a point under the finger stays under it (exactly at the view's middle).
+ * Turn by a drag of (dx, dy) pixels. Under a finger the picture follows it: `radPerPixel` is the view's vertical
+ * angle over its height in pixels, so a point under the finger stays under it (exactly at the view's middle). The
+ * mouse steers the head instead, as on every desk game: moved right, he looks right (Arnd 2026-11-18, "mouselook is
+ * left/right inverted"). Up and down stay as the finger has them for both.
  */
-export function turn(look: Look, dx: number, dy: number, radPerPixel: number): Look {
-  const yaw = wrap(look.yaw + dx * radPerPixel);
+export function turn(look: Look, dx: number, dy: number, radPerPixel: number, by: Dragger = 'finger'): Look {
+  const yaw = wrap(by === 'mouse' ? look.yaw - dx * radPerPixel : look.yaw + dx * radPerPixel);
   const pitch = Math.min(PITCH_LIMIT, Math.max(-PITCH_LIMIT, look.pitch + dy * radPerPixel));
   return { yaw, pitch };
 }
