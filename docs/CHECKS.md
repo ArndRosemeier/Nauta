@@ -23,6 +23,10 @@ What keeps tests fast:
 - A fixture several files need is built once and frozen, not once per test.
 - A test that outgrows 2 s gets a smaller fixture or is split. It does not get a longer limit.
 
+### Timing tests
+
+A test never asserts bare milliseconds: a CI runner is slower than the tablet and shares its cores with the other test files, so such a test fails by chance and gets flakier as the suite grows. A test that guards a cost uses `pace(work, pairs)` from `test/support/pace.ts`: the work's time as a share of a reference loop of plain sines and cosines, measured in the same rounds on the same machine. The limit is then a ratio that holds on any machine. The milliseconds themselves (a sea sample, a simulation step, a frame) are measured where they count, on the tablet, by `?bench`.
+
 ## Slow checks
 
 Each is its own script, run in CI on pushes to `main` (the `Slow checks` job) and by hand, never inside `npm test`.

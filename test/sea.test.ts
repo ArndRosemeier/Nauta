@@ -9,6 +9,7 @@ import { changeWind, followWind, layerWeights, seaAt, seaSample, seaWind, startS
 import { makeSwell } from '../src/sim/sea/swell.ts';
 import { HEIGHT_PER_DEVIATION, makeWaves, seaPreset, type WaveSet } from '../src/sim/sea/waves.ts';
 import { GRAVITY } from '../src/sim/units.ts';
+import { pace } from './support/pace.ts';
 
 const SEED = 1805;
 const wind = (force: number, toward = 0.4) => ({ speed: beaufortSpeed(force), toward });
@@ -103,18 +104,16 @@ test('the sea does not repeat within 2 km (autocorrelation)', () => {
   }
 });
 
-test('1000 samples take under 1 ms', () => {
+test('a sample costs less than its waves\' bare sines and cosines', () => {
+  // On the tablet 1000 samples take under 1 ms, which `?bench` measures there. Here the same budget is held
+  // as a ratio, so a slow or busy CI runner cannot fail it by chance: a sample of 28 waves costs about two
+  // thirds of 28 plain sine and cosine pairs, and may never cost more than all of them.
+  const SAMPLES = 1000;
   const sea = startSea(SEED, wind(6), 0), o = seaSample();
-  const round = () => {
-    const t0 = performance.now();
-    for (let i = 0; i < 1000; i++) seaAt(sea, i * 3.1, i * 1.7, 100 + i * 0.01, o);
-    return performance.now() - t0;
-  };
-  // Other test files run beside this one, so the quietest of many rounds is the honest measure.
-  for (let i = 0; i < 20; i++) round();
-  let best = Infinity;
-  for (let i = 0; i < 60; i++) best = Math.min(best, round());
-  assert.ok(best < 1, `best of 60 rounds: ${best.toFixed(3)} ms`);
+  const share = pace(() => {
+    for (let i = 0; i < SAMPLES; i++) seaAt(sea, i * 3.1, i * 1.7, 100 + i * 0.01, o);
+  }, SAMPLES * (SEA_COMPONENTS + SWELL_COMPONENTS));
+  assert.ok(share < 1, `1000 samples cost ${share.toFixed(2)} of their waves' bare sines and cosines`);
 });
 
 test('the water under a world point is found: its calm point plus its shift is that point', () => {
