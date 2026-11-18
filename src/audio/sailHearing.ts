@@ -22,7 +22,7 @@ import { rigPlan } from '../sim/ship/rig';
 import { sailArea, type Sail } from '../sim/ship/sails';
 import { shipY, shipZ } from '../sim/ship/section';
 import { pushBeds, takeAngle, TAKES, type BedLevel } from './ambience';
-import type { Heard, PlacedBed, PlacedShot } from './heard';
+import { clearHeard, type Heard, type PlacedBed, type PlacedShot } from './heard';
 import {
   ABACK, ABACK_AT, ABACK_REARM, BLOCK_PERIOD, BLOCK_RUN, BLOCK_SPREAD, CANVAS_FULL, CANVAS_GAP, CANVAS_QUEUE, CANVAS_SILENT,
   FILL, FILL_AT, FILL_REARM, FLOG_BEDS, FLOG_FULL_AREA, FLOG_GAIN, FLOG_GLIDE, FLOG_REF, RIGGING_BEDS, RIGGING_FULL,
@@ -180,8 +180,7 @@ export class SailWatch {
 
   /** One frame: what of her sails and rigging is heard now, into `out` (cleared first). */
   heard(s: SailScene, out: Heard): Heard {
-    out.shots.length = 0;
-    out.beds.length = 0;
+    clearHeard(out);
     if (s.aboard) this.rigging(s, out);
     if (!s.standing || !s.drawn) return out;
     const running = this.canvasHeard(s, out);

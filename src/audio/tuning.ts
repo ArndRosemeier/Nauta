@@ -113,8 +113,9 @@ export const CREST_LOUDNESS: readonly [number, number] = [0.5, 1.3];
  * ship's water (N2.8) adds two takes on deck or two below, 8 MB; the slaps, creaks, the counter's slaps and the
  * footsteps about 11 MB; the crew at work (N4.6) about 17 MB, 9 MB of it the crowd's feet and the drum; under sail
  * (N3.9) the rigging's two beds between their winds (four takes, 15 MB), the canvas flogging (two takes, 8 MB) and the
- * canvas, blocks and yards (5 MB). What is not playing goes first when more is needed, least recently heard first.
+ * canvas, blocks and yards (5 MB); gunfire (N5.6) about 9 MB, all of it fetched when sound opens. What is not playing
+ * goes first when more is needed, least recently heard first.
  */
-export const SOUND_MEMORY = 108 * 1024 * 1024;
+export const SOUND_MEMORY = 120 * 1024 * 1024;
 /** Under water the world's sound is heard through a low-pass at this frequency, Hz. */
 export const UNDER_WATER_HZ = 350;

@@ -35,6 +35,7 @@ import { ShipSound } from './audio/shipSound';
 import { CrewSound } from './audio/crewSound';
 import { beatingToQuarters } from './sim/guns/gunnery';
 import { SailSound } from './audio/sailSound';
+import { GunSound } from './audio/gunSound';
 import { OPEN_AIR } from './audio/acoustics';
 import { CrewView } from './render/crew/crewView';
 import { CaptainView } from './render/captain/captainView';
@@ -42,7 +43,7 @@ import { TWIN_OFFSET, musterCrews } from './app/crew';
 import { CrewTrialRun } from './app/crewTrialRun';
 import { formatBytes } from './probe/report';
 import { Vector3 } from 'three/webgpu';
-import { DEGREE, MS_PER_SECOND, apartOnWater } from './sim/units';
+import { DEGREE, MS_PER_SECOND, apartOnWater, wrapBearing } from './sim/units';
 import { simTime } from './sim/state';
 import { parseOrder } from './sim/orders';
 import { apparentSpeed } from './sim/ship/sailing';
@@ -102,6 +103,8 @@ declare global {
       say: (words: string) => string; onward: (seconds: number, draw?: boolean) => Promise<void>; sails: () => SailsSummary; aback: () => number; windFrom: () => number;
       /** Turns the look onto the other ship from where the last frame put the eye (the browser checks' glass shots) and says how far off she is, m; -1: no other ship. */
       aimAtOther: () => number;
+      /** The other ship's compass bearing from hers, degrees; -1: no other ship. */
+      bearingOfOther: () => number;
       /** How far apart the two ships' middles are as the match stands, m; -1: no other ship. */
       apart: () => number;
       /** The glass at the eye at once, drawn out to `power`, or lowered (null); and what the HUD says of the other ship. */
@@ -289,6 +292,11 @@ async function start(): Promise<void> {
     sails: () => ship!.sails.summary(),
     aback: () => sailsSeen(match.state, match.ship)?.standing.filter((st) => st.aback).length ?? 0,
     windFrom: () => blowing.from / DEGREE,
+    // The other ship's compass bearing from hers, degrees (-1 with none): checks turn her to bring the guns to bear.
+    bearingOfOther: () => {
+      const a = match.pose(match.ship), b = match.other >= 0 ? match.pose(match.other) : null;
+      return a && b ? wrapBearing(Math.atan2(b.x - a.x, -(b.z - a.z))) / DEGREE : -1;
+    },
     aimAtOther: () => {
       const her = match.other >= 0 ? match.pose(match.other) : null;
       if (!her || !ship) return -1;
@@ -332,6 +340,9 @@ async function start(): Promise<void> {
   if (match && crewSound) match.on('events', (events) => crewSound.onEvents(events));
   // Her sails and rigging heard (N3.9): the wind in the rigging on her always; canvas, blocks and yards when a match sails her.
   const sailSound = ship ? new SailSound(sound.engine, MATCH_SEED) : null;
+  // Gunfire heard (N5.6), both ships' guns as the match fires them.
+  const gunSound = ship && match ? new GunSound(sound.engine) : null;
+  if (match && gunSound) match.on('events', (events) => gunSound.onFired(events));
   const drawnSails: SailHeard[] = [];
   let aloft = meanWind(wind, 0);
   const ear = new Vector3(), facing = new Vector3(), crown = new Vector3(), gust = meanWind(wind, 0);
@@ -448,7 +459,12 @@ async function start(): Promise<void> {
     // Her own sound first: it gives the room the sea and the wind are heard through. Sailing, her way is the match's.
     const body = walking?.drawnBody, soles = body ? [body.feet.L, body.feet.R] : null;
     const sailing = match?.state.ships[match.ship] ?? null;
-    const room = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: where.eye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: sailing?.sailing.ahead ?? 0 }) : OPEN_AIR;
+    const herRoom = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: where.eye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: sailing?.sailing.ahead ?? 0 }) : OPEN_AIR;
+    // Gunfire (N5.6): the reports, shot passing and falling, her own guns jolting the deck under him; deafened by a
+    // broadside close by, the rest is heard through a dull room.
+    const gunfire = gunSound && match ? gunSound.roar({ t: seaTime, ear: [ear.x, ear.y, ear.z], earShip: where.eye, aboard: where.off ? -1 : match.ship, below: herRoom.below }, herRoom) : null;
+    for (const j of gunfire?.jolts ?? []) walking?.body.jolt(j.x, j.z, j.strength);
+    const room = gunfire?.room ?? herRoom;
     if (crewSound && match) { const mine = match.state.ships[match.ship]; crewSound.drum = !!mine && beatingToQuarters(mine.told, mine.guns); }
     if (ship && crewSound && match && sailing) crewSound.atWork(sailing, simTime(match.state), ship.drawn, where.eye, room);
     else if (ship && crewSound && !still) crewSound.bellAlone(seaTime, ship.drawn, room);

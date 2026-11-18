@@ -11,6 +11,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { RATE, rng, wav } from './wav.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -18,8 +19,6 @@ const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1
 const RAW = resolve(opt('--raw') ?? '.sound-raw');
 const spec = JSON.parse(readFileSync(join(here, 'pipe-calls.json'), 'utf8'));
 
-/** Sample rate, Hz (the game's: the make script keeps it). */
-const RATE = 32000;
 /** The warble: the pitch undulates this many times a second, by this share, and the loudness a little with it. */
 const WARBLE_HZ = 13, WARBLE_DEPTH = 0.05, WARBLE_LOUD = 0.15;
 /** The trill: the tongue breaks the sound this many times a second. */
@@ -39,10 +38,6 @@ const REFLECTIONS = [[0.007, 0.16], [0.019, 0.09]];
 /** The take's peak, dBFS (the make script levels it again). */
 const PEAK_DB = -1;
 
-function rng(seed) {
-  let s = seed >>> 0 || 1;
-  return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
-}
 const ease = (u) => u * u * (3 - 2 * u);
 
 /** Per sample: the pitch between low (0) and high (1), the tone and whether the pipe sounds; and each note's onset. */
@@ -100,16 +95,6 @@ function synth(call, seed) {
   for (const [d, g] of REFLECTIONS) { const k = Math.round(d * RATE); for (let i = 0; i < dry.length - k; i++) out[i + k] += g * dry[i]; }
   const peak = out.reduce((m, v) => Math.max(m, Math.abs(v)), 0), gain = Math.pow(10, PEAK_DB / 20) / Math.max(peak, 1e-9);
   return out.map((v) => v * gain);
-}
-
-function wav(samples) {
-  const data = Buffer.alloc(samples.length * 2);
-  samples.forEach((v, i) => data.writeInt16LE(Math.round(Math.max(-1, Math.min(1, v)) * 32767), i * 2));
-  const h = Buffer.alloc(44);
-  h.write('RIFF', 0); h.writeUInt32LE(36 + data.length, 4); h.write('WAVE', 8); h.write('fmt ', 12);
-  h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(RATE, 24);
-  h.writeUInt32LE(RATE * 2, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write('data', 36); h.writeUInt32LE(data.length, 40);
-  return Buffer.concat([h, data]);
 }
 
 mkdirSync(join(RAW, 'pipe'), { recursive: true });

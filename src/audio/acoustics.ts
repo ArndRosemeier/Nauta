@@ -74,7 +74,7 @@ function roomOf(plan: ShipPlan, id: string): { spaces: Space[]; t60: number } {
 }
 
 /** A frequency between two, glided in log frequency (as the ear hears it): `u` 0 gives `a`, 1 gives `b`. */
-const logLerp = (a: number, b: number, u: number): number => a * Math.pow(b / a, u);
+export const logLerp = (a: number, b: number, u: number): number => a * Math.pow(b / a, u);
 
 /**
  * The room at an eye in ship space (+x starboard, +y up from the load waterline, -z forward): open air on deck, aloft

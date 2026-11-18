@@ -408,6 +408,70 @@
     31.425
    ]
   },
+  "gun/far": {
+   "kind": "calls",
+   "files": [
+    "gun/far-1.mp3",
+    "gun/far-2.mp3",
+    "gun/far-3.mp3",
+    "gun/far-4.mp3",
+    "gun/far-5.mp3",
+    "gun/far-6.mp3"
+   ],
+   "seconds": [
+    1.855,
+    1.55,
+    1.785,
+    1.77,
+    3.5,
+    1.595
+   ]
+  },
+  "gun/near": {
+   "kind": "calls",
+   "files": [
+    "gun/near-1.mp3",
+    "gun/near-2.mp3",
+    "gun/near-3.mp3",
+    "gun/near-4.mp3",
+    "gun/near-5.mp3",
+    "gun/near-6.mp3"
+   ],
+   "seconds": [
+    3.5,
+    3.22,
+    3.13,
+    2.91,
+    2.365,
+    3.06
+   ]
+  },
+  "gun/ring": {
+   "kind": "call",
+   "files": [
+    "gun/ring.mp3"
+   ],
+   "seconds": [
+    6.035
+   ]
+  },
+  "gun/through": {
+   "kind": "calls",
+   "files": [
+    "gun/through-1.mp3",
+    "gun/through-2.mp3",
+    "gun/through-3.mp3",
+    "gun/through-4.mp3",
+    "gun/through-5.mp3"
+   ],
+   "seconds": [
+    3,
+    2.45,
+    3,
+    3,
+    3
+   ]
+  },
   "haul/pull": {
    "kind": "calls",
    "files": [
@@ -528,6 +592,38 @@
    ],
    "seconds": [
     3.85
+   ]
+  },
+  "shot/pass": {
+   "kind": "calls",
+   "files": [
+    "shot/pass-1.mp3",
+    "shot/pass-2.mp3",
+    "shot/pass-3.mp3",
+    "shot/pass-4.mp3"
+   ],
+   "seconds": [
+    1.6,
+    1.6,
+    1.6,
+    1.6
+   ]
+  },
+  "shot/splash": {
+   "kind": "calls",
+   "files": [
+    "shot/splash-1.mp3",
+    "shot/splash-2.mp3",
+    "shot/splash-3.mp3",
+    "shot/splash-4.mp3",
+    "shot/splash-5.mp3"
+   ],
+   "seconds": [
+    0.21,
+    2.255,
+    2.5,
+    1.795,
+    1.98
    ]
   },
   "slap/burst": {
