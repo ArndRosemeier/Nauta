@@ -1,0 +1,2 @@
+Under the hood, ships now fight for sides: each gun fires on the nearest enemy it faces, and a battle ends when one side is left.
+Nothing changes in a duel; the setup dialog still runs two ships until the rest of the work lands.

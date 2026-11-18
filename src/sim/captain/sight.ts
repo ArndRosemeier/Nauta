@@ -12,6 +12,7 @@ import { angleDiff, deriveSeed, Rng } from '@futuremagic/core';
 import { openHoles, standingNow } from '../damage';
 import { unstayed } from '../damage/fall';
 import { waterIn } from '../end';
+import { foeOf } from '../foes';
 import { battery, gunAt } from '../guns/guns';
 import { SKILL, BEARS_WITHIN, FIRE_NOTICE, type Skill } from '../rules/captain';
 import { WASH } from '../rules/damage';
@@ -130,9 +131,9 @@ function noticedAt(seed: number, ship: number, space: number, fireAt: number): n
   return fireAt * (1 + FIRE_NOTICE * (2 * new Rng(deriveSeed(seed, 'fire seen', ship, space)).float() - 1));
 }
 
-/** What the captain of `ship` (with the eye of `skill`) knows at the start of the step of `state`. The duel's enemy is the other ship. */
-export function sightOf(state: SimState, ship: number, skill: Skill): Sight {
-  const own = state.ships[ship]!, other = state.ships[1 - ship]!, t = simTime(state);
+/** What the captain of `ship` (with the eye of `skill`) knows at the start of the step of `state`. His enemy is `foe`, the nearest of the other sides' ships (foes.ts) unless given; the duel's is the other ship. */
+export function sightOf(state: SimState, ship: number, skill: Skill, foe: number | null = foeOf(state.ships, ship)): Sight {
+  const own = state.ships[ship]!, other = state.ships[foe!]!, t = simTime(state);
   const me = own.motion.pose, her = other.motion.pose, row = SKILL[skill];
   const rng = new Rng(deriveSeed(state.matchSeed, 'captain', ship, state.tick));
   const range = apartOnWater(me, her) * Math.max(0, 1 + rng.gaussian(0, row.judgeRange));

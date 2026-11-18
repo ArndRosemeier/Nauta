@@ -1,10 +1,11 @@
 /**
  * How the fight ends (pure, implementation plan N6.4, design decisions for N6): the one owner of `SimState.fight`
  * (rules.json `owners`). Each step, after the ships have moved, a ship is lost when she has sunk (her water at what
- * founders her), burnt out, blown up or struck her colours; the first step any ship is lost ends the fight, kept as one
- * record (who lost, how, when; both lost in one step is a draw). With neither lost when the match's time runs out, it is
+ * founders her), burnt out, blown up or struck her colours; the fight ends the first step at most one side has a ship that
+ * is not lost (docs/design/scenarios.md; a duel: the first step any ship is lost), kept as one record (who lost, how, when;
+ * every side lost in one step is a draw). With neither lost when the match's time runs out, it is
  * drawn: they part at nightfall, the master warning five minutes before. Sailing out of the fight ends it too (menu.md):
- * past `PARTING.losing` apart the master says they are losing her, and `PARTING.gone` apart for a minute the ship that
+ * past `PARTING.losing` apart (the nearest ships of two sides) the master says they are losing her, and `PARTING.gone` apart for a minute the ship that
  * opened the distance has broken off the action and loses, or it is drawn when both sailed apart.
  *
  * Beaten (`beaten`, with N7.5a's helpless ship) is what makes a computer captain strike (N7.1) and his first lieutenant say "We must strike, sir"
@@ -132,27 +133,46 @@ export function beaten(ship: SimShip, was: Damage, enemies: readonly SimShip[] =
   return enemies.some(canRake) || crewsAble(ship) < BEATEN.crews;
 }
 
-/** How far a ship sailed away from the other in a step, m: her way along the line from the other to her (less than 0: toward her). */
+/** How far a ship sailed away from another in a step, m: her way along the line from the other to her (less than 0: toward her). */
 function sailedAway(was: ShipPose, now: ShipPose, other: ShipPose): number {
   const dx = was.x - other.x, dz = was.z - other.z, d = Math.hypot(dx, dz);
   return d > 0 ? ((now.x - was.x) * dx + (now.z - was.z) * dz) / d : 0;
 }
 
+/** The nearest ship of another side than ship `i`'s among `ships`, or -1 with none. */
+function nearestEnemy(ships: readonly SimShip[], i: number): number {
+  let best = -1, far = Infinity;
+  ships.forEach((o, k) => {
+    const d = o.side === ships[i]!.side ? Infinity : apartOnWater(ships[i]!.motion.pose, o.motion.pose);
+    if (d < far) { far = d; best = k; }
+  });
+  return best;
+}
+
 /**
- * Sailing out of the fight, one step on (two ships): what each has opened since they were last within
- * `PARTING.losing`, since when they have been past `PARTING.gone`, and, after a minute past it, how each is lost: the
- * ship that opened at least `PARTING.share` of the distance has broken off the action; none: both sailed apart.
+ * Sailing out of the fight, one step on: what each ship has opened (away from her nearest enemy) since the sides were last
+ * within `PARTING.losing`, since when they have been past `PARTING.gone`, and, after a minute past it, how each is lost:
+ * the ships that opened at least `PARTING.share` of the distance have broken off the action; none: all sailed apart. The
+ * distance is that of the nearest two ships of different sides, so a fleet is parted only when all its sides are.
  */
 export function parting(f: Fight, before: readonly SimShip[], after: readonly SimShip[], tick: number, events: FightEvent[]): Pick<Fight, 'opened' | 'goneSince'> & { lost: (LostHow | null)[] | null } {
-  if (after.length !== 2) return { opened: null, goneSince: null, lost: null };
-  const was = before.map((s) => s.motion.pose), now = after.map((s) => s.motion.pose), apart = apartOnWater(now[0]!, now[1]!);
+  const foes = after.map((_, i) => nearestEnemy(after, i));
+  if (foes.every((k) => k < 0)) return { opened: null, goneSince: null, lost: null };
+  const was = before.map((s) => s.motion.pose), now = after.map((s) => s.motion.pose);
+  const apart = Math.min(...foes.map((k, i) => (k < 0 ? Infinity : apartOnWater(now[i]!, now[k]!))));
   if (apart <= PARTING.losing) return { opened: null, goneSince: null, lost: null };
   if (f.opened === null) events.push({ kind: 'losing', tick });
-  const opened = now.map((p, i) => (f.opened?.[i] ?? 0) + sailedAway(was[i]!, p, was[1 - i]!));
+  const opened = now.map((p, i) => (f.opened?.[i] ?? 0) + (foes[i]! < 0 ? 0 : sailedAway(was[i]!, p, was[foes[i]!]!)));
   const goneSince = apart > PARTING.gone ? f.goneSince ?? tick : null;
   if (goneSince === null || tick - goneSince < PARTING.seconds * STEPS_PER_SECOND) return { opened, goneSince, lost: null };
   const total = opened.reduce((sum, o) => sum + Math.max(0, o), 0);
   return { opened, goneSince, lost: opened.map((o) => (o >= PARTING.share * total ? 'broke off' : null)) };
+}
+
+/** Whether the fight is decided with `lost` as it stands: at most one side has a ship not lost (one side alone: any ship lost). */
+function decided(ships: readonly SimShip[], lost: readonly (LostHow | null)[]): boolean {
+  const sides = new Set(ships.map((s) => s.side)), standing = new Set(ships.flatMap((s, i) => (lost[i] === null ? [s.side] : [])));
+  return sides.size < 2 ? standing.size < sides.size : standing.size <= 1;
 }
 
 /**
@@ -163,12 +183,12 @@ export function parting(f: Fight, before: readonly SimShip[], after: readonly Si
 export function stepFight(f: Fight, before: readonly SimShip[], after: readonly SimShip[], tick: number): { fight: Fight; events: FightEvent[] } {
   if (f.end) return { fight: f, events: [] };
   const events: FightEvent[] = [];
-  const now = after.map((s, i) => beaten(s, before[i]!.damage, after.filter((_, j) => j !== i)));
+  const now = after.map((s, i) => beaten(s, before[i]!.damage, after.filter((o) => o.side !== s.side)));
   now.forEach((b, i) => { if (b && !f.beaten[i]) events.push({ kind: 'beaten', tick, ship: i }); });
   const lost = after.map(lostHow);
   const parted = parting(f, before, after, tick, events);
   let end: FightEnd | null = null;
-  if (lost.some((l) => l !== null)) end = { tick, lost, apart: false };
+  if (decided(after, lost)) end = { tick, lost, apart: false };
   else if (parted.lost) end = { tick, lost: parted.lost, apart: true };
   else if (tick + 1 >= f.nightfall) end = { tick, lost, apart: false };
   else if (tick + 1 === f.nightfall - ticksOf(LIGHT_WARNING_MINUTES)) events.push({ kind: 'light', tick });
@@ -176,6 +196,13 @@ export function stepFight(f: Fight, before: readonly SimShip[], after: readonly 
   const changed = end !== null || now.some((b, i) => b !== f.beaten[i]) || parted.opened !== f.opened || parted.goneSince !== f.goneSince;
   const beatenAt = now.map((b, i) => (b ? (f.beaten[i] ? f.beatenAt[i] ?? tick : tick) : null));
   return { fight: changed ? { ...f, beaten: now, beatenAt, opened: parted.opened, goneSince: parted.goneSince, end } : f, events };
+}
+
+/** The winning side of an ended fight (the one side with a ship not lost), or null: drawn, or not over. `ships`: the match's ships. */
+export function winningSide(f: Fight, ships: readonly SimShip[]): number | null {
+  if (!f.end) return null;
+  const end = f.end, standing = new Set(ships.flatMap((s, i) => (end.lost[i] === null ? [s.side] : [])));
+  return standing.size === 1 && end.lost.some((l) => l !== null) ? [...standing][0]! : null;
 }
 
 /** The winner of an ended fight (the one ship not lost), or null: drawn, or not over. */

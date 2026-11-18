@@ -65,6 +65,11 @@
   ],
   "owners": [
     {
+      "field": "side",
+      "owner": "src/sim/state.ts",
+      "what": "the side a ship fights for: her friends and enemies follow from it (made once by startMatch, scenarios stage 2)"
+    },
+    {
       "field": "windSeed",
       "owner": "src/sim/wind.ts",
       "what": "the seed of a match's wind swings and gusts"

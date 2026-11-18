@@ -22,6 +22,7 @@ import { repairsDue } from './crew/repairs';
 import { killedOf, launch, outOf, stepAftermath, stepHits, type Aftermath, type Hit } from './damage';
 import { carryOut, giveOrder, heard, masterSteers, wordSpent, type AnswerCode, type Order, type OrderMoment, type RefusalCode, type SailingOrder } from './orders';
 import { stepFight, waterIn, type FightEvent } from './end';
+import { enemyPoses, foeOf, lostNow } from './foes';
 import { masterOrder } from './captain/helm';
 import { engagedSide, stepGunnery } from './guns/gunnery';
 import { leeOf, smokeAfter } from './guns/smoke';
@@ -113,9 +114,9 @@ export interface StepResult {
   readonly events: readonly SimEvent[];
 }
 
-/** What an order to `ship` is given against in `state`: the tick, the mean wind, the force, the range to the enemy (a duel's other ship) and the water in her. */
+/** What an order to `ship` is given against in `state`: the tick, the mean wind, the force, the range to her foe (the nearest enemy; a duel's other ship) and the water in her. */
 export function orderMoment(state: SimState, ship: number): OrderMoment {
-  const own = state.ships[ship], other = state.ships.length === 2 ? state.ships[1 - ship] : undefined;
+  const own = state.ships[ship], foe = foeOf(state.ships, ship), other = foe === null ? undefined : state.ships[foe];
   return {
     tick: state.tick, wind: meanWind(state.wind, simTime(state)), force: state.wind.windForce,
     enemy: own && other ? apartOnWater(own.motion.pose, other.motion.pose) : null, water: own ? waterIn(own.damage) : 0,
@@ -159,13 +160,15 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
   const elapsed = dayElapsed(state.dayStart, tick), watch = elapsed === null ? null : watchAt(elapsed);
   const before = tick > 0 ? dayElapsed(state.dayStart, tick - 1) : null;
   if (watch && before !== null && watchAt(before).index !== watch.index) for (let i = 0; i < ships.length; i++) events.push({ kind: 'watch', tick, ship: i, index: watch.index, onDeck: watch.onDeck });
+  // Which ships are lost now: no enemy while another stands (foes.ts).
+  const lost = lostNow(ships);
   const sea = followWind(state.sea, { speed: wind.speed, toward: wind.toward }, t);
   const next = ships.map((s, i) => {
     const pose = s.motion.pose;
     // The men out of the quarter bill (badly hurt, killed), and what the crew does for her life now (crew/repairs.ts).
     const out = outOf(s.damage), repairs = repairsDue(s.damage, s.told, s.crew, tick);
     // At quarters, the side her guns bear on the enemy: her gun crews stand to it (gunnery.ts, crew.ts).
-    const enemies = ships.flatMap((o, k) => (k === i ? [] : [o.motion.pose]));
+    const enemies = enemyPoses(ships, i, lost);
     const quarters = s.told.quarters ? engagedSide(pose, enemies, s.told.aim) : undefined;
     const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, killed: killedOf(s.damage), repairs, quarters, ...(watch === null ? {} : { watch: watch.onDeck, minute: dayMinutesAt(state.dayStart, tick)! }) });
     for (const e of crewed.events) {
@@ -181,9 +184,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     events.push(...after.events);
     const sailed = stepSailing(carried.sailing, pose, here, after.sailing, state.wind.windForce);
     for (const kind of sailed.events) events.push({ kind, tick, ship: i });
-    // The duel's one enemy is the other ship (design decisions for N5: she is the target).
-    const enemy = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
-    const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, out, sailing: s.sailing, pose, heel: s.motion.heel, drill: s.drill, smoke: s.smoke, enemy, sea });
+    const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, out, sailing: s.sailing, pose, heel: s.motion.heel, drill: s.drill, smoke: s.smoke, enemies, sea });
     events.push(...gunnery.fired);
     const told = heard(carried.told, sailed.events, sailed.sailing);
     return {
@@ -196,7 +197,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
   for (const e of events) if (e.kind === 'fired') { flying = launch(flying, e); guns++; }
   // The powder smoke the wind lays on the ship to leeward, and clears (guns/smoke.ts).
   const smoked = next.map((s, i) => {
-    const me = ships[i]!.motion.pose, other = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
+    const me = ships[i]!.motion.pose, foe = foeOf(ships, i, lost), other = foe === null ? null : ships[foe]!.motion.pose;
     const smoke = smokeAfter(s.smoke, guns, other ? leeOf(me.x, me.z, other.x, other.z, wind.x, wind.z) : 0, wind.speed);
     return smoke === s.smoke ? s : { ...s, smoke };
   });
