@@ -33,7 +33,7 @@ import { touch, type TouchEvent } from './ship/touch';
 import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 import { apartOnWater } from './units';
-import { dayElapsed, watchAt } from './day';
+import { dayElapsed, dayMinutesAt, watchAt } from './day';
 import type { Watch } from './rules/day';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
@@ -167,7 +167,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     // At quarters, the side her guns bear on the enemy: her gun crews stand to it (gunnery.ts, crew.ts).
     const enemies = ships.flatMap((o, k) => (k === i ? [] : [o.motion.pose]));
     const quarters = s.told.quarters ? engagedSide(pose, enemies, s.told.aim) : undefined;
-    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, killed: killedOf(s.damage), repairs, quarters, ...(watch === null ? {} : { watch: watch.onDeck }) });
+    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, killed: killedOf(s.damage), repairs, quarters, ...(watch === null ? {} : { watch: watch.onDeck, minute: dayMinutesAt(state.dayStart, tick)! }) });
     for (const e of crewed.events) {
       const given = s.told.given.find((g) => g.id === e.of);
       if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });

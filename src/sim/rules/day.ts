@@ -49,3 +49,24 @@ export const DECK_WATCH: readonly { readonly part: Part; readonly place: string 
   { part: 'waist', place: 'pin-waist-pins-s6' },
   { part: 'waist', place: 'pin-waist-pins-p6' },
 ];
+
+/**
+ * The few jobs of the day (design ruling 2026-11-18: galley before meals, grog at noon; from one seeded table in the
+ * roster data, nothing reads a real clock): while the game hour is in `from` up to `to`, the hands of the watch on deck
+ * who stand a post of `who` (a part, or every part) go to the job's places (a hand's slot among the posts of
+ * `DECK_WATCH`, round the places) and are at the job until it ends, then back to their posts. Each job has its clip in
+ * app/standBy.ts `WATCH_JOB_CLIPS`.
+ */
+export interface DayJob {
+  readonly what: 'wash down' | 'grog';
+  readonly from: number;
+  readonly to: number;
+  readonly who: readonly Part[] | null;
+  readonly places: readonly string[];
+}
+export const DAY_JOBS: readonly DayJob[] = [
+  // The morning watch washes the deck down (the waist's two hands with their brooms), before the hands' breakfast.
+  { what: 'wash down', from: 5.5, to: 7, who: ['waist'], places: ['station-wash-1', 'station-wash-2'] },
+  // Up spirits at noon: the watch on deck's hands come to the scuttlebutt for their grog and go back.
+  { what: 'grog', from: 11.75, to: 12.25, who: null, places: Array.from({ length: 9 }, (_, k) => `station-grog-${k + 1}`) },
+];

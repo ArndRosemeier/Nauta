@@ -37,6 +37,8 @@ export interface Man {
   readonly watch: Watch | null;
   /** Where he stands while his watch has the deck (rules/day.ts `DECK_WATCH`), or null: he stays in his hammock. */
   readonly watchPost: string | null;
+  /** His slot among the posts of `DECK_WATCH` (which of the places he is the watch's), or null: where the day's jobs send him (`DAY_JOBS`). */
+  readonly watchSlot: number | null;
 }
 
 let places: ReadonlyMap<string, CrewPlace> | null = null;
@@ -84,7 +86,7 @@ export function brigRoster(): readonly Man[] {
   const men: Man[] = [];
   let next = 0, boys = 0;
   // His home: the row's `idle` place in turn; a man who sleeps below has the placeholder until the bunks are shared out.
-  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null; paces: readonly [string, string] | null; powderBoy: number | null; watch: Watch | null; watchPost: string | null } => ({ watch: null, watchPost: null, home: row.paces ? row.paces[0] : row.idle ? row.idle[k % row.idle.length]! : post, bunk: null, paces: row.paces ?? null, powderBoy: row.part === 'boys' ? boys++ : null });
+  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null; paces: readonly [string, string] | null; powderBoy: number | null; watch: Watch | null; watchPost: string | null; watchSlot: number | null } => ({ watch: null, watchPost: null, watchSlot: null, home: row.paces ? row.paces[0] : row.idle ? row.idle[k % row.idle.length]! : post, bunk: null, paces: row.paces ?? null, powderBoy: row.part === 'boys' ? boys++ : null });
   for (const row of ROSTER) {
     for (let k = 0; k < row.count; k++) {
       if (row.posts !== 'guns') {
@@ -133,12 +135,12 @@ function keepWatches(men: Man[]): void {
   }
   for (const w of [0, 1] as const) {
     const free = sleepers.filter((i) => men[i]!.watch === w);
-    for (const job of DECK_WATCH) {
+    DECK_WATCH.forEach((job, slot) => {
       const at = free.findIndex((i) => men[i]!.part === job.part);
       if (at < 0) throw new Error(`no ${job.part} in watch ${w} for ${job.place}`);
       const [i] = free.splice(at, 1);
-      men[i!] = { ...men[i!]!, watchPost: job.place };
-    }
+      men[i!] = { ...men[i!]!, watchPost: job.place, watchSlot: slot };
+    });
   }
 }
 

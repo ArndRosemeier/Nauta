@@ -17,8 +17,8 @@ import { VOCABULARY, type ShipOrders } from '../orders';
 import { bareSpot, shipPlan, type Spot } from '../ship/plan';
 import { sailShare, type SailSetting } from '../ship/sails';
 import type { SailWork } from '../ship/sailing';
-import type { Watch } from '../rules/day';
-import { STEP_SECONDS, STEPS_PER_SECOND } from '../units';
+import { DAY_JOBS, type Watch } from '../rules/day';
+import { MINUTES_PER_HOUR, STEP_SECONDS, STEPS_PER_SECOND } from '../units';
 import type { Closures } from './closures';
 import { goingAt, goingRoute, startGoing, stepGoings, type Going } from './going';
 import { deadSpot } from './dead';
@@ -88,6 +88,8 @@ export interface Deck {
   readonly quarters?: Engaged;
   /** In the sandbox, the watch that has the deck now (sim/day.ts `watchAt`): the men of the other watch sleep, those of it with a post stand there (`restPlace`); left out in a fight, which has no watches. */
   readonly watch?: Watch;
+  /** And the game minute of the day it is (day.ts `dayMinutes`): the day's jobs send the watch on deck's hands to their places (rules/day.ts `DAY_JOBS`). */
+  readonly minute?: number;
 }
 
 /** The side a ship at quarters fights on: +1 starboard, -1 larboard, both at once, or neither yet. */
@@ -160,10 +162,10 @@ function target(i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Ta
  * (roster.ts `quartersPlace`), at his post when she fights both sides (his pair split), and where he stands or is
  * going while neither side bears, if that is at one of his pair's guns.
  */
-function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged | undefined, tick: number, onDeck?: Watch): string {
+function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged | undefined, tick: number, onDeck?: Watch, minute?: number): string {
   const post = roster[i]!.post, marine = roster[i]!.quarters, paces = roster[i]!.paces, watch = roster[i]!.watch;
   if (quarters === undefined && paces) return pacePlace(paces, i, tick);
-  if (quarters === undefined && watch !== null && onDeck !== undefined) return watch === onDeck && roster[i]!.watchPost ? roster[i]!.watchPost! : roster[i]!.home;
+  if (quarters === undefined && watch !== null && onDeck !== undefined) return watch === onDeck && roster[i]!.watchPost ? (minute === undefined ? null : jobPlace(roster[i]!, minute)) ?? roster[i]!.watchPost! : roster[i]!.home;
   // A man at no gun with a place at quarters (the marines): there, on the side she fights; while neither or both
   // sides bear, the men take the sides in turn.
   if (quarters !== undefined && marine !== null) return atQuartersOf(marine, typeof quarters === 'number' ? quarters : SIDES[i % SIDES.length]!);
@@ -174,6 +176,12 @@ function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged
   const at = h.going?.path.to ?? h.stands;
   if (!at) return post;
   return SIDES.map((side) => quartersPlace(i, side, roster)).find((p) => p !== null && sameSpot(at, placeSpot(p))) ?? post;
+}
+
+/** The place of the day's job (rules/day.ts `DAY_JOBS`) a hand of the watch on deck is to be at in game minute `minute`, or null: his post. */
+function jobPlace(m: Man, minute: number): string | null {
+  const hour = minute / MINUTES_PER_HOUR, job = DAY_JOBS.find((j) => hour >= j.from && hour < j.to && (j.who === null || j.who.includes(m.part)));
+  return job ? job.places[m.watchSlot! % job.places.length]! : null;
 }
 
 /** The end of his walk a pacing officer is to be at in the match's `tick`: the ends in turn, each for `PACE_SECONDS`, each man's round put on by `PACE_STAGGER`. */
@@ -348,7 +356,7 @@ function sendMen(men: readonly Hand[], roster: readonly Man[], byMan: ReadonlyMa
   for (const i of order) {
     if (sent >= SENT_PER_STEP) break;
     if (struck.has(i)) continue;
-    const h = men[i]!, to = byMan.has(i) ? target(i, roster, byMan) : placeSpot(restPlace(i, h, roster, deck.quarters, deck.tick, deck.watch));
+    const h = men[i]!, to = byMan.has(i) ? target(i, roster, byMan) : placeSpot(restPlace(i, h, roster, deck.quarters, deck.tick, deck.watch, deck.minute));
     if (h.blocked === deck.closures.waysSerial) continue;
     let from: Spot;
     if (h.going) {
@@ -397,7 +405,7 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
   const idle = told.acts.filter((a) => !c.tasks.some((t) => t.act === a.id)).map((a) => a.id);
   // Nothing to do and every man at home (unless she is at quarters: then the gun crews stand to their posts).
   // (the officers who pace, and the men of a watch, are away from home on their rounds and posts, and go on when their turn comes).
-  const restless = deck.quarters === undefined && roster.some((m, i) => (m.paces || (m.watch !== null && deck.watch !== undefined)) && !c.men[i]!.going && !sameSpot(standing(c.men[i]!, m), placeSpot(restPlace(i, c.men[i]!, roster, undefined, deck.tick, deck.watch))));
+  const restless = deck.quarters === undefined && roster.some((m, i) => (m.paces || (m.watch !== null && deck.watch !== undefined)) && !c.men[i]!.going && !sameSpot(standing(c.men[i]!, m), placeSpot(restPlace(i, c.men[i]!, roster, undefined, deck.tick, deck.watch, deck.minute))));
   if (c.tasks.length === 0 && deck.quarters === undefined && !restless && c.men.every((h, i) => h.going === null && (h.stands === null || roster[i]!.paces !== null || roster[i]!.watchPost !== null))) return { crew: c, done: idle, events: [], sails: [], mended: [] };
   const events: CrewEvent[] = [];
   let tasks = manTasks(c.tasks, c.men, roster, deck.tick, out);
