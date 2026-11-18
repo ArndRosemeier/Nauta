@@ -7,7 +7,8 @@
  * to bear at quarters, `quartersPlace`), so a gun crew is a mix of topmen,
  * forecastle men, afterguard and waisters, and sail work takes men from the guns.
  */
-import { ROSTER, type Part } from '../rules/crew';
+import { BUNK_PLACE, BUNK_PRIORITY, ROSTER, type Part } from '../rules/crew';
+import { BUNKS, type Bunk } from '../rules/bunks';
 import { deepFreeze, shipPlan, bareSpot, type CrewPlace, type Spot } from '../ship/plan';
 import { rigPlan } from '../ship/rig';
 import { SIDES, sideLetter } from '../ship/spars';
@@ -25,6 +26,8 @@ export interface Man {
   readonly quarters: string | null;
   /** The crew place he stands by at while she is not at quarters, and where he is when he has nothing to do: his post unless his row gives him `idle`. */
   readonly home: string;
+  /** His bunk, where he sleeps while he stands by (his `home` is its station), or null: he is at a post. */
+  readonly bunk: Bunk | null;
 }
 
 let places: ReadonlyMap<string, CrewPlace> | null = null;
@@ -71,11 +74,13 @@ export function brigRoster(): readonly Man[] {
   const free = new Map(pairs.map((p) => [p, atGuns.filter((g) => g.pair === p)]));
   const men: Man[] = [];
   let next = 0;
+  // His home: the row's `idle` place in turn; a man who sleeps below has the placeholder until the bunks are shared out.
+  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null } => ({ home: row.idle ? row.idle[k % row.idle.length]! : post, bunk: null });
   for (const row of ROSTER) {
     for (let k = 0; k < row.count; k++) {
       if (row.posts !== 'guns') {
         const quarters = row.quarters ? row.quarters[k % row.quarters.length]! : null, post = row.posts[k % row.posts.length]!;
-        men.push({ rank: row.rank, part: row.part, skill: row.skill, post, gun: null, quarters, home: row.idle ? row.idle[k % row.idle.length]! : post });
+        men.push({ rank: row.rank, part: row.part, skill: row.skill, post, gun: null, quarters, ...homeOf(row, k, post) });
         continue;
       }
       // Round the pairs, skipping any whose places are all taken.
@@ -84,9 +89,14 @@ export function brigRoster(): readonly Man[] {
       const place = free.get(pair)!.shift();
       if (!place) throw new Error('more men posted at the guns than the guns have places');
       next++;
-      men.push({ rank: row.rank, part: row.part, skill: row.skill, post: place.place, gun: place.gun, quarters: null, home: row.idle ? row.idle[k % row.idle.length]! : place.place });
+      men.push({ rank: row.rank, part: row.part, skill: row.skill, post: place.place, gun: place.gun, quarters: null, ...homeOf(row, k, place.place) });
     }
   }
+  // The men who sleep below take the bunks, the sail hands and the guns' men the ones nearest the ladders, then in roster order.
+  const sleepers = men.flatMap((m, i) => (m.home === BUNK_PLACE ? [i] : []))
+    .sort((a, b) => BUNK_PRIORITY.indexOf(men[a]!.part) - BUNK_PRIORITY.indexOf(men[b]!.part) || a - b);
+  if (sleepers.length > BUNKS.length) throw new Error('more men sleep below than there are bunks');
+  sleepers.forEach((i, k) => { men[i] = { ...men[i]!, home: BUNKS[k]!.station, bunk: BUNKS[k]! }; });
   for (const m of men) {
     placeSpot(m.post);
     placeSpot(m.home);

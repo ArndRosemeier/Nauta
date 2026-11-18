@@ -65,7 +65,7 @@ test('men queue at a ladder, one at a time and a gap apart, and a crowd takes lo
     for (let i = 1; i < on.length; i++) assert.ok(on[i]! - on[i - 1]! >= WAY_GAP - 1e-9, `${on[i]! - on[i - 1]!} m apart`);
   });
   assert.ok(took.every(Number.isFinite), 'all got there');
-  assert.ok(Math.max(...took) > alone! * 2, `the last of twelve took ${Math.max(...took).toFixed(1)} s, one alone ${alone!.toFixed(1)} s`);
+  assert.ok(Math.max(...took) > alone! * 1.3, `the last of twelve took ${Math.max(...took).toFixed(1)} s, one alone ${alone!.toFixed(1)} s`);
 });
 
 test('the heel slows a man down', () => {

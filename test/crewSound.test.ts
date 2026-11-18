@@ -125,7 +125,7 @@ test("the first lieutenant's parties for her life are piped as they are ordered;
 });
 
 test('what follows is piped: Carry On when the hands are done, Haul Away, the braces and Carry On as she comes round, the Still when she misses stays', () => {
-  const sail = calls(listen([{ tick: 1, order: { kind: 'sail', ship: 0, canvas: 'plain' } }], 45).shots).map((s) => s.id);
+  const sail = calls(listen([{ tick: 1, order: { kind: 'sail', ship: 0, canvas: 'plain' } }], 110).shots).map((s) => s.id);
   assert.deepEqual(sail, [ORDER_CALLS.sail.id, CARRY_ON.id], 'made sail, then Carry On');
   const steer = calls(listen([{ tick: 1, order: { kind: 'steer', ship: 0, heading: 120 * DEGREE } }], 5).shots).map((s) => s.id);
   assert.deepEqual(steer, [ORDER_CALLS.steer.id], 'a course ends without a call');
@@ -139,7 +139,7 @@ test('what follows is piped: Carry On when the hands are done, Haul Away, the br
 });
 
 test('making sail: feet run on her deck, the nearest one by one and the rest as a crowd, and the gangs haul in their rhythm at the pins', () => {
-  const { shots, beds } = listen([{ tick: 1, order: { kind: 'sail', ship: 0, canvas: 'plain' } }], 40);
+  const { shots, beds } = listen([{ tick: 1, order: { kind: 'sail', ship: 0, canvas: 'plain' } }], 100);
   const feet = shots.filter((s) => s.id === RUN_STEP.id);
   assert.ok(feet.length > 20, `feet heard (${feet.length})`);
   const most = Math.max(...[...groupBy(feet, (s) => String(s.t)).values()].map((g) => g.length));

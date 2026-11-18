@@ -150,7 +150,7 @@ test('the first lieutenant\'s parties take men from the guns by the quarter bill
   assert.ok(without < guns(start) && guns(s) <= without, `the guns are short by them: ${guns(s)} of ${guns(start)}`);
   // The fire party puts the fire out.
   let out = false, fought = 0;
-  s = run(s, 40, [], (st, events) => {
+  s = run(s, 60, [], (st, events) => {
     fought = Math.max(fought, atWork(st.ships[0]!.crew, 'fight', messdeck));
     out ||= events.some((e) => e.kind === 'aftermath' && e.what === 'out' && e.id === messdeck);
   });
