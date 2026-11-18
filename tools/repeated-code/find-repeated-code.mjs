@@ -37,6 +37,8 @@ import {
   shape,
   extractFunctions,
   languageOf,
+  readSource,
+  tokensOf,
   listSourceFiles,
   resolveExtensions,
 } from '../duplicate-candidates/find-duplicate-candidates.mjs';
@@ -297,7 +299,7 @@ export function findBodyClones(functions, opts = {}) {
 // ---------------------------------------------------------------------------
 
 /**
- * @param {{file:string, source:string}[]} sources  file = display path
+ * @param {{file:string, source:string, tokens?:object[]}[]} sources  file = display path; `tokens`: the source already tokenized
  * @param {{window?:number, minFiles?:number, minInfo?:number}} [opts]
  */
 export function findIdioms(sources, opts = {}) {
@@ -311,8 +313,7 @@ export function findIdioms(sources, opts = {}) {
   const idOf = (s) => { let v = vocab.get(s); if (v === undefined) { v = vocab.size; vocab.set(s, v); } return v; };
   const docs = [];
   const df = new Map(); // kept name -> number of files containing it
-  for (const { file, source, lang = languageOf(file) } of sources) {
-    const tokens = tokenize(maskCode(source, lang));
+  for (const { file, source, lang = languageOf(file), tokens = tokenize(maskCode(source, lang)) } of sources) {
     const { norm, names } = idiomShape(tokens, lang);
     const ids = Int32Array.from(norm, idOf);
     for (const n of new Set(names.filter(Boolean))) df.set(n, (df.get(n) ?? 0) + 1);
@@ -322,11 +323,18 @@ export function findIdioms(sources, opts = {}) {
   const N = Math.max(1, docs.length);
   const idf = (n) => Math.log2(N / (df.get(n) ?? 1));
 
-  // Hash every window; remember occurrences (first one per file).
+  // Hash every window; remember occurrences (first one per file). A window is a number (its place in all the windows
+  // of all the files, a small integer), until a second file has it: only then is it a list. Most windows occur once,
+  // and a list and its objects for each of them made most of this scan's memory churn.
+  const firstWindow = [];
+  let windows = 0;
+  for (const doc of docs) { firstWindow.push(windows); windows += Math.max(0, doc.ids.length - W + 1); }
+  const docOfWindow = new Uint32Array(windows);
+  const placeOf = (g, d) => ({ d, i: g - firstWindow[d] });
   const occ = new Map();
-  for (let d = 0; d < docs.length; d += 1) {
+  for (let d = 0, g = 0; d < docs.length; d += 1) {
     const ids = docs[d].ids;
-    for (let i = 0; i + W <= ids.length; i += 1) {
+    for (let i = 0; i + W <= ids.length; i += 1, g += 1) {
       let h1 = 0x811c9dc5, h2 = 0x2545f491;
       for (let k = 0; k < W; k += 1) {
         h1 = Math.imul(h1 ^ ids[i + k], 0x01000193);
@@ -334,10 +342,11 @@ export function findIdioms(sources, opts = {}) {
       }
       const key = (h1 >>> 0) * 2097152 + ((h2 >>> 0) & 0x1fffff);
       stats.windows += 1;
-      let list = occ.get(key);
-      if (!list) { list = []; occ.set(key, list); }
-      const last = list[list.length - 1];
-      if (!last || last.d !== d) list.push({ d, i });
+      docOfWindow[g] = d;
+      const seen = occ.get(key);
+      if (seen === undefined) occ.set(key, g);
+      else if (typeof seen === 'number') { if (docOfWindow[seen] !== d) occ.set(key, [seen, g]); }
+      else if (docOfWindow[seen[seen.length - 1]] !== d) seen.push(g);
     }
   }
 
@@ -349,8 +358,9 @@ export function findIdioms(sources, opts = {}) {
 
   // Recurring windows -> verified groups, extended to the maximal shared run.
   const groups = [];
-  for (const list of occ.values()) {
-    if (list.length < minFiles) continue;
+  for (const found of occ.values()) {
+    if (typeof found === 'number' || found.length < minFiles) continue;
+    const list = found.map((g) => placeOf(g, docOfWindow[g]));
     // Verify against the first occurrence (hash collisions split off).
     const ref = list[0];
     const members = list.filter((o) => sameWindow(ref, o, W));
@@ -418,11 +428,13 @@ export function scan(rootDir, opts = {}) {
   const sources = [];
   const functions = [];
   for (const file of files) {
-    let source;
-    try { source = fs.readFileSync(file, 'utf8'); } catch (err) { skipped.push({ file: display(file), reason: `read: ${err.code || err.message}` }); continue; }
+    let entry;
+    try { entry = readSource(file, opts.cache); } catch (err) { skipped.push({ file: display(file), reason: `read: ${err.code || err.message}` }); continue; }
     try {
-      for (const fn of extractFunctions(source, languageOf(file))) functions.push({ name: fn.name, file: display(file), line: fn.line, kind: fn.kind, size: fn.tokens.length, endLine: fn.tokens.length ? fn.tokens[fn.tokens.length - 1].line : fn.line, tokens: fn.tokens });
-      sources.push({ file: display(file), source });
+      // Tokenized once, for the functions here and for the idioms (`findIdioms` reads `tokens`).
+      const tokens = tokensOf(entry);
+      for (const fn of extractFunctions(entry.source, entry.lang, tokens)) functions.push({ name: fn.name, file: display(file), line: fn.line, kind: fn.kind, size: fn.tokens.length, endLine: fn.tokens.length ? fn.tokens[fn.tokens.length - 1].line : fn.line, tokens: fn.tokens });
+      sources.push({ file: display(file), source: entry.source, tokens });
     } catch (err) {
       skipped.push({ file: display(file), reason: `parse: ${err.message}` });
     }
