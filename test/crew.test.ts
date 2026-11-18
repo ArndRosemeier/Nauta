@@ -1,95 +1,32 @@
 /**
- * The crew and its tasks (implementation plan N4.1): the roster and quarter bill add up; each order done by a full crew
+ * The crew and its tasks (implementation plan N4.1): the roster and quarter bill add up; an order done by a full crew
  * takes the time in the table (rules/crew.ts JOBS, from when its men are there); with half the hands it takes longer
  * by the short-handed rule; two orders at once share the men; no man ever has two tasks; work stopped frees the men,
- * who go back to their posts; the crew is plain data. The crew is driven alone here (orders.ts and crew.ts, her sailing
- * standing still), which is cheaper than whole matches; tests/orders.test.ts sails her through them.
+ * who go back to their posts; the crew is plain data, and two crews at their busiest fit the network's 16 KB a state.
+ * The crew is driven alone here (test/support/crew.ts), which is cheaper than whole matches; every order by a full
+ * crew, and the orders sailed through whole matches, are in the slow check tools/sim/orders.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { encode } from '../src/sim/codec.ts';
 import { openShip } from '../src/sim/crew/closures.ts';
-import { startCrew, stepCrew, taskOf, type Crew, type CrewEvent, type Task } from '../src/sim/crew/crew.ts';
+import { startCrew, stepCrew, taskOf, type Crew } from '../src/sim/crew/crew.ts';
 import { jobWork } from '../src/sim/crew/drill.ts';
-import { brigRoster, crewPlaces, type Man } from '../src/sim/crew/roster.ts';
-import { carryOut, giveOrder, startOrders, type Order, type ShipOrders } from '../src/sim/orders.ts';
-import { COMPLEMENT, FEWEST, GANGS, JOBS, ROSTER, type Part } from '../src/sim/rules/crew.ts';
-import { startSailing, type Sailing } from '../src/sim/ship/sailing.ts';
+import { brigRoster, crewPlaces } from '../src/sim/crew/roster.ts';
+import type { Order } from '../src/sim/orders.ts';
+import { COMPLEMENT, FEWEST, GANGS, JOBS, ROSTER } from '../src/sim/rules/crew.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
-import { DEGREE, STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
-import { steadyWind } from './support/sail.ts';
+import { decodeState, encodeState, startMatch } from '../src/sim/state.ts';
+import { STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
+import { drive, fullCrewOrder, give, MOST_SECONDS, short, skillOf, startSail, startTold } from './support/crew.ts';
+import { duelSetup } from './support/match.ts';
 
-const FORCE = 4;
-const WIND = steadyWind(FORCE, 0);
-/** A beam reach under battle sail, with way on (so a tack is taken). */
-const HEADING = 100 * DEGREE;
-/** The longest an order here takes, s. */
-const MOST_SECONDS = 90;
-
-/** What a run gives back: the end, every task as it began and ended (ticks), the events, and the tick each order was done. */
-interface Run {
-  readonly told: ShipOrders;
-  readonly sailing: Sailing;
-  readonly crew: Crew;
-  readonly tasks: Map<number, { task: Task; began: number | null; ended: number | null }>;
-  readonly events: CrewEvent[];
-  readonly doneAt: Map<string, number>;
-}
-
-/** A ship given `orders` at tick 0 (and `later` at their ticks) and her crew stepped on until every order is done or `seconds` pass; every step checks that no man has two tasks. */
-function drive(orders: readonly Order[], roster: readonly Man[] = brigRoster(), seconds = MOST_SECONDS, later: readonly { tick: number; order: Order }[] = []): Run {
-  let sailing = startSailing({ heading: HEADING, speed: 3 }, WIND, FORCE);
-  let told = startOrders(HEADING, 'battle'), crew = startCrew(roster);
-  const tasks: Run['tasks'] = new Map(), events: CrewEvent[] = [], doneAt = new Map<string, number>();
-  const give = (o: Order, tick: number) => {
-    const answer = giveOrder(told, sailing, o, { tick, wind: WIND, force: FORCE });
-    assert.equal(answer.reason, '', `${o.kind} is taken`);
-    told = answer.told;
-  };
-  for (const o of orders) give(o, 0);
-  for (let tick = 0; tick < seconds * STEPS_PER_SECOND; tick++) {
-    for (const l of later) if (l.tick === tick) give(l.order, tick);
-    const r = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas }, roster);
-    events.push(...r.events);
-    const seen = new Set<number>();
-    for (const t of r.crew.tasks) {
-      for (const i of t.hands) { assert.ok(!seen.has(i), `man ${i} has two tasks at tick ${tick}`); seen.add(i); }
-      const k = tasks.get(t.id);
-      tasks.set(t.id, { task: t, began: t.began, ended: null });
-      if (k && k.began !== null) assert.equal(t.began, k.began);
-    }
-    for (const [id, k] of tasks) if (k.ended === null && !r.crew.tasks.some((t) => t.id === id)) tasks.set(id, { ...k, ended: tick });
-    const c = carryOut(told, sailing, r.done, WIND);
-    for (const o of c.done) doneAt.set(o.kind, tick);
-    told = c.told; sailing = c.sailing; crew = r.crew;
-    if (told.given.length === 0 && crew.tasks.length === 0 && tick > 0 && later.every((l) => l.tick < tick)) break;
-  }
-  return { told, sailing, crew, tasks, events, doneAt };
-}
-
-/** The roster with the men of `parts` beyond the first who make up `skill` turned to idlers (as if the rest were elsewhere). */
-function short(parts: readonly Part[], skill: number): Man[] {
-  let kept = 0;
-  return brigRoster().map((m) => {
-    if (!parts.includes(m.part)) return m;
-    if (kept < skill) { kept += m.skill; return m; }
-    return { ...m, part: 'idlers' };
-  });
-}
-
-/** The skill of a task's hands. */
-const skillOf = (t: Task, roster: readonly Man[]) => t.hands.reduce((s, i) => s + roster[i]!.skill, 0);
-
-const ORDERS: readonly Order[] = [
-  { kind: 'steer', ship: 0, heading: 120 * DEGREE },
-  { kind: 'tack', ship: 0 },
-  { kind: 'wear', ship: 0 },
-  { kind: 'heave', ship: 0 },
-  { kind: 'sail', ship: 0, canvas: 'plain' },
-  { kind: 'sail', ship: 0, canvas: 'all' },
-  { kind: 'shorten', ship: 0 },
-  { kind: 'back', ship: 0, mast: 'main' },
-];
+/** The network's most a state may take, bytes. */
+const STATE_BYTES = 16 * 1024;
+/** Long enough for the men sent first for plain sail to reach their places (the most are on their way about 3 s in), s. */
+const BUSY_SECONDS = 8;
+/** Long enough for the men of a job to be at their places, s. */
+const WAIT_SECONDS = 10;
 
 test('the roster is the brig\'s 121, every man posted at a crew place of the plan, the guns\' men each at a place of his own', () => {
   const roster = brigRoster(), places = crewPlaces();
@@ -105,18 +42,9 @@ test('the roster is the brig\'s 121, every man posted at a crew place of the pla
   for (const gang of Object.values(GANGS)) for (const part of [gang.aloft, ...gang.deck]) if (part) assert.ok(roster.some((m) => m.part === part), part);
 });
 
-test('each order done by a full crew takes the time in the table once its men are there, and none is short-handed', () => {
-  for (const order of ORDERS) {
-    const r = drive([order]);
-    assert.ok(r.doneAt.has(order.kind), `${order.kind} is done`);
-    assert.deepEqual(r.events, [], `${order.kind}: no job short-handed`);
-    for (const { task, began, ended } of r.tasks.values()) {
-      assert.ok(began !== null && ended !== null, `${order.kind}: ${task.job} began and ended`);
-      assert.ok(skillOf(task, brigRoster()) >= jobWork(task.job, task.on).need, `${order.kind}: ${task.job} has all its hands`);
-      const seconds = (ended - began) * STEP_SECONDS, table = jobWork(task.job, task.on).work;
-      assert.ok(Math.abs(seconds - table) <= STEP_SECONDS + 1e-9, `${order.kind}: ${task.job} worked ${seconds.toFixed(2)} s, the table says ${table} s`);
-    }
-  }
+test('an order done by a full crew takes the time in the table once its men are there, and none is short-handed', () => {
+  // The helm, and one mast's braces; every order is held to it in tools/sim/orders.ts.
+  for (const order of [{ kind: 'steer', ship: 0, heading: 2 } as Order, { kind: 'back', ship: 0, mast: 'main' } as Order]) fullCrewOrder(order);
 });
 
 test('with half the hands a job takes longer by the rule, and with too few it does not start', () => {
@@ -132,8 +60,9 @@ test('with half the hands a job takes longer by the rule, and with too few it do
   assert.ok(seconds > 1.5 * ((full.ended! - full.began!) * STEP_SECONDS), 'it takes clearly longer');
   assert.deepEqual(half.events.map((e) => [e.kind, e.job]), [['short-handed', 'brace']], 'the first lieutenant hears it is short-handed');
   // Below the fewest hands that can move it, the men wait and it is never done.
-  const none = drive([back], short(GANGS.main.deck, FEWEST * brace * (2 / 3)), 30);
-  assert.ok(!none.doneAt.has('back') && none.crew.tasks.length === 1 && none.crew.tasks[0]!.began === null);
+  const none = drive([back], short(GANGS.main.deck, FEWEST * brace * (2 / 3)), WAIT_SECONDS), waiting = none.crew.tasks[0]!;
+  assert.ok(!none.doneAt.has('back') && none.crew.tasks.length === 1 && waiting.began === null, 'not begun');
+  assert.ok(waiting.hands.length > 0 && waiting.hands.every((i) => !none.crew.men[i]!.going), 'though its men are there');
 });
 
 test('two orders at once share the men: the later job waits for hands or starts short, and both are done', () => {
@@ -157,13 +86,40 @@ test('work stopped by a later order frees its men, who go back to their posts; t
   const r = drive([plain], brigRoster(), MOST_SECONDS, [{ tick: 3 * STEPS_PER_SECOND, order: battle }]);
   assert.deepEqual([r.told.given, r.told.acts, r.crew.tasks], [[], [], []]);
   assert.ok(r.crew.men.some((h) => h.going || h.stands), 'men are on their way back');
-  // Busy: the tack and a sail order at once, every man's task found and the state plain data the codec takes.
-  let told = startOrders(HEADING, 'battle');
-  const sailing = startSailing({ heading: HEADING, speed: 3 }, WIND, FORCE);
-  for (const o of [{ kind: 'tack', ship: 0 }, plain] as Order[]) told = giveOrder(told, sailing, o, { tick: 0, wind: WIND, force: FORCE }).told;
+  // Busy: the tack and a sail order at once, every man's task found and the crew plain data the codec takes.
+  let told = startTold();
+  const sailing = startSail();
+  for (const o of [{ kind: 'tack', ship: 0 }, plain] as Order[]) told = give(told, sailing, o);
   let crew = startCrew();
-  for (let tick = 0; tick < 10 * STEPS_PER_SECOND; tick++) crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas }).crew;
+  for (let tick = 0; tick < BUSY_SECONDS * STEPS_PER_SECOND; tick++) crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas }).crew;
   assert.ok(crew.men.filter((h) => h.going).length > 0, 'men on their way');
   for (const t of crew.tasks) for (const i of t.hands) assert.equal(taskOf(crew, i), t);
   assert.ok(encode(crew).length > 0);
+});
+
+test('two crews at their busiest, making plain sail, fit the network\'s 16 KB a state, and step on the same from its bytes', () => {
+  // The crew at its busiest while its men go to their places for plain sail (the busiest the state gets until she beats to quarters).
+  const sailing = startSail(), told = give(startTold(), sailing, { kind: 'sail', ship: 0, canvas: 'plain' });
+  let crew = startCrew(), busiest: Crew = crew, most = 0;
+  for (let tick = 0; tick < BUSY_SECONDS * STEPS_PER_SECOND; tick++) {
+    crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas }).crew;
+    const bytes = encode(crew).length;
+    if (bytes > most) { most = bytes; busiest = crew; }
+  }
+  assert.ok(busiest.men.filter((h) => h.going).length >= COMPLEMENT / (2 * 2), 'a good part of the crew on its way');
+  // Both ships of a duel so, at once.
+  const match = startMatch(duelSetup(1805, 4));
+  const busy = { ...match, ships: match.ships.map((s) => ({ ...s, crew: busiest, told })) };
+  const bytes = encodeState(busy);
+  assert.ok(bytes.length < STATE_BYTES, `${bytes.length} bytes`);
+  // The guest's copy is the host's, and its crew steps on to the same.
+  const back = decodeState(bytes);
+  assert.deepEqual(back, busy);
+  let host = busy.ships[0]!.crew, guest = back.ships[0]!.crew;
+  const tick0 = BUSY_SECONDS * STEPS_PER_SECOND;
+  for (let tick = tick0; tick < tick0 + STEPS_PER_SECOND; tick++) {
+    const deck = { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas };
+    host = stepCrew(host, told, deck).crew; guest = stepCrew(guest, back.ships[0]!.told, deck).crew;
+  }
+  assert.deepEqual(encode(guest), encode(host));
 });
