@@ -2,7 +2,8 @@
  * What damage leads to (implementation plan N6.2): a hole below the waterline floods her at the rule's rate and lists
  * her; the carpenter's crew at the pumps holds one and a half waterline holes and hands to the pumps three (N7.5a), four sink
  * her against the crew alone and, plugged, only weep; a spar falls with three wounds in a part, or with its weather shrouds gone and the
- * wind on them, taking all it carries and the men on it, and a dismasted ship cannot sail; fire doubles at the table's
+ * wind on them, taking all it carries and the men on it, or with its stay gone and still aback after a while (in danger
+ * first), and a dismasted ship cannot sail; fire doubles at the table's
  * pace, spreads, is put out by men fighting it and, unfought, reaches the magazine in the table's time; with her
  * steering shot away she answers no helm.
  *
@@ -11,13 +12,13 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { holeCode, startDamage, stepAftermath, type AftermathIn, type Damage } from '../src/sim/damage.ts';
+import { holeCode, startDamage, stepAftermath, type Aftermath, type AftermathIn, type Damage } from '../src/sim/damage.ts';
 import { fallsDue, standingOf } from '../src/sim/damage/fall.ts';
 import { burnt, kindled, magazineSpace, type Fire } from '../src/sim/damage/fire.ts';
 import { founderTonnes, inflow, pumped, sinkingFor } from '../src/sim/damage/flood.ts';
 import { sparParts } from '../src/sim/damage/meet.ts';
 import { REPAIRS } from '../src/sim/rules/crew.ts';
-import { AT_WATERLINE, FIGHT_AT_HAND, FIRE, PUMPING, WASH, WEEP } from '../src/sim/rules/damage.ts';
+import { ABACK_FALLS, AT_WATERLINE, FIGHT_AT_HAND, FIRE, PUMPING, WASH, WEEP } from '../src/sim/rules/damage.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { stepSailing, UNDAMAGED, type SailingDamage } from '../src/sim/ship/sailing.ts';
@@ -184,4 +185,31 @@ test('a fire in her magazine is fought by the men there; with none fit to fight 
   const quiet = stepAftermath(startDamage(), input);
   assert.deepEqual(quiet.events, []);
   assert.equal(quiet.sailing, UNDAMAGED, 'an unhurt ship sails as she did');
+});
+
+test('a mast whose stay is shot away while aback is in danger, and falls only if she stays aback (design thread 2026-11-18)', () => {
+  const s0 = startMatch({ seed: 3, windForce: 3, windFrom: 0, ships: [{ x: 0, z: 0, heading: Math.PI / 2, canvas: 'plain' }] });
+  const ship = s0.ships[0]!, wind = windAt(s0.wind, 0, 0, 0);
+  const input: AftermathIn = { seed: 3, tick: 0, t: 0, ship: 0, pose: ship.motion.pose, sea: s0.sea, crew: ship.crew, sailing: ship.sailing, wind };
+  // Head to wind, every square sail is aback.
+  const aback = { ...input, sailing: { ...ship.sailing, heading: 0 } };
+  const stayCut: Damage = { ...startDamage(), cut: [lineIndex('fore-stay')] };
+  const run = (d: Damage, inp: AftermathIn, seconds: number) => {
+    const events: Aftermath[] = [];
+    let out = { damage: d };
+    for (let k = 0; k < seconds * STEPS_PER_SECOND; k++) { const r = stepAftermath(out.damage, { ...inp, tick: k }); events.push(...r.events); out = r; }
+    return { damage: out.damage, events };
+  };
+  const fore = partOf('fore-mast', 1), main = partOf('main-mast', 1), [most, least] = ABACK_FALLS.seconds;
+  assert.deepEqual(run(stayCut, input, 1).events, [], 'drawing, she keeps it: no danger');
+  const first = run(stayCut, aback, 1);
+  assert.deepEqual(first.events.map((e) => [e.what, e.id]), [['danger', fore]], 'aback, the master cries it once');
+  assert.deepEqual(first.damage.danger.map(([part]) => part), [fore]);
+  const held = run(stayCut, aback, least);
+  assert.ok(!held.events.some((e) => e.what === 'fell'), `it stands at least ${least} s`);
+  const filled = run(held.damage, input, 1);
+  assert.deepEqual(filled.damage.danger, [], 'filled, it is out of danger');
+  const lost = run(stayCut, aback, most + 1);
+  assert.deepEqual(lost.events.filter((e) => e.what === 'fell').map((e) => e.id), [fore], `still aback after at most ${most} s it falls, and the main does not go with it`);
+  assert.deepEqual(lost.events.filter((e) => e.what === 'danger').map((e) => e.id), [fore, main], 'the main stay made fast to it, the main comes into danger in its turn');
 });

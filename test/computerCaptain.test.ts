@@ -2,7 +2,7 @@
  * The computer captain (implementation plan N7.1): he gives only orders a ship takes, the same on every machine and
  * from nothing but the match's state; he looks round as often as his skill says; he beats to quarters, loads and fires
  * by his ranges; he sees to water, fire and wreckage; he closes for the weather position, lays a broadside at his range,
- * turns away before the ships touch; and beaten, he strikes (asked twice). Whole duels are `check:captains`'.
+ * turns away before the ships touch; saves a mast in danger by his skill; and beaten, he strikes (asked twice). Whole duels are `check:captains`'.
  *
  * Each from a state built for the purpose (CHECKS.md), at most a few seconds of steps a test.
  */
@@ -22,6 +22,8 @@ import { CLOSEST, SKILL, SKILLS, STRIKE_AGAIN, type Skill } from '../src/sim/rul
 import { beaten, lostHow } from '../src/sim/end.ts';
 import { COMPLEMENT } from '../src/sim/rules/crew.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
+import { rigPlan } from '../src/sim/ship/rig.ts';
+import { sparParts } from '../src/sim/damage/meet.ts';
 import { duelStart } from '../src/sim/start.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import { DEGREE, KNOT, STEPS_PER_SECOND } from '../src/sim/units.ts';
@@ -176,4 +178,21 @@ test('played alone with a foe (?foe=master), the other ship is commanded by the 
   for (const s of [alone, fought]) s.pump();
   assert.equal(alone.state.ships[1]!.told.serial, 0, 'alone, nobody orders her');
   assert.equal(fought.state.ships[1]!.told.quarters, true, 'with a foe, his orders were stepped: quarters');
+});
+
+test('a mast in danger: the master bears away at once, the seasoned soon after, the green late; laid aback, he fills (design thread 2026-11-18)', () => {
+  const foreStay = rigPlan().lines.findIndex((l) => l.id === 'fore-stay'), fore = sparParts().findIndex((p) => p.spar === 'fore-mast') + 1;
+  const since = (seconds: number) => pair([0, -400], 0, { cut: [foreStay], danger: [[fore, -seconds * STEPS_PER_SECOND]] });
+  const saves = (s: SimState, skill: Skill) => firstLook(s, skill).filter((o) => o.kind === 'away' || o.kind === 'fill').map((o) => o.kind);
+  assert.deepEqual(saves(since(0), 'master'), ['away']);
+  assert.ok(!kinds(firstLook(since(0), 'master')).includes('steer'), 'the helm waits on saving the mast');
+  const later = SKILL.seasoned.saveMast;
+  assert.deepEqual(saves(since(0), 'seasoned'), [], 'the seasoned captain takes a moment');
+  assert.deepEqual(saves(since(later), 'seasoned'), ['away']);
+  assert.deepEqual(saves(since(later), 'green'), [], 'the green one is late');
+  assert.deepEqual(saves(since(SKILL.green.saveMast), 'green'), ['away']);
+  const backed = since(0);
+  const laid = { ...backed, ships: backed.ships.map((sh, i) => (i === 0 ? { ...sh, told: { ...sh.told, backed: [false, true] } } : sh)) };
+  assert.deepEqual(saves(laid, 'master'), ['fill'], 'a mast laid aback is filled');
+  assert.equal(sightOf(backed, 0, 'master').unstayed[0], true, 'he knows the foremast unstayed');
 });

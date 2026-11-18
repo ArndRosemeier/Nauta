@@ -2,8 +2,9 @@
  * What of her rig still stands (pure, implementation plan N6.2): from the spars that have broken (`Damage.fallen`),
  * the lines cut and the sails' holes, which spars are down (broken, or stepped on one that is down), which lines are
  * gone (cut, or made fast to what is down), which sails can still stand and how much each still draws; and which spars
- * are due to fall now (a part with `STRUCK_DOWN` wounds; the weather side's shrouds or the stays gone with the wind on
- * them), and what lies alongside dragging her. damage.ts keeps what fell and calls these; nothing here changes anything.
+ * are in danger (stays gone, aback) or due to fall now (a part with `STRUCK_DOWN` wounds; the weather side's shrouds
+ * gone with the wind on them; in danger too long), and what lies alongside dragging her. damage.ts keeps what fell and
+ * how long each spar has been in danger, and calls these; nothing here changes anything.
  */
 import {
   FALL_WIND, FALLS_AT_PART, RENT_AREA, SPLIT, STRUCK_DOWN, SUPPORT_LOST, WRECK_DRAG,
@@ -120,28 +121,55 @@ const MAST_ORDER = ['fore', 'main'] as const;
 /**
  * The spars due to fall now (each once, the lowest break of a spar first): a part with STRUCK_DOWN wounds; a spar whose
  * weather side has lost more than SUPPORT_LOST of its shrouds and backstays with the wind across her at FALL_WIND or
- * more, or that share of its stays with its mast's square sails aback. Each goes over its lee side.
+ * more; a spar in danger (`inDanger`) for long enough, its break among `overdue` (damage.ts keeps the time,
+ * `ABACK_FALLS`). Each goes over its lee side.
  */
-export function fallsDue(standing: Standing, wounds: readonly number[], wind: RigWind): Fall[] {
+export function fallsDue(standing: Standing, wounds: readonly number[], wind: RigWind, overdue: readonly number[] = []): Fall[] {
   const t = tiesOf(), rig = rigPlan(), out: Fall[] = [], due = new Set<number>();
-  // The wind from starboard (the air moving to larboard) presses the rig to larboard: it goes over that side.
-  const weather: -1 | 1 = wind.across < 0 ? 1 : -1, lee = -weather as -1 | 1;
+  const lee = leeOf(wind);
   let run = 0;
   for (let k = 0; k < wounds.length; k++) {
     run = k > 0 && wounds[k] === wounds[k - 1] ? run + 1 : 1;
     const s = sparOfPart(wounds[k]!);
     if (run === STRUCK_DOWN && !standing.down[s] && !due.has(s)) { due.add(s); out.push({ part: wounds[k]!, side: lee }); }
   }
-  const lost = (lines: readonly number[]): boolean => lines.length > 0 && lines.filter((l) => standing.gone[l]).length > lines.length * SUPPORT_LOST;
-  rig.spars.forEach((spar, i) => {
+  rig.spars.forEach((_, i) => {
     if (standing.down[i] || due.has(i)) return;
-    const [larboard, stays, starboard] = t.holds[i]!, side = weather === 1 ? starboard : larboard;
-    const windOn = Math.abs(wind.across) >= FALL_WIND && lost(side);
-    const mast = MAST_ORDER.indexOf(spar.mast as (typeof MAST_ORDER)[number]);
-    const aback = mast >= 0 && lost(stays) && wind.aback(mast);
-    if (windOn || aback) { due.add(i); out.push({ part: t.firstPart[i]! + FALLS_AT_PART, side: lee }); }
+    const [larboard, , starboard] = t.holds[i]!, side = lee === -1 ? starboard : larboard, part = t.firstPart[i]! + FALLS_AT_PART;
+    const windOn = Math.abs(wind.across) >= FALL_WIND && supportLost(standing, side);
+    if (windOn || (overdue.includes(part) && endangered(standing, wind, i))) { due.add(i); out.push({ part, side: lee }); }
   });
   return out;
+}
+
+/**
+ * The spars in danger now: more than SUPPORT_LOST of its stays gone while its mast's square sails are aback (design
+ * thread 2026-11-18: the master cries it, and it falls only if it stays so, `ABACK_FALLS`), each as the fall it
+ * would be (its break, its lee side).
+ */
+export function inDanger(standing: Standing, wind: RigWind): Fall[] {
+  const t = tiesOf(), lee = leeOf(wind);
+  return rigPlan().spars.flatMap((_, i) => (endangered(standing, wind, i) ? [{ part: t.firstPart[i]! + FALLS_AT_PART, side: lee }] : []));
+}
+
+/** The side the wind presses her rig over: from starboard (the air moving to larboard) it goes over to larboard. */
+const leeOf = (wind: RigWind): -1 | 1 => (wind.across < 0 ? -1 : 1);
+
+/** Whether more than SUPPORT_LOST of these standing lines are gone. */
+const supportLost = (standing: Standing, lines: readonly number[]): boolean =>
+  lines.length > 0 && lines.filter((l) => standing.gone[l]).length > lines.length * SUPPORT_LOST;
+
+/** Whether each mast (fore, main) has a standing spar whose stays are lost: laid aback, it would be in danger. */
+export function unstayed(standing: Standing): boolean[] {
+  const t = tiesOf(), spars = rigPlan().spars;
+  return MAST_ORDER.map((m) => spars.some((s, i) => s.mast === m && !standing.down[i] && supportLost(standing, t.holds[i]![1])));
+}
+
+/** Whether a standing spar's stays are lost while its mast is aback. */
+function endangered(standing: Standing, wind: RigWind, spar: number): boolean {
+  if (standing.down[spar]) return false;
+  const mast = MAST_ORDER.indexOf(rigPlan().spars[spar]!.mast as (typeof MAST_ORDER)[number]);
+  return mast >= 0 && supportLost(standing, tiesOf().holds[spar]![1]) && wind.aback(mast);
 }
 
 /** What lies alongside dragging her: where (m forward of the mainmast, m across, + starboard) and how hard (kN per (m/s)² of water past it). */

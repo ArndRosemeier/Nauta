@@ -10,6 +10,7 @@
  */
 import { angleDiff, deriveSeed, Rng } from '@futuremagic/core';
 import { openHoles, standingNow } from '../damage';
+import { unstayed } from '../damage/fall';
 import { waterIn } from '../end';
 import { battery, gunAt } from '../guns/guns';
 import { SKILL, BEARS_WITHIN, FIRE_NOTICE, type Skill } from '../rules/captain';
@@ -80,8 +81,14 @@ export interface Sight {
   readonly beaten: boolean;
   /** How long she has been beaten, s (0 while she is not). */
   readonly beatenFor: number;
+  /** How long since her master cried a spar in danger (its stays gone, aback), s; null while none is. */
+  readonly dangerFor: number | null;
+  /** Each mast (fore, main) with a spar whose stays are gone: laid aback, it would be in danger. */
+  readonly unstayed: readonly boolean[];
 }
 
+/** No mast unstayed (nothing cut). */
+const NONE_UNSTAYED: readonly boolean[] = MASTS.map(() => false);
 /** A quarter turn, rad: square to her side. */
 const QUARTER = Math.PI / 2;
 /** A lower mast's spar id is its mast's name and this (`fore-mast`). */
@@ -143,5 +150,7 @@ export function sightOf(state: SimState, ship: number, skill: Skill): Sight {
     fire: d.fires.reduce((m, f) => (f.size >= noticedAt(state.matchSeed, ship, f.space, row.fireAt) ? Math.max(m, f.size) : m), 0), wreckage: d.alongside.length,
     beaten: state.fight.beaten[ship] ?? false,
     beatenFor: (state.tick - (state.fight.beatenAt[ship] ?? state.tick)) / STEPS_PER_SECOND,
+    dangerFor: d.danger.length > 0 ? (state.tick - Math.min(...d.danger.map(([, since]) => since))) / STEPS_PER_SECOND : null,
+    unstayed: d.cut.length > 0 ? unstayed(standingNow(d)) : NONE_UNSTAYED,
   };
 }

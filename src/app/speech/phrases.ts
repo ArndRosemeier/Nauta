@@ -143,6 +143,7 @@ export const PHRASES = {
   'water 2': p(["She's settling, sir! The water's gaining fast!"], ['Sie sackt weg, Herr Kapitän! Das Wasser steigt schnell!']),
   'holed': p(["We're holed below the waterline, sir!", 'Shot between wind and water, sir!'], ['Treffer unter der Wasserlinie, Herr Kapitän!', 'Ein Leck unter Wasser, Herr Kapitän!']),
   'spar wounded': p(['A spar is wounded, sir.', "The {mast}mast's wounded, sir."], ['Eine Spiere ist angeschossen, Herr Kapitän.', 'Der {mast}mast ist angeschossen, Herr Kapitän.']),
+  'stay gone': p(["The {mast}stay's gone, sir! She's aback!", "The {mast}stay's shot away! Fill her, sir, or we lose the {mast}mast!"], ['Das {mast}stag ist weg, Herr Kapitän! Die Segel stehen back!', 'Das {mast}stag ist weggeschossen! Füllen, oder der {mast}mast geht über Bord!']),
   'mast fell': p(["The {mast}mast's gone, sir!", "Look out below! The {mast}mast's coming down!"], ['Der {mast}mast ist weg, Herr Kapitän!', 'Achtung unten! Der {mast}mast fällt!']),
   'fire': p(['Fire! Fire in the ship!', 'Fire below, sir!'], ['Feuer! Feuer im Schiff!', 'Feuer unter Deck, Herr Kapitän!']),
   'fire out': p(["The fire's out, sir.", "Fire's out, sir."], ['Das Feuer ist aus, Herr Kapitän.', 'Feuer gelöscht, Herr Kapitän.']),

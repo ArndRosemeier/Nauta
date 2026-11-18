@@ -132,13 +132,14 @@ export function helmOrder(sight: Sight, want: number): Order | null {
 
 /**
  * Keeping station on her while he lays his broadside (rules/captain.ts `BACK_ABAFT`): his main topsail laid aback when
- * she has dropped abaft his beam, filled when she is back abreast of him, or when he is closing again.
+ * she has dropped abaft his beam, filled when she is back abreast of him, or when he is closing again. Never with that
+ * mast's stays shot away (`Sight.unstayed`): laid aback, it would be in danger.
  */
 export function stationOrder(sight: Sight, skill: Skill, wanted: Wanted): Order | null {
   const row = SKILL[skill], told = sight.own.told, ship = sight.ship, main = MASTS.indexOf(HOVE_TO_MAST);
   if (told.hove) return null;
   const abaft = Math.abs(sight.off) - BEAM, station = row.range * STATION_RANGES;
-  if (!told.backed[main] && wanted.side !== null && sight.range < station && abaft > BACK_ABAFT && abaft < BACK_MOST) return { kind: 'back', ship, mast: HOVE_TO_MAST };
+  if (!told.backed[main] && !sight.unstayed[main] && wanted.side !== null && sight.range < station && abaft > BACK_ABAFT && abaft < BACK_MOST) return { kind: 'back', ship, mast: HOVE_TO_MAST };
   if (told.backed[main] && (wanted.side === null || sight.range > station * HYSTERESIS || abaft < FILL_ABAFT || abaft > BACK_MOST)) return { kind: 'fill', ship };
   return null;
 }

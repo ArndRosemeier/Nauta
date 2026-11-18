@@ -161,6 +161,7 @@ export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
       if (hers) return mast ? [report('lookout', ship, 'her mast', { mast })] : [];
       if (!mine) return [];
       if (mast) return [cry('boatswain', ship, 'mast fell', { mast })];
+      if (e.what === 'danger') { const named = mastOfPart(e.id); return named ? [cry('master', ship, 'stay gone', { mast: named })] : []; }
       if (e.what === 'fire') return [cry('first lieutenant', ship, 'fire')];
       return e.what === 'out' ? [report('first lieutenant', ship, 'fire out')] : [];
     }
