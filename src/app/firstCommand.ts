@@ -122,7 +122,8 @@ export class FirstCommand {
     const before = this.guide;
     this.guide = g;
     if (before?.now === g?.now && before?.tap === g?.tap) return;
-    this.page.fan?.guide(g?.items ?? [], g?.tap === 'fire');
+    const man = g?.tap && g.tap !== 'glass' && g.tap !== 'fire' ? g.tap : null;
+    this.page.fan?.guide(g?.items ?? [], g?.tap === 'fire', man);
     this.page.glassButton.classList.toggle('lesson', g?.tap === 'glass');
     this.place(g?.tap ?? null);
   }

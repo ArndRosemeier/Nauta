@@ -12,9 +12,14 @@ Fixed by the design: the captain never steers, trims or fires himself; the crew 
 
 1. **To a man you can see.** Look at an officer or tap him, and his orders open around your finger. He is hailed across the deck, so this works from anywhere he can see or hear you, which on a 30 m brig is the whole weather deck. This is the main way.
 2. **Through your midshipman.** A midshipman stays at the captain's side wherever he goes: below, aloft, on the bowsprit. Tap him and choose first whom the order is for, then the order. He runs to deliver it, and you see him go. It costs the time of his run, so being away from the quarterdeck in a fight has a price, and it is never impossible to command.
-3. **By key** (keyboard) for the frequent orders. A key gives the same order to the same officer, hailed if he is in reach of your voice, by the midshipman if not.
+3. **From the officer row** (Arnd 2026-11-18: "As a player of course I have no idea which person does what. Give me everybody that I can command as an icon with a small description below, obviously clickable. Clicking one of those then reveals the available commands."). Along the foot of the view, always on screen, one card for each man he commands: an icon, his rank and what he is for ("Master: steering and course"). A tap or click on a card opens that man's fan above it, the same fan as a tap on the man; the same card again closes it. A man out of the captain's voice is marked "by midshipman" and his orders go by the midshipman, as with the keys. It is the main way to start with, since nobody has to be found in the ship first; taps on men in the world and keys stay. With the mouse taken for looking the cards cannot be clicked (the pointer is locked): free it with Escape, or use the dot and the keys.
+4. **By key** (keyboard) for the frequent orders. A key gives the same order to the same officer, hailed if he is in reach of your voice, by the midshipman if not.
 
 The game never pauses while orders are open, and the view keeps moving with the ship.
+
+## The officer row
+
+Six cards along the foot of the view, in the midshipman's order: master (the wheel: steering and course), first lieutenant (a square sail: sails, quarters, striking), gunner (a gun: guns and shot), carpenter (a hammer: leaks and repairs), lookout (a spyglass: what he sees), midshipman (a sealed letter: carries your word below). Each is a lacquer card in a brass rule with the icon in brass on a round lacquer disc, the rank in small brass capitals and the role in small italic. A card of a man out of voice has a dashed disc and "by midshipman" under it; the card of the open fan is brass; in the first match the lesson rings the card of the man to tap. On a narrow screen (a phone) the roles are left out; while "Fire!" or "Steer there" stand by the thumb, a tablet's row moves to the left clear of them. Built in `src/app/officerRow.ts`; what the cards say is `officerCards` in `fanOrders.ts`.
 
 ## The order fan
 

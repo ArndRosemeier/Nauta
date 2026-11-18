@@ -1,6 +1,6 @@
 /**
  * The order fan (plan N4.4), by hand, not in CI: `npm run shot:fan [-- <out dir>]` (run `npm run build` first).
- * `?sail&walk` at the tablet's 1180 × 820, the captain on the quarterdeck: the officers at their posts; the first
+ * `?sail&walk` at the tablet's 1180 × 820, the captain on the quarterdeck: the officers at their posts and the officer row (a click on a card opens his fan); the first
  * lieutenant's fan and its ring "Make sail"; the master's fan with "About" under the finger; a key's order (T) sent by
  * the midshipman from below; "steer there" with the captain's arm out; at quarters the gunner's fan, and held for the
  * word the large "Fire!" (N5.3b). Fails if the page throws. Slow on the cloud's
@@ -16,6 +16,13 @@ const game = await openGame(served, '?sail&walk&hour=10&day=0&yaw=45&pitch=-8', 
 const { page } = game;
 await frames(page, 8);
 await snap(page, `${out}/officers.png`);
+// The officer row along the foot: a real click on a card opens that man's fan above it; the same card closes it.
+const cards = await page.evaluate(() => window.__nautaFan.cards());
+const card = async (name, who) => { const c = cards.find((k) => k.who === who); await page.mouse.click(c.x, c.y); await frames(page, 2); await snap(page, `${out}/${name}.png`); };
+await card('row-master', 'master');
+await card('row-closed', 'master');
+await card('row-gunner', 'gunner');
+await page.keyboard.press('Escape');
 const say = async (name, who, choose = [], light = null) => {
   const shown = await page.evaluate(([w, c]) => window.__nautaFan.open(w, c), [who, choose]);
   if (light) await page.evaluate((id) => window.__nautaFan.lightUp(id), light);

@@ -716,7 +716,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What each order key gives | `src/app/fanOrders.ts#KEY_ORDERS` |
 | Whether her guns wait for the captain's word (the Fire! button shows) | `src/app/fanOrders.ts#waitingForWord` |
 | Which drawn man a finger points at on the view | `src/app/fanOrders.ts#manAt` |
-| The order fan on the page: tap or press a man, the midshipman, the keys, steer there; the captain's arm | `src/app/orderFan.ts#OrderFan` |
+| The order fan on the page: tap or press a man, a card of the officer row, the midshipman, the keys, steer there; the captain's arm | `src/app/orderFan.ts#OrderFan` |
+| Everyone the captain commands as cards (rank, what each is for, out of voice or not); their words | `src/app/fanOrders.ts#officerCards` |
+| The officer row on the page: an icon, rank and role for each man, always on screen, a tap opens his fan | `src/app/officerRow.ts#OfficerRow` |
 | The drawn officer of a rank among the men on the view | `src/app/fanOrders.ts#manOnScreen` |
 | The first match: its settings, the first lieutenant's course of lessons and tips, what each asks and when it is done (pure) | `src/app/lessons.ts#Lessons` |
 | What of hers is heard, as the lessons key it | `src/app/lessons.ts#heardKeys` |

@@ -174,6 +174,8 @@ declare global {
       open: (who: Officer, choose?: string[]) => string; lightUp: (id: string) => void;
       /** Where the officers are on the view now, CSS px from its top left (the checks put the mouse on one). */
       men: () => readonly { who: Officer; x: number; y: number; seen: boolean }[];
+      /** Where each card of the officer row is on the screen, CSS px (the checks click one). */
+      cards: () => readonly { who: Officer; x: number; y: number }[];
     };
     /** The crews drawn (N4.3), for the browser checks: what they hold and where. */
     __nautaCrew?: CrewView;
@@ -439,7 +441,7 @@ async function start(): Promise<void> {
   mouse.whenTakenOrFreed((taken) => { if (!taken) fan?.freed(); });
   fan?.onSent((e) => speech?.sent(e));
   const pointing = new Vector3();
-  if (fan && crew) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id), men: () => crew.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) }; }
+  if (fan && crew) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id), cards: () => f.cardsForCheck(), men: () => crew.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) }; }
   // Every line the men said, in a sheet opened by the Reports tag or its key (Arnd, 2026-11-18).
   if (speech) new ReportsPanel(speech.log, settings);
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */

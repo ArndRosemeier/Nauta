@@ -2,7 +2,9 @@
  * The order fan on the page (implementation plan N4.4, docs/design/orders.md; its look: ui-style.md "The order fan").
  * Three ways to give an order: tap or press a man in sight and his orders open round the finger (he is hailed); tap
  * the midshipman, choose whom the message is for, then the order (he runs with it, and it is given when he gets
- * there); or press a key (hailed when the man is in reach of the captain's voice, by the midshipman when not). "Steer
+ * there); or press a key (hailed when the man is in reach of the captain's voice, by the midshipman when not); or tap his
+ * card in the officer row along the foot of the view (officerRow.ts: everyone he commands, always on screen, so no one
+ * need be found in the ship first; the midshipman carries the order to a man out of his voice). "Steer
  * there" raises the captain's arm: he looks where she is to go and gives it. The game never pauses.
  *
  * Slide the finger onto an order and lift, or lift on the man and tap the order: both work; lifting outside the fan
@@ -25,6 +27,7 @@ import { KEY_ACTIONS, type KeyAction, type Settings } from './settings';
 import type { WordKey } from './words';
 import { LEFT_BUTTON, RIGHT_BUTTON } from './mouse';
 import { isTap, pressOf, type Press } from './press';
+import { OfficerRow } from './officerRow';
 
 /** The fan's ring round the finger, px (ui-style.md: tags 96 px across on a ring 132 px out). */
 const RING = 132;
@@ -135,8 +138,12 @@ export class OrderFan {
   private readonly heard = new Set<(s: Sent) => void>();
   /** The orders a lesson of the first match points to (N7.4): their tags, and the large "Fire!", carry a brass mark. */
   private guided: readonly string[] = [];
+  /** The officer row along the foot of the view, and the man whose card opened the fan now (null: not from the row). */
+  private readonly row: OfficerRow;
+  private fromRow: Officer | null = null;
 
   constructor(private readonly view: HTMLElement, private readonly page: FanPage) {
+    this.row = new OfficerRow({ captain: () => page.captain(), words: () => page.wording(), chosen: (who, x, top) => this.pickCard(who, x, top) });
     this.thumb.append(this.fire, this.steer);
     document.body.append(this.root, this.thumb, this.mark, this.pointer, this.aimName);
     this.pointer.style.display = 'none';
@@ -200,7 +207,9 @@ export class OrderFan {
       this.fireShown = waiting;
       this.fire.replaceChildren(this.page.wording().fire, keyCap(this.page.settings().keys.fire));
       this.fire.style.display = waiting ? 'block' : 'none';
+      this.thumbUp();
     }
+    this.row.refresh(now);
     this.hailFor = Math.max(0, this.hailFor - dt);
     const p = this.page, delivered = p.midshipman.step(dt, p.captain(), p.heel(), p.closures());
     if (delivered) this.delivered(delivered);
@@ -225,12 +234,18 @@ export class OrderFan {
     return this.open ? this.slots.map((s) => `${s.item.id}${s.dim ? ' (dim)' : ''}${s.on ? ' (on)' : ''}`).join(', ') : 'closed';
   }
 
+  /** For the browser checks: where each card of the officer row is on the screen (they click it). */
+  cardsForCheck(): { who: Officer; x: number; y: number }[] {
+    return this.row.middles();
+  }
+
   /**
    * The first match's lesson (N7.4) points to these items of the fan (a ring's id and an order's; 'fire': the large
-   * "Fire!"): each carries a brass mark wherever it shows. None: no mark.
+   * "Fire!"): each carries a brass mark wherever it shows, and so does the card of `man` in the officer row. None: no mark.
    */
-  guide(ids: readonly string[], fire: boolean): void {
+  guide(ids: readonly string[], fire: boolean, man: Officer | null = null): void {
     this.guided = ids;
+    this.row.lesson(man);
     this.fire.classList.toggle('lesson', fire);
     this.tags.forEach((tag, i) => tag.classList.toggle('lesson', ids.includes(this.slots[i]?.item.id ?? '')));
   }
@@ -244,6 +259,18 @@ export class OrderFan {
   }
 
   // ---------- Opening and choosing ----------
+
+  /**
+   * A card of the officer row chosen: his fan opens above the row, over the card; the same card again closes it. A man
+   * out of the captain's voice has his orders carried by the midshipman, as the keys do.
+   */
+  private pickCard(who: Officer, x: number, top: number): void {
+    const again = this.fromRow === who && this.open !== null;
+    this.close();
+    this.stopPointing();
+    if (again) return;
+    if (this.openFor(who, x, top - RING - TAG / 2 - EDGE, who !== 'midshipman' && !this.inVoice(who))) { this.fromRow = who; this.row.light(who); }
+  }
 
   /** A finger or a click on the view: on a man, his fan opens round it and the finger is the fan's. */
   private down(e: PointerEvent): void {
@@ -458,6 +485,7 @@ export class OrderFan {
   private startPointing(runner: boolean): void {
     this.pointing = { runner };
     this.showSteer(true);
+    this.thumbUp();
   }
 
   private steerNow(runner: boolean, via: Via): void {
@@ -469,6 +497,7 @@ export class OrderFan {
   private stopPointing(): void {
     this.pointing = null;
     this.showSteer(false);
+    this.thumbUp();
   }
 
   /** The "Steer there" tag by the thumb and the mark in the middle of the view, while the captain points. */
@@ -588,5 +617,12 @@ export class OrderFan {
     this.tags = [];
     this.hub = null;
     this.pointer.style.display = 'none';
+    this.fromRow = null;
+    this.row.light(null);
+  }
+
+  /** While the large "Fire!" or the "Steer there" tags stand by the thumb, the officer row keeps clear of them (nauta.css `thumb-up`). */
+  private thumbUp(): void {
+    document.body.classList.toggle('thumb-up', this.fireShown || this.pointing !== null);
   }
 }

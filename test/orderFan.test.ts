@@ -12,7 +12,8 @@ import { openShip } from '../src/sim/crew/closures.ts';
 import { routeNetwork, standable } from '../src/sim/crew/network.ts';
 import { DEGREE, KNOT } from '../src/sim/units.ts';
 import { meanWind } from '../src/sim/wind.ts';
-import { FAN_DEPTH, FAN_MOST, KEY_ORDERS, keyOfItem, waitingForWord, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem } from '../src/app/fanOrders.ts';
+import { FAN_DEPTH, FAN_MOST, KEY_ORDERS, keyOfItem, officerCards, waitingForWord, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem } from '../src/app/fanOrders.ts';
+import { words } from '../src/app/words.ts';
 import { OFFICERS, TAKERS, deliverAt, floorApart, inVoice, midshipmanStart, postOf, quarterdeck, takerOf } from '../src/app/officers.ts';
 import { Midshipman } from '../src/app/midshipman.ts';
 import { lookBearing } from '../src/app/look.ts';
@@ -110,6 +111,17 @@ test('the men stand on her floor; the voice reaches across the weather deck and 
   assert.equal(inVoice(quarterdeck(), postOf('lookout')), true);
   assert.equal(inVoice({ space: 'cabin', along: -7, across: 0 }, postOf('master')), false);
   assert.equal(inVoice(null, postOf('master')), false);
+});
+
+test('the officer row names everyone he commands, each with his rank and what he is for; out of voice a man is marked far', () => {
+  const cards = officerCards(quarterdeck());
+  assert.deepEqual(cards.map((c) => c.who), [...OFFICERS], 'everyone, in the midshipman\'s order');
+  assert.equal(new Set(cards.map((c) => c.role)).size, OFFICERS.length, 'each has a line of his own');
+  for (const c of cards) for (const k of [c.rank, c.role]) { assert.ok(words('en')[k].length > 0 && words('de')[k].length > 0, `${c.who}: ${k} is worded in both languages`); }
+  assert.equal(cards.some((c) => c.far), false, 'on the quarterdeck every voice carries');
+  const below = officerCards({ space: 'cabin', along: -7, across: 0 });
+  assert.deepEqual(below.filter((c) => c.far).map((c) => c.who), [...TAKERS], 'from below the midshipman carries every order, and is always at hand himself');
+  assert.equal(officerCards(null).filter((c) => c.far).length, TAKERS.length);
 });
 
 test('the midshipman runs a message to the man and gives it when he gets there', () => {
