@@ -128,6 +128,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The berth deck's height along her | `src/sim/ship/plan.ts#berthDeck` |
 | A space's floor at a place | `src/sim/ship/plan.ts#floorAt` |
 | The underside of what is over a space (headroom) | `src/sim/ship/plan.ts#overheadAt` |
+| The clear height over a floor at a place, the beams or a fitting hanging lower (what a man stoops under) | `src/sim/ship/plan.ts#headroomAt` |
 | The inside of her side at a place and height | `src/sim/ship/plan.ts#insideBreadth` |
 | Every floor under a place, lowest first (what the walker stands on) | `src/sim/ship/plan.ts#floorsUnder` |
 | Her girth on one side at a place along her | `src/sim/ship/plan.ts#sectionGirth` |
@@ -380,6 +381,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The task a man has | `src/sim/crew/crew.ts#taskOf` |
 | What stands on her and the numbers that set it out (the fittings' models, guns' gear, helm, boats, anchors, nettings, casks) | `src/sim/rules/fittings.ts#MODEL` |
 | Every fitting on her, set out on her plan in ship space (plan N2.6) | `src/sim/ship/furnish.ts#furnish` |
+| What the fittings put in a man's way, by height: standing obstacles and overheads for the plan, the low ones stepped over | `src/sim/ship/furnish.ts#fittingSolids` |
+| The room each fitting model takes, in its own frame | `src/sim/rules/fittings.ts#SOLID` |
 | Her fittings drawn as instances in her moving frame, by zone of her and level of detail | `src/render/ship/furnishings.ts#Furnishings` |
 | Something more of hers put into one of her zones, seen with it and lit by its lanterns (`ShipView.addToZone`) | `src/render/ship/shipView.ts#ShipView` |
 | One of her materials made to draw instances in her frame (they see ship space) | `src/render/ship/fitted.ts#fitted` |

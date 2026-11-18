@@ -11,12 +11,12 @@
  */
 import {
   BUCKETS, CASK, CASK_CLEAR, CATTED, COCKPIT_CHESTS, COT_CABINS, COT_OFF_SIDE, FACING, GUN_GEAR,
-  FIFE_MODELS, GUN_INBOARD, HOLD_BARRELS, HOLD_BUTTS, HOLD_PASSAGE, IN_FITTING, BELFRY, MESS_TABLES, MODEL, NETTINGS, PUMPS, SKIDS,
-  STERN_DAVITS, TABLE_OFF_SIDE, TABLE_TOP, type ModelName,
+  FIFE_MODELS, GUN_INBOARD, HOLD_BARRELS, HOLD_BUTTS, HOLD_PASSAGE, ON_CENTRELINE, BELFRY, MESS_TABLES, MODEL, NETTINGS, PUMPS, SKIDS,
+  GEAR_CLEAR, SOLID, STERN_DAVITS, STOW_GAP, TABLE_OFF_SIDE, TABLE_TOP, type ModelName,
 } from '../rules/fittings';
-import { BERTH_HEADROOM, FITTINGS, HOLD_FLOOR, RAILS, type Level } from '../rules/ships';
+import { BERTH_HEADROOM, BODY, HOLD_FLOOR, LEAST_PASSAGE, LOAD_WATERLINE, RAILS, type Level } from '../rules/ships';
 import { HULL_AFT, hullHalfBreadth, sideTop, weatherDeck } from './hull';
-import { berthDeck, insideBreadth, spacesById, type Rect, type ShipPlan } from './plan';
+import { berthDeck, floorsUnder, insideBreadth, rectCentre, spacesById, type Obstacle, type Overhead, type Rect, type ShipPlan } from './plan';
 import { shipY, shipZ } from './section';
 
 /** One fitting on her: its model, where its origin stands (ship space), and how it is turned. */
@@ -44,16 +44,16 @@ const CASK_SIDE_CHECKS = 8;
 /** A length this small is none, m. */
 const EPSILON = 1e-9;
 
-/** The middle along her of one of the plan's fittings (rules/ships.ts FITTINGS), m forward of the mainmast. */
-function middleOf(id: string): number {
-  const f = FITTINGS.find((r) => r.id === id);
-  if (!f) throw new Error(`the plan has no fitting ${id}`);
-  return (f.aft + f.fore) / 2;
-}
-
 /** One fitting at a place on her plan: m forward of the mainmast, m across, height above her base. */
 function at(model: ModelName, level: Level, along: number, across: number, height: number, turn = 0, lean = 0, spin = 0): Furnishing {
   return { model, level, x: across, y: shipY(height), z: shipZ(along), spin, lean, turn };
+}
+
+/** Whether a tub standing by her side (its width along her) would stand where a man stands to work: a crew place on deck. */
+function crowdsAPlace(plan: ShipPlan, model: ModelName, along: number, across: number): boolean {
+  const [part] = SOLID[model], reach = LEAST_PASSAGE / 2 + GEAR_CLEAR;
+  const halfAlong = part!.x[1] + reach, halfAcross = part!.z[1] + reach;
+  return plan.places.some((p) => p.space === 'deck' && Math.abs(p.along - along) < halfAlong && Math.abs(p.across - across) < halfAcross);
 }
 
 /**
@@ -78,7 +78,10 @@ function guns(plan: ShipPlan, out: Furnishing[]): void {
     };
     const a = g.along, port = plan.guns.indexOf(g);
     gear(MODEL.garland, a + GUN_GEAR.garland.along, GUN_GEAR.garland.off, 0, QUARTER);
-    gear(port % 2 === 0 ? MODEL.spongeTub : MODEL.matchTub, a + GUN_GEAR.tub.along, GUN_GEAR.tub.off, 0, s * QUARTER);
+    const tub = port % 2 === 0 ? MODEL.spongeTub : MODEL.matchTub, byTheSide = a + GUN_GEAR.tub.along;
+    if (crowdsAPlace(plan, tub, byTheSide, s * (insideBreadth(byTheSide, weatherDeck(byTheSide, wall)) - GUN_GEAR.tub.off))) {
+      gear(tub, (a + next.along) / 2, GUN_GEAR.tub.inboard, 0, 0);
+    } else gear(tub, byTheSide, GUN_GEAR.tub.off, 0, s * QUARTER);
     if (underPins(a + GUN_GEAR.rammer.along)) {
       gear(MODEL.rammer, a + GUN_GEAR.rammer.along, GUN_GEAR.onDeck.rammer, 0, 0);
       gear(MODEL.handspike, a + GUN_GEAR.handspike.along, GUN_GEAR.onDeck.handspike, 0, 0);
@@ -92,12 +95,12 @@ function guns(plan: ShipPlan, out: Furnishing[]): void {
 /** On the weather deck: the helm, capstan, pumps, chimney, bell, the boats on the skids, the stern davits with the gig, the anchors, nettings and buckets. */
 function weatherFittings(out: Furnishing[]): void {
   const onDeck = (model: ModelName, along: number, across: number, turn = 0) => out.push(at(model, 'weather', along, across, weatherDeck(along, across), turn));
-  onDeck(MODEL.wheel, middleOf(IN_FITTING.wheel), 0, FACING.forward);
-  onDeck(MODEL.binnacle, middleOf(IN_FITTING.binnacle), 0, FACING.forward);
-  onDeck(MODEL.capstan, middleOf(IN_FITTING.capstan), 0);
+  onDeck(MODEL.wheel, ON_CENTRELINE.wheel, 0, FACING.forward);
+  onDeck(MODEL.binnacle, ON_CENTRELINE.binnacle, 0, FACING.forward);
+  onDeck(MODEL.capstan, ON_CENTRELINE.capstan, 0);
   for (const s of [1, -1]) onDeck(MODEL.pump, PUMPS.along, s * PUMPS.across, s > 0 ? 0 : Math.PI);
-  onDeck(MODEL.chimney, middleOf(IN_FITTING.stove), 0, FACING.forward);
-  onDeck(MODEL.bell, BELFRY.along, BELFRY.across, FACING.forward);
+  onDeck(MODEL.chimney, ON_CENTRELINE.stove, 0, FACING.forward);
+  onDeck(MODEL.bell, BELFRY.along, BELFRY.across, FACING.starboard);
   // The boats on the gallows' chocks: the cutter to port, the jolly boat to starboard, their bows forward.
   for (const g of SKIDS.gallows) onDeck(MODEL.gallows, g, 0);
   const skid = Math.max(...SKIDS.gallows.map((g) => weatherDeck(g, 0))) + SKIDS.chocks;
@@ -138,13 +141,15 @@ function weatherFittings(out: Furnishing[]): void {
 /** On the berth deck: the stove, the mess tables, cots and chests in the cabins, and chests in the cockpit. */
 function berthFittings(plan: ShipPlan, out: Furnishing[]): void {
   const spaces = spacesById(plan);
-  const stove = middleOf(IN_FITTING.stove);
+  const stove = ON_CENTRELINE.stove;
   out.push(at(MODEL.stove, 'berth', stove, 0, berthDeck(stove), FACING.aft));
-  // Mess tables athwart her, from her side to the middle, both sides.
+  // Mess tables athwart her, from her side toward the middle, both sides: the outboard end a hand off her side, so no
+  // corner is left between the table and her side that a man could get into but not out of.
+  const halfTable = SOLID[MODEL.table][0]!.z[1];
   for (const along of MESS_TABLES.along) {
     for (const s of [1, -1]) {
       const floor = berthDeck(along), outer = insideBreadth(along, floor + TABLE_TOP) - TABLE_OFF_SIDE;
-      out.push(at(MODEL.table, 'berth', along, s * (outer + MESS_TABLES.inner) / 2, floor, FACING.starboard));
+      out.push(at(MODEL.table, 'berth', along, s * Math.max(outer - halfTable, MESS_TABLES.inner + halfTable), floor, FACING.starboard));
     }
   }
   // A cot along her side in each cabin, a chest under it.
@@ -175,10 +180,18 @@ function caskFits(along: number, across: number, floor: number, radius: number, 
   return true;
 }
 
-/** What the casks keep out of in the hold: what is in the way there (a ladder's foot, the pump well, the masts). */
+/**
+ * What the casks keep out of in the hold: what is in the way there (a ladder's foot, the pump well, the masts), not
+ * the casks themselves, and the floor a man crosses from a door in the hold to where he stands to use it.
+ */
 function holdWays(plan: ShipPlan): Rect[] {
-  const c = HOLD_PASSAGE.clear;
-  return plan.obstacles.filter((o) => o.level === 'hold').map((r) => ({ aft: r.aft - c, fore: r.fore + c, port: r.port - c, starboard: r.starboard + c }));
+  const c = HOLD_PASSAGE.clear, spaces = spacesById(plan), reach = HOLD_PASSAGE.half + c;
+  const inWay = plan.obstacles.filter((o) => o.level === 'hold' && !o.fitting).map((r) => ({ aft: r.aft - c, fore: r.fore + c, port: r.port - c, starboard: r.starboard + c }));
+  const doors = plan.ways.filter((w) => w.kind === 'door' && [w.from, w.to].some((e) => spaces.get(e.space)!.level === 'hold'));
+  return [...inWay, ...doors.map((w) => ({
+    aft: Math.min(w.from.along, w.to.along) - reach, fore: Math.max(w.from.along, w.to.along) + reach,
+    port: Math.min(w.from.across, w.to.across) - reach, starboard: Math.max(w.from.across, w.to.across) + reach,
+  }))];
 }
 
 /** Whether a cask's plan, from `aft` to `fore` and `across` ± `radius`, keeps out of the ways. */
@@ -234,4 +247,89 @@ export function furnish(plan: ShipPlan): Furnishing[] {
   berthFittings(plan, out);
   holdFittings(plan, out);
   return out;
+}
+
+// --- What is in the way (ship.md "Fittings are solid too") ------------------------------------------------------
+
+/** What the fittings put in a man's way: the room of those that stand in it, and of those over his head. */
+export interface FittingSolids {
+  /** Walked round: from the floor up into a man's way (above BODY.stepUp, under the least headroom). */
+  readonly standing: readonly Obstacle[];
+  /** Stooped under (or clear over a man's head): wholly above the least headroom over the floor. */
+  readonly overhead: readonly Overhead[];
+}
+
+/** A point of a model's frame where a fitting stands: turned by its spin, lean and turn (Furnishing), in ship space. */
+function placed(f: Furnishing, x: number, y: number, z: number): [number, number, number] {
+  const cs = Math.cos(f.spin), ss = Math.sin(f.spin);
+  const x1 = x * cs + z * ss, z1 = -x * ss + z * cs;
+  const cl = Math.cos(f.lean), sl = Math.sin(f.lean);
+  const y2 = y * cl - z1 * sl, z2 = y * sl + z1 * cl;
+  const ct = Math.cos(f.turn), st = Math.sin(f.turn);
+  return [f.x + x1 * ct + z2 * st, f.y + y2, f.z - x1 * st + z2 * ct];
+}
+
+/** A part's room where it stands: its oblong on her plan and its foot and top, m above her base. */
+function partRoom(f: Furnishing, p: (typeof SOLID)[ModelName][number]): Rect & { low: number; high: number } {
+  let aft = Infinity, fore = -Infinity, port = Infinity, starboard = -Infinity, low = Infinity, high = -Infinity;
+  for (const x of p.x) for (const y of p.y) for (const z of p.z) {
+    const [sx, sy, sz] = placed(f, x, y, z), along = -sz, h = sy + LOAD_WATERLINE;
+    aft = Math.min(aft, along); fore = Math.max(fore, along); port = Math.min(port, sx); starboard = Math.max(starboard, sx);
+    low = Math.min(low, h); high = Math.max(high, h);
+  }
+  return { aft, fore, port, starboard, low, high };
+}
+
+/**
+ * The casks of the hold, stowed in tiers and rows that touch, as a few oblongs: each stow's whole room, out to her
+ * side (what is between the outer casks and her curving side is filled with smaller casks and dunnage; no one goes there).
+ */
+function stows(plan: ShipPlan, casks: readonly (Rect & { level: Level })[]): (Rect & { level: Level })[] {
+  const out = casks.map((c) => ({ ...c }));
+  const near = (a: Rect, b: Rect) => a.aft <= b.fore + STOW_GAP && b.aft <= a.fore + STOW_GAP && a.port <= b.starboard + STOW_GAP && b.port <= a.starboard + STOW_GAP;
+  for (let joined = true; joined;) {
+    joined = false;
+    for (let i = 0; i < out.length && !joined; i++) {
+      for (let j = i + 1; j < out.length; j++) {
+        const a = out[i]!, b = out[j]!;
+        if (a.level !== b.level || !near(a, b)) continue;
+        out[i] = { level: a.level, aft: Math.min(a.aft, b.aft), fore: Math.max(a.fore, b.fore), port: Math.min(a.port, b.port), starboard: Math.max(a.starboard, b.starboard) };
+        out.splice(j, 1);
+        joined = true;
+        break;
+      }
+    }
+  }
+  return out.map((c) => {
+    const beside = plan.spaces.filter((s) => s.level === c.level && s.aft < c.fore && s.fore > c.aft);
+    return c.port > 0 ? { ...c, starboard: Math.max(c.starboard, ...beside.map((s) => s.starboard)) } : { ...c, port: Math.min(c.port, ...beside.map((s) => s.port)) };
+  });
+}
+
+/** The casks, whose stows are given whole. */
+const CASKS = new Set<ModelName>([MODEL.butt, MODEL.barrel]);
+
+/**
+ * What every fitting on her puts in a man's way, from the one placement list (furnish) and each model's room
+ * (rules/fittings.ts SOLID), by its height over the floor it stands over: under BODY.stepUp it is stepped over and
+ * left out; wholly over the least headroom it is overhead; otherwise it stands in the way. Fittings hung outboard of
+ * every space (the anchors, the gig) are in no one's way. The plan's obstacles and overheads (plan.ts) are these.
+ */
+export function fittingSolids(plan: ShipPlan, fittings: readonly Furnishing[] = furnish(plan)): FittingSolids {
+  const standing: Obstacle[] = [], overhead: Overhead[] = [], casks: (Rect & { level: Level })[] = [];
+  fittings.forEach((f, i) => {
+    SOLID[f.model].forEach((p, k) => {
+      const r = partRoom(f, p), { along, across } = rectCentre(r);
+      const under = floorsUnder(plan, along, across).find((u) => u.space.level === f.level);
+      if (!under) return;
+      const floor = under.floor, rect = { aft: r.aft, fore: r.fore, port: r.port, starboard: r.starboard };
+      if (r.high - floor < BODY.stepUp) return;
+      const id = SOLID[f.model].length > 1 ? `${f.model}-${i}-${k}` : `${f.model}-${i}`;
+      if (r.low - floor >= BODY.leastHeadroom) overhead.push({ id, level: f.level, ...rect, underside: r.low });
+      else if (CASKS.has(f.model)) casks.push({ level: f.level, ...rect });
+      else standing.push({ id, level: f.level, ...rect, fitting: true });
+    });
+  });
+  stows(plan, casks).forEach((c, i) => standing.push({ id: `stow-${c.level}-${i}`, ...c, fitting: true }));
+  return { standing, overhead };
 }

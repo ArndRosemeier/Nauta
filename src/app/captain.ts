@@ -9,7 +9,7 @@ import { LadderClimb, faceYaw, type ClimbStep, type Climber, type Ladder } from 
 import type { DeckIntent, Vec3 } from '@futuremagic/deck';
 import { BODY, LADDER } from '../sim/rules/ships';
 import { EYE_BELOW_TOP, HEAD_CLEAR } from '../sim/rules/walking';
-import { floorsUnder, overheadAt, type ShipPlan, type Spot, type Way } from '../sim/ship/plan';
+import { floorsUnder, headroomAt, type ShipPlan, type Spot, type Way } from '../sim/ship/plan';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { WalkGraph } from '../sim/ship/walk';
 import { eyeOf, ladderOffered, spotOf, stepWalker, walkerAt, type DeckWalker, type LadderOffer } from '../sim/ship/deckWalk';
@@ -144,7 +144,7 @@ export class Captain {
     const free = Math.min(1, Math.max(0, (into + EDGE_EASE) / (2 * EDGE_EASE)));
     const under = floorsUnder(this.plan, along, across).filter((f) => shipY(f.floor) <= feet + FEET_SLACK).pop();
     if (under && free < 1) {
-      const beams = shipY(overheadAt(under.space, along, across)) - HEAD_CLEAR - EYE_BELOW_TOP;
+      const beams = shipY(under.floor + headroomAt(this.plan, under.space, along, across)) - HEAD_CLEAR - EYE_BELOW_TOP;
       if (beams < top) top = beams + (top - beams) * free;
     }
     out[0] = x; out[1] = top; out[2] = z;

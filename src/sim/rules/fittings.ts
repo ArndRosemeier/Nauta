@@ -63,8 +63,12 @@ export const GUN_INBOARD = { carronade: 0, long6: 0.36 } as const;
 export const GUN_GEAR = {
   /** The shot garland on the deck against the waterway. */
   garland: { along: 1.2, off: 0.1 },
-  /** A sponge tub or a match tub, by turns, beyond the garland. */
-  tub: { along: 2.15, off: 0.32 },
+  /**
+   * A sponge tub or a match tub, by turns, beyond the garland. Where it would stand on a pin rail's hauling place
+   * (rules/ships.ts RAILS: the men stand a stride inboard of the pins), it stands `inboard` off the bulwark in the
+   * middle of the gap instead, between the two guns' crews, its narrow side along her.
+   */
+  tub: { along: 2.15, off: 0.32, inboard: 1.35 },
   /** The rammer and sponge and the handspike on hooks on the bulwark: along, height above the deck, off the bulwark. */
   rammer: { along: 1.45, up: 0.98, off: 0.1 },
   handspike: { along: 1.45, up: 0.66, off: 0.06 },
@@ -73,18 +77,23 @@ export const GUN_GEAR = {
 } as const;
 
 /**
- * Which of the plan's fittings (rules/ships.ts FITTINGS) each model stands in the middle of, so it moves with the
- * plan: the wheel (its drum aft of its standards), the binnacle (its lights toward the helmsman), the capstan, and
- * the Brodie stove on the berth deck (its fire door aft), the galley chimney over its flue on the weather deck.
+ * Where the helm, the capstan and the galley stand on her centreline, m forward of the mainmast: the wheel (its drum
+ * aft of its standards), the binnacle (its lights toward the helmsman), the capstan, and the Brodie stove on the berth
+ * deck (its fire door aft) with the galley chimney over its flue on the weather deck. What is in the way there is the
+ * models' own room (SOLID), so the plan keeps no oblong for them.
  */
-export const IN_FITTING = { wheel: 'wheel', binnacle: 'binnacle', capstan: 'capstan', stove: 'stove' } as const;
+export const ON_CENTRELINE = { wheel: -8.65, binnacle: -7.95, capstan: -3.775, stove: 12.1 } as const;
 /**
- * The chain pumps either side of the mainmast, in the plan's main bitts and pumps (FITTINGS): their middles, m
- * forward of the mast and from the centreline, the brakes clear of the mast, the dales running outboard.
+ * The chain pumps side by side just forward of the mainmast's partners: their middles, m forward of the mast and from
+ * the centreline, the dales running outboard. Here they leave the gangway between them and the guns at the D ports a
+ * man's passage (ship.md "Fittings are solid too"); abreast the mast they closed it.
  */
-export const PUMPS = { along: 0.55, across: 0.85 } as const;
-/** The bell's belfry on the forecastle, to port of the bowsprit's heel. */
-export const BELFRY = { along: 16.3, across: -1.2 } as const;
+export const PUMPS = { along: 1.05, across: 0.7 } as const;
+/**
+ * The bell's belfry on the forecastle, to port of the bowsprit's heel, turned athwart with its face inboard: so it
+ * leaves the way beside the bowsprit and the long six's crew their places (m forward, m across).
+ */
+export const BELFRY = { along: 16.32, across: -1.15 } as const;
 
 /** The boats on the skids amidships (ship.md): two gallows over the main hatch's fore and after ends and forward of it, the cutter to port and the jolly boat to starboard on their chocks. */
 export const SKIDS = { gallows: [2.55, 6.95], boats: 4.75, across: 0.95, chocks: 2.05 } as const;
@@ -103,7 +112,7 @@ export const CATTED = { along: 18.2, out: 1.18, below: 0.28, lean: 1.2, height: 
 export const NETTINGS = { aft: -11.2, fore: 16.6, tile: 2 } as const;
 
 /** Fire buckets either side of the companion (FITTINGS: the companion, -6.65..-5.62), m across. */
-export const BUCKETS = { along: -6.12, across: [0.72, 1.02] } as const;
+export const BUCKETS = { along: -6.45, across: [0.72, 1.02] } as const;
 
 /** The mess tables on the messdeck, athwart her between the side and the middle, slung from the beams: along her, and how far their inner ends stand from the middle. */
 export const MESS_TABLES = { along: [6.85, 7.95, 9.85, 10.65], inner: 0.85 } as const;
@@ -139,3 +148,61 @@ export const CASK_CLEAR = 0.04;
  * way there (a ladder's foot).
  */
 export const HOLD_PASSAGE = { half: 0.4, clear: 0.1 } as const;
+
+/** A box a model fills, in its own frame (m; y up from its origin on the floor, its front +z): from and to on each axis. */
+export interface SolidPart {
+  readonly x: readonly [number, number];
+  readonly y: readonly [number, number];
+  readonly z: readonly [number, number];
+}
+/** A model that is one box from its origin's floor: as wide (x), high (y) and deep (z) as given, from and to. */
+const box = (x: number, y: number, z0: number, z1 = -z0, y0 = 0): readonly SolidPart[] => [{ x: [-x, x], y: [y0, y], z: [z0, z1] }];
+
+/**
+ * The room each model takes where it stands (ship.md "Fittings are solid too"), so the walk graph and the crew's
+ * routes know it without the models: boxes in the model's frame, held to the built models' bounds by
+ * test/furnish.test.ts. furnish.ts turns them with the fitting and sorts them by height over the floor: under
+ * BODY.stepUp stepped over, from the floor up into a man's way walked round, over the least headroom stooped under.
+ * The boat gallows is three parts: its feet on the deck, its two posts, and its cross-piece with the arms the boats'
+ * chocks rest on, which a man passes under. The anchors hang outside her and take no room in her.
+ */
+export const SOLID: Readonly<Record<ModelName, readonly SolidPart[]>> = {
+  prop_long_gun_6: box(0.44, 0.92, -1.17),
+  prop_ship_wheel: box(0.71, 1.7, -0.38),
+  prop_binnacle: box(0.31, 1.11, -0.18),
+  prop_capstan: box(0.52, 1.03, -0.52),
+  prop_chain_pump: box(0.63, 1.18, -0.62),
+  prop_galley_stove: box(0.6, 1.92, -0.44),
+  prop_galley_chimney: box(0.3, 1.11, -0.31),
+  prop_ship_bell: box(0.38, 1.18, -0.15),
+  prop_boat_cutter: box(0.93, 1.05, -2.81),
+  prop_boat_jolly: box(0.88, 0.98, -2.5),
+  prop_boat_gig: box(0.75, 0.9, -3.11),
+  prop_boat_gallows: [
+    { x: [-1.44, 1.44], y: [0, 0.2], z: [-0.08, 0.08] },
+    { x: [-1.26, -0.98], y: [0, 1.7], z: [-0.12, 0.12] },
+    { x: [0.98, 1.26], y: [0, 1.7], z: [-0.12, 0.12] },
+    { x: [-1.9, 1.9], y: [1.7, 2.19], z: [-0.12, 0.12] },
+  ],
+  prop_stern_davits: box(1.44, 0.76, -0.62, 1.9, -0.28),
+  // Catted and fished outboard of her bow: in no one's way (its box, turned, would reach in over the forecastle).
+  prop_anchor_bower: [],
+  prop_shot_garland: box(0.62, 0.2, -0.08),
+  prop_rammer_sponge: box(0.08, 0.16, -1),
+  prop_handspike: box(0.03, 0.07, -0.77),
+  prop_sponge_tub: box(0.29, 0.46, -0.24),
+  prop_match_tub: box(0.2, 0.58, -0.2),
+  prop_fire_bucket: box(0.14, 0.48, -0.14),
+  prop_hammock_netting: box(0.2, 0.53, -1),
+  prop_mess_table: box(0.63, 1.6, -0.75),
+  prop_sea_chest: box(0.52, 0.46, -0.25),
+  prop_cot: box(0.38, 1.6, -0.99, 0.99, 0.55),
+  prop_cask_butt: box(0.44, 1.3, -0.43),
+  prop_cask_barrel: box(0.3, 0.78, -0.29),
+  prop_bitts: box(1.2, 1.12, -0.37, 0.01),
+  prop_fife_rail: box(0.8, 0.9, -0.14, 0.01),
+};
+/** Gear keeps this much more than half a man's passage (rules/ships.ts LEAST_PASSAGE) from where a man stands to work, m. */
+export const GEAR_CLEAR = 0.1;
+/** Casks stowed this close together are one stow in the way, m (they touch, in their tiers and rows). */
+export const STOW_GAP = 0.05;
