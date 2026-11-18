@@ -1,0 +1,2 @@
+Along the foot of the screen there is now a row with everyone you command: master, first lieutenant, gunner, carpenter, lookout and midshipman, each an icon with a few words on what he does. Tap one and his orders open above it; tap it again to close them.
+A man out of your voice says "by midshipman" under his icon: the midshipman runs your order to him. Tapping the men on deck and the keys work as before.
