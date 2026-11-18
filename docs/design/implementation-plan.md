@@ -445,6 +445,15 @@ You give every sailing order from the deck and watch the men do it.
 
 **How 240 men are drawn (design thread, 2026-11-18, from N4.0's finding that a full Actors character holds about 7 MB, so 240 of them would take 1.6 GB):** the crew is drawn in two ways from one simulation. **A few full characters** for the men within reach of the captain and the officer he is speaking to: a pool of about a dozen, handed from man to man as he moves, each with the face, dress and hands a close look deserves. **The crowd figure** (X5) for everyone else on both ships: a handful of builds, dress by rank and navy baked on, told apart by height, tint, hat and hair, drawn as instances and animated from the same clips at the rate N4.0 fixes. A man changes from one to the other in the same pose at the same instant of his motion, by a short fade, so nothing pops. The other ship's men are crowd figures only, simpler with distance. Both crews together stay inside 150 MB. Arnd's `?crew` numbers from the iPad decide the pool's size, the crowd's level of detail and its animation rate; if the crowd figure alone holds up at arm's length, the pool shrinks to the officers.
 
+**The crowd's make-up (design thread, 2026-11-18, for N4.3; the crowd figure is built, Actors PR 108: 242 men in 19 MB and 59 draw calls):**
+
+- **Builds.** Seamen and hands come in four builds (slight, middling, broad, tall); marines and officers in two each, since their dress and place tell them apart already. Both navies use the same bodies and differ in dress, so the whole duel stays at about 30 kinds.
+- **Hats.** An officer's cocked hat and a marine's hat belong to his dress and are always worn. Seamen wear a tarred hat, a kerchief or nothing, drawn by seed, as now. Boys go bareheaded.
+- **Hair.** Three for seamen (a queue, cropped, and none under a kerchief), one each for marines and officers, whose hats hide the rest.
+- **Beards.** None on crowd figures: the navies of 1800 shaved. A full character may carry side whiskers and stubble in his skin.
+- **Coat tails.** Crowd officers and marines wear their tails short and stiff, cut so that no stride shows a leg through them; the long tails are for the full characters near the captain.
+- **The near pool.** Twelve full characters, each keeping only the levels of detail seen within about 8 m (the crowd figure takes over beyond), which should bring the pool well under its present 93 MB. Arnd's iPad numbers may shrink it to eight.
+
 **Open design questions for N4:** Arnd's four answers in orders.md (the midshipman, "Steer there", the "Fire!" button, no pause); the phrase book's words; dress by navy and rank; how much the men show mood.
 
 **Notes:** N4.0 (the trial), `?crew` (`src/app/crew.ts`, `crewLooks.ts`, `crewLevels.ts`, `crewTrial.ts`, `src/render/crew/crewView.ts`). Frame times from the iPad still to be noted here.
