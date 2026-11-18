@@ -46,11 +46,15 @@
       #standpoints { position: fixed; left: max(10px, env(safe-area-inset-left)); bottom: max(10px, env(safe-area-inset-bottom)); right: 140px; display: flex; flex-wrap: wrap; gap: 8px; }
       #standpoints button { min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #ffffff33; background: #0b1a2a99; color: #e8eef4; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
       #standpoints button.on { border-color: #f2c14e; color: #f2c14e; }
+      /* ?bench (src/app/benchRun.ts): the frame times and memory, large enough to read off a tablet, clear of the HUD. */
+      #bench { position: fixed; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); max-width: calc(100% - 20px); display: none; margin: 0; padding: 10px 14px; border-radius: 10px; background: #0b1a2acc; white-space: pre-wrap; font: 15px/1.45 ui-monospace, monospace; -webkit-user-select: text; user-select: text; }
+      #bench button { margin-top: 8px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #f2c14e; background: none; color: #f2c14e; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; }
     </style>
   </head>
   <body>
     <canvas id="view"></canvas>
     <pre id="hud"></pre>
+    <pre id="bench"></pre>
     <button id="version" type="button"></button>
     <div id="loading"><h1>NAUTA</h1></div>
     <div id="failed"></div>

@@ -1,0 +1,3 @@
+Add ?bench to the address to measure the game on the iPad: the view flies over the sea for a minute, then the frame times, whether they keep 60 frames a second, and the memory stay on the screen to read off.
+?sea=calm, ?sea=breeze or ?sea=gale sets the sea, and ?look=90,-5 turns the view that far off the sun (or moon) and tilts it.
+Behind the scenes: 24 standard pictures of the sea (four times of day, three seas, from the quarterdeck and the masthead) are now taken with every build, to judge the sea's look by.
