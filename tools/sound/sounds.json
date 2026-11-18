@@ -1,0 +1,119 @@
+{
+  "about": "Nauta's sounds (tools/sound/README.md). Every take made with the newest ByteDance Seed Audio through OpenRouter by @futuremagic/audio's make script. No voices anywhere (Arnd). Beds come in two takes (a, b) that the game blends slowly, so no loop is heard.",
+  "sounds": [
+    {
+      "id": "bed/sea-calm-a",
+      "kind": "bed",
+      "prompt": "The sound of a calm sea far out on the open ocean, heard from the deck of a wooden sailing ship drifting in a calm: a soft continuous murmur of water, gentle trickles and quiet gurgles along her side, small laps now and then, peaceful, no wind, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/sea-calm-b",
+      "kind": "bed",
+      "prompt": "The sound of still water in the middle of the ocean, very quiet: small soft plops and gentle sucking gurgles of water along a ship's wooden side, long hushed pauses, no wind, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/sea-breeze-a",
+      "kind": "bed",
+      "prompt": "The sound of the open ocean far from land in a moderate breeze, heard from the deck of a sailing ship: an irregular soft seething of water along her sides, small crests fizzing into foam here and there, a light restless wash, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/sea-breeze-b",
+      "kind": "bed",
+      "prompt": "The sound of lively choppy water in the middle of the ocean, heard close to the surface from a ship: water splashing and gurgling against her side, little whitecaps fizzing, a steady soft hiss of the sea all around, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/sea-fresh-a",
+      "kind": "bed",
+      "prompt": "The sound of a rough open ocean in a strong breeze, heard from the deck of a sailing ship far from land: water rushing and seething loudly along her sides, many whitecaps hissing all around, heavy splashes and blown spray pattering down, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/sea-fresh-b",
+      "kind": "bed",
+      "prompt": "The sound of big seas in mid ocean, heard from a ship: a loud constant seething hiss of foam all around, heavy water surging past her side and gurgling away, crests tumbling over close by, spray rattling down, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/sea-gale-a",
+      "kind": "bed",
+      "prompt": "The sound of a gale in mid ocean, heard from the deck of a sailing ship far from land: a deep endless roar of seething white water all around, huge crests collapsing close by with heavy booming rushes, flying spray drumming down, no thunder, no rain, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/sea-gale-b",
+      "kind": "bed",
+      "prompt": "The sound of a storm sea in the middle of the ocean, heard close to the surface: a wild chaos of tumbling water and seething foam, deep surges heaving past, crests bursting into spray all around, a deep rumbling roar, no thunder, no rain, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/wind-light-a",
+      "kind": "bed",
+      "prompt": "The sound of a gentle breeze in the open air, a soft airy hush of wind past the ears that rises and falls slowly, nothing else, no water, no waves, no leaves, no birds, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/wind-light-b",
+      "kind": "bed",
+      "prompt": "The sound of a light breath of wind on an open deck, a faint soft whisper of moving air with slow gentle swells, nothing else, no water, no waves, no leaves, no birds, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/wind-fresh-a",
+      "kind": "bed",
+      "prompt": "The sound of a fresh wind blowing steadily across an open deck, a full rushing wind past the ears rising and falling in gusts, nothing else, no water, no waves, no trees, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/wind-fresh-b",
+      "kind": "bed",
+      "prompt": "The sound of a brisk wind out in the open, a strong steady rush of air past the ears with soft buffeting gusts and a faint low moan, nothing else, no water, no waves, no trees, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/wind-strong-a",
+      "kind": "bed",
+      "prompt": "The sound of a strong wind at sea, loud buffeting gusts and a deep rushing roar of air with a low moaning whistle, wild and cold, no trees, no thunder, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/wind-strong-b",
+      "kind": "bed",
+      "prompt": "The sound of a near gale blowing across the open ocean, a heavy continuous roar of wind with surging gusts that moan and whistle, no trees, no thunder, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/wind-gale-a",
+      "kind": "bed",
+      "prompt": "The sound of a howling gale at sea, a screaming roaring wind with violent gusts and a high shrieking whistle, terrifying and relentless, no thunder, no rain, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/wind-gale-b",
+      "kind": "bed",
+      "prompt": "The sound of a storm wind over the ocean, a deafening roar of air with shrieking gusts rising and falling, a deep booming buffet, no thunder, no rain, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/swell",
+      "kind": "bed",
+      "prompt": "The sound of a long slow ocean swell lifting a wooden ship, heard close to the water at her side: a deep hollow surge of water rising along the planks and a long low gurgling draw as it sinks away, quiet and deep, no wind, no breaking waves, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "slap/lap",
+      "kind": "steps",
+      "prompt": "The sound of eight separate small wavelets lapping against the wooden side of a ship, each a soft wet clop and a little gurgle that dies away, one at a time with three seconds of complete silence between them, no wind, no voices, no talking, no music",
+      "count": 8,
+      "tail": 1200
+    },
+    {
+      "id": "slap/hull",
+      "kind": "calls",
+      "prompt": "The sound of eight separate waves slapping against the wooden hull of a ship, each a deep wet thump and a splash of water falling back and draining away, one at a time with three seconds of complete silence between them, no wind, no voices, no talking, no music",
+      "count": 10,
+      "most": 3.5
+    },
+    {
+      "id": "slap/crest",
+      "kind": "calls",
+      "prompt": "The sound of eight separate single wave crests tumbling over into white foam close by on an otherwise quiet sea, each a short splash and a fizzing hiss that dies away, one at a time with three seconds of complete silence between them, no wind, no voices, no talking, no music",
+      "most": 4,
+      "count": 8
+    },
+    {
+      "id": "slap/burst",
+      "kind": "calls",
+      "prompt": "The sound of six separate heavy seas bursting against the side of a wooden ship, each a deep hollow boom, a crash of spray and water pouring back into the sea, one at a time with four seconds of complete silence between them, no wind, no thunder, no voices, no talking, no music",
+      "count": 6,
+      "most": 5,
+      "gap": 1.2
+    }
+  ]
+}

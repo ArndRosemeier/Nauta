@@ -21,6 +21,7 @@
     "plan:draw": "tsx tools/plan/draw.ts"
   },
   "dependencies": {
+    "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/props": "file:vendor/assetgenerator/packages/props",
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",

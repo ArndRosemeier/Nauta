@@ -1,0 +1,3 @@
+You can hear the sea and the wind: tap the screen once and the sound starts (Safari waits for a first touch). Headphones help.
+The sound follows the weather: quiet lapping water in a calm, seething whitecaps in a breeze, a roaring sea and a howling wind in a gale. Try ?wind=0, ?wind=4 and ?wind=8.
+Waves slap and crests break close by as you see them pass, from where they are; gusts are heard rising and falling.

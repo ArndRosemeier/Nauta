@@ -7,7 +7,10 @@
     "src/app/standpoints.ts",
     "src/app/quality.ts",
     "src/probe/report.ts",
-    "src/probe/waves.ts"
+    "src/probe/waves.ts",
+    "src/audio/ambience.ts",
+    "src/audio/slaps.ts",
+    "src/audio/tuning.ts"
   ],
   "banned": [
     "three",

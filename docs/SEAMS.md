@@ -152,3 +152,13 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Choosing the quality level from measured frame time in the first seconds (`?quality=` fixes one) | `src/app/quality.ts#QualityChooser` |
 | The triangles of a sea tile's grid at a density (every second or fourth vertex of the densest) | `src/render/seaGrid.ts#seaTileTriangles` |
 | The densities a sea tile's grid can be drawn at | `src/render/seaGrid.ts#seaCellChoices` |
+| A wind speed's force on the Beaufort scale, with fractions (`beaufortSpeed` backwards) | `src/sim/rules/beaufort.ts#beaufortForce` |
+| The sea's and the wind's sound as data: beds by sea force and wind speed, their gains and glides, the slaps and when each is heard (the takes and their prompts: tools/sound/sounds.json) | `src/audio/tuning.ts#SEA_BEDS` |
+| The force of the sea as its wave layers show it (what its sound follows) | `src/audio/ambience.ts#seaForce` |
+| Every ambience bed's level now: sea, wind and the swell's surge | `src/audio/ambience.ts#bedLevels` |
+| Beds along a scale crossfading at equal power | `src/audio/ambience.ts#anchorWeights` |
+| A bed's two takes blended by a slow seeded swing (no loop heard) | `src/audio/ambience.ts#takeAngle` |
+| The sea's RMS height at a moment | `src/audio/slaps.ts#seaRms` |
+| Which sound a crest makes at a force of the sea (lap, slap, crest, burst) | `src/audio/slaps.ts#slapKind` |
+| Slaps and crests placed near the listener where crests pass | `src/audio/slaps.ts#SlapWatch` |
+| The sea and the wind heard: the sound engine, the listener's ears, muffling under water and below deck | `src/audio/seaSound.ts#SeaSound` |
