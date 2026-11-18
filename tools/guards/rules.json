@@ -3,6 +3,7 @@
   "pure": [
     "src/sim",
     "src/app/bench.ts",
+    "src/app/body.ts",
     "src/app/look.ts",
     "src/app/params.ts",
     "src/app/standpoints.ts",

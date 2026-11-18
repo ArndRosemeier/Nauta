@@ -8,6 +8,7 @@ import { showStandpoints } from './app/standpointBar';
 import { showVersion } from './app/whatsNew';
 import { Walking } from './app/walking';
 import { QUALITY_LEVELS, QualityChooser, type QualityKnobs } from './app/quality';
+import { showMotionSetting } from './app/motionSetting';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
@@ -130,6 +131,8 @@ async function start(): Promise<void> {
   if (ship && !walking) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
+  // Walking: the calm view, how much of his body's motion the view takes (plan N2.7).
+  if (walking) showMotionSetting(el<HTMLButtonElement>('motion'), params.motion, (s) => { walking.body.strength = s; });
   const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());

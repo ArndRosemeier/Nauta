@@ -1,10 +1,11 @@
 /**
  * What the page's address asks for (`?hud&hour=17`, `?eye=30&wind=6`, `?sea=gale`, `?yaw=70&pitch=-10`,
- * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`). Pure: it takes the query string.
+ * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`). Pure: it takes the query string.
  */
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
+import { CALM_LEAST } from '../sim/rules/body';
 
 /** The hour a game starts at when the address names none: a clear morning. */
 const START_HOUR = 10;
@@ -64,6 +65,8 @@ export interface Params {
   readonly bench: number;
   /** Walk her decks with two thumbs (`?walk`, plan N2.3), from the plan's station named (`?walk=surgeon`; empty: the quarterdeck); null: no walking. */
   readonly walk: string | null;
+  /** How much of his body's motion the view takes (`?motion=0.1`, from `CALM_LEAST` to 1, plan N2.7); null: the device's own setting. */
+  readonly motion: number | null;
 }
 
 export function readParams(query: string): Params {
@@ -82,6 +85,7 @@ export function readParams(query: string): Params {
       : null,
     toLight: q.has('look') ? readLook(q.get('look') ?? '') : null,
     bench: q.has('bench') ? num('bench', BENCH_SECONDS, BENCH_SHORTEST, BENCH_LONGEST) : 0,
+    motion: q.has('motion') ? num('motion', 1, CALM_LEAST, 1) : null,
   };
 }
 

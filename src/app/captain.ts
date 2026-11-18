@@ -91,7 +91,7 @@ export class Captain {
     if (!this.climbing) {
       const offer = ladderOffered(this.walker, intent, this.plan);
       if (offer) this.startClimb(offer);
-      else this.walker = stepWalker(this.walker, intent, this.plan, this.graph, this.doors, dt);
+      else this.walker = stepWalker(this.walker, intent, this.plan, this.graph, this.doors, dt, up);
     }
     if (this.climbing) {
       this.climb.up.copy(up);
