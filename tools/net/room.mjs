@@ -40,7 +40,9 @@ try {
   const code = await net(host, () => window.__nautaNet.code);
   ok(/^[A-Z0-9]{6}$/.test(code), `the host opened room ${code}`);
   const guest = await open(`join=${code}`);
-  ok(await net(guest, () => window.__nautaNet.role === 'guest' && window.__nautaNet.ship === 1), 'the guest joined it and commands the second ship');
+  // The guest starts from the room's state of before he came; the host seats him once it hears he is there.
+  const seated = await guest.waitForFunction(() => window.__nautaNet.role === 'guest' && window.__nautaNet.ship === 1, null, { timeout: TIMEOUT }).then(() => true, () => false);
+  ok(seated, 'the guest joined it and commands the second ship');
   ok(await net(host, () => window.__nautaNet.give('plain sail')) === '', 'the host gives an order');
   ok(await net(guest, () => window.__nautaNet.give('come up a point')) === '', 'the guest gives one');
   ok(await net(guest, () => window.__nautaNet.give('take in sail')) === '', 'and another');

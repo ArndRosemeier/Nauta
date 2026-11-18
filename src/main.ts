@@ -427,7 +427,7 @@ async function start(): Promise<void> {
     firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
   };
   if (match) {
-    const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.use(s), () => words(settings.now.language), () => settings.now.matchMinutes);
+    const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.useSession(s), () => words(settings.now.language), () => settings.now.matchMinutes);
     match.onChange(() => rooms.refresh());
     settings.watch((s, before) => { if (before && before.language !== s.language) rooms.refresh(); });
   }
