@@ -200,7 +200,8 @@ export const SENT_PER_STEP = 2;
  * - plug: a shot hole near or under the water plugged, by two of the carpenter's crew, about 45 s.
  * - fish: a wounded spar fished (one wound less), by the carpenter and his mate, when nothing leaks.
  * - splice: a cut line knotted and spliced, by the boatswain and his two mates, about 60 s.
- * - tackle: the relieving tackles rigged on the tiller when her steering is shot away, four quartermasters, about 90 s.
+ * - tackle: the relieving tackles rigged on the tiller when her steering is shot away, four of the helm's men (the
+ *   quartermasters, the afterguard when they are down: a shot through the wheel once took all four), about 90 s.
  * - cut: a fallen spar cut away from alongside, six forecastle men with axes, about 60 s (the first lieutenant's order).
  * - pump, fight: eight men at the pumps, eight at a fire, for as long as there is water in her or the fire burns (his
  *   orders), taken from the guns by the quarter bill (`bill`: the waisters first, then the last places of each gun).
@@ -228,7 +229,7 @@ export const REPAIRS: Readonly<Record<RepairName, RepairRow>> = {
   plug: { what: 'a shot hole plugged', men: 2, work: 60, who: { ranks: CARPENTERS } },
   fish: { what: 'a wounded spar fished', men: 2, work: 90, who: { ranks: ['carpenter', "carpenter's mate"] } },
   splice: { what: 'a cut line knotted and spliced', men: 3, work: 60, who: { ranks: ['boatswain', "boatswain's mate"] } },
-  tackle: { what: 'the relieving tackles rigged', men: 4, work: 90, who: { ranks: ['quartermaster'] } },
+  tackle: { what: 'the relieving tackles rigged', men: 4, work: 90, who: { parts: HELM_PARTS } },
   cut: { what: 'the wreckage cut away', men: 6, work: 60, who: { parts: ['forecastle'] } },
   pump: { what: 'hands at the pumps', men: 8, work: STANDING_WORK, who: 'bill' },
   fight: { what: 'a fire fought', men: 8, work: STANDING_WORK, who: 'bill' },
