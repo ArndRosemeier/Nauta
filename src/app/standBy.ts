@@ -3,7 +3,10 @@
  * NEVER just stand around"): the helmsmen hold the wheel, the officers talk, the marines clean their arms or keep
  * their watch with a pistol ready. The hands off watch are not on deck at all: they sleep below (crewDrawn.ts). By the place he is at, then his seed. Pure; clips are the pack's (crewLooks.ts PACK_CLIPS).
  */
-import type { Man } from '../sim/crew/roster';
+import { sameSpot } from '../sim/crew/crew';
+import { placeSpot, type Man } from '../sim/crew/roster';
+import type { Spot } from '../sim/ship/plan';
+import { DAY_JOBS, type DayJob } from '../sim/rules/day';
 import { WHEEL } from '../sim/rules/crew';
 
 /** At the wheel: the hands on the spokes. */
@@ -33,6 +36,11 @@ const HANDING = ['pick up', 'interact', 'pick up'] as const;
 /** The midshipman at the captain's side: attentive, glancing about, ready to be sent off. */
 const ATTENTIVE = ['arms folded', 'nod', 'shake head'] as const;
 
+/** A lookout at the rail of a top or the forecastle, watching the sea. */
+const LOOKING_OUT = 'lean on rail';
+/** A hand of the watch on deck at the pin rails, coiling down a rope (CMU 62_21, crewLooks.ts PACK_MOCAP). */
+const COILING = 'cmu 62_21';
+
 /** The places of a kind of man by the id's start: the clips he plays there, by his seed. */
 const BY_PLACE: readonly (readonly [prefix: string, clips: readonly string[]])[] = [
   [WHEEL, [STEERING]],
@@ -53,6 +61,23 @@ export function standByClip(m: Man, seed: number): string {
   return clips[seed % clips.length]!;
 }
 
+/** Where the watch on deck stands (rules/day.ts `DECK_WATCH`), by the id's start: what a hand of the watch does there. */
+const BY_WATCH_PLACE: readonly (readonly [prefix: string, clip: string])[] = [['top-', LOOKING_OUT], ['station-forecastle', LOOKING_OUT], ['pin-', COILING]];
+
+/** What a hand of the watch on deck plays at each of the day's jobs (rules/day.ts `DAY_JOBS`): washing the deck down with a broom (CMU 80_19), drinking his grog. */
+const WATCH_JOB_CLIPS: Readonly<Record<DayJob['what'], string>> = { 'wash down': 'cmu 80_19', grog: 'eat or drink' };
+
+/**
+ * The clip of a hand of the watch on deck standing at `at` (his post, `Man.watchPost`, or a place of the day's job he
+ * has been sent to), or null when he stands at neither: a lookout looking out, a hand coiling down, a man at his grog.
+ */
+export function watchClip(m: Man, at: Spot): string | null {
+  if (m.watchPost === null || m.watchSlot === null) return null;
+  if (sameSpot(at, placeSpot(m.watchPost))) return BY_WATCH_PLACE.find(([prefix]) => m.watchPost!.startsWith(prefix))?.[1] ?? TINKERING;
+  const job = DAY_JOBS.find((j) => (j.who === null || j.who.includes(m.part)) && sameSpot(at, placeSpot(j.places[m.watchSlot! % j.places.length]!)));
+  return job ? WATCH_JOB_CLIPS[job.what] : null;
+}
+
 /** The clip of a man at his place at quarters, or waiting there for his work to begin: ready at his gun, arms at hand, or alert. */
 export function standToClip(m: Man, seed: number): string {
   const clips = m.gun !== null ? AT_GUN : m.part === 'marines' ? ARMED : m.part === 'boys' ? HANDING : m.part === 'officers' ? CALLING : ALERT;
@@ -64,5 +89,5 @@ export const attentiveClip = (seed: number): string => ATTENTIVE[seed % ATTENTIV
 
 /** Every clip a man standing by or standing to can play (the crowd bakes them). */
 export const STAND_BY_CLIPS: readonly string[] = [
-  ...new Set([STEERING, ON_WATCH, TINKERING, COOKING, MENDING, ...TALKING, ...CLEANING, ...AT_GUN, ...ARMED, ...HANDING, ...CALLING, ...ALERT, ...ATTENTIVE]),
+  ...new Set([LOOKING_OUT, COILING, ...Object.values(WATCH_JOB_CLIPS), STEERING, ON_WATCH, TINKERING, COOKING, MENDING, ...TALKING, ...CLEANING, ...AT_GUN, ...ARMED, ...HANDING, ...CALLING, ...ALERT, ...ATTENTIVE]),
 ];

@@ -167,6 +167,8 @@ export function eventWords(e: SimEvent, ship: number): string | null {
     case 'tacked': return e.ship === ship ? `${at} she has come through the wind` : null;
     case 'wore': return e.ship === ship ? `${at} she has worn round` : null;
     case 'missed stays': return e.ship === ship ? `${at} she missed stays and falls back` : null;
+    // The watches changed: the pipe is heard, and the men are seen going below and coming up; the panel keeps to the fight.
+    case 'watch': return null;
     case 'bore away': return e.ship === ship ? `${at} the helmsman bears away a little: a sail was aback` : null;
     case 'short-handed': return e.ship === ship ? `${at} ${orderWords(e.order)}: short-handed: ${jobWords(e.job)}` : null;
     // A gun fired, hers or the enemy's: a broadside is a run of the same words (the panel counts them).

@@ -33,9 +33,20 @@ import { touch, type TouchEvent } from './ship/touch';
 import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 import { apartOnWater } from './units';
+import { dayElapsed, dayMinutesAt, watchAt } from './day';
+import type { Watch } from './rules/day';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
-export type SimEvent = OrderRefused | OrderTaken | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit | Aftermath | FightEvent;
+export type SimEvent = OrderRefused | OrderTaken | OrderAnswered | OrderDone | Sailed | ShortHanded | WatchChanged | GunFired | TouchEvent | Hit | Aftermath | FightEvent;
+
+/** The sandbox's watches changed: the new watch (a row of rules/day.ts `WATCHES`) has the deck, the watch `onDeck` (0 larboard, 1 starboard). The hands are piped. */
+export interface WatchChanged {
+  readonly kind: 'watch';
+  readonly tick: number;
+  readonly ship: number;
+  readonly index: number;
+  readonly onDeck: Watch;
+}
 
 /** An order the ship could not take: why, as a code (the phrase book, N4.5, words it) and in English for now. */
 export interface OrderRefused {
@@ -144,6 +155,10 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
   const hits = stepHits({ seed: state.matchSeed, tick, flying: state.flying, ships: ships.map((s) => ({ pose: s.motion.pose, crew: s.crew, canvas: s.sailing.canvas, guns: s.guns, damage: s.damage, quarters: s.told.quarters })) });
   events.push(...hits.events);
   ships = ships.map((s, i) => (hits.damage[i] === s.damage && hits.guns[i] === s.guns ? s : { ...s, damage: hits.damage[i]!, guns: hits.guns[i]! }));
+  // The sandbox's day: the watch that has the deck (watches change at their bells; sim/day.ts), or none in a fight.
+  const elapsed = dayElapsed(state.dayStart, tick), watch = elapsed === null ? null : watchAt(elapsed);
+  const before = tick > 0 ? dayElapsed(state.dayStart, tick - 1) : null;
+  if (watch && before !== null && watchAt(before).index !== watch.index) for (let i = 0; i < ships.length; i++) events.push({ kind: 'watch', tick, ship: i, index: watch.index, onDeck: watch.onDeck });
   const sea = followWind(state.sea, { speed: wind.speed, toward: wind.toward }, t);
   const next = ships.map((s, i) => {
     const pose = s.motion.pose;
@@ -152,7 +167,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     // At quarters, the side her guns bear on the enemy: her gun crews stand to it (gunnery.ts, crew.ts).
     const enemies = ships.flatMap((o, k) => (k === i ? [] : [o.motion.pose]));
     const quarters = s.told.quarters ? engagedSide(pose, enemies, s.told.aim) : undefined;
-    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, killed: killedOf(s.damage), repairs, quarters });
+    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, killed: killedOf(s.damage), repairs, quarters, ...(watch === null ? {} : { watch: watch.onDeck, minute: dayMinutesAt(state.dayStart, tick)! }) });
     for (const e of crewed.events) {
       const given = s.told.given.find((g) => g.id === e.of);
       if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });

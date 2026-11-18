@@ -602,6 +602,10 @@ export const STATIONS: readonly StationRow[] = [
   { id: 'sailroom-bench', name: 'the sail room', who: 'the sailmaker', orders: [], space: 'sailroom', along: 11.9, across: -2.5 },
   { id: 'workshop-a', name: "the fore hold, the carpenter's stores", who: "the carpenter's mate", orders: [], space: 'fore-hold', along: 12.5, across: 0.45 },
   { id: 'workshop-b', name: "the fore hold, the carpenter's stores", who: "the carpenter's crew", orders: [], space: 'fore-hold', along: 13.4, across: 0.45 },
+  // Where the watch on deck stands at the day's jobs (rules/day.ts `DAY_JOBS`): the scuttlebutt where the grog is served,
+  // between the hatches of the waist, nine places round it; and the two the deck is washed down at.
+  ...[[4, -0.5], [4, 0.5], [5, -0.5], [5, 0.5], [6, -0.5], [6, 0.5], [7, -0.5], [7, 0.5], [3.5, 0]].map(([along, across], k) => ({ id: `grog-${k + 1}`, name: 'the waist, round the scuttlebutt', who: 'the watch on deck at its grog', orders: [], space: 'deck', along: along!, across: across! })),
+  ...[[5, -1], [5, 1]].map(([along, across], k) => ({ id: `wash-${k + 1}`, name: 'the waist, between the guns', who: 'the waisters washing the deck down', orders: [], space: 'deck', along: along!, across: across! })),
   ...BUNK_STATIONS,
 ];
 /**

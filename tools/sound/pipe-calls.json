@@ -176,6 +176,16 @@
         { "note": [1, 0], "tone": "plain", "s": 0.06 },
         { "note": [0, 0], "tone": "plain", "s": 0.15 }
       ]
+    },
+    {
+      "id": "pipe/watch",
+      "what": "Relieve the watch (the general call that calls the hands): the low note rising to a warbled high held, then falling; it turns out the watch below and sends the other down at a change of watch.",
+      "segments": [
+        { "note": [0, 0], "tone": "plain", "s": 0.2 },
+        { "note": [0, 1], "tone": "plain", "s": 0.3 },
+        { "note": [1, 1], "tone": "warble", "s": 0.8 },
+        { "note": [1, 0], "tone": "plain", "s": 0.3 }
+      ]
     }
   ]
 }

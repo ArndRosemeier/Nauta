@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { bellStrikes, CrewWatch, pullLoudness, type CrewHeard, type CrewShot } from '../src/audio/crewHearing.ts';
 import {
-  LIFE_CALLS, BELL, BELL_EVERY, BELLS_A_WATCH, CALL_GAP, CARRY_ON, DRUM, HAUL_CALL, HAUL_PERIOD, HAUL_PULL, HAUL_SPREAD, ORDER_CALLS,
+  WATCH_CALL, LIFE_CALLS, BELL, BELL_EVERY, BELLS_A_WATCH, CALL_GAP, CARRY_ON, DRUM, HAUL_CALL, HAUL_PERIOD, HAUL_PULL, HAUL_SPREAD, ORDER_CALLS,
   RUN_STEP, STILL_CALL, SWING_PULLS, THROUGH_DECK,
 } from '../src/audio/crewTuning.ts';
 import { openShip } from '../src/sim/crew/closures.ts';
@@ -86,7 +86,7 @@ test('every order has its call, the hands\' orders each their own, and every cal
   assert.equal(new Set(hands.map((k) => ORDER_CALLS[k].id)).size, hands.length, 'no two orders of the hands share a call');
   const piped = [...hands.map((k) => ORDER_CALLS[k].id), ...Object.values(LIFE_CALLS).map((c) => c.id)];
   assert.equal(new Set(piped).size, piped.length, 'the parties for her life each their own call too');
-  for (const c of [...Object.values(ORDER_CALLS), ...Object.values(LIFE_CALLS), HAUL_CALL, STILL_CALL, CARRY_ON]) {
+  for (const c of [...Object.values(ORDER_CALLS), ...Object.values(LIFE_CALLS), HAUL_CALL, STILL_CALL, CARRY_ON, WATCH_CALL]) {
     const entry = index.sounds[c.id];
     assert.ok(entry, `${c.id} is made`);
     assert.ok(Math.abs(entry.seconds[0]! - c.seconds) < 0.15, `${c.id}: ${entry.seconds[0]} s made, ${c.seconds} s in the tuning`);
@@ -187,6 +187,12 @@ test('the ship\'s bell: struck every five minutes of the match, one bell more ea
   const alone = new CrewWatch(SEED), out: CrewHeard = { shots: [], beds: [] };
   alone.bellAlone({ t: BELL_EVERY - STEP_SECONDS, pose: BASE.motion.pose, below: 0, day: null }, out);
   assert.equal(alone.bellAlone({ t: BELL_EVERY, pose: BASE.motion.pose, below: 0, day: null }, out).shots.length, 1, 'with no match, by the page\'s clock');
+});
+
+test('the hands are piped when the watches change, on her ship only', () => {
+  const change = (ship: number) => calls(listen([], 2, { extra: (tick) => (tick === 15 ? [{ kind: 'watch', tick, ship, index: 3, onDeck: 1 }] : []) }).shots).map((s) => s.id);
+  assert.deepEqual(change(0), [WATCH_CALL.id]);
+  assert.deepEqual(change(1), []);
 });
 
 test('in the sandbox the bell strikes the day\'s watches by the day clock, and the five-minute bell is silent', () => {
