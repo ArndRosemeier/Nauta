@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readParams } from '../src/app/params.ts';
 
 test('no query: WebGPU, no HUD, a morning that moves', () => {
-  assert.deepEqual(readParams(''), { forceWebGL: false, hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, eye: 4.5, wind: 4, look: null });
+  assert.deepEqual(readParams(''), { forceWebGL: false, hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, slice: null, eye: 4.5, wind: 4, look: null });
 });
 
 test('the query sets the backend, the HUD, the hour, the day length, the eye and the wind', () => {
-  assert.deepEqual(readParams('?gl&hud&hour=17.5&day=0&eye=30&wind=7'), { forceWebGL: true, hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, eye: 30, wind: 7, look: null });
+  assert.deepEqual(readParams('?gl&hud&hour=17.5&day=0&eye=30&wind=7'), { forceWebGL: true, hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, slice: null, eye: 30, wind: 7, look: null });
 });
 
 test('nonsense falls back, and numbers are held to their range', () => {
@@ -32,4 +32,10 @@ test('?yaw and ?pitch set where the captain looks at the start, in degrees', () 
   const look = readParams('?yaw=90&pitch=-10').look!;
   assert.ok(Math.abs(look.yaw - Math.PI / 2) < 1e-12 && Math.abs(look.pitch + Math.PI / 18) < 1e-12);
   assert.equal(readParams('?pitch=-200').look!.pitch, -1.5);
+});
+
+test('?slice stands on the slice of her waist, at the standpoint named', () => {
+  assert.equal(readParams('?slice').slice, '');
+  assert.equal(readParams('?slice=below').slice, 'below');
+  assert.equal(readParams('').slice, null);
 });

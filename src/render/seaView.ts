@@ -69,13 +69,16 @@ export class SeaView {
   readonly deep: Mesh;
   /** Whether the eye was under the water in the last frame. */
   underWater = false;
+  /** Set by the app while the eye is inside a hull: below the waterline there it is dry, not under water. */
+  sheltered = false;
   /** Tiles drawn in the last frame. */
   tilesDrawn = 0;
   private readonly table = seaWaveTable();
   private readonly frustum = new Frustum();
   private readonly box = new Box3();
   private readonly viewProj = new Matrix4();
-  private readonly origin = new Vector3();
+  /** Where the sea's own frame stands (it follows the eye in steps); the ship's sea cut reads it. */
+  readonly origin = new Vector3();
   private readonly fine = fineTable();
   private readonly gusts: GustMap;
   private readonly sample = seaSample();
@@ -158,7 +161,7 @@ export class SeaView {
     I.gusts.needsUpdate = true;
 
     // Under the water: the deep around the eye, and the sea's underside.
-    this.underWater = cam.y < surfaceAt(sea, cam.x, cam.z, t, this.sample).height;
+    this.underWater = !this.sheltered && cam.y < surfaceAt(sea, cam.x, cam.z, t, this.sample).height;
     this.deep.visible = this.underWater;
     this.deep.position.copy(cam);
 

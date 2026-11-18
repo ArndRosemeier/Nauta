@@ -28,6 +28,7 @@ import {
 } from 'three/tsl';
 import { fullSky } from '@futuremagic/sky/rig';
 import { EARTH_RADIUS } from './earth';
+import { seaCut } from './seaCut';
 import { SEA_LOD_RANGE, SEA_MAX_TILES, SEA_MORPH_START, SEA_TILE_CELLS, SEA_WAVE_FULL_CELLS, SEA_WAVE_GONE_CELLS } from './seaGrid';
 import { SEA_DRAWN_WAVES, SEA_WAVE_STRIDE } from './seaWaves';
 import { SEA_FINE_DRAWN, SEA_FINE_STRIDE } from './seaFine';
@@ -104,6 +105,13 @@ const FOAM_TILE_FINE = 2.56;
 const FOAM_EDGE = 0.12;
 /** The breakup noise at the fine scale that joins the coarse one, so a sheet of foam has holes of every size. */
 const BREAKUP_FINE = 0.35;
+/**
+ * Where most of the breakup noise lies (it runs about this low and high), stretched to 0..1; and how much of it even the
+ * thickest fresh foam beats, so a breaking crest is never one white sheet but always shows water through its holes.
+ */
+const BREAKUP_LOW = 0.3;
+const BREAKUP_HIGH = 0.7;
+const FOAM_FULLEST = 0.8;
 /** How much the bubbles grain fresh foam (0 none, 1 holes right through). */
 const BUBBLE_DEPTH = 0.25;
 /** The foam's pattern blurs into its mean share where a pixel covers this much of the water, m (sharp to blurred), and that share. */
@@ -232,7 +240,7 @@ function beckmann(nh, m2) {
 const SMITH_KNEE = 1.6;
 const SMITH = [3.535, 2.181, 2.276, 2.577] as const;
 function smith(c, m2) {
-  const a = c.div(sqrt(m2.mul(float(1).sub(c.mul(c)).max(PIXEL_LEAST))));
+  const a = c.div(sqrt(m2.mul(c.mul(c).oneMinus().max(PIXEL_LEAST))));
   const fit = a.mul(SMITH[0]).add(a.mul(a).mul(SMITH[1])).div(float(1).add(a.mul(SMITH[2])).add(a.mul(a).mul(SMITH[3])));
   return select(a.lessThan(SMITH_KNEE), fit, float(1));
 }
@@ -299,6 +307,9 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     vToEye.assign(I.eye.sub(placed));
     return placed;
   })();
+
+  // No water inside a hull (seaCut.ts): the surface's point here is the eye less the way to it.
+  m.maskNode = seaCut(I.eye.sub(vToEye));
 
   m.colorNode = Fn(() => {
     const calm = vCalm, toEye = vToEye, far = length(toEye), V = toEye.div(far);
@@ -399,12 +410,12 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       const water = body.add(through).mul(float(1).sub(skyShare));
       const lit = water.add(sky.mul(skyShare)).add(I.sun.mul(glitter).mul(sunUp));
       // Gusts: their roughness darkens the water by itself (it reflects higher, darker sky); a touch more for the eye.
-      const gusted = lit.mul(float(1).sub(gustStrength.mul(GUST_DARKEN)));
+      const gusted = lit.sub(lit.mul(gustStrength).mul(GUST_DARKEN));
       // Foam: fresh white foam broken up by its noise, then a lace that thins as it fades.
       // Where the pattern is finer than a pixel, its share instead of its shape.
       const blurred = smoothstep(FOAM_SHARP, FOAM_BLURRED, pixelNarrow);
-      const breakup = mix(coarse.y, fine.y, BREAKUP_FINE);
-      const freshShape = smoothstep(0, FOAM_EDGE, foamNow.sub(breakup)).mul(mix(float(1), fine.z, BUBBLE_DEPTH));
+      const breakup = smoothstep(BREAKUP_LOW, BREAKUP_HIGH, mix(coarse.y, fine.y, BREAKUP_FINE));
+      const freshShape = smoothstep(0, FOAM_EDGE, foamNow.mul(FOAM_FULLEST).sub(breakup)).mul(mix(float(1), fine.z, BUBBLE_DEPTH));
       const freshCover = mix(freshShape, foamNow.mul(foamNow).mul(FOAM_FAR_FRESH), blurred);
       const ragged = mix(coarse.y, coarse.x, LACE_SHARE);
       const oldShape = smoothstep(float(1).sub(foamOld), float(1).sub(foamOld).add(LACE_SOFT), ragged).mul(foamOld);

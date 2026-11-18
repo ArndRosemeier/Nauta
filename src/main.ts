@@ -2,11 +2,16 @@
 import { GraphicsUnavailable } from '@futuremagic/stage';
 import { readParams } from './app/params';
 import { watchLook } from './app/lookInput';
+import { standpoint, type Standpoint } from './app/standpoints';
+import { showStandpoints } from './app/standpointBar';
 import { showVersion } from './app/whatsNew';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
 import { makeTestBodies } from './render/testBodies';
+import { loadFittings } from './render/ship/fittings';
+import { buildSlice } from './render/ship/slice';
+import { ShipView } from './render/ship/shipView';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
 import { makeWind, meanWind } from './sim/wind';
 import { followWind, startSea } from './sim/sea/sea';
@@ -24,6 +29,12 @@ const MATCH_SEED = 1805;
 const WIND_FROM = 247.5 * DEGREE;
 /** How long the loading screen takes to fade (the `transition` of #loading in index.html), ms, and a little more. */
 const LOADING_FADE_MS = 700;
+/** How far off the sun's light stands from what it lights, m (only its direction matters). */
+const SUN_DISTANCE = 60;
+/** Triangles are counted in thousands on the HUD. */
+const THOUSAND = 1000;
+/** Bytes in a megabyte, for the HUD. */
+const MEGABYTE = 1 << 20;
 
 declare global {
   interface Window {
@@ -37,7 +48,10 @@ const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as
 async function start(): Promise<void> {
   const params = readParams(location.search);
   const canvas = el<HTMLCanvasElement>('view'), hud = el('hud'), loading = el('loading');
-  const view = await createView(canvas, params.forceWebGL);
+  // `?slice`: her waist, built from the fittings pack behind the loading screen (plan N2.0); the sun casts shadows then.
+  const ship = params.slice !== null ? new ShipView(buildSlice(await loadFittings(import.meta.env.BASE_URL))) : null;
+  let where: Standpoint = standpoint(params.slice ?? '');
+  const view = await createView(canvas, params.forceWebGL, ship !== null);
   view.camera.position.set(0, params.eye, 0);
   const startLook = params.look ?? START_LOOK;
   view.camera.rotation.set(startLook.pitch, startLook.yaw, 0);
@@ -55,10 +69,12 @@ async function start(): Promise<void> {
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
   await view.stage.add(seaView.deep);
-  // On WebGPU, building the sea's shader can leave the sky's environment map blank until it is drawn again.
-  sky.redrawEnvironment();
   if (params.rig) await view.stage.add(makeTestBodies(startLook.yaw, params.eye));
-  const input = watchLook(canvas, startLook, view.radPerPixel);
+  if (ship) await view.stage.add(ship.group);
+  // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
+  sky.redrawEnvironment();
+  const input = watchLook(canvas, ship ? where.look : startLook, view.radPerPixel);
+  if (ship) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
 
@@ -66,18 +82,25 @@ async function start(): Promise<void> {
   view.renderer.setAnimationLoop(() => {
     const now = performance.now(), dt = Math.min(MAX_FRAME_SECONDS, (now - last) / MS_PER_SECOND);
     last = now;
-    view.camera.rotation.set(input.look.pitch, input.look.yaw, 0);
-    sky.update(dt, view.camera);
     seaTime += dt;
     meanWind(wind, seaTime, blowing);
     sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
+    if (ship) {
+      ship.update(sea, seaTime, dt, view.camera, where, input.look, view.sun, sky.lightDirection, sky.gain, view.radPerPixel(), seaView.origin);
+      sky.below = ship.below;
+      seaView.sheltered = ship.below > 0;
+    } else {
+      view.camera.rotation.set(input.look.pitch, input.look.yaw, 0);
+      view.sun.position.copy(view.sun.target.position).addScaledVector(sky.lightDirection, SUN_DISTANCE);
+    }
+    sky.update(dt, view.camera);
     seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
     frames++;
     if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${params.wind} · eye ${params.eye} m · sea ${seaView.tilesDrawn} tiles\n${view.stage.hudLine()}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${params.wind} · eye ${params.eye} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris, ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\n${view.stage.hudLine()}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;

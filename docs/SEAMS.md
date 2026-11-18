@@ -78,3 +78,33 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The strength lit materials take the sky's environment map at | `src/render/skyView.ts#SkyView` |
 | The sea drawn: tiles chosen for the camera each frame, waves and light handed to the shader | `src/render/seaView.ts#SeaView` |
 | A game kind's own attribute on the Stage's stand-in mesh | `src/render/materials.ts#standInAttribute` |
+| The brig's measures (Cruizer class, from the Admiralty draught): her midship section, decks, ports, rig sizes | `src/sim/rules/ships.ts#MIDSHIP_SECTION` |
+| Her moulded half-breadth at a height | `src/sim/ship/section.ts#halfBreadth` |
+| Her section's outline by girth, planked or ceiled | `src/sim/ship/section.ts#sectionOutline` |
+| Ship space: heights above her base, metres forward of the mainmast | `src/sim/ship/section.ts#shipY` |
+| The weather deck's height across her (its camber) | `src/sim/ship/section.ts#deckY` |
+| The plane of the water under her footprint | `src/sim/ship/standIn.ts#waterPlane` |
+| Her stand-in motion: easing toward the water (until N2.2) | `src/sim/ship/standIn.ts#followWater` |
+| Where one stands on the slice, and the look from there | `src/app/standpoints.ts#STANDPOINTS` |
+| The standpoints' buttons | `src/app/standpointBar.ts#showStandpoints` |
+| Vertices gathered and handed to the GPU as one geometry | `src/render/ship/gathered.ts#Gathered` |
+| Her solid parts' vertices (finish, grain, occlusion, wear) | `src/render/ship/solid.ts#Solid` |
+| A finished timber or plate with rounded edges | `src/render/ship/shapes.ts#box` |
+| A turned part (mast, hoops, ring bolts) | `src/render/ship/shapes.ts#lathe` |
+| A round bar between two points | `src/render/ship/shapes.ts#rod` |
+| A curved surface from rows of points (hull, decks, ceiling) | `src/render/ship/shapes.ts#sheet` |
+| Rope as tubes round centre lines | `src/render/ship/rope.ts#Ropes` |
+| A rope hanging between two points | `src/render/ship/rope.ts#hanging` |
+| Her paint and the tints of her timber | `src/render/ship/looks.ts#BLACK` |
+| Loading the fittings pack made in AssetGenerator | `src/render/ship/fittings.ts#loadFittings` |
+| Placing a fitting into her solids, slot by slot | `src/render/ship/fittings.ts#place` |
+| The slice of her waist (N2.0) | `src/render/ship/slice.ts#buildSlice` |
+| Her rig within the slice: mast, top, channels, deadeyes, shrouds, ratlines, pin rails, coils | `src/render/ship/rig.ts#buildRig` |
+| The timber's grain, pores and grime as one texture | `src/render/ship/grain.ts#makeGrainTexture` |
+| Her timber's shader: grain, planks, seams, paint, wear, grime | `src/render/ship/shipMaterials.ts#makeWoodMaterial` |
+| Her iron, copper, lantern glow and rope shaders | `src/render/ship/shipMaterials.ts#makeRopeMaterial` |
+| What her shaders read each frame (eye, lantern, hatch) | `src/render/ship/shipMaterials.ts#SHIP_INPUTS` |
+| Her half-breadth and deck height in a shader | `src/render/ship/hullNode.ts#hullHalfBreadth` |
+| No water drawn inside her hull | `src/render/seaCut.ts#seaCut` |
+| The ship drawn and riding the sea, the eye carried with her | `src/render/ship/shipView.ts#ShipView` |
+| The sun's shadow map round her | `src/render/ship/shipView.ts#shadowingSun` |
