@@ -505,11 +505,13 @@ function makeSail(told: ShipOrders, s: Sailing, order: SailingOrder, canvas: Can
   return tell(told, order, now.tick, { canvas }, acts, true);
 }
 
-/** She is in stays: a tack ordered and not yet put to the helm, or her bow turning up through the wind toward the other tack. */
-function inStays(told: ShipOrders, s: Sailing, from: number): boolean {
-  if (told.given.some((g) => g.order.kind === 'tack')) return true;
-  const tack = tackOf(s.heading, from, s.sides[0]!);
-  return s.steer.turn === tack && tackOf(s.steer.heading, from, tack) === -tack;
+/**
+ * She is not round yet: a tack ordered and not yet put to the helm, her helmsman still turning her the long way onto
+ * the course he was given (through the wind and on until she lies on it), or her masts' sails not yet all over on one
+ * side. Her bow past the wind's eye is not round: a second tack then would put her back into the wind with no way.
+ */
+function inStays(told: ShipOrders, s: Sailing): boolean {
+  return told.given.some((g) => g.order.kind === 'tack') || s.steer.turn !== 0 || s.sides.some((side) => side !== s.sides[0]);
 }
 
 /** Why an order is not one at all (no such kind, a field that is not what it should be), or ''. Untrusted orders come from other machines. */
@@ -583,7 +585,7 @@ function sailing(told: ShipOrders, s: Sailing, order: SailingOrder, now: OrderMo
       return tell(told, order, now.tick, { helm: { heading: 0, by: tack } }, [{ kind: 'helm', heading: closeHauled(tack, from), turn: 0 }], false);
     case 'tack': {
       if (s.ahead < NO_WAY) return refuse(told, 'no way', 'she has no way on her');
-      if (inStays(told, s, from)) return refuse(told, 'in stays', 'she is in stays: not until she is round');
+      if (inStays(told, s)) return refuse(told, 'in stays', 'she is in stays: not until she is round');
       return tell(told, order, now.tick, { helm: { heading: 0, by: -tack } }, [{ kind: 'helm', heading: closeHauled(-tack, from), turn: tack }], false);
     }
     case 'wear': {
