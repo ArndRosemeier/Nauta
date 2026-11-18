@@ -10,9 +10,8 @@ import type { WaveSet } from '../sim/sea/waves';
 import type { WindState } from '../sim/wind';
 import { DEEP, SEA } from './materials';
 import { SEA_INPUTS, SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, TILE_AT, useFineSea, useSeaSky, useWake } from './seaMaterial';
-import { WakeMap } from './wakeMap';
+import { WAKE_SLOTS, WakeMap } from './wakeMap';
 import { apartOnWater } from '../sim/units';
-import { SHIPS_DRAWN } from './ship/shipMaterials';
 import type { Track, WakeSource } from './wake';
 import { SEA_MAX_TILES, SEA_TILE_CELLS, seaCellChoices, seaDropAtReach, seaReach, seaTiles, seaTileTriangles } from './seaGrid';
 import { SEA_WAVE_STRIDE, WAVE_AT, fillSeaWaves, seaWaveTable } from './seaWaves';
@@ -104,7 +103,7 @@ export class SeaView {
   /** The fine sea's bands on the GPU (plan N1.2): main.ts runs their passes each frame before drawing. */
   readonly fine: FineSea;
   /** Each ship's wake on the GPU (plans N2.5, N3.8: hers, then the other captain's): main.ts fills them each frame after the fine sea's passes. */
-  readonly wakes = Array.from({ length: SHIPS_DRAWN }, (_, i) => new WakeMap(i));
+  readonly wakes = Array.from({ length: WAKE_SLOTS }, (_, i) => new WakeMap(i));
   private readonly toSea = new Matrix4();
   private readonly gusts: GustMap;
   private readonly sample = seaSample();

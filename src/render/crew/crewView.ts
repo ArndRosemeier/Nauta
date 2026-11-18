@@ -232,7 +232,7 @@ export class CrewView {
     private readonly pool: NearPool,
     private readonly climber: ClimbRig,
     private readonly workbench: Character,
-    private readonly views: readonly (ShipView | null)[],
+    private readonly viewOf: (ship: number) => ShipView | null,
     private readonly other: OtherCrewAt,
     rosters: readonly (readonly Man[])[],
   ) {
@@ -257,11 +257,11 @@ export class CrewView {
   }
 
   /**
-   * Loads the crews of both ships (`views`: each ship's view by her place in the match, null where she is not drawn):
+   * Loads the crews of `ships` ships (`viewOf`: each ship's view by her place in the match, null where she is not drawn):
    * the workbench character, the figures baked from it, and the near pool as the knobs size it. `note` hears progress.
    */
-  static async load(renderer: WebGPURenderer, base: string, views: readonly (ShipView | null)[], knobs: Pick<CrewKnobs, 'pool' | 'poolFull'>, other: OtherCrewAt, note: (what: string) => void): Promise<CrewView> {
-    const rosters = views.map(() => brigRoster());
+  static async load(renderer: WebGPURenderer, base: string, viewOf: (ship: number) => ShipView | null, ships: number, knobs: Pick<CrewKnobs, 'pool' | 'poolFull'>, other: OtherCrewAt, note: (what: string) => void): Promise<CrewView> {
+    const rosters = Array.from({ length: ships }, () => brigRoster());
     note('the crews come aboard');
     const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, levels: [CROWD_LEVEL] });
     const kinds = crowdKinds(workbench.catalog, rosters);
@@ -272,7 +272,7 @@ export class CrewView {
     const pool = await NearPool.load(renderer, `${base}${PACK}`, workbench, knobs.pool, knobs.poolFull, fullLook(workbench.catalog, figureOf(0, 1, rosters[0]![1]!)));
     note('the climbers learn the shrouds');
     const climber = await ClimbRig.make(renderer, `${base}${PACK}`, workbench);
-    return new CrewView(figures, pool, climber, workbench, views, other, rosters);
+    return new CrewView(figures, pool, climber, workbench, viewOf, other, rosters);
   }
 
   /**
@@ -413,7 +413,7 @@ export class CrewView {
    */
   private placeGroup(ship: number, fr: CrewFrame): Group | null {
     const g = this.groups[ship]!, trialOther = ship !== fr.mine && this.other !== null;
-    const view = trialOther ? this.views[fr.mine] : this.views[ship];
+    const view = trialOther ? this.viewOf(fr.mine) : this.viewOf(ship);
     if (!view || !view.group.visible) return null;
     g.matrix.copy(view.group.matrixWorld);
     if (trialOther && 'offset' in this.other!) {
@@ -465,7 +465,7 @@ export class CrewView {
     const at = manDrawn(from, to, fr.state.f, d.man, d.m, d.seed, d.at), mine = d.ship === fr.mine;
     if (mine) this.officerAt(d, fr);
     this.climbs(d);
-    const view = mine || (this.other && 'aboard' in this.other) ? this.views[fr.mine]! : null;
+    const view = mine || (this.other && 'aboard' in this.other) ? this.viewOf(fr.mine)! : null;
     const eye = this.eyes[d.ship]!;
     // A man at his place on the captain's floor steps aside as the captain walks up to him (the match does not know where he walks).
     if (at.clip !== WALKING && at.clip !== RUNNING && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT) stepAside(at, eye);

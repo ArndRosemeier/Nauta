@@ -28,7 +28,7 @@
  */
 import { HalfFloatType, LinearFilter, LinearMipmapLinearFilter, ClampToEdgeWrapping, Matrix4, RGBAFormat, StorageTexture, Vector4, type ComputeNode, type WebGPURenderer } from 'three/webgpu';
 import {
-  Fn, If, Loop, abs, clamp, dot, exp, float, instanceIndex, int, length, max, min, mix, normalize, select, sign, smoothstep, sqrt,
+  Fn, If, Loop, abs, clamp, dot, exp, float, instanceIndex, int, length, max, min, mix, normalize, select, sign, smoothstep, sqrt, step,
   texture, textureStore, uniform, uniformArray, uvec2, vec2, vec4, cos, sin, pow,
 } from 'three/tsl';
 import { GRAVITY } from '../sim/units';
@@ -129,6 +129,9 @@ type WakeInputs = ReturnType<typeof makeInputs>;
 
 /** Each ship's inputs, by her index (0 hers, 1 the other captain's: shipMaterials.ts `SHIP_OBJECT.ship`), made when first asked for. */
 const INPUTS: WakeInputs[] = [];
+/** How many ships have a wake map at once: the sea's shader reads four textures of each, so only the ships nearest the eye are given one (`seaView.show`). */
+export const WAKE_SLOTS = 2;
+
 export function wakeInputs(ship: number): WakeInputs {
   for (let i = INPUTS.length; i <= ship; i++) INPUTS.push(makeInputs());
   return INPUTS[ship]!;
@@ -217,9 +220,11 @@ const WET_EDGE = 0.06;
  * Her side wet from the sea (plan N2.5, "water running off"): at a point of her outside (ship space), how wet it is,
  * 0..1: up to where the water has climbed her side lately and is draining down (the stations' wet line), and her bow
  * wave at speed; ragged in streaks below the line as it runs off. `colour` and `rough` darkened and made glossy by it.
- * `ship`: whose hull it is (a node, 0 to `ships` − 1): each ship's own stations wet her.
+ * `ship`: the wake slot of the ship whose hull it is (a node, 0 to `ships` − 1, or below 0 for none): each ship's own stations wet her.
  */
 export function wetHull(p, colour, rough, ship, ships: number) {
+  // A ship with no wake map (a negative slot: too far to need one) is not wetted.
+  const live = step(float(0), float(ship));
   const pick = (f) => {
     let v = f(wakeInputs(0));
     for (let i = 1; i < ships; i++) v = select(ship.equal(i), f(wakeInputs(i)), v);
@@ -230,7 +235,7 @@ export function wetHull(p, colour, rough, ship, ships: number) {
   const line = st.w.add(st.z).add(bowWave);
   // Streaks: a hash per strip along her, so the edge runs down in fingers.
   const strip = p.z.mul(STREAKS).floor(), streak = sin(strip.mul(STREAK_SEED * TURN * STREAKS)).mul(HALF).add(HALF);
-  const wet = float(1).sub(smoothstep(line.sub(streak.mul(STREAK_DEPTH)), line.sub(streak.mul(STREAK_DEPTH)).add(WET_EDGE), p.y)).mul(now.w);
+  const wet = float(1).sub(smoothstep(line.sub(streak.mul(STREAK_DEPTH)), line.sub(streak.mul(STREAK_DEPTH)).add(WET_EDGE), p.y)).mul(now.w).mul(live);
   return { colour: mix(colour, colour.mul(WET_DARK), wet), rough: mix(rough, float(WET_ROUGH), wet) };
 }
 

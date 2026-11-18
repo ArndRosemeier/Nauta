@@ -1,0 +1,2 @@
+The game can now draw up to eight ships at once, each with her own sails, shot holes, guns and flag.
+To see it, add ?watch&ships=4 (up to 8) to the address: computer captains fight in two sides. For now only two ships have crews on deck, and only the nearest two leave a wake.

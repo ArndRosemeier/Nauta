@@ -44,7 +44,7 @@ export async function openGame({ base, browser }, query, viewport, hasTouch = fa
   for (const path of scripts) await page.addInitScript({ path });
   // Errors, and three's warnings (a shader node that failed to build is only warned about, and the mesh is not drawn).
   page.on('console', (m) => { if (m.type() === 'error' || (m.type() === 'warning' && m.text().startsWith('THREE.')) || process.env.SHOT_LOG) console.error(`[page] ${m.text()}`); });
-  page.on('pageerror', (e) => { failed = true; console.error(`[page error] ${e.message}`); });
+  page.on('pageerror', (e) => { failed = true; console.error(`[page error] ${e.message}${process.env.SHOT_STACK ? "\n" + e.stack : ""}`); });
   await page.goto(base + (query.startsWith('?') ? query : '?' + query), { timeout: TIMEOUT });
   await page.waitForFunction(() => window.__nautaReady === true, null, { timeout: TIMEOUT }).catch(() => { failed = true; console.error('page did not report ready'); });
   await page.addStyleTag({ content: '#loading{display:none!important}' });

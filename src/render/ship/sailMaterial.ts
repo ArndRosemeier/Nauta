@@ -9,10 +9,10 @@
  * behind a sail it glows, the doubled cloth of its seams and bands darker against it and the rig's shadows on it (the
  * sun's light as it reaches the cloth, shadowed, through the back of the canvas).
  */
-import { DataTexture, DoubleSide, FloatType, LinearFilter, MeshStandardNodeMaterial, PhysicalLightingModel, RGBAFormat, UnsignedByteType, Vector2 } from 'three/webgpu';
+import { DataArrayTexture, DataTexture, DoubleSide, FloatType, LinearFilter, MeshStandardNodeMaterial, PhysicalLightingModel, RGBAFormat, UnsignedByteType, Vector2 } from 'three/webgpu';
 import {
   Fn, abs, attribute, clamp, cos, cross, faceDirection, float, floor, fract, fwidth, hash, int, ivec2, max, min, mix, normalView, normalize,
-  round, select, sin, smoothstep, step, texture, textureLoad, transformNormalToView, uniform, varyingProperty, vec2, vec3, vec4,
+  round, select, sin, smoothstep, step, texture, textureLoad, transformNormalToView, uniform, uniformArray, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import {
   BREATHE_HZ, BREATHE_U, BREATHE_V, BUNT, FLAG, NONE, REEF_ROLL, ROW, SAME_POINT, ROLL_ENDS, ROLL_IN, ROLL_TURNS, ROW_TEXELS, SHAPE_TEXELS, TEXEL, SCALLOP, SHIVER_FALL, SHIVER_HZ,
@@ -20,7 +20,7 @@ import {
 } from './sailForm';
 import { CLEAR_DRAPE, CLEAR_FADE, CLEAR_MARGIN, CLEAR_REACH, CLEAR_SOLIDS, CLEAR_STRIDE } from './sailClear';
 import { ENSIGN_PATTERN, FLAGS, PENNANT_PATTERN, SAIL_ATLAS_SIZE } from './sailGrid';
-import { SHIPS_DRAWN, SHIP_OBJECT, crossfadeMask, nearest } from './shipMaterials';
+import { SHIPS_DRAWN, SHIP_OBJECT, crossfadeMask, nearest, setPerShip } from './shipMaterials';
 import { filtered } from '../dataTexture';
 
 /** Rows of the sails' state: her 11 sails, the ensign and the pennant, and room to spare. */
@@ -39,7 +39,9 @@ export function setShipSails(rows: Float32Array, ship = 0): void {
  * The sails' hole map (sailGrid.ts `sailAtlas`): a texel per 5 cm of every sail's cloth, a block per ship drawn (her
  * own first), with the marks damageMarks.ts writes (hole, scorch, frayed rim, cut): the holed kind leaves the cut out.
  */
-export const SAIL_DAMAGE_TEXTURE = new DataTexture(new Uint8Array(SAIL_ATLAS_SIZE * SAIL_ATLAS_SIZE * SHIPS_DRAWN * RGBA), SAIL_ATLAS_SIZE, SAIL_ATLAS_SIZE * SHIPS_DRAWN, RGBAFormat, UnsignedByteType);
+export const SAIL_DAMAGE_TEXTURE = new DataArrayTexture(new Uint8Array(SAIL_ATLAS_SIZE * SAIL_ATLAS_SIZE * SHIPS_DRAWN * RGBA), SAIL_ATLAS_SIZE, SAIL_ATLAS_SIZE, SHIPS_DRAWN);
+SAIL_DAMAGE_TEXTURE.format = RGBAFormat;
+SAIL_DAMAGE_TEXTURE.type = UnsignedByteType;
 filtered(SAIL_DAMAGE_TEXTURE, LinearFilter);
 /** Canvas frayed round a shot hole: greyed and darkened toward this (linear RGB), this much at most. */
 const FRAYED = [0.09, 0.08, 0.065];
@@ -50,11 +52,9 @@ const SAIL_CUT_FROM = 0.5;
  * Which ships drawn fly the French colours (1) and which the British (0), by the ship's index drawn (0 hers, 1 the
  * other's): a uniform, so the menu's choice of navy (docs/design/menu.md) changes the flags without a shader compiled.
  */
-const FRENCH_FLAGS = uniform(new Vector2(0, 1));
-/** The colours each ship drawn flies: hers and the other's (true: French). */
-export function setFrenchFlags(mine: boolean, hers: boolean): void {
-  FRENCH_FLAGS.value.set(mine ? 1 : 0, hers ? 1 : 0);
-}
+const FRENCH_FLAGS = uniformArray(Array.from({ length: SHIPS_DRAWN }, (_, i) => (i === 0 ? 0 : 1)), 'float');
+/** The colours each ship drawn flies, by the ship's index drawn: hers, then the others' (true: French). */
+export const setFrenchFlags = (french: readonly boolean[]): void => setPerShip(FRENCH_FLAGS, french, 0);
 /** Seconds, for the sails' shiver, breathing and the flags' waves (sailsView.ts keeps it with the CPU's copy). */
 export const SAIL_TIME = uniform(0);
 
@@ -283,14 +283,14 @@ export function makeSailMaterial(crossfade = false, holed = crossfade): MeshStan
   canvas = mix(canvas, vec3(...HEMP), point);
   canvas = mix(canvas, vec3(...TARRED), bolt);
   // Her block of the hole map; the flags have none.
-  const marks = texture(SAIL_DAMAGE_TEXTURE, vec2(bd.z, bd.w.add(SHIP_OBJECT.ship).div(SHIPS_DRAWN))).mul(float(1).sub(isFlag));
+  const marks = texture(SAIL_DAMAGE_TEXTURE, vec2(bd.z, bd.w)).depth(int(SHIP_OBJECT.ship)).mul(float(1).sub(isFlag));
   canvas = mix(mix(canvas, vec3(...FRAYED), marks.b.mul(FRAY_SHOWS)), vec3(...SCORCH), marks.g);
   const doubled = max(max(overlap, band), tabling);
   const canvasThrough = float(CANVAS_THROUGH).mul(mix(float(1), float(DOUBLED), doubled)).mul(float(1).sub(max(bolt, point)));
   const isPennant = pattern.greaterThan(ENSIGN_PATTERN + 1 / 2);
   const british = select(isPennant, pennantColour(s, drop), ensignColour(s, drop));
   const french = select(isPennant, tricolour(s, FRENCH_PENNANT_BAND), tricolour(s, ENSIGN.fly / BANDS));
-  const flies = select(int(SHIP_OBJECT.ship).equal(0), FRENCH_FLAGS.x, FRENCH_FLAGS.y);
+  const flies = FRENCH_FLAGS.element(int(SHIP_OBJECT.ship));
   const flag = mix(british, french, flies);
   m.colorNode = mix(canvas, flag, isFlag);
   m.throughNode = m.colorNode.mul(mix(canvasThrough, float(BUNTING_THROUGH), isFlag));
