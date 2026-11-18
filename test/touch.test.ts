@@ -92,7 +92,8 @@ test('head on: they strike, lose most of their way, are turned off each other an
 });
 
 test('a glancing blow: her stem catches the other\'s quarter as she crosses ahead, the other is swung round and they part', () => {
-  const r = sail([{ x: 0, z: 40, heading: 0, speed: 3 }, { x: -8, z: 0, heading: 90 * DEGREE, speed: 3 }]);
+  // Placed so her stem meets the other's quarter at the pace she gathers in a moderate breeze (rules/sailing.ts LIGHT_AIRS).
+  const r = sail([{ x: 0, z: 44, heading: 0, speed: 3 }, { x: -8, z: 0, heading: 90 * DEGREE, speed: 3 }]);
   assert.ok(r.deepest < MOST_OVERLAP, `nothing passes through (deepest ${r.deepest.toFixed(3)} m)`);
   assert.ok(r.apart, 'they end apart');
   const hits = struck(r);

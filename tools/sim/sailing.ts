@@ -23,7 +23,8 @@
  *   npm run check:sailing
  */
 import {
-  CLOSE_HAULED, HEEL_LIMIT, SPEED_CANVAS, SPEED_TABLE, SPEED_TOLERANCE, SPEED_WIND_FORCE, type CanvasName,
+  CLOSE_HAULED, HEEL_LIMIT, LIGHT_BATTLE_LEAST, LIGHT_SPEED_TABLE, LIGHT_WIND_FORCE, LIGHTEST_SHARE, SPEED_CANVAS, SPEED_TABLE,
+  SPEED_TOLERANCE, SPEED_WIND_FORCE, TACK_RECOVERY, type CanvasName,
 } from '../../src/sim/rules/sailing.ts';
 import { DUEL_FORCES, WIND_PRESETS } from '../../src/sim/rules/wind.ts';
 import { START_CLOSING, START_MINUTES } from '../../src/sim/rules/start.ts';
@@ -87,18 +88,23 @@ function pointOfSail(force: number, canvas: CanvasName, angle: number): { knots:
   return { knots: speed / n / KNOT, heel: heel / n };
 }
 
-/** How long a tack from a beam reach takes, from the helm put over to her head through the wind, s (Infinity if she does not come through). */
-function tack(force: number, canvas: CanvasName): number {
+/**
+ * A tack from a beam reach: how long it takes, from the helm put over to her head through the wind (her fore yards
+ * over, `tacked`), s (Infinity if she does not come through), and how long after that she is back at
+ * `TACK_RECOVERY.knots` (Infinity if not within the run).
+ */
+function tack(force: number, canvas: CanvasName): { through: number; back: number } {
   const s = run(match(force, canvas, 90), SETTLE);
-  let at = Infinity, t = 0;
+  let at = Infinity, back = Infinity, t = 0;
   // Timed from the helm put over (the order's `done`): the hands' time before it is the order table's (rules/orders.ts).
   let from = Infinity;
-  run(s, TACK_LIMIT * 2, (_s, events) => {
+  run(s, TACK_LIMIT * 2, (st, events) => {
     t += 1 / STEPS_PER_SECOND;
     if (from === Infinity && events.some((e) => e.kind === 'done' && e.order.kind === 'tack')) from = t;
     if (at === Infinity && events.some((e) => e.kind === 'tacked')) at = t - from;
+    if (at !== Infinity && back === Infinity && st.ships[0]!.sailing.ahead >= TACK_RECOVERY.knots * KNOT) back = t - from - at;
   }, [{ kind: 'tack', ship: 0 }]);
-  return at;
+  return { through: at, back };
 }
 
 /** How long heaving to from a beam reach under battle sail takes to take her way off, s (Infinity if not within `HEAVE_LIMIT`). */
@@ -112,17 +118,33 @@ function heaveTo(force: number): number {
 }
 
 const t0 = performance.now();
-console.log(`force canvas  ${POINTS.map((a) => `${a.toFixed(0).padStart(5)}°`).join('')}   heel (most)  tack`);
+console.log(`force canvas  ${POINTS.map((a) => `${a.toFixed(0).padStart(5)}°`).join('')}   heel (most)  tack  ${TACK_RECOVERY.knots} kn again`);
+/** Her speeds under plain sail in the light breeze, and close-hauled under battle sail, by force (the light-airs rows). */
+const light = new Map<string, number>();
 for (const force of FORCES) {
   for (const canvas of CANVASES) {
     const rows = POINTS.map((a) => pointOfSail(force, canvas, a));
     const heel = Math.max(...rows.map((r) => Math.abs(r.heel)));
-    const tackTime = tack(force, canvas);
-    console.log(`${String(force).padStart(5)} ${canvas.padEnd(7)} ${rows.map((r) => r.knots.toFixed(1).padStart(6)).join('')}   ${(heel / DEGREE).toFixed(1).padStart(5)}°      ${tackTime === Infinity ? 'missed' : `${tackTime.toFixed(0)} s`}`);
+    const { through: tackTime, back } = tack(force, canvas);
+    POINTS.forEach((a, k) => light.set(`${force} ${canvas} ${a.toFixed(1)}`, rows[k]!.knots));
+    console.log(`${String(force).padStart(5)} ${canvas.padEnd(7)} ${rows.map((r) => r.knots.toFixed(1).padStart(6)).join('')}   ${(heel / DEGREE).toFixed(1).padStart(5)}°      ${tackTime === Infinity ? 'missed' : `${tackTime.toFixed(0)} s`}   ${back === Infinity ? 'not' : `${back.toFixed(0)} s`}`);
+    // Held in the light airs (force 3 and 4); from force 5 up her pace is as built and the time is printed only.
+    if (force >= WORKING_FORCE && force < SPEED_WIND_FORCE && !(back <= TACK_RECOVERY.within)) problems.push(`force ${force}, ${canvas} sail: ${TACK_RECOVERY.knots} kn again ${back === Infinity ? 'never' : `${back.toFixed(0)} s`} after the tack, not within ${TACK_RECOVERY.within} s`);
     if (heel >= HEEL_LIMIT) problems.push(`force ${force}, ${canvas} sail: steady heel ${(heel / DEGREE).toFixed(1)}° passes the limit`);
     if (force >= WORKING_FORCE && !(tackTime < TACK_LIMIT)) problems.push(`force ${force}, ${canvas} sail: the tack took ${tackTime.toFixed(0)} s`);
   }
 }
+// Light airs are not slow (N3 design decisions): force 3 under plain sail to its table, battle sail never slow
+// close-hauled, and force 2 no less than three quarters of force 3's table (the same slack for a seaway).
+const lightSlack = SPEED_TOLERANCE * SEAWAY_SLACK, closeHauled = (CLOSE_HAULED / DEGREE).toFixed(1);
+for (const [angle, knots] of LIGHT_SPEED_TABLE) {
+  const v = pointOfSail(LIGHT_WIND_FORCE, SPEED_CANVAS, angle).knots, lightest = pointOfSail(LIGHT_WIND_FORCE - 1, SPEED_CANVAS, angle).knots;
+  console.log(`light airs ${angle}°: force ${LIGHT_WIND_FORCE} ${v.toFixed(1)} kn (the table ${knots}), force ${LIGHT_WIND_FORCE - 1} ${lightest.toFixed(1)} kn (at least ${(LIGHTEST_SHARE * knots).toFixed(1)})`);
+  if (Math.abs(v - knots) > lightSlack) problems.push(`light airs: force ${LIGHT_WIND_FORCE} at ${angle}° made ${v.toFixed(1)} kn against ${knots} kn`);
+  if (lightest < LIGHTEST_SHARE * knots - lightSlack) problems.push(`light airs: force ${LIGHT_WIND_FORCE - 1} at ${angle}° made ${lightest.toFixed(1)} kn, under ${LIGHTEST_SHARE} of ${knots} kn`);
+}
+const battleClose = light.get(`${LIGHT_WIND_FORCE} battle ${closeHauled}`)!;
+if (battleClose < LIGHT_BATTLE_LEAST) problems.push(`light airs: battle sail close-hauled in force ${LIGHT_WIND_FORCE} made ${battleClose.toFixed(1)} kn, under ${LIGHT_BATTLE_LEAST}`);
 for (const [angle, knots] of SPEED_TABLE) {
   const v = pointOfSail(SPEED_WIND_FORCE, SPEED_CANVAS, angle).knots, slack = SPEED_TOLERANCE * SEAWAY_SLACK;
   if (knots === 0 ? v > slack : Math.abs(v - knots) > slack) problems.push(`the table in a seaway: ${angle}° made ${v.toFixed(1)} kn against ${knots} kn`);

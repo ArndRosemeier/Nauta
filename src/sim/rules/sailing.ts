@@ -194,5 +194,33 @@ export const SPEED_CANVAS: CanvasName = 'plain';
 export const SPEED_TABLE: readonly (readonly [angle: number, knots: number])[] = [
   [55, 0], [60, 2.5], [67.5, 5], [90, 10.2], [110, 11.5], [135, 11], [160, 10.2], [180, 10],
 ];
+/**
+ * Light airs are not slow (implementation plan, N3 design decisions, 2026-11-18; fun before realism). In a match sailed
+ * in a light wind her drawing sails drive her ahead `drive` times as hard as the wind alone would, by the match's force,
+ * and that extra by the true wind's `angle` off her bow takes the `share` of it (all of it close-hauled, little with the
+ * wind abaft the beam, where a light wind already carries her well). Only her drive ahead: her heel and leeway stay
+ * the wind's, so its force still changes the sea, the heel, the sound and the risk far more than her speed. 1 from
+ * force 5 up, where the table above holds unchanged.
+ */
+export const LIGHT_AIRS = {
+  force: [2, 3, 4, 5], drive: [14, 5.2, 2.4, 1],
+  angle: [67.5, 90, 135, 180], share: [1, 0.8, 0.15, 0.1],
+} as const;
+/**
+ * Gathering way (the same decision): with some way on her already (`from`, m/s), not in stays and not going astern,
+ * she gains more `times` as fast as her hull's whole mass would let her, by the match's force, so after a tack at speed
+ * she is soon going again; from force 5 up as built. From a standstill she gathers it at the hull's own pace, so a missed tack still costs its
+ * two and a half minutes; laid aback (heaving to) she gathers it at that pace too; and she carries her way as ever. Her speeds are not changed, only how soon she reaches them.
+ */
+export const GATHERING = { force: [2, 3, 4, 5], times: [8, 8, 3, 1], from: KNOT } as const;
+/** Her speeds in a gentle breeze (force 3) under plain sail, knots, by the true wind's angle off her bow (the same light-airs decision). */
+export const LIGHT_WIND_FORCE = 3;
+export const LIGHT_SPEED_TABLE: readonly (readonly [angle: number, knots: number])[] = [[67.5, 4], [90, 7], [135, 8]];
+/** Under battle sail close-hauled in force 3 she never makes less than this, knots; in force 2 no less than this share of force 3's speeds. */
+export const LIGHT_BATTLE_LEAST = 3;
+export const LIGHTEST_SHARE = 0.75;
+/** After a tack at speed in the light airs (force 3 and 4) she is back at `knots` within `within` s of filling on the new tack (her fore yards over). */
+export const TACK_RECOVERY = { knots: 3, within: 30 } as const;
+
 /** How far her speed may lie from the table, knots (a tuned game number, not a measurement); at no way, the most she may make. */
 export const SPEED_TOLERANCE = 1;

@@ -91,6 +91,8 @@ function broadsideByOrders(): void {
 const MANNED_WITHIN = 20;
 /** How near a gun with her whole crew reloads to the table's time, s. */
 const RELOAD_SLACK = 1;
+/** The wind the gun crews' check is sailed in (Beaufort). */
+const CREWS_FORCE = 5;
 /** The longest she is sailed for the gun crews' check, s. */
 const CREWS_FOR = 400;
 
@@ -102,7 +104,9 @@ const CREWS_FOR = 400;
  * the deck. Fails if a side is not manned within `MANNED_WITHIN` of coming to bear, or a reload strays.
  */
 function crewsAtQuarters(): void {
-  let s = startMatch(duelStart(SEED));
+  // In a fresh breeze (force 5), where her pace is the speed table's: the turn onto the other tack brings the larboard
+  // guns to bear only at about that pace from this start (with the light airs' pace of force 4 they never bear).
+  let s = startMatch({ ...duelStart(SEED), windForce: CREWS_FORCE });
   const say = (words: string): Order => { const o = parseOrder(words, 0); if (typeof o === 'string') throw new Error(o); return o; };
   const enemy = Math.atan2(s.ships[1]!.motion.pose.x - s.ships[0]!.motion.pose.x, -(s.ships[1]!.motion.pose.z - s.ships[0]!.motion.pose.z));
   const course = Math.round(wrapBearing(enemy - Math.PI / 2) / DEGREE) % 360;
