@@ -1,0 +1,2 @@
+In "Walk the ship", the officer of the watch, the boatswain and the helmsmen keep their watches: the other watch lies in hammocks, and the cook is at his galley only from half past five to seven in the evening.
+Orders given in the sandbox call the watch on deck first; the watch below is piped up and starts a few seconds later.

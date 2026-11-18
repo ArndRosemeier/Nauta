@@ -122,9 +122,12 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
   if (hand.going) {
     const w = goingAt(hand.going), way = w.way === null ? null : goingRoute(hand.going).legs[hand.going.leg]?.kind ?? null;
     const out: At = { along: w.along, across: w.across, height: w.height, space: w.space, yaw: Math.atan2(w.facing[1], -w.facing[0]), way, moving: true };
-    return m.bunk ? outOfBunk(out, m.bunk, placeSpot(m.home)) : out;
+    const bed = m.bunk ?? m.berth;
+    return bed ? outOfBunk(out, bed, placeSpot(bed.station)) : out;
   }
   if (!task && !hand.stands && m.bunk) return inBunk(m.bunk, placeSpot(m.home));
+  // A watch-keeper whose watch is below lies in the hammock of his own (the berth), at its station.
+  if (!task && hand.stands && m.berth && sameSpot(hand.stands, placeSpot(m.berth.station))) return inBunk(m.berth, placeSpot(m.berth.station));
   const at = manAt(hand, m.home), own = !task && !hand.stands ? postSpots().get(man) : undefined;
   let { along, across } = own ?? at.spot, yaw = FORWARD, height = own?.height ?? at.height;
   const place = task ? placeOf(task, man) : hand.stands ? null : { id: m.home, rank: 0 };

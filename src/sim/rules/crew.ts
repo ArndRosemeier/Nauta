@@ -10,6 +10,7 @@
  * table gave plus the walk to the place; Arnd judges the feel at G4. Pure.
  */
 import type { LineKind, YardLevel } from './rig';
+import type { Watch } from './day';
 
 /**
  * The parts a man belongs to for the ship's work: the topmen of each mast go aloft, the forecastle men work the
@@ -47,6 +48,18 @@ export interface RankRow {
    * is the first.
    */
   readonly paces?: readonly [string, string];
+  /**
+   * The watches the men of the row stand in the sandbox (rules/day.ts), taken in turn; none: the roster shares the
+   * sleeping hands between them (crew/roster.ts `keepWatches`) or the man keeps none. A watch-keeper who is not a sleeper
+   * has a hammock of his own for while his watch is below (`Man.berth`).
+   */
+  readonly watches?: readonly Watch[];
+  /** Where the watch-keeper stands on deck while his watch has the deck, if he is neither pacing nor one of the posts of `DECK_WATCH` (the helmsmen: the wheel). */
+  readonly watchPost?: string;
+  /** Two places the officer of the watch paces between while his watch has the deck in the sandbox, for an officer who does not pace in a fight (the second lieutenant, the boatswain's mate): as `paces`. */
+  readonly watchPaces?: readonly [string, string];
+  /** The hours of the day he keeps his place (the cook at his galley, 5:30 to 19:00), the game hours from and to; he sleeps in his berth the rest of the day in the sandbox. */
+  readonly hours?: readonly [from: number, to: number];
 }
 
 /** How long a pacing officer stays at one end before he walks to the other, s (he walks about 3 s; the rest he stands looking about). */
@@ -62,6 +75,9 @@ export const POWDER_SECONDS = 22;
 export const POWDER_STAGGER = 5;
 /** The quarterdeck's two walks, one each side of the capstan and the skylight: the aft and the fore end of each (stations of rules/ships.ts). */
 export const QUARTERDECK_WALKS = { starboard: ['station-pace-s-aft', 'station-pace-s-fore'], larboard: ['station-pace-p-aft', 'station-pace-p-fore'] } as const;
+
+/** The hours the cook keeps his galley in the sandbox's day (game hours, from and to): he lights his fire before the hands' breakfast and keeps it to supper, and sleeps the rest of the night. */
+const GALLEY_HOURS = [5.5, 19] as const;
 
 /** A man's skill at the ropes, by what he is (hands: an able seaman is 1). */
 const PETTY = 1.2;
@@ -80,19 +96,19 @@ const BOY = 0.4;
  */
 export const ROSTER: readonly RankRow[] = [
   { rank: 'captain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
-  { rank: 'first lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], paces: QUARTERDECK_WALKS.starboard },
-  { rank: 'second lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
+  { rank: 'first lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], paces: QUARTERDECK_WALKS.starboard, watches: [0] },
+  { rank: 'second lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'], watches: [1], watchPaces: QUARTERDECK_WALKS.starboard },
   { rank: 'master', count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'] },
   { rank: 'midshipman', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], idle: ['station-quarterdeck'] },
   { rank: 'surgeon', count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
   { rank: 'gunner', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
-  { rank: 'boatswain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], paces: QUARTERDECK_WALKS.larboard },
+  { rank: 'boatswain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], paces: QUARTERDECK_WALKS.larboard, watches: [0] },
   { rank: 'carpenter', count: 1, part: 'officers', skill: ABLE, posts: ['station-pumps'], idle: ['station-bunk'] },
-  { rank: "boatswain's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
+  { rank: "boatswain's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'], watches: [1], watchPaces: QUARTERDECK_WALKS.larboard },
   { rank: "gunner's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-magazine'] },
   { rank: "carpenter's mate", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-workshop-a'] },
-  { rank: 'quartermaster', count: 4, part: 'helm', skill: ABLE, posts: ['station-wheel'], idle: ['station-wheel', 'station-wheel', 'station-bunk'] },
-  { rank: 'cook', count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-fore-ladder-foot'], idle: ['station-galley-cook'] },
+  { rank: 'quartermaster', count: 4, part: 'helm', skill: ABLE, posts: ['station-wheel'], idle: ['station-wheel', 'station-wheel', 'station-bunk'], watches: [0, 1], watchPost: 'station-wheel' },
+  { rank: 'cook', count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-fore-ladder-foot'], idle: ['station-galley-cook'], hours: GALLEY_HOURS },
   { rank: 'sailmaker', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-sailroom-bench'] },
   { rank: "carpenter's crew", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-workshop-b'] },
   // The marines (design ruling 2026-11-18: the quarterdeck is the captain's). Before quarters two sentries aft by the

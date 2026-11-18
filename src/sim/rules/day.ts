@@ -32,6 +32,14 @@ export const BELLS_AT_WATCH_END = 8;
 export const FIRST_DOG_END_BELLS = 4;
 
 /**
+ * An order calls the watch on deck first: a man of the watch below is turned out by the pipe, which takes this long
+ * from the men being told off before he starts for his place, s, and counts as this much farther off (m) in choosing
+ * the nearest free men.
+ */
+export const TURN_OUT_SECONDS = 6;
+export const TURN_OUT_METRES = 12;
+
+/**
  * The watch on deck at its jobs (design ruling 2026-11-18: the watch on deck is at its jobs, the watch below asleep; people
  * of no use right now stay below): the places a watch's hands stand at while it has the deck, each taken by the first
  * hand of that part in the watch who has none, so each watch has the same few on deck at the same places: a lookout in

@@ -39,6 +39,12 @@ export interface Man {
   readonly watchPost: string | null;
   /** His slot among the posts of `DECK_WATCH` (which of the places he is the watch's), or null: where the day's jobs send him (`DAY_JOBS`). */
   readonly watchSlot: number | null;
+  /** Two places the officer of the watch paces between while his watch has the deck (the sandbox), if he does not pace in a fight: the first is his place when he comes on deck. Null: he paces at most by `paces`. */
+  readonly watchPaces: readonly [string, string] | null;
+  /** The hammock a watch-keeper who does not sleep there by day lies in while his watch is below (or the cook after his hours): the floor under it is the station. Null: he sleeps at his home (`bunk`) or keeps no watch. */
+  readonly berth: Bunk | null;
+  /** The game hours of the day he keeps his home place (the cook at his galley), or null. */
+  readonly hours: readonly [from: number, to: number] | null;
 }
 
 let places: ReadonlyMap<string, CrewPlace> | null = null;
@@ -86,7 +92,7 @@ export function brigRoster(): readonly Man[] {
   const men: Man[] = [];
   let next = 0, boys = 0;
   // His home: the row's `idle` place in turn; a man who sleeps below has the placeholder until the bunks are shared out.
-  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null; paces: readonly [string, string] | null; powderBoy: number | null; watch: Watch | null; watchPost: string | null; watchSlot: number | null } => ({ watch: null, watchPost: null, watchSlot: null, home: row.paces ? row.paces[0] : row.idle ? row.idle[k % row.idle.length]! : post, bunk: null, paces: row.paces ?? null, powderBoy: row.part === 'boys' ? boys++ : null });
+  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null; paces: readonly [string, string] | null; powderBoy: number | null; watch: Watch | null; watchPost: string | null; watchSlot: number | null; watchPaces: readonly [string, string] | null; berth: Bunk | null; hours: readonly [number, number] | null } => ({ watch: row.watches ? row.watches[k % row.watches.length]! : null, watchPost: row.watchPost ?? null, watchSlot: null, watchPaces: row.watchPaces ?? null, berth: null, hours: row.hours ?? null, home: row.paces ? row.paces[0] : row.idle ? row.idle[k % row.idle.length]! : post, bunk: null, paces: row.paces ?? null, powderBoy: row.part === 'boys' ? boys++ : null });
   for (const row of ROSTER) {
     for (let k = 0; k < row.count; k++) {
       if (row.posts !== 'guns') {
@@ -108,12 +114,14 @@ export function brigRoster(): readonly Man[] {
     .sort((a, b) => BUNK_PRIORITY.indexOf(men[a]!.part) - BUNK_PRIORITY.indexOf(men[b]!.part) || a - b);
   if (sleepers.length > BUNKS.length) throw new Error('more men sleep below than there are bunks');
   sleepers.forEach((i, k) => { men[i] = { ...men[i]!, home: BUNKS[k]!.station, bunk: BUNKS[k]! }; });
-  keepWatches(men);
+  keepWatches(men, sleepers.length);
   for (const m of men) {
     placeSpot(m.post);
     placeSpot(m.home);
     for (const place of m.paces ?? []) placeSpot(place);
     if (m.watchPost) placeSpot(m.watchPost);
+    for (const place of m.watchPaces ?? []) placeSpot(place);
+    if (m.berth) placeSpot(m.berth.station);
     for (const side of SIDES) if (m.quarters) placeSpot(atQuartersOf(m.quarters, side));
   }
   built = deepFreeze(men);
@@ -125,16 +133,20 @@ export function brigRoster(): readonly Man[] {
  * each watch's hands take the places of `DECK_WATCH` in order (each the first of its part in that watch without one),
  * where they stand while it has the deck.
  */
-function keepWatches(men: Man[]): void {
+function keepWatches(men: Man[], hammocks: number): void {
   const turn = new Map<Part, number>();
   const sleepers = men.flatMap((m, i) => (m.bunk ? [i] : []));
   for (const i of sleepers) {
+    if (men[i]!.watch !== null) continue;
     const k = turn.get(men[i]!.part) ?? 0;
     turn.set(men[i]!.part, k + 1);
     men[i] = { ...men[i]!, watch: (k % 2) as Watch };
   }
+  // The watch-keepers and the cook who do not sleep by day each have a hammock of their own besides, from those left.
+  const spare = BUNKS.slice(hammocks);
+  men.forEach((m, i) => { if (m.bunk === null && (m.watch !== null || m.hours !== null)) men[i] = { ...m, berth: spare.shift()! }; });
   for (const w of [0, 1] as const) {
-    const free = sleepers.filter((i) => men[i]!.watch === w);
+    const free = sleepers.filter((i) => men[i]!.watch === w && men[i]!.watchPost === null);
     DECK_WATCH.forEach((job, slot) => {
       const at = free.findIndex((i) => men[i]!.part === job.part);
       if (at < 0) throw new Error(`no ${job.part} in watch ${w} for ${job.place}`);
