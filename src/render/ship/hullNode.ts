@@ -5,7 +5,7 @@
  * uses it to leave out the water inside her hull (seaCut.ts).
  */
 import { DataTexture, DataUtils, HalfFloatType, LinearFilter, RGFormat } from 'three/webgpu';
-import { texture, vec2 } from 'three/tsl';
+import { step, texture, vec2 } from 'three/tsl';
 import { PLANKING } from '../../sim/rules/ships';
 import { HULL_AFT, HULL_FORE, HULL_HIGH, HULL_LOW, hullHalfBreadth, sheer } from '../../sim/ship/hull';
 import { shipY, shipZ } from '../../sim/ship/section';
@@ -47,6 +47,8 @@ const HULL_TEXTURE = makeHullTexture();
  * (float nodes). Read at its one level, so compute passes can read it too (the wake's, wakeMap.ts).
  */
 export function hullAt(z, y) {
-  const t = texture(HULL_TEXTURE, vec2(z.sub(Z0).div(Z1 - Z0), y.sub(Y0).div(Y1 - Y0))).level(0);
-  return { half: t.r, deck: t.g };
+  const u = z.sub(Z0).div(Z1 - Z0), t = texture(HULL_TEXTURE, vec2(u, y.sub(Y0).div(Y1 - Y0))).level(0);
+  // Beyond her ends she has no breadth: the texture's edge, clamped, would carry her transom's breadth on along her
+  // axis for ever (a point far astern, high in her frame as she pitches, would be cut out of the sea).
+  return { half: t.r.mul(step(0, u)).mul(step(u, 1)), deck: t.g };
 }

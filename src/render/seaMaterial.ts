@@ -264,10 +264,10 @@ export function useSeaSky(env: Texture): void { skyMap = env; }
 let fineSea: FineSea | null = null;
 /** Hand the sea its fine bands: the material reads their textures. */
 export function useFineSea(fine: FineSea): void { fineSea = fine; }
-/** A ship's wake (SeaView), set before the warm-up builds the sea. */
-let wakeMap: WakeMap | null = null;
-/** Hand the sea the wake map: the one seam a ship's water comes in through (plan N2.5). */
-export function useWake(map: WakeMap): void { wakeMap = map; }
+/** The ships' wakes (SeaView), set before the warm-up builds the sea. */
+let wakeMaps: readonly WakeMap[] = [];
+/** Hand the sea the ships' wake maps: the one seam a ship's water comes in through (plans N2.5, N3.8). */
+export function useWake(maps: readonly WakeMap[]): void { wakeMaps = maps; }
 
 /** Beckmann's distribution of facets at `nh` (cosine to the half vector) for a mean square slope `m2`. */
 function beckmann(nh, m2) {
@@ -300,8 +300,8 @@ const fresnel = (c) => float(FRESNEL_DOWN).add(float(1 - FRESNEL_DOWN).mul(pow(f
 export function makeSeaMaterial(): MeshBasicNodeMaterial {
   if (!skyMap) throw new Error('the sea was built before the sky\'s environment map (useSeaSky)');
   if (!fineSea) throw new Error('the sea was built before its fine bands (useFineSea)');
-  if (!wakeMap) throw new Error('the sea was built before its wake map (useWake)');
-  const I = SEA_INPUTS, env = skyMap, bands = fineSea, wake = wakeMap;
+  if (!wakeMaps.length) throw new Error('the sea was built before its wake maps (useWake)');
+  const I = SEA_INPUTS, env = skyMap, bands = fineSea, wake = wakeMaps;
   const m = new MeshBasicNodeMaterial({ side: DoubleSide, fog: false });
   m.name = 'sea';
 

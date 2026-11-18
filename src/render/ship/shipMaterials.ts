@@ -96,8 +96,6 @@ export const SHIP_OBJECT = {
   ship: uniform(0).onObjectUpdate(({ object }) => object.userData.ship ?? 0),
 };
 
-/** 1 on her own meshes, 0 on the other ship's: her water (wakeMap.ts `wetHull`) is hers alone, the other ship is drawn dry. */
-const ownShip = () => float(1).sub(SHIP_OBJECT.ship.min(1));
 
 /** Bytes per texel of the damage map (before the map: the bundle reads it as undefined when it comes later, and the map is empty). */
 const RGBA = 4;
@@ -247,7 +245,7 @@ export function makeWoodMaterial(crossfade = false): MeshStandardNodeMaterial {
   const seam = max(seamA, seamB).mul(planked).mul(fade);
   const seamColour = mix(vec3(...PITCH), surface.mul(SEAM_UNDER_PAINT), cover);
   // Her outside wet where the sea has climbed it (wakeMap.ts `wetHull`); inside, dry.
-  const wet = wetHull(positionLocal, scorched(mix(surface, seamColour, seam), gr, sh.z), mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), ownShip());
+  const wet = wetHull(positionLocal, scorched(mix(surface, seamColour, seam), gr, sh.z), mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), SHIP_OBJECT.ship, SHIPS_DRAWN);
   const outside = float(1).sub(step(0, SHIP_OBJECT.light.w));
   m.colorNode = mix(scorched(mix(surface, seamColour, seam), gr, sh.z), wet.colour, outside);
   m.roughnessNode = mix(mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), wet.rough, outside);
@@ -311,7 +309,7 @@ export function makeCopperMaterial(crossfade = false): MeshStandardNodeMaterial 
   const tarnish = clamp(g.w.mul(TARNISH).add(sheet.mul(1 - TARNISH)), 0, 1);
   const green = smoothstep(GREEN_FROM, GREEN_FROM + GREEN_SOFT, g.z);
   const metal = mix(fin.rgb, vec3(...COPPER_BROWN), tarnish);
-  const wet = wetHull(positionLocal, mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail)), mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2)), ownShip());
+  const wet = wetHull(positionLocal, mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail)), mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2)), SHIP_OBJECT.ship, SHIPS_DRAWN);
   m.colorNode = wet.colour;
   m.metalnessNode = float(1).sub(green);
   m.roughnessNode = wet.rough;

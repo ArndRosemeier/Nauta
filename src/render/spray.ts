@@ -103,7 +103,13 @@ export interface SprayBow {
   readonly speed: number;
 }
 
-/** The drops: a ring of starts, written as slams come; one mesh. */
+/** A ship the spray flies from: her slams since the last frame (world) and her bow. */
+export interface SprayFrom {
+  readonly slams: readonly Slam[];
+  readonly bow: SprayBow;
+}
+
+/** The drops: a ring of starts, written as slams come, from every ship drawn; one mesh. */
 export class SprayView {
   readonly mesh: Mesh;
   /** Where the spray's frame stands (the sea's origin; drops are kept from it so the numbers stay small). */
@@ -111,7 +117,8 @@ export class SprayView {
   private readonly drops: InstancedBufferAttribute;
   private readonly flings: InstancedBufferAttribute;
   private next = 0;
-  private running = 0;
+  /** Each ship's share of a drop her bow wave has thrown at speed, not yet thrown. */
+  private readonly running: number[] = [];
   private readonly rng = new Rng(SPRAY_SEED);
 
   constructor(material: Material) {
@@ -133,27 +140,31 @@ export class SprayView {
   }
 
   /**
-   * Once a frame: drops thrown by her slams (world), and at speed from her bow wave at her stem (`bow`: where, her
-   * heading as a direction on the water, her velocity over it and her speed through it), the wind blowing, the clock
-   * `t`, `dt` since the last frame, and `origin`, the sea's.
+   * Once a frame, for each ship (`from`): drops thrown by her slams (world), and at speed from her bow wave at her
+   * stem (`bow`: where, her heading as a direction on the water, her velocity over it and her speed through it); the
+   * wind blowing, the clock `t`, `dt` since the last frame, and `origin`, the sea's.
    */
-  show(slams: readonly Slam[], bow: SprayBow, wind: Wind, t: number, dt: number, origin: Vector3): void {
+  show(from: readonly SprayFrom[], wind: Wind, t: number, dt: number, origin: Vector3): void {
     if (!origin.equals(this.origin)) this.move(origin);
     this.mesh.position.copy(this.origin);
     SPRAY_INPUTS.now.value = t;
     SPRAY_INPUTS.wind.value.set(wind.x * wind.speed, 0, wind.z * wind.speed);
     let written = false;
-    for (const s of slams) {
-      const n = Math.min(DROPS_MOST, Math.round(s.rate * DROPS_PER_RATE));
-      for (let i = 0; i < n; i++) this.throw(s.at, s.side, s.rate, bow, t);
-      written ||= n > 0;
-    }
-    // At speed, her bow wave throws a little all the time, alternately to each side.
-    const share = bow.speed / WAKE.top;
-    if (share > RUNNING_FROM) {
-      this.running += (dt * RUNNING_RATE * (share - RUNNING_FROM)) / (1 - RUNNING_FROM);
-      for (; this.running >= 1; this.running--) { this.throw(bow.stem, this.rng.sign(), bow.speed * (1 - RUNNING_FROM), bow, t); written = true; }
-    }
+    from.forEach(({ slams, bow }, ship) => {
+      for (const s of slams) {
+        const n = Math.min(DROPS_MOST, Math.round(s.rate * DROPS_PER_RATE));
+        for (let i = 0; i < n; i++) this.throw(s.at, s.side, s.rate, bow, t);
+        written ||= n > 0;
+      }
+      // At speed, her bow wave throws a little all the time, to either side.
+      const share = bow.speed / WAKE.top;
+      let running = this.running[ship] ?? 0;
+      if (share > RUNNING_FROM) {
+        running += (dt * RUNNING_RATE * (share - RUNNING_FROM)) / (1 - RUNNING_FROM);
+        for (; running >= 1; running--) { this.throw(bow.stem, this.rng.sign(), bow.speed * (1 - RUNNING_FROM), bow, t); written = true; }
+      }
+      this.running[ship] = running;
+    });
     if (written) { this.drops.needsUpdate = true; this.flings.needsUpdate = true; }
   }
 

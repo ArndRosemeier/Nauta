@@ -17,7 +17,7 @@ import {
 import { Rng } from '@futuremagic/core';
 import type { SeaState } from '../../sim/sea/sea';
 import { lyingStill, poseBetween, shipOrigin, startMotion, stepMotion, toWorld, type ShipMotion, type ShipPose } from '../../sim/ship/motion';
-import { STEP_SECONDS } from '../../sim/units';
+import { STEP_SECONDS, apartOnWater } from '../../sim/units';
 import { ChurnWatch, STEM_Z, Track, type Slam, type WakeSource } from '../wake';
 import type { SprayBow } from '../spray';
 import type { ShipWater } from '../seaView';
@@ -422,6 +422,9 @@ export class ShipView {
     g.updateMatrixWorld(true);
     this.inverse.copy(g.matrixWorld).invert();
     this.moveSails(dt);
+    // The water at her side, whoever lays her (plan N2.5): its churn, her wet line, slams at her bow.
+    this.slams.length = 0;
+    this.churn.keepUp(this.drawn, sea, t, this.slams);
   }
 
   /**
@@ -431,7 +434,7 @@ export class ShipView {
    */
   follow(sea: SeaState, t: number, dt: number, camera: PerspectiveCamera): void {
     const at = this.poseFrom ? this.poseFrom(t) : this.drawn;
-    this.lay(sea, t, dt, earthDrop(Math.hypot(at.x - camera.position.x, at.z - camera.position.z)));
+    this.lay(sea, t, dt, earthDrop(apartOnWater(at, camera.position)));
     this.zones.get(OUTSIDE)!.visible = true;
     this.crossfade(camera.position.distanceTo(this.group.position) / this.zoom);
     this.trianglesDrawn = this.countDrawn();
@@ -445,9 +448,6 @@ export class ShipView {
   update(sea: SeaState, t: number, dt: number, camera: PerspectiveCamera, where: Standpoint, look: Look, gain: number, radPerPixel: number, seaOrigin: Vector3): void {
     this.lay(sea, t, dt);
     const g = this.group;
-    // The water at her side, whoever lays her (plan N2.5): its churn, her wet line, slams at her bow.
-    this.slams.length = 0;
-    this.churn.keepUp(this.drawn, sea, t, this.slams);
 
     // The eye: on board it rides with her, its tilt eased toward level; off her it stands still where she lies.
     this.eye.set(...where.eye);
@@ -518,7 +518,7 @@ export class ShipView {
   /** What her wake needs of her now (seaView.ts `ShipWater`), with her `way` through the water: her track, her pose, the water at her side. */
   water(way: ShipWay): ShipWater {
     const c = this.churn.churnNow();
-    return { track: this.track, source: { pose: this.drawn, ahead: way.ahead, leeway: way.leeway, bowChurn: c.bow, sideChurn: c.side }, churn: this.churn.lists };
+    return { track: this.track, source: { pose: this.drawn, ahead: way.ahead, leeway: way.leeway, bowChurn: c.bow, sideChurn: c.side }, churn: this.churn.lists, toShip: this.inverse };
   }
 
   /** Her bow as the spray needs it (spray.ts `SprayBow`), with her `way`: her stem at the waterline, her heading, her velocity. */

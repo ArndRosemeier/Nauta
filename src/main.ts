@@ -42,7 +42,7 @@ import { TWIN_OFFSET, musterCrews } from './app/crew';
 import { CrewTrialRun } from './app/crewTrialRun';
 import { formatBytes } from './probe/report';
 import { Vector3 } from 'three/webgpu';
-import { DEGREE, MS_PER_SECOND } from './sim/units';
+import { DEGREE, MS_PER_SECOND, apartOnWater } from './sim/units';
 import { simTime } from './sim/state';
 import { parseOrder } from './sim/orders';
 import { apparentSpeed } from './sim/ship/sailing';
@@ -189,7 +189,7 @@ async function start(): Promise<void> {
   seaView.fine.run(view.renderer);
   // The sea's mesh is drawn as many tiles at once, a shader of its own: the warm-up builds it with the kinds.
   // So are her fittings' instanced draws, which three builds shaders of their own for, and the spray from her bow (N2.5).
-  await seaView.wake.compile(view.renderer);
+  for (const w of seaView.wakes) await w.compile(view.renderer);
   const spray = ship ? new SprayView(SPRAY.make()) : null;
   await furnished?.ready();
   await herFittings?.ready();
@@ -300,7 +300,7 @@ async function start(): Promise<void> {
     },
     apart: () => {
       const a = match.pose(match.ship), b = match.other >= 0 ? match.pose(match.other) : null;
-      return a && b ? Math.hypot(a.x - b.x, a.z - b.z) : -1;
+      return a && b ? apartOnWater(a, b) : -1;
     },
     glass: (power) => {
       if (!glass) return;
@@ -318,7 +318,7 @@ async function start(): Promise<void> {
   }
   const apply = (k: QualityKnobs) => {
     view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k);
-    seaView.wake.levels = k.wakeLevels;
+    for (const w of seaView.wakes) w.levels = k.wakeLevels;
   };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());
@@ -336,7 +336,7 @@ async function start(): Promise<void> {
   let aloft = meanWind(wind, 0);
   const ear = new Vector3(), facing = new Vector3(), crown = new Vector3(), gust = meanWind(wind, 0);
   /** Her way through the water, sailed by a match (`?sail`); still without one. Her wake follows it (N2.5). */
-  const way = { ahead: 0, leeway: 0 };
+  const way = { ahead: 0, leeway: 0 }, herWay = { ahead: 0, leeway: 0 };
   // `?bench`: the fixed flight, measured once the quality level is chosen (plan N1.9).
   const bench = params.bench > 0 ? new BenchRun(el('bench'), params.bench, {
     settled: () => quality.chosen,
@@ -429,15 +429,19 @@ async function start(): Promise<void> {
       view.sun.position.copy(view.sun.target.position).addScaledVector(sky.lightDirection, SUN_DISTANCE);
     }
     sky.update(dt, view.camera);
-    const mine = match?.state.ships[match.ship]?.sailing;
+    // Each ship's way through the water, as her match sails her; her wake and spray follow it (N2.5, N3.8).
+    const mine = match?.state.ships[match.ship]?.sailing, hers = match && match.other >= 0 ? match.state.ships[match.other]?.sailing : undefined;
     way.ahead = mine?.ahead ?? 0; way.leeway = mine?.leeway ?? 0;
-    seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky, ship?.water(way) ?? null);
+    herWay.ahead = hers?.ahead ?? 0; herWay.leeway = hers?.leeway ?? 0;
+    const herWater = other?.group.visible ? other.water(herWay) : null;
+    seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky, [ship?.water(way) ?? null, herWater]);
     if (ship && spray) {
       const bow = ship.bow(way);
-      spray.show(ship.slams, bow, windAt(wind, bow.stem[0], bow.stem[2], seaTime, gust), seaTime, dt, seaView.origin);
+      const from = [{ slams: ship.slams, bow }, ...(other && herWater ? [{ slams: other.slams, bow: other.bow(herWay) }] : [])];
+      spray.show(from, windAt(wind, bow.stem[0], bow.stem[2], seaTime, gust), seaTime, dt, seaView.origin);
     }
     seaView.fine.run(view.renderer);
-    seaView.wake.fill(view.renderer);
+    for (const w of seaView.wakes) w.fill(view.renderer);
     view.camera.getWorldPosition(ear);
     view.camera.getWorldDirection(facing);
     crown.copy(view.camera.up).applyQuaternion(view.camera.quaternion);
