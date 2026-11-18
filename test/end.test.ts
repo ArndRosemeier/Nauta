@@ -16,7 +16,7 @@ import { winner, type Fight } from '../src/sim/end.ts';
 import { battery, dismountGun } from '../src/sim/guns/guns.ts';
 import { parseOrder, type Order } from '../src/sim/orders.ts';
 import { HARMS } from '../src/sim/rules/damage.ts';
-import { ASK_AGAIN, LIGHT_WARNING_MINUTES } from '../src/sim/rules/end.ts';
+import { ASK_AGAIN, BEATEN, LIGHT_WARNING_MINUTES } from '../src/sim/rules/end.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import { duelStart } from '../src/sim/start.ts';
@@ -110,8 +110,8 @@ test('drawn at nightfall, the master warning five minutes before; a headless due
   assert.deepEqual(h.fight.end?.lost, [null, null]);
 });
 
-test('beaten by the rule, said once: half her men out; the water gaining past two thirds; dismasted with fewer than four gun crews', () => {
-  const men = brigRoster().length, half = Math.ceil(men / 2);
+test('beaten by the rule, said once: a quarter of her men out; the water gaining past 0.95 of foundering; dismasted facing a ship that can sail, or with fewer than four gun crews', () => {
+  const men = brigRoster().length, half = Math.ceil(men * BEATEN.out);
   const hurt = Array.from({ length: half }, (_, i) => i * HARMS.length + HARMS.indexOf('killed'));
   let r = once(pair({ hurt }));
   assert.deepEqual(ofKind(r.events, 'beaten'), [{ kind: 'beaten', tick: 0, ship: 0 }], '"We must strike, sir"');
@@ -119,16 +119,20 @@ test('beaten by the rule, said once: half her men out; the water gaining past tw
   r = once(r.state);
   assert.deepEqual(ofKind(r.events, 'beaten'), [], 'said once');
   assert.equal(r.state.fight.end, null, 'a player is never made to strike');
-  assert.deepEqual(once(pair({ hurt: hurt.slice(1) })).state.fight.beaten, [false, false], 'one man short of half');
-  // Water over two thirds and gaining (foundered she pours in), not when it is falling.
-  const deep = founderTonnes() * 0.7;
-  assert.deepEqual(once(pair({ flooded: [deep / 2, deep / 2], holes: holesUnder(1, 5) })).state.fight.beaten, [true, false], 'over two thirds and gaining');
-  assert.deepEqual(once(pair({ flooded: [deep / 2, deep / 2] })).state.fight.beaten, [false, false], 'over two thirds but not gaining (the pumps draw it down)');
+  assert.deepEqual(once(pair({ hurt: hurt.slice(1) })).state.fight.beaten, [false, false], 'one man short');
+  // Water over the mark and gaining (foundered she pours in), not when it is falling.
+  const deep = founderTonnes() * (BEATEN.water + (1 - BEATEN.water) / 2);
+  assert.deepEqual(once(pair({ flooded: [deep / 2, deep / 2], holes: holesUnder(1, 5) })).state.fight.beaten, [true, false], 'over the mark and gaining');
+  assert.deepEqual(once(pair({ flooded: [deep / 2, deep / 2] })).state.fight.beaten, [false, false], 'over the mark but not gaining (the pumps draw it down)');
   // Dismasted: both lower masts broken at their heels.
   const heels = ['fore-mast', 'main-mast'].map((spar) => sparParts().findIndex((p) => p.spar === spar));
   const masts = pair({ fallen: heels });
-  assert.deepEqual(once(masts).state.fight.beaten, [false, false], 'dismasted with her guns manned fights on');
+  assert.deepEqual(once(masts).state.fight.beaten, [true, false], 'dismasted facing a ship that can sail with half her guns: helpless (N7.5a)');
   let guns = masts.ships[0]!.guns;
   for (let g = 0; g < battery().length; g++) guns = dismountGun(guns, g);
-  assert.deepEqual(once({ ...masts, ships: masts.ships.map((s, i) => (i === 0 ? { ...s, guns } : s)) }).state.fight.beaten, [true, false], 'dismasted and every gun dismounted');
+  const halfGuns = battery().length / 2;
+  let fewer = masts.ships[1]!.guns;
+  for (let g = 0; g <= halfGuns; g++) fewer = dismountGun(fewer, g);
+  assert.deepEqual(once({ ...masts, ships: masts.ships.map((s, i) => (i === 1 ? { ...s, guns: fewer } : s)) }).state.fight.beaten, [false, false], 'dismasted with her guns manned, facing a ship with fewer than half hers, fights on');
+  assert.deepEqual(once({ ...masts, ships: masts.ships.map((s, i) => (i === 0 ? { ...s, guns } : { ...s, guns: fewer })) }).state.fight.beaten, [true, false], 'dismasted and every gun dismounted');
 });

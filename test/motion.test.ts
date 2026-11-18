@@ -39,7 +39,7 @@ const overWater = (m: ShipMotion, along: number) => toWorld(m.pose, 0, designWat
 let rest: ShipMotion | null = null;
 const resting = () => (rest ??= run((() => {
   const m = startMotion(0, 0, 0);
-  return { pose: { ...m.pose, heave: m.pose.heave + 0.3, pitch: m.pose.pitch - DEGREE } };
+  return { ...m, pose: { ...m.pose, heave: m.pose.heave + 0.3, pitch: m.pose.pitch - DEGREE } };
 })(), flat, 0, 90));
 
 test('in calm she settles at her waterline: the draught\'s load waterline on the water from stern to bow, upright and still', () => {
@@ -59,7 +59,7 @@ let heeled: number[] | null = null;
 const heelRun = () => {
   if (heeled) return heeled;
   const out: number[] = [], r = resting();
-  run({ pose: { ...r.pose, roll: 20 * DEGREE } }, flat, 0, 120, STILL, (m) => out.push(m.pose.roll));
+  run({ ...r, pose: { ...r.pose, roll: 20 * DEGREE } }, flat, 0, 120, STILL, (m) => out.push(m.pose.roll));
   return (heeled = out);
 };
 /** Her swings: the roll at each turn (where the rate changes sign). */

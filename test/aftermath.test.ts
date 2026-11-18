@@ -1,7 +1,7 @@
 /**
  * What damage leads to (implementation plan N6.2): a hole below the waterline floods her at the rule's rate and lists
- * her; the pumps hold a small leak and lose to a large one; five waterline holes sink her in about eight minutes and,
- * plugged and pumped, she holds; a spar falls with three wounds in a part, or with its weather shrouds gone and the
+ * her; the carpenter's crew at the pumps holds one and a half waterline holes and hands to the pumps three (N7.5a), four sink
+ * her against the crew alone and, plugged, only weep; a spar falls with three wounds in a part, or with its weather shrouds gone and the
  * wind on them, taking all it carries and the men on it, and a dismasted ship cannot sail; fire doubles at the table's
  * pace, spreads, is put out by men fighting it and, unfought, reaches the magazine in the table's time; with her
  * steering shot away she answers no helm.
@@ -16,7 +16,8 @@ import { fallsDue, standingOf } from '../src/sim/damage/fall.ts';
 import { burnt, kindled, magazineSpace, type Fire } from '../src/sim/damage/fire.ts';
 import { founderTonnes, inflow, pumped, sinkingFor } from '../src/sim/damage/flood.ts';
 import { sparParts } from '../src/sim/damage/meet.ts';
-import { FIRE, FOUNDER_MINUTES, PUMPING } from '../src/sim/rules/damage.ts';
+import { REPAIRS } from '../src/sim/rules/crew.ts';
+import { AT_WATERLINE, FIGHT_AT_HAND, FIRE, PUMPING, WASH, WEEP } from '../src/sim/rules/damage.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { stepSailing, UNDAMAGED, type SailingDamage } from '../src/sim/ship/sailing.ts';
@@ -26,34 +27,46 @@ import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { windAt } from '../src/sim/wind.ts';
 import { spotUnder } from './support/damage.ts';
 
-/** The men the quarter bill posts at the pumps (rules/crew.ts). */
-const PUMP_HANDS = 6;
-/** A hole "at her waterline" in the design's sense: her roll and the waves put it about this far under, on the average, m. */
-const AT_WATERLINE = 0.3;
+/** The carpenter's crew at the pumps while he and his mate plug, and "Hands to the pumps" (rules/crew.ts). */
+const CARPENTERS_CREW = 4;
+const HANDS_TO_THE_PUMPS = 8;
 const SECONDS_PER_MINUTE = 60;
+/** A fire party (rules/crew.ts). */
+const FIRE_PARTY = REPAIRS.fight.men;
+/** Four holes at her waterline: more than the carpenter's crew can hold, a hole more than hands to the pumps can. */
+const FOUR = 4;
+/** With the carpenter's crew alone at the pumps, four such holes founder her within this many minutes; hands to the pumps hold her half as long again. */
+const FOUNDERS_WITHIN = 20;
+const LONGER = 1.5;
 
-test('the pumps hold a small leak and lose to a large one', () => {
-  const pumps = pumped(PUMP_HANDS, PUMPING.least + 1);
-  assert.ok(pumps > 0 && pumped(0, PUMPING.least + 1) === 0 && pumped(PUMP_HANDS, PUMPING.least) === 0, 'manned, they draw while there is water above the well');
-  assert.ok(inflow('round', 'long6', AT_WATERLINE) < pumps, 'a 6-pound shot hole at her waterline is held');
-  assert.ok(inflow('round', 'carronade', 1) > 2 * pumps, 'a 32-pound shot hole a metre down is not');
+test('the carpenter\'s crew at the pumps holds one and a half holes at her waterline, hands to the pumps three; a hole a metre down is more', () => {
+  const hole = inflow('round', 'carronade', AT_WATERLINE), crew = pumped(CARPENTERS_CREW, PUMPING.least + 1), hands = pumped(HANDS_TO_THE_PUMPS, PUMPING.least + 1);
+  assert.ok(pumped(0, PUMPING.least + 1) === 0 && pumped(CARPENTERS_CREW, PUMPING.least) === 0, 'manned, they draw while there is water above the well');
+  assert.ok(Math.abs(crew - PUMPING.holds * hole) < 1e-9 && Math.abs(hands - 2 * crew) < 1e-9, `the crew clears ${crew.toFixed(3)} t/s, hands ${hands.toFixed(3)}, a hole lets in ${hole.toFixed(3)}`);
+  assert.ok(inflow('round', 'long6', AT_WATERLINE) < hole / 2, 'a 6-pound shot hole lets in a fraction of a 32-pound one');
+  assert.ok(inflow('round', 'carronade', 1) > 1.5 * hole, 'a 32-pound shot hole a metre down lets in more');
   assert.equal(inflow('round', 'carronade', 1, 1), 0, 'once the water inside stands as high as the sea outside, none comes in');
 });
 
-test('five holes at her waterline sink her in about eight minutes with the pumps manned; plugged and pumped she holds', () => {
-  // Her water in steps of a second, the holes sinking deeper as its weight sinks her.
+/** Minutes until four waterline holes (weeping by `share`) founder her against `men` at the pumps, in steps of a second, the holes sinking deeper as her water sinks her; Infinity if not within `most`. */
+function foundering(men: number, share: number, most: number): number {
   const founders = founderTonnes();
-  let water = 0, t = 0;
-  for (; water < founders && t < 2 * FOUNDER_MINUTES * SECONDS_PER_MINUTE; t++) {
-    water += 5 * inflow('round', 'carronade', AT_WATERLINE + sinkingFor(water)) - pumped(PUMP_HANDS, water);
+  let water = 0;
+  for (let t = 0; t < most * SECONDS_PER_MINUTE; t++) {
+    water = Math.max(0, water + FOUR * share * inflow('round', 'carronade', AT_WATERLINE + sinkingFor(water)) - pumped(men, water));
+    if (water >= founders) return t / SECONDS_PER_MINUTE;
   }
-  const minutes = t / SECONDS_PER_MINUTE;
-  assert.ok(Math.abs(minutes - FOUNDER_MINUTES) < FOUNDER_MINUTES * 0.2, `foundered in ${minutes.toFixed(1)} min`);
-  // Plugged: the pumps clear what is in her.
-  const half = founders / 2;
-  water = half;
-  for (let k = 0; k < FOUNDER_MINUTES * SECONDS_PER_MINUTE; k++) water -= pumped(PUMP_HANDS, water);
-  assert.ok(water < half, `pumped down to ${water.toFixed(0)} t of ${half.toFixed(0)}`);
+  return Infinity;
+}
+
+test('four holes at her waterline founder her against the carpenter\'s crew; hands to the pumps hold her far longer; plugged, they only weep and hands to the pumps clear her', () => {
+  const crew = foundering(CARPENTERS_CREW, 1, FOUNDERS_WITHIN), hands = foundering(HANDS_TO_THE_PUMPS, 1, LONGER * FOUNDERS_WITHIN);
+  assert.ok(crew < FOUNDERS_WITHIN && hands > LONGER * crew, `foundered in ${crew.toFixed(1)} min, with hands to the pumps in ${hands.toFixed(1)} min`);
+  // Plugged: they weep, and hands at the pumps clear what is in her.
+  const half = founderTonnes() / 2;
+  let water = half;
+  for (let k = 0; k < FOUNDERS_WITHIN * SECONDS_PER_MINUTE; k++) water += FOUR * WEEP * inflow('round', 'carronade', AT_WATERLINE + sinkingFor(water)) - pumped(HANDS_TO_THE_PUMPS, water);
+  assert.ok(water < half / 2, `pumped down to ${water.toFixed(0)} t of ${half.toFixed(0)}`);
 });
 
 /** One ship lying still in a calm with three carronade holes half a metre under her waterline on one side, stepped `seconds`. */
@@ -75,7 +88,7 @@ test('a hole below her waterline floods her at the rule\'s rate and lists her to
   const seconds = 30;
   const starboard = flooding(1, seconds), larboard = flooding(-1, seconds);
   const [l, s] = starboard.state.ships[0]!.damage.flooded;
-  const expected = (3 * inflow('round', 'carronade', 1 / 2) - pumped(PUMP_HANDS, l + s)) * seconds;
+  const expected = (3 * inflow('round', 'carronade', 1 / 2 + WASH) - pumped(CARPENTERS_CREW, l + s)) * seconds;
   assert.ok(Math.abs(l + s - expected) < expected * 0.25, `${(l + s).toFixed(1)} t in, the rule gives ${expected.toFixed(1)} t`);
   assert.ok(s > l, 'more on the side it comes in');
   assert.ok(starboard.roll > larboard.roll, `heeled ${starboard.roll} with the holes to starboard, ${larboard.roll} to larboard`);
@@ -140,7 +153,9 @@ test('fire doubles at the table\'s pace, spreads, is put out by men fighting it,
   assert.deepEqual(minute.spread, [], 'small, it keeps to its space');
   const big = run([{ space: deck, size: FIRE.spread }], 1);
   assert.ok(big.spread.length > 0 && big.fires.length > 1, 'at its spreading size it catches the spaces joined to it');
-  assert.deepEqual(run(kindled([], deck), 10, 4).fires, [], 'four men put a fresh fire out');
+  // A contest (N7.5a): the two men at hand cannot hold a fresh fire; a fire party of eight puts it out within a minute.
+  assert.ok(run(kindled([], deck), 10, FIGHT_AT_HAND).fires[0]!.size > FIRE.start, 'the men at hand do not hold a fresh fire');
+  assert.deepEqual(run(kindled([], deck), SECONDS_PER_MINUTE, FIRE_PARTY).fires, [], 'a fire party puts it out');
   // Unfought, from a fire in the magazine itself (the nearest a fire can start), the powder catches after the table's doublings: three minutes or more.
   const tableTime = FIRE.doubling * Math.log2(FIRE.catch / FIRE.start);
   assert.ok(tableTime >= 3 * SECONDS_PER_MINUTE, `${tableTime.toFixed(0)} s`);
@@ -159,10 +174,11 @@ test('a fire in her magazine is fought by the men there; with none fit to fight 
     for (let k = 1; k < STEPS_PER_SECOND && !out.damage.blownUp; k++) out = stepAftermath(out.damage, { ...input, tick: k });
     return out;
   };
-  const fought = after(burning);
-  assert.ok(!fought.damage.blownUp && fought.damage.fires[0]!.size < burning.fires[0]!.size, 'the gunner\'s mate and his boys beat it down');
   // Every man badly hurt: no one fights it.
   const hurt = ship.crew.men.map((_, i) => i * 3 + 1);
+  const fresh: Damage = { ...ship.damage, fires: [{ space: magazineSpace(), size: FIRE.start }] };
+  const fought = after(fresh), unfought = after({ ...fresh, hurt });
+  assert.ok(fought.damage.fires[0]!.size < unfought.damage.fires[0]!.size, 'the gunner\'s mate and his boys beat at it');
   const gone = after({ ...burning, hurt });
   assert.ok(gone.damage.blownUp && gone.events.some((e) => e.what === 'blew up'), 'her powder goes up');
   const quiet = stepAftermath(startDamage(), input);

@@ -617,3 +617,9 @@ export const HULL_DAMPING = { upward: 3, sideways: 0.4 } as const;
  * height a sloop of war carried laden, about 0.7 to 1.5 m.
  */
 export const ROLL_PERIOD = { least: 6, most: 10 } as const;
+
+/**
+ * Her steady heel is her roll averaged over about this many seconds, two of her rolls (motion.ts keeps it): what her gun
+ * captains judge her heel by and lay against, so her roll brings their guns through the elevation they want (N7.5a).
+ */
+export const HEEL_SECONDS = 12;

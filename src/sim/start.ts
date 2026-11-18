@@ -1,18 +1,21 @@
 /**
- * Where a duel starts (implementation plan N3, design decision "The start"): the two ships 1,500 m apart with the wind
- * on the beam of the line between them, each under battle sail and steering at the other, so neither has the weather
+ * Where a duel starts (implementation plan N3, design decision "The start", by time since N7.5a): the two ships as far
+ * apart as they close in three minutes in that wind (rules/start.ts), with the wind on the beam of the line between them, each under battle sail and steering at the other, so neither has the weather
  * position. The match's seed turns the whole picture round the compass and picks the force (2 to 6). Pure: the same
  * seed gives the same start on every machine.
  */
 import { deriveSeed, Rng } from '@futuremagic/core';
 import { START_CANVAS } from './rules/sailing';
-import { START_APART, START_WAY, WEATHER_TURN_DEGREES, WIND_CHOICES } from './rules/start';
+import { START_CLOSING, START_MINUTES, START_WAY, WEATHER_TURN_DEGREES, WIND_CHOICES } from './rules/start';
 import { DUEL_FORCES } from './rules/wind';
 import type { MatchSetup } from './state';
-import { bearingDir, DEGREE, KNOT, wrapBearing } from './units';
+import { bearingDir, DEGREE, KNOT, SECONDS_PER_MINUTE, wrapBearing } from './units';
 
 /** A quarter turn, rad: the wind stands square to the line between the ships. */
 const QUARTER = Math.PI / 2;
+
+/** How far apart the ships start in a wind of `force`, m: what they close in `START_MINUTES` under battle sail. */
+export const startApart = (force: number): number => START_CLOSING[force]! * START_MINUTES * SECONDS_PER_MINUTE;
 
 /** The wind a match is set to (menu.md): as the seed draws it, or a force drawn within a named range. */
 export type WindChoice = 'drawn' | keyof typeof WIND_CHOICES;
@@ -43,7 +46,7 @@ export function duelStart(seed: number, terms: StartTerms = {}): MatchSetup {
   const rng = new Rng(deriveSeed(seed, 'start'));
   const square = rng.range(0, 2 * Math.PI), windForce = forceFor(seed, terms.wind ?? 'drawn', rng.int(DUEL_FORCES.least, DUEL_FORCES.most));
   // The line from the first ship to the second, square to the seed's wind: each heads at the other with the wind abeam.
-  const line = wrapBearing(square - QUARTER), [dx, dz] = bearingDir(line), half = START_APART / 2;
+  const line = wrapBearing(square - QUARTER), [dx, dz] = bearingDir(line), half = startApart(windForce) / 2;
   // Turned toward the first ship (from behind her beam) when she holds the weather position, toward the second when she does.
   const turn = terms.meet === 'weather' ? WEATHER_TURN_DEGREES * DEGREE : terms.meet === 'lee' ? -WEATHER_TURN_DEGREES * DEGREE : 0;
   const ship = (side: number, heading: number) => ({ x: side * dx * half, z: side * dz * half, heading: wrapBearing(heading), speed: START_WAY * KNOT, canvas: START_CANVAS });

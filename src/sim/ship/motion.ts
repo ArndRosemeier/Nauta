@@ -22,7 +22,7 @@ import { surfaceAt, seaSample, type SeaState } from '../sea/sea';
 import { sincos } from '../trig';
 import { GRAVITY, STEP_SECONDS } from '../units';
 import {
-  DESIGN_WATERLINE, HEAVE_ADDED_MASS, HULL_DAMPING, KEEL_DEPTH, KEEL_HALF_SIDING, LOAD_WATERLINE, MIDSHIP_SECTION,
+  DESIGN_WATERLINE, HEAVE_ADDED_MASS, HEEL_SECONDS, HULL_DAMPING, KEEL_DEPTH, KEEL_HALF_SIDING, LOAD_WATERLINE, MIDSHIP_SECTION,
   PITCH_ADDED_INERTIA, PITCH_GYRATION, PLANKING, ROLL_GYRATION, SEA_WATER,
 } from '../rules/ships';
 import { buoyancyAlong, designWaterline, hullEnds, hullMesh } from './hull';
@@ -49,6 +49,8 @@ export interface ShipPose {
 /** A ship afloat: her pose, changed only here. Plain data, so the simulation frame (N3.1) can encode and hash it. */
 export interface ShipMotion {
   readonly pose: ShipPose;
+  /** Her steady heel, rad (+ to starboard): her roll averaged over about `HEEL_SECONDS`, what her gun captains lay against (N7.5a). */
+  readonly heel: number;
 }
 
 /**
@@ -261,23 +263,28 @@ export function pointVelocity(pose: ShipPose, x: number, y: number, z: number, o
 }
 const peekFrom: [number, number, number] = [0, 0, 0];
 
+/** Her trim at rest, rad (+ by the stern): as the draught's load waterline slopes. */
+export function restTrim(): number {
+  const [a0, h0] = DESIGN_WATERLINE.aft, [a1, h1] = DESIGN_WATERLINE.fore;
+  return Math.atan((h0 - h1) / (a1 - a0));
+}
+
 /**
  * She put on the water with her centre at (x, z) and her bow toward `heading`, still, at the draught's load waterline:
  * trimmed by the stern as it slopes, the waterline at the mainmast on the calm level.
  */
 export function startMotion(x: number, z: number, heading: number): ShipMotion {
-  const [a0, h0] = DESIGN_WATERLINE.aft, [a1, h1] = DESIGN_WATERLINE.fore;
-  const pitch = Math.atan((h0 - h1) / (a1 - a0));
+  const pitch = restTrim();
   // The waterline's point at the mainmast, (0, y0, 0) in ship space, on the calm level: her centre's height follows.
   const y0 = designWaterline(0) - LOAD_WATERLINE;
   const level: ShipPose = { x, z, heave: 0, heading, pitch, roll: 0, heaveRate: 0, pitchRate: 0, rollRate: 0 };
   const heave = -toWorld(level, 0, y0, 0)[1];
-  return { pose: { ...level, heave } };
+  return { pose: { ...level, heave }, heel: 0 };
 }
 
 /** She moved bodily across the water by (dx, dz), m (ships touch, touch.ts: two hulls pushed out of each other). */
 export function shifted(m: ShipMotion, dx: number, dz: number): ShipMotion {
-  return { pose: { ...m.pose, x: m.pose.x + dx, z: m.pose.z + dz } };
+  return { pose: { ...m.pose, x: m.pose.x + dx, z: m.pose.z + dz }, heel: m.heel };
 }
 
 /** The water under her this step: its height and velocity on the grid. */
@@ -403,6 +410,7 @@ export function stepMotion(m: ShipMotion, sea: SeaState, t: number, way: Way, bu
       roll: p.roll + rollRate * STEP_SECONDS,
       heaveRate, pitchRate, rollRate,
     },
+    heel: m.heel + (p.roll - m.heel) * (STEP_SECONDS / HEEL_SECONDS),
   };
 }
 

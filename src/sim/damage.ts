@@ -15,11 +15,13 @@
  * its punch it holes the cell and goes on with that much less, throwing splinters ahead of it among the men; timber it
  * cannot go through stops it, lodged, with fewer splinters; a gun it meets is dismounted; a man is struck (killed or
  * wounded by the table); a spar is wounded and the ball spends its chord through it; a line is cut, a sail holed.
- * Chain reaches lines, sails and spars `CHAIN_BITE` times as far. The flight itself does not slow for what the ball
+ * Chain reaches lines, sails and spars `CHAIN_BITE` times as far. A ball in by her bow or stern along her length rakes
+ * her (N7.5a): it comes through her ends square on and the guns it meets do not stop it, so it travels her deck and
+ * counts for several. The flight itself does not slow for what the ball
  * went through (the spent punch is kept instead), so a ball through her goes on to its splash as it was flying.
  *
  * **What damage leads to** (N6.2, `stepAftermath`, each step for each ship): the sea comes in at her holes below the
- * water as she lies (damage/flood.ts) against the pumps, and its weight goes to her floating (motion.ts); spars with
+ * water as she lies (damage/flood.ts; a plugged hole still weeps) against the pumps, and its weight goes to her floating (motion.ts); spars with
  * three wounds in a part, or their weather shrouds or stays gone with the wind on them, fall with all they carry and
  * the men on them, and lie alongside dragging her until cut away (damage/fall.ts); a ball may set her afire, and fire
  * grows, spreads through her ways, is beaten down by the men at hand and, left too long, reaches her powder
@@ -40,8 +42,8 @@ import { brigRoster, type Man } from './crew/roster';
 import { battery, dismountGun, gunAt, gunCount, type Battery } from './guns/guns';
 import { pathAt, type GunFired, type Shot, type Vec } from './guns/shot';
 import {
-  AWASH_SECONDS, CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
-  MAN_AS_OAK, PIERCE, PUMP_POST, SMASHED, SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, WAD_RANGE, type Harm, type HurtBy,
+  AT_WATERLINE, AWASH_SECONDS, CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
+  MAN_AS_OAK, PIERCE, PUMP_POST, RAKING, SEEP, SMASHED, SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, WAD_RANGE, WASH, WEEP, type Harm, type HurtBy,
 } from './rules/damage';
 import { SHOT, type ShotKind } from './rules/guns';
 import { LOAD_WATERLINE, type GunKind } from './rules/ships';
@@ -78,7 +80,7 @@ export interface Damage {
   readonly steering: boolean;
   /** Her magazine has gone up. */
   readonly blownUp: boolean;
-  /** The holes the carpenter's crew has plugged (their `holes` numbers), ascending: the sea comes in at them no more. */
+  /** The holes the carpenter's crew has plugged (their `holes` numbers), ascending: the sea only weeps in at them (rules/damage.ts `WEEP`). */
   readonly plugged: readonly number[];
 }
 
@@ -344,10 +346,12 @@ function traceBall(
     if (!nearHer(pa, pe)) return;
     const w = (work[j] ??= opened(s)), aboard = aboardOf(s, w, roster);
     const d: Place = [pe[0] - pa[0], pe[1] - pa[1], pe[2] - pa[2]];
+    // In by her bow or stern along her length, it rakes her (rules/damage.ts `RAKING`).
+    const times = Math.abs(d[0]) >= Math.cos(RAKING.within) * Math.hypot(...d) ? RAKING.times : 1;
     for (const m of meetings(pa, pe, reach, aboard)) {
       if (punch <= 0) break;
       const event = { kind: 'hit', tick: input.tick, ship: j, by: f.by, gun: f.gun, at: m.at } as const;
-      punch = meet(m, punch, { shot, gun, rng, fireRng, range, w, d, events, event });
+      punch = meet(m, punch, { shot, gun, rng, fireRng, range, w, d, times, events, event });
     }
   });
   return punch;
@@ -363,6 +367,8 @@ interface MeetWith {
   readonly range: number;
   readonly w: Working;
   readonly d: Place;
+  /** Raking her: `RAKING.times` (a gun spends 1 / times of a gun's iron), else 1. */
+  readonly times: number;
   readonly events: Hit[];
   readonly event: Pick<Hit, 'kind' | 'tick' | 'ship' | 'by' | 'gun' | 'at'>;
 }
@@ -372,7 +378,8 @@ function meet(m: Meeting, punch: number, c: MeetWith): number {
   const { w, events, event } = c;
   switch (m.kind) {
     case 'timber': {
-      const thick = TIMBER[m.part] / Math.max(m.cos, GLANCING), through = punch > thick;
+      // Raking, it meets her light stern or bow timbers square on, not glancing along her side.
+      const thick = TIMBER[m.part] / (c.times > 1 ? 1 : Math.max(m.cos, GLANCING)), through = punch > thick;
       w.touched = true;
       if (m.cell) w.holes.push(holeCode(m.cell.id, m.u, m.v, c.shot, c.gun, !through));
       events.push({ ...event, what: through ? 'hole' : 'lodged', id: m.cell?.id ?? GONE, part: m.part });
@@ -388,7 +395,7 @@ function meet(m: Meeting, punch: number, c: MeetWith): number {
         events.push({ ...event, what: 'gun', id: m.gun });
         kindle(m.at, c);
       }
-      return punch - GUN_AS_OAK;
+      return punch - GUN_AS_OAK / c.times;
     case 'man':
       strike(m.man, c.shot, c);
       return punch - MAN_AS_OAK;
@@ -551,7 +558,7 @@ const lessOne = (list: readonly number[], x: number): readonly number[] => {
 };
 
 /**
- * The repairs her crew finished, done to her (N6.3, design decisions for N6): a hole plugged lets in no more sea, a
+ * The repairs her crew finished, done to her (N6.3, design decisions for N6): a hole plugged only weeps, a
  * spar fished has one wound less, a line spliced is whole again, the relieving tackles give her her steering back, the
  * wreckage cut away drags her no more. The pumps, the fire parties and the wounded carried below change nothing here.
  */
@@ -596,16 +603,16 @@ export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly 
   let next = d;
 
   // The sea coming in, and the pumps.
-  const holes = openHoles(d), [larboard, starboard] = d.flooded;
+  const holes = leaks(d.holes), [larboard, starboard] = d.flooded;
   if (holes.length > 0 || larboard + starboard > 0) {
-    const roll = input.pose.roll, level = lyingOf(larboard + starboard).level;
+    const roll = input.pose.roll, level = lyingOf(larboard + starboard).level, plugged = d.plugged;
     let inL = 0, inS = 0;
     for (const h of holes) {
       toWorld(input.pose, h.at[1], h.at[2] - LOAD_WATERLINE, -h.at[0], holeWorld);
-      const depth = surfaceAt(input.sea, holeWorld[0], holeWorld[2], input.t, water).height - holeWorld[1];
-      if (!(depth > 0)) continue;
-      // The water inside stands over the hole by its level there (the surface lies level in the world as she heels).
-      const q = inflow(h.shot, h.gun, depth, level + h.at[1] * roll - h.at[2]);
+      const depth = surfaceAt(input.sea, holeWorld[0], holeWorld[2], input.t, water).height - holeWorld[1] + WASH;
+      // The water inside stands over the hole by its level there (the surface lies level in the world as she heels); every hole seeps.
+      const under = depth > 0 ? inflow(h.shot, h.gun, depth, level + h.at[1] * roll - h.at[2]) : 0;
+      const q = Math.max(under, SEEP * inflow(h.shot, h.gun, AT_WATERLINE)) * (plugged.length > 0 && plugged.includes(h.code) ? WEEP : 1);
       if (h.at[1] < 0) inL += q; else inS += q;
     }
     // Foundered, the sea pours in over her side.

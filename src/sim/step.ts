@@ -24,6 +24,7 @@ import { carryOut, giveOrder, heard, masterSteers, wordSpent, type AnswerCode, t
 import { stepFight, waterIn, type FightEvent } from './end';
 import { masterOrder } from './captain/helm';
 import { engagedSide, stepGunnery } from './guns/gunnery';
+import { leeOf, smokeAfter } from './guns/smoke';
 import type { GunFired } from './guns/shot';
 import { followWind } from './sea/sea';
 import { stepMotion } from './ship/motion';
@@ -166,7 +167,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     for (const kind of sailed.events) events.push({ kind, tick, ship: i });
     // The duel's one enemy is the other ship (design decisions for N5: she is the target).
     const enemy = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
-    const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, out, sailing: s.sailing, pose, enemy, sea });
+    const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, out, sailing: s.sailing, pose, heel: s.motion.heel, drill: s.drill, smoke: s.smoke, enemy, sea });
     events.push(...gunnery.fired);
     const told = heard(carried.told, sailed.events, sailed.sailing);
     return {
@@ -175,9 +176,15 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     };
   });
   // Every shot fired in this step is put in flight (damage.ts); it is first traced in the next step.
-  let flying = hits.flying;
-  for (const e of events) if (e.kind === 'fired') flying = launch(flying, e);
-  const touched = touch(state.ships, next, tick);
+  let flying = hits.flying, guns = 0;
+  for (const e of events) if (e.kind === 'fired') { flying = launch(flying, e); guns++; }
+  // The powder smoke the wind lays on the ship to leeward, and clears (guns/smoke.ts).
+  const smoked = next.map((s, i) => {
+    const me = ships[i]!.motion.pose, other = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
+    const smoke = smokeAfter(s.smoke, guns, other ? leeOf(me.x, me.z, other.x, other.z, wind.x, wind.z) : 0, wind.speed);
+    return smoke === s.smoke ? s : { ...s, smoke };
+  });
+  const touched = touch(state.ships, smoked, tick);
   events.push(...touched.events);
   // Whether a ship is beaten or lost now, and the fight's end (end.ts).
   const fought = stepFight(state.fight, state.ships, touched.ships, tick);

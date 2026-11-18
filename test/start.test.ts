@@ -1,30 +1,31 @@
 /**
- * Where a duel starts (implementation plan N3, design decision "The start", built with N3.7): 1,500 m apart, the wind
+ * Where a duel starts (implementation plan N3, design decision "The start", built with N3.7, by time with N7.5a): as far
+ * apart as the ships close in three minutes in that wind (about 650 m in force 2, 1,500 m in force 6), the wind
  * on the beam of the line between them, both under battle sail and closing; the seed turns the picture and picks the
  * force from 2 to 6.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { angleDiff } from '@futuremagic/core';
-import { aloneStart, duelStart } from '../src/sim/start.ts';
+import { aloneStart, duelStart, startApart } from '../src/sim/start.ts';
 import { startMatch } from '../src/sim/state.ts';
 import { meanWind } from '../src/sim/wind.ts';
 import { DUEL_FORCES } from '../src/sim/rules/wind.ts';
-import { START_APART, WEATHER_TURN_DEGREES, WIND_CHOICES } from '../src/sim/rules/start.ts';
+import { WEATHER_TURN_DEGREES, WIND_CHOICES } from '../src/sim/rules/start.ts';
 import { bearingDir, DEGREE } from '../src/sim/units.ts';
 
 const SEEDS = 200;
 
-test('each seed: 1,500 m apart, each heading at the other with the wind square across the line, under battle sail with way on', () => {
+test('each seed: three minutes of closing apart, each heading at the other with the wind square across the line, under battle sail with way on', () => {
   for (let seed = 0; seed < SEEDS; seed++) {
     const setup = duelStart(seed);
-    const [a, b] = setup.ships;
+    const [a, b] = setup.ships, apart = startApart(setup.windForce);
     assert.ok(a && b && setup.ships.length === 2);
-    assert.ok(Math.abs(Math.hypot(b.x - a.x, b.z - a.z) - START_APART) < 1e-9);
+    assert.ok(Math.abs(Math.hypot(b.x - a.x, b.z - a.z) - apart) < 1e-9);
     // Each bow points at the other ship.
     const [ax, az] = bearingDir(a.heading), [bx, bz] = bearingDir(b.heading);
-    assert.ok(Math.abs(ax * (b.x - a.x) + az * (b.z - a.z) - START_APART) < 1e-6, `seed ${seed}: the first heads at the second`);
-    assert.ok(Math.abs(bx * (a.x - b.x) + bz * (a.z - b.z) - START_APART) < 1e-6, `seed ${seed}: the second heads at the first`);
+    assert.ok(Math.abs(ax * (b.x - a.x) + az * (b.z - a.z) - apart) < 1e-6, `seed ${seed}: the first heads at the second`);
+    assert.ok(Math.abs(bx * (a.x - b.x) + bz * (a.z - b.z) - apart) < 1e-6, `seed ${seed}: the second heads at the first`);
     // The wind comes square across both courses, one on each side: neither has the weather gauge.
     assert.ok(Math.abs(Math.abs(angleDiff(a.heading, setup.windFrom)) - 90 * DEGREE) < 1e-9);
     assert.ok(Math.abs(angleDiff(a.heading, setup.windFrom) + angleDiff(b.heading, setup.windFrom)) < 1e-9);

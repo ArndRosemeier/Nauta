@@ -1,10 +1,19 @@
 /**
- * How a duel starts (design thread, 2026-11-18, "The start" in the implementation plan's N3 design decisions; Arnd
- * judges the feel at G3). Pure data, read by sim/start.ts.
+ * How a duel starts (design thread, 2026-11-18, "The start" in the implementation plan's N3 design decisions, made "by
+ * time, not by distance" with N7.5a; Arnd judges the feel at G3). Pure data, read by sim/start.ts.
  */
 
-/** How far apart the two ships start, m: a long gunshot and more, so the first decision is who works for the wind. */
-export const START_APART = 1500;
+/**
+ * The ships start as far apart as they close in this many minutes under battle sail in that wind (N7.5a): they open
+ * fire about half a minute before they would meet, so the first broadside comes about three minutes in.
+ */
+export const START_MINUTES = 3.5;
+/**
+ * How fast the two ships close at the start, m/s together, by the wind's force: both under battle sail, heading at each
+ * other with the wind abeam, over the first three minutes (measured in `check:sailing`, which fails when the sailing
+ * strays from it): about 650 m in three minutes in a light breeze, 1,500 m in a strong one.
+ */
+export const START_CLOSING: Readonly<Record<number, number>> = { 2: 3.6, 3: 4.3, 4: 5.6, 5: 7.5, 6: 8.3 };
 /**
  * The way each ship has on at the start, knots: under way on a beam reach, closing. Not measured: about what battle
  * sail drives her at in a light breeze, so in a stronger wind she gathers more way in the first minute and in force 2

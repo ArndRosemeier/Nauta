@@ -9,7 +9,7 @@
  * `CROSS_SECONDS`), so a hole on one side lists her that way, and water left in her runs to the low side as she rolls.
  * Places are the plan's (along, across, height above her base, m).
  */
-import { CROSS_SECONDS, DISCHARGE, PUMPING, RAGGED } from '../rules/damage';
+import { AT_WATERLINE, CROSS_SECONDS, DISCHARGE, PUMPING, RAGGED } from '../rules/damage';
 import { SHOT, type ShotKind } from '../rules/guns';
 import { LOAD_WATERLINE, SEA_WATER, type GunKind } from '../rules/ships';
 import { designWaterline, displacedVolume, HULL_AFT, HULL_FORE, hullBottom, sheer } from '../ship/hull';
@@ -97,10 +97,13 @@ export function inflow(shot: ShotKind, gun: GunKind, depth: number, over = 0): n
   return DISCHARGE * (ROUND_AREA * d * d) * Math.sqrt(2 * GRAVITY * head) * SEA_WATER;
 }
 
+/** What one pump fully manned clears, t/s: the sea coming in at `PUMPING.holds` 32-pound shot holes at her waterline. */
+export const pumpRate = (): number => PUMPING.holds * inflow('round', 'carronade', AT_WATERLINE);
+
 /** What the pumps clear, t/s, worked by `men` (each pump fully manned by PUMPING.hands), while more than PUMPING.least lies in her. */
 export function pumped(men: number, tonnes: number): number {
   if (tonnes <= PUMPING.least) return 0;
-  return (Math.min(PUMPING.count * PUMPING.hands, Math.max(0, men)) / PUMPING.hands) * PUMPING.rate;
+  return (Math.min(PUMPING.count * PUMPING.hands, Math.max(0, men)) / PUMPING.hands) * pumpRate();
 }
 
 /**
