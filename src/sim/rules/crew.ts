@@ -1,0 +1,183 @@
+/**
+ * The crew's rules (implementation plan N4.1; docs/ARCHITECTURE.md: rules as data): who is aboard a brig, the quarter
+ * bill that tells each man where he stands and what part of the ship he works, the jobs an order comes to (the hands
+ * each needs, the work it takes, where it is done) and how an order travels down to the men. Read by src/sim/crew/.
+ *
+ * **First proposals for gate G4.** The complement is the Cruizer class's 121 (ship.md); how it is split follows the
+ * usual establishment of an 18-gun brig-sloop about 1805 (a commander, two lieutenants, a master, the warrant officers,
+ * about twenty marines, eight boys, the rest seamen and landsmen), not one ship's muster book. The hands and seconds of
+ * each job are tuned for pace (fun before realism, nauta-plan.md), so that a full crew takes about the times N3.4's
+ * table gave plus the walk to the place; Arnd judges the feel at G4. Pure.
+ */
+import type { LineKind, YardLevel } from './rig';
+
+/**
+ * The parts a man belongs to for the ship's work: the topmen of each mast go aloft, the forecastle men work the
+ * headsails and the fore braces and sheets, the afterguard the main braces, the boom sail and the staysails, the
+ * waisters (landsmen) tail on wherever they are sent; the quartermasters steer; the marines haul aft. Officers,
+ * idlers and boys are not sent to the ropes.
+ */
+export type Part = 'officers' | 'helm' | 'foretop' | 'maintop' | 'forecastle' | 'afterguard' | 'waist' | 'marines' | 'idlers' | 'boys';
+
+/**
+ * One line of the roster: a rank, how many of it, the part of the ship he works, his skill and where he stands at his
+ * quarters (his post: a crew place id of the plan or the rig, the list taken in turn; `guns` gives each man his place
+ * at a gun by the quarter bill, crew/roster.ts).
+ */
+export interface RankRow {
+  readonly rank: string;
+  readonly count: number;
+  readonly part: Part;
+  /** How much of a hand he is at the ropes: an able seaman is one, a landsman less, a boy less still. */
+  readonly skill: number;
+  readonly posts: readonly string[] | 'guns';
+}
+
+/** A man's skill at the ropes, by what he is (hands: an able seaman is 1). */
+const PETTY = 1.2;
+const ABLE = 1;
+const ORDINARY = 0.85;
+const LANDSMAN = 0.7;
+const MARINE = 0.7;
+const IDLER = 0.6;
+const BOY = 0.4;
+
+/**
+ * The brig's people, 121 officers, men and boys (ship.md). The captain is the player: he is on the roster and stands
+ * on the quarterdeck, and is never sent. Topmen: the captain of each top and three men have their post in their top
+ * (a lookout and the first to lay out), the rest stand at the guns. Marines stand along the quarterdeck rails, the
+ * boys by the magazine and the hatches the powder comes up.
+ */
+export const ROSTER: readonly RankRow[] = [
+  { rank: 'captain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
+  { rank: 'first lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
+  { rank: 'second lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'] },
+  { rank: 'master', count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'] },
+  { rank: "master's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'] },
+  { rank: 'midshipman', count: 2, part: 'officers', skill: ABLE, posts: ['station-quarterdeck', 'station-waist'] },
+  { rank: 'surgeon', count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
+  { rank: "surgeon's mate", count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
+  { rank: 'purser', count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
+  { rank: "captain's clerk", count: 1, part: 'officers', skill: IDLER, posts: ['station-quarterdeck'] },
+  { rank: 'gunner', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'] },
+  { rank: 'boatswain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
+  { rank: 'carpenter', count: 1, part: 'officers', skill: ABLE, posts: ['station-pumps'] },
+  { rank: "boatswain's mate", count: 2, part: 'officers', skill: ABLE, posts: ['station-waist', 'pin-bow-pins-s6'] },
+  { rank: "gunner's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-magazine'] },
+  { rank: "carpenter's mate", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
+  { rank: 'quartermaster', count: 4, part: 'helm', skill: ABLE, posts: ['station-wheel'] },
+  { rank: 'cook', count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-fore-ladder-foot'] },
+  { rank: "captain's steward", count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-companion-ladder-foot'] },
+  { rank: 'sailmaker', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
+  { rank: 'armourer', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
+  { rank: "carpenter's crew", count: 2, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
+  { rank: 'sergeant of marines', count: 1, part: 'marines', skill: MARINE, posts: ['pin-quarter-pins-s9'] },
+  { rank: 'corporal of marines', count: 1, part: 'marines', skill: MARINE, posts: ['pin-quarter-pins-p9'] },
+  { rank: 'drummer', count: 1, part: 'officers', skill: MARINE, posts: ['station-quarterdeck'] },
+  {
+    rank: 'private of marines', count: 17, part: 'marines', skill: MARINE,
+    posts: ['pin-quarter-pins-s15', 'pin-quarter-pins-p15', 'pin-quarter-pins-s16', 'pin-quarter-pins-p16', 'pin-quarter-pins-s17', 'pin-quarter-pins-p17', 'pin-quarter-pins-s18', 'pin-quarter-pins-p18'],
+  },
+  { rank: 'boy', count: 8, part: 'boys', skill: BOY, posts: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-after-ladder-head', 'ladder-magazine-ladder-head'] },
+  { rank: 'captain of the foretop', count: 1, part: 'foretop', skill: PETTY, posts: ['top-fore-s'] },
+  { rank: 'fore topman', count: 3, part: 'foretop', skill: ABLE, posts: ['top-fore-p', 'top-fore-s', 'top-fore-p'] },
+  { rank: 'fore topman', count: 6, part: 'foretop', skill: ABLE, posts: 'guns' },
+  { rank: 'captain of the maintop', count: 1, part: 'maintop', skill: PETTY, posts: ['top-main-s'] },
+  { rank: 'main topman', count: 3, part: 'maintop', skill: ABLE, posts: ['top-main-p', 'top-main-s', 'top-main-p'] },
+  { rank: 'main topman', count: 8, part: 'maintop', skill: ABLE, posts: 'guns' },
+  { rank: 'captain of the forecastle', count: 1, part: 'forecastle', skill: PETTY, posts: 'guns' },
+  { rank: 'forecastle man', count: 11, part: 'forecastle', skill: ABLE, posts: 'guns' },
+  { rank: 'captain of the afterguard', count: 1, part: 'afterguard', skill: PETTY, posts: 'guns' },
+  { rank: 'afterguard', count: 11, part: 'afterguard', skill: ORDINARY, posts: 'guns' },
+  { rank: 'waister', count: 19, part: 'waist', skill: LANDSMAN, posts: 'guns' },
+];
+
+/** How many she carries (ship.md): the roster adds up to it (tested). */
+export const COMPLEMENT = 121;
+
+/**
+ * The jobs an order comes to (crew/drill.ts): what each is, where it is done, how many hands it needs and how many
+ * seconds of work it takes with them all there. A square sail's jobs scale with its yard (a course is the heaviest,
+ * a topgallant the lightest); fore-and-aft sails are worked from the deck alone.
+ * - helm: the helmsman puts the helm over, at the wheel.
+ * - stations: "ready about" or "ready to wear": the hands cast off and man the braces of both masts and the headsail
+ *   sheets; the helm goes over when they are ready.
+ * - brace: one mast's yards swung aback or filled, at its braces.
+ * - loose: a square sail loosed (or a reef taken in or shaken out) by men out on its yard.
+ * - sheet: a square sail sheeted home and hoisted, at its sheets, tacks and halliard.
+ * - clew: a square sail clewed up, at its clewlines, clewgarnets and buntlines (furling it aloft is the men's own
+ *   business later and changes nothing she does).
+ * - hoist: a headsail, staysail or the boom sail run up and sheeted, at its halliards, sheets and outhauls.
+ * - douse: one hauled down or brailed in, at its downhaul or brails.
+ */
+export type JobName = 'helm' | 'stations' | 'brace' | 'loose' | 'sheet' | 'clew' | 'hoist' | 'douse';
+
+/** A job's hands and seconds: one number, or one per yard (a square sail's jobs). */
+export type BySail = number | Readonly<Record<YardLevel, number>>;
+
+export interface JobRow {
+  readonly what: string;
+  /** Hands it needs, in skill (an able seaman is one). */
+  readonly hands: BySail;
+  /** Seconds of work with all its hands there. */
+  readonly work: BySail;
+  /** The lines whose pins its men stand at (square-sail and fore-and-aft jobs), or null (helm, loose: other places). */
+  readonly lines: readonly LineKind[] | null;
+}
+
+export const JOBS: Readonly<Record<JobName, JobRow>> = {
+  helm: { what: 'the helm put over', hands: 1, work: 1.5, lines: null },
+  stations: { what: 'the hands at the braces and headsail sheets', hands: 12, work: 2, lines: ['brace', 'sheet'] },
+  brace: { what: "a mast's yards swung round", hands: 8, work: 8, lines: ['brace'] },
+  loose: { what: 'a square sail loosed on its yard', hands: { course: 4, topsail: 4, topgallant: 2 }, work: { course: 6, topsail: 8, topgallant: 5 }, lines: null },
+  sheet: { what: 'a square sail sheeted home and hoisted', hands: { course: 8, topsail: 10, topgallant: 4 }, work: { course: 6, topsail: 8, topgallant: 5 }, lines: ['sheet', 'tack', 'halliard'] },
+  clew: { what: 'a square sail clewed up', hands: { course: 6, topsail: 4, topgallant: 2 }, work: { course: 6, topsail: 6, topgallant: 4 }, lines: ['clewgarnet', 'clewline', 'buntline'] },
+  hoist: { what: 'a fore-and-aft sail hoisted and sheeted', hands: 4, work: 5, lines: ['halliard', 'sheet', 'outhaul'] },
+  douse: { what: 'a fore-and-aft sail hauled down or brailed', hands: 2, work: 4, lines: ['downhaul', 'brail'] },
+};
+
+/**
+ * Who works what (the quarter bill's parts of ship), by gang: each mast's square sails and braces, the headsails, the
+ * after sails (boom sail and staysails). `aloft` goes out on the yards; `deck` hauls, in the order they are sent.
+ * "Ready about" takes the hands of every gang on deck. The helm is the quartermasters'.
+ */
+export type Gang = 'fore' | 'main' | 'head' | 'after';
+export const GANGS: Readonly<Record<Gang, { readonly aloft: Part | null; readonly deck: readonly Part[] }>> = {
+  fore: { aloft: 'foretop', deck: ['forecastle', 'waist'] },
+  main: { aloft: 'maintop', deck: ['afterguard', 'waist', 'marines'] },
+  head: { aloft: null, deck: ['forecastle', 'waist'] },
+  after: { aloft: null, deck: ['afterguard', 'marines'] },
+};
+export const STATIONS_PARTS: readonly Part[] = ['afterguard', 'forecastle', 'waist', 'marines'];
+export const HELM_PARTS: readonly Part[] = ['helm'];
+/** The crew place a helm job is done at. */
+export const WHEEL = 'station-wheel';
+
+/**
+ * Short-handed (the rule): work goes at the share of its hands that is there, by skill, and no faster than with all
+ * of them (more men than a job needs do not hurry it). With half the hands a job takes twice its seconds. Below
+ * FEWEST of its hands it does not move at all (one man cannot sway up a topsail yard): the men there wait for more.
+ */
+export const FEWEST = 0.25;
+
+/**
+ * How an order travels (docs/design/orders.md, "How an order travels"): the man it is given to hears it and passes it
+ * on; the master tells the helmsman, the first lieutenant has the boatswain pipe the hands. Seconds from the order to
+ * the men being told off, by who takes it (orders.ts VOCABULARY's `to`).
+ */
+export const PASSED: Readonly<Record<'master' | 'first lieutenant', number>> = { master: 1, 'first lieutenant': 2 };
+
+/**
+ * Choosing the men: the nearest free man of the parts a job is for goes first. Nearness is the distance in plan plus
+ * the height between, a metre of height reckoned as CLIMB_METRES metres of deck (a man climbs the ratlines about a
+ * third as fast as he walks, rules/routes.ts).
+ */
+export const CLIMB_METRES = 3;
+
+/**
+ * Sending the men: at most this many of a ship's men are sent on their way in one step. A route costs about 0.1 to
+ * 0.3 ms once its place has been routed to (the first route to a new place about 1 ms, N4.2), and a duel steps two
+ * ships in its 2 ms, so a big order sends its men over a few steps, as their reactions differ anyway: 2 a step is 60
+ * men a second.
+ */
+export const SENT_PER_STEP = 2;

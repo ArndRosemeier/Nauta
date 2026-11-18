@@ -269,11 +269,11 @@ Before writing code that does something, look here. If a row covers it, call tha
 | An order in its own words | `src/sim/orders.ts#orderWords` |
 | A compass course in words (`090`) | `src/sim/orders.ts#headingWords` |
 | Why an order is no order at all (an untrusted order from another machine) | `src/sim/orders.ts#malformed` |
-| Giving a ship an order: taken, refused with its reason, or answered and changed (a course she will not lie); what she is told and the timed acts | `src/sim/orders.ts#giveOrder` |
-| Carrying out a ship's orders each step: the acts falling due done to her sailing, orders done reported, full and by following the wind | `src/sim/orders.ts#carryOut` |
+| Giving a ship an order: taken, refused with its reason, or answered and changed (a course she will not lie); what she is told and the acts for the crew | `src/sim/orders.ts#giveOrder` |
+| Carrying out a ship's orders each step: the acts the crew finished done to her sailing, orders done reported, full and by following the wind | `src/sim/orders.ts#carryOut` |
 | What she is told after missing stays (the master bears away on the old tack) | `src/sim/orders.ts#heard` |
 | A ship's orders at the start | `src/sim/orders.ts#startOrders` |
-| The orders' time table and judgements: a point, no way, the time of each order and each sail, heaving to | `src/sim/rules/orders.ts#SAIL_SECONDS` |
+| The orders' judgements: a point, no way, full and by following the wind, what heaving to comes to | `src/sim/rules/orders.ts#HOVE_TO_IN` |
 | The stays | `src/sim/ship/lines.ts#buildStays` |
 | The standing rigging: shrouds, futtock shrouds, backstays, slings, the bowsprit's | `src/sim/ship/lines.ts#buildStanding` |
 | The running rigging, each line on a pin of its own | `src/sim/ship/lines.ts#buildRunning` |
@@ -336,3 +336,13 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Sending a man on his way | `src/sim/crew/going.ts#startGoing` |
 | One step of every man on his way (speeds, crowds, queues, the captain, rerouting) | `src/sim/crew/going.ts#stepGoings` |
 | Where a man on his way is now (spot, height, way, facing) | `src/sim/crew/going.ts#goingAt` |
+| A spot alone, from anything that stands on one (a crew place, a man on his way) | `src/sim/ship/plan.ts#bareSpot` |
+| The crew's rules: the roster by rank, part, skill and post; the jobs (hands, work, lines); the gangs; the short-handed rule; how an order travels; choosing and sending the men (first proposals) | `src/sim/rules/crew.ts#ROSTER` |
+| The brig's people and the quarter bill: every man's rank, part, skill, post and gun | `src/sim/crew/roster.ts#brigRoster` |
+| Every crew place of the plan and the rig, by id | `src/sim/crew/roster.ts#crewPlaces` |
+| A crew place's spot | `src/sim/crew/roster.ts#placeSpot` |
+| What the crew does for an act of an order: its jobs, their places, hands, work and which waits for which (the drill) | `src/sim/crew/drill.ts#drill` |
+| Who works a sail (its gang) | `src/sim/crew/drill.ts#gangOf` |
+| A crew at the start, every man at his post | `src/sim/crew/crew.ts#startCrew` |
+| One step of the crew: acts become tasks, men told off by the quarter bill and sent, work done at the share of hands present, acts finished (the one owner of every man's task and place) | `src/sim/crew/crew.ts#stepCrew` |
+| The task a man has | `src/sim/crew/crew.ts#taskOf` |

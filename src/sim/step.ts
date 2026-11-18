@@ -10,6 +10,7 @@
  * sails one step in the true wind at her place (sailing.ts) and floats one step on that sea as her sailing says
  * (motion.ts).
  */
+import { stepCrew } from './crew/crew';
 import { carryOut, giveOrder, heard, type Order } from './orders';
 import { followWind } from './sea/sea';
 import { stepMotion } from './ship/motion';
@@ -18,7 +19,7 @@ import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
-export type SimEvent = OrderRefused | OrderDone | Sailed;
+export type SimEvent = OrderRefused | OrderDone | Sailed | ShortHanded;
 
 /** An order the ship could not take, with the reason in words. */
 export interface OrderRefused {
@@ -29,7 +30,7 @@ export interface OrderRefused {
   readonly reason: string;
 }
 
-/** An order carried out: its last act done (the helm put over, the last sail set, the yards swung), by the time table until the crew exists (orders.ts). */
+/** An order carried out: its last act done by the men (the helm put over, the last sail set, the yards swung). */
 export interface OrderDone {
   readonly kind: 'done';
   readonly tick: number;
@@ -42,6 +43,16 @@ export interface Sailed {
   readonly kind: SailingEvent;
   readonly tick: number;
   readonly ship: number;
+}
+
+/** A job of an order begun with fewer hands than it needs (crew/crew.ts): the first lieutenant says so (N4.5), and it goes slower. */
+export interface ShortHanded {
+  readonly kind: 'short-handed';
+  readonly tick: number;
+  readonly ship: number;
+  readonly order: Order;
+  /** The job (rules/crew.ts `JOBS`). */
+  readonly job: string;
 }
 
 /** What a step gives back. */
@@ -73,12 +84,17 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
       tick: tick + 1,
       sea,
       ships: ships.map((s, i) => {
-        const carried = carryOut(s.told, s.sailing, tick, wind);
-        for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
         const pose = s.motion.pose;
+        const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas });
+        for (const e of crewed.events) {
+          const given = s.told.given.find((g) => g.id === e.of);
+          if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });
+        }
+        const carried = carryOut(s.told, s.sailing, crewed.done, wind);
+        for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
         const sailed = stepSailing(carried.sailing, pose, windAt(state.wind, pose.x, pose.z, t));
         for (const kind of sailed.events) events.push({ kind, tick, ship: i });
-        return { motion: stepMotion(s.motion, sea, t, sailed.way), sailing: sailed.sailing, told: heard(carried.told, sailed.events, sailed.sailing) };
+        return { ...s, motion: stepMotion(s.motion, sea, t, sailed.way), sailing: sailed.sailing, told: heard(carried.told, sailed.events, sailed.sailing), crew: crewed.crew };
       }),
     },
     events,
