@@ -1,0 +1,2 @@
+The other brig can now be commanded by a computer captain: open the game with ?sail&foe=master (or foe=seasoned, foe=green) and she works for the wind, closes, lays her broadside alongside you, fires on the roll and sees to her leaks and fires.
+Beaten, he strikes his colours. For now fights still last long: the damage is retuned next so a duel is decided in 10 to 20 minutes.

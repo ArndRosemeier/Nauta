@@ -22,6 +22,7 @@
     "check:sailing": "tsx tools/sim/sailing.ts",
     "check:crew": "tsx tools/sim/crew.ts",
     "check:gunnery": "tsx tools/sim/gunnery.ts",
+    "check:captains": "tsx tools/sim/captains.ts",
     "plan:draw": "tsx tools/plan/draw.ts",
     "shot:sea": "node tools/shot/sea.mjs",
     "check:shots": "node tools/shot/check.mjs",

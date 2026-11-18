@@ -372,7 +372,7 @@ export interface OrderMoment {
 }
 
 /** Her tack for a heading in a wind from `from`: +1 the wind on her starboard side, -1 on her larboard; `otherwise` dead ahead or astern. */
-function tackOf(heading: number, from: number, otherwise: number): number {
+export function tackOf(heading: number, from: number, otherwise: number): number {
   const d = angleDiff(heading, from);
   return d === 0 || Math.abs(d) === Math.PI ? otherwise : Math.sign(d);
 }
@@ -615,6 +615,9 @@ export function wordSpent(told: ShipOrders): ShipOrders {
   return told.word ? { ...told, word: false } : told;
 }
 
+/** Whether she is going about: a tack or a wear ordered and not yet done. */
+export const goingAbout = (told: ShipOrders): boolean => told.given.some((g) => g.order.kind === 'tack' || g.order.kind === 'wear');
+
 /** One step of carrying out: what she is still told, how she sails after the acts done now, and the orders now done. */
 export interface CarriedOut {
   readonly told: ShipOrders;
@@ -649,7 +652,7 @@ export function carryOut(told: ShipOrders, s: Sailing, finished: readonly number
     next = { ...told, acts, given: told.given.filter((g) => !ended.includes(g)) };
   }
   if (next.hove && !next.acts.some((a) => a.kind === 'yards')) sailing = keepHove(sailing, next);
-  if (next.helm.by && !next.acts.some((a) => a.kind === 'helm') && !next.given.some((g) => g.order.kind === 'tack' || g.order.kind === 'wear')) {
+  if (next.helm.by && !next.acts.some((a) => a.kind === 'helm') && !goingAbout(next)) {
     const heading = closeHauled(next.helm.by, wind.from);
     if (Math.abs(angleDiff(sailing.steer.heading, heading)) > BY_FOLLOW) sailing = steerTo(sailing, heading, sailing.steer.turn);
   }

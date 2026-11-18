@@ -43,7 +43,7 @@ jobs:
       - name: Typecheck and build
         run: npm run build
 
-  # The slow checks (docs/CHECKS.md), in two jobs side by side, each with its own 10 minutes: each check under its own
+  # The slow checks (docs/CHECKS.md), in jobs side by side, each with its own 10 minutes: each check under its own
   # budget, each job's checks together within two thirds of its 10 minutes. A new check goes where there is more room.
   slow:
     name: "Slow checks: the start, the sea and the simulation"
@@ -129,6 +129,31 @@ jobs:
         with:
           name: shots-brig
           path: shots
+      - name: All slow checks together within the job's 10 minutes
+        if: always()
+        run: node tools/guards/budget.mjs --sum 600
+
+  # Computer captains fighting whole duels (N7.1): a job of its own, as the check fights a duel on every core.
+  slow-captains:
+    name: "Slow checks: computer captains fight duels"
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: The job's start and the budget log
+        run: |
+          echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+          echo "BUDGET_LOG=$RUNNER_TEMP/budget.log" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Computer captains fight duels to the end; each closes, fires and strikes when beaten, and no order of his is refused (N7.1)
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:captains
       - name: All slow checks together within the job's 10 minutes
         if: always()
         run: node tools/guards/budget.mjs --sum 600
