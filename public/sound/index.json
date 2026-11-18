@@ -663,6 +663,16 @@
     8
    ]
   },
+  "music/title": {
+   "kind": "music",
+   "take": "music/title-a",
+   "files": [
+    "music/title.mp3"
+   ],
+   "seconds": [
+    176
+   ]
+  },
   "pipe/back": {
    "kind": "call",
    "files": [

@@ -540,5 +540,25 @@
       "kind": "bed",
       "prompt": "The sound of a wooden sailing ship breaking up and going down: deep groaning and cracking of her timbers under strain, beams splitting, loose things crashing about, the sea roaring in through her, continuous for thirty seconds, no explosions, no guns, no voices, no talking, no shouting, no screaming, no music"
     }
+  ],
+  "music": [
+    {
+      "id": "music/title-a",
+      "kind": "music",
+      "prompt": "Title theme for a game about commanding a Royal Navy brig at sea in 1805. Instrumental only: no vocals, no singing, no choir, no humming, no spoken words. It opens quietly: a solo fiddle plays a memorable, yearning folk-like melody in D dorian, in the spirit of an old English sea song, over soft low strings and a held drone. The melody is then taken up by warm French horns and full strings, rising into a broad, sweeping, adventurous orchestral statement with gentle timpani rolls like distant thunder, then it falls back to the lone fiddle and a soft final chord. Cinematic, heartfelt, proud and a little melancholy. Acoustic orchestra, no synthesizers, no electronic beats.",
+      "out": "music/title",
+      "kbps": 96
+    },
+    {
+      "id": "music/title-b",
+      "kind": "music",
+      "prompt": "Main title music for a naval age-of-sail game, a frigate captain's theme, around 1800. Instrumental only: no vocals, no singing, no choir, no humming, no spoken words. A slow 6/8 lilt like a ship rolling on a long swell. Celtic harp and a low whistle introduce a simple, unforgettable melody; cellos and violas answer; the theme grows into a full orchestra with horns and strings, majestic and wind-swept like sails filling at dawn, then settles to harp and strings and ends softly. Cinematic orchestral, warm, noble, wistful. Acoustic instruments only, no synthesizers, no drum kit."
+    },
+    {
+      "id": "music/title-clip",
+      "kind": "music",
+      "model": "clip",
+      "prompt": "Title theme for a Royal Navy sailing ship game, 1805. Instrumental only: no vocals, no singing, no choir, no humming, no spoken words. A solo fiddle melody in a minor mode like an old English sea song over soft strings, swelling into warm horns and full strings with a gentle timpani roll, cinematic, proud and wistful, acoustic orchestra only."
+    }
   ]
 }

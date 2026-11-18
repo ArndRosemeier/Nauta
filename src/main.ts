@@ -1,5 +1,7 @@
 /** The page: the view, the sky, the sea and the look, started behind the loading screen. */
 import { GraphicsUnavailable } from '@futuremagic/stage';
+// The title first (plan N7.7): it is up and drawing in its worker before three.js and the game are even evaluated.
+import './title/boot';
 import './ui/nauta.css';
 import { readParams, type Params } from './app/params';
 import { BenchRun } from './app/benchRun';
@@ -44,6 +46,8 @@ import { battery } from './sim/guns/guns';
 import { toWorld, type ShipPose } from './sim/ship/motion';
 import { shipY, shipZ } from './sim/ship/section';
 import { SeaSound } from './audio/seaSound';
+import { pageEngine } from './audio/pageEngine';
+import { handOver } from './title/title';
 import { ShipSound } from './audio/shipSound';
 import { CrewSound } from './audio/crewSound';
 import { beatingToQuarters } from './sim/guns/gunnery';
@@ -75,8 +79,6 @@ const HUD_EVERY_MS = 500;
 const MATCH_SEED = 1805;
 /** The bearing the wind blows from until matches exist, rad: west-south-west, the Atlantic's prevailing wind. */
 const WIND_FROM = 247.5 * DEGREE;
-/** How long the loading screen takes to fade (the `transition` of #loading in index.html), ms, and a little more. */
-const LOADING_FADE_MS = 700;
 /** How far off the sun's light stands from what it lights, m (only its direction matters). */
 const SUN_DISTANCE = 60;
 /** Triangles are counted in thousands on the HUD. */
@@ -183,7 +185,7 @@ async function start(): Promise<void> {
   if (other && herGuns) other.addMoving(herGuns.draws.group);
   // `?crew`: the trial's 240 men (plan N4.0), mustered behind the loading screen; how long that takes is part of the trial.
   const mustered = performance.now();
-  const men = ship && params.crew ? musterCrews(params.crew === 'aboard').filter((m, i, all) => i - all.findIndex((o) => o.crew === m.crew) < params.men) : [], note = loading.querySelector('p')!;
+  const men = ship && params.crew ? musterCrews(params.crew === 'aboard').filter((m, i, all) => i - all.findIndex((o) => o.crew === m.crew) < params.men) : [], note = loading.querySelector('.title-note')!;
   const crew = ship && params.crew ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, ship, men, params.crew === 'aboard' ? null : TWIN_OFFSET,
     (n) => { note.textContent = `mustering the crews: ${n} of ${men.length} (${((performance.now() - mustered) / MS_PER_SECOND).toFixed(0)} s)`; }) : null;
   const musterSeconds = (performance.now() - mustered) / MS_PER_SECOND;
@@ -379,8 +381,8 @@ async function start(): Promise<void> {
   });
   new SettingsMenu(settings, { qualityNow: () => `${quality.knobs.name} · ${quality.reason}` });
   document.addEventListener('visibilitychange', () => quality.interrupt());
-  // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want.
-  const sound = new SeaSound(import.meta.env.BASE_URL, MATCH_SEED);
+  // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want (the title's tap opens it).
+  const sound = new SeaSound(pageEngine(), MATCH_SEED);
   // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
   // Each part of the sound at the player's level (plan N7.3): the whole is the engine's master volume.
   const shipPart = new Channel(sound.engine), crewPart = new Channel(sound.engine), battlePart = new Channel(sound.engine);
@@ -569,8 +571,8 @@ async function start(): Promise<void> {
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
-      loading.style.opacity = '0';
-      setTimeout(() => loading.remove(), LOADING_FADE_MS);
+      // The title fades into the deck (plan N7.7).
+      handOver();
     }
   });
 }
@@ -596,7 +598,9 @@ function crewLine(crew: CrewView, musterSeconds: number, held: ReturnType<CrewVi
  * without drawing (the network check, plan N3.7); their code loads only when asked for.
  */
 const asked = readParams(location.search);
-const run = asked.probe ? () => import('./probe/page').then((p) => p.runProbe())
+// `?title`: the title alone (title/boot.ts), nothing behind it.
+const titleAlone = new URLSearchParams(location.search).has('title');
+const run = titleAlone ? () => Promise.resolve() : asked.probe ? () => import('./probe/page').then((p) => p.runProbe())
   : asked.netcheck ? () => import('./app/netCheck').then((p) => p.runNetCheck(asked)) : start;
 
 run().catch((err: unknown) => {
@@ -605,6 +609,6 @@ run().catch((err: unknown) => {
     ? `Nauta needs WebGPU, which this browser does not offer (${err.why}). It runs in Safari on an iPad or Mac (iPadOS and macOS 26 or later) and in a current Chrome or Edge.`
     : `Nauta could not start: ${err instanceof Error ? err.message : String(err)}`;
   failed.style.display = 'grid';
-  el('loading').remove();
+  handOver(true);
   console.error(err);
 });

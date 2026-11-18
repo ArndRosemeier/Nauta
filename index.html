@@ -18,13 +18,7 @@
       body { font: 14px/1.4 system-ui, sans-serif; color: #e8eef4; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
       #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
       #hud { position: fixed; left: max(8px, env(safe-area-inset-left)); top: calc(max(14px, env(safe-area-inset-top)) + 66px); margin: 0; white-space: pre; font: 12px/1.35 ui-monospace, monospace; text-shadow: 0 1px 2px #000; pointer-events: none; display: none; }
-      #loading, #failed { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1a2a; transition: opacity 0.6s; }
-      /* The loading screen in the interface's look (docs/design/ui-style.md): the title in brass capitals on the lacquer, ivory words. */
-      #loading { background: linear-gradient(180deg, #172430 0%, #0a1118 100%); }
-      #loading > div { text-align: center; color: #eadfc6; }
-      #loading h1 { font: 400 50px/1 'Caslon Display', Georgia, serif; letter-spacing: 0.35em; margin: 0 0 0 0.35em; color: #d4ad62; }
-      #loading p { margin: 18px 0 0; min-height: 1.4em; font: italic 16px/1.4 'Caslon', Georgia, serif; opacity: 0.75; }
-      #failed { display: none; padding: 24px; text-align: center; }
+      #failed { position: fixed; inset: 0; display: none; place-items: center; background: #0b1a2a; padding: 24px; text-align: center; }
       /* ?probe: the report scrolls and can be selected, the buttons fit a finger. */
       #probe { position: fixed; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 24px max(12px, env(safe-area-inset-left)); }
       #probe header { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -45,7 +39,7 @@
     <pre id="hud"></pre>
     <pre id="bench"></pre>
     <button id="glass-button" class="nt-pill" type="button"></button>
-    <div id="loading"><div><h1>NAUTA</h1><p></p></div></div>
+    <div id="loading"><canvas class="title-view"></canvas><div class="title-plate"><h1>NAUTA</h1></div><p class="title-hint nt-pill">Tap to hear the theme</p><p class="title-note"></p></div>
     <div id="failed"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

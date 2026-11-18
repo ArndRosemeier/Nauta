@@ -10,16 +10,12 @@ import { apparentSpeed, type Sailing } from '../sim/ship/sailing';
 import { bedLevels, seaForce, type BedLevel } from './ambience';
 import { SlapWatch, type SlapEvent } from './slaps';
 import type { Room } from './acoustics';
-import { SOUND_MEMORY, UNDER_WATER_HZ } from './tuning';
+import { UNDER_WATER_HZ } from './tuning';
 
 /** The way of a ship through the water: her heading, way ahead and leeway (sailing.ts). */
 export type Way = Pick<Sailing, 'heading' | 'ahead' | 'leeway'>;
 
-/** Safari's audio session for a game: sound plays even when the device is set to silent, as a video's does. */
-interface AudioSessionNavigator { audioSession?: { type: string } }
-
 export class SeaSound {
-  readonly engine: AudioEngine;
   /** The sea and the wind's own level, 0..1 (the player's setting, plan N7.3; channel.ts for the other parts). */
   level = 1;
   private readonly watch: SlapWatch;
@@ -30,11 +26,8 @@ export class SeaSound {
   /** The low-pass now (null: open), so the engine is told only of a change. */
   private muffled: number | null = null;
 
-  /** `base`: the page's base URL (the sounds are in its `sound/`); `seed`: the match's. */
-  constructor(base: string, private readonly seed: number) {
-    const nav = navigator as Navigator & AudioSessionNavigator;
-    if (nav.audioSession) nav.audioSession.type = 'playback';
-    this.engine = new AudioEngine({ base: `${base}sound/`, seed, budget: SOUND_MEMORY });
+  /** `engine`: the page's sound (pageEngine.ts), open since the title's first tap or opening with the next; `seed`: the match's. */
+  constructor(readonly engine: AudioEngine, private readonly seed: number) {
     this.watch = new SlapWatch(seed);
   }
 

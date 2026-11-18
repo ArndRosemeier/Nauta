@@ -619,6 +619,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Keeping the settings on the device and telling the page of every change (the address's for one visit) | `src/app/settingsStore.ts#SettingsStore` |
 | The settings on the page: the rose button, the sheet's pages and controls | `src/app/settingsPanel.ts#SettingsMenu` |
 | A key's code as its cap reads (`KeyW` is W) | `src/app/settingsPanel.ts#keyName` |
+| The title while the game prepares: shown first, the finger, the theme on the first tap, the hand-over to the deck (N7.7) | `src/title/title.ts#Title` |
+| The title's picture, drawn in its worker (or on the page) | `src/title/scene.ts#TitleScene` |
+| The title's look as data: colours by the sun's height, layout, the brig's drawing, the exchange of fire | `src/title/titleLook.ts#SKY_KEYS` |
+| The page's one sound engine, opened by the first tap (the title's or the game's) | `src/audio/pageEngine.ts#pageEngine` |
 | The interface's words in English and German | `src/app/words.ts#words` |
 | A panel over the view that is not the world (the sheet: frame, rose, title, close); the look is docs/design/ui-style.md | `src/app/sheet.ts#openSheet` |
 | The compass rose, the interface's mark | `src/app/sheet.ts#rose` |

@@ -91,6 +91,8 @@ const EN = {
   otherDevice: 'On the other device open this link, or tap the room in its list of rooms waiting:',
   room: 'Room',
   captainsOf: 'captains',
+  titleTap: 'Tap to hear the theme',
+  titleThen: 'Drag across the sky to move the sun · tap the brig to fire',
 };
 
 export type WordKey = keyof typeof EN;
@@ -180,6 +182,8 @@ const DE: Record<WordKey, string> = {
   otherDevice: 'Auf dem anderen Gerät diesen Link öffnen oder den Raum in seiner Liste wartender Räume antippen:',
   room: 'Raum',
   captainsOf: 'Kapitäne',
+  titleTap: 'Tippen, um die Titelmelodie zu hören',
+  titleThen: 'Über den Himmel ziehen bewegt die Sonne · die Brigg antippen, und sie feuert',
 };
 
 const BY_LANGUAGE: Readonly<Record<Language, Readonly<Record<WordKey, string>>>> = { en: EN, de: DE };
