@@ -86,7 +86,8 @@ test('orders are answered in the step they are given in; one she cannot take is 
   assert.ok(Math.abs(one.helm.heading - 2.5) < 1e-12 && one.helm.by === 0, 'the course wrapped');
   assert.deepEqual(one.backed, [false, true]);
   assert.equal(zero.canvas, 'plain');
-  assert.deepEqual(zero.helm, s.ships[0]!.told.helm);
+  // The refused course (not a number) was not taken (her helm may be the helmsman's own: with a sail aback at her start he bears away a point, test/bearAway.test.ts).
+  assert.ok(Number.isFinite(zero.helm.heading) && zero.helm.by === 0);
   const refused = events.filter((e: SimEvent) => e.kind === 'refused');
   assert.deepEqual(refused.map((e) => [e.tick, e.order.ship, e.order.kind]), [[0, 2, 'steer'], [0, 0, 'steer'], [0, 0, 'sail'], [0, 1, 'back']]);
   assert.match(refused[0]!.reason, /no ship 2/);

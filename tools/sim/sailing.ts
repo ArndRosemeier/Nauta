@@ -34,7 +34,7 @@ import type { Order } from '../../src/sim/orders.ts';
 import { NO_WAY } from '../../src/sim/rules/orders.ts';
 import { JOBS, PASSED } from '../../src/sim/rules/crew.ts';
 import { rigPlan } from '../../src/sim/ship/rig.ts';
-import { canvasFor } from '../../src/sim/ship/sailing.ts';
+import { canvasFor, sailAback } from '../../src/sim/ship/sailing.ts';
 import { meanWind } from '../../src/sim/wind.ts';
 import { simTime } from '../../src/sim/state.ts';
 import { STEER_POINTS, steerPoint } from '../../src/app/orderReport.ts';
@@ -53,6 +53,11 @@ const SETTLE = 60;
 const MEASURE = 60;
 /** Hove to, her way must be off within this, s (in a working wind). */
 const HEAVE_LIMIT = 300;
+/** A header: the wind goes round this far toward her bow while she is 70° to 80° off it; no sail may be aback more than `HEADER_FILL` s into the next `HEADER_SECONDS`. */
+const HEADER = 10 * DEGREE;
+const HEADER_POINTS = [70, 75, 80];
+const HEADER_SECONDS = 40;
+const HEADER_FILL = 30;
 /** A tack must be through within this, s. */
 const TACK_LIMIT = 60;
 /** The lightest wind a tack is held to the limit in (a light breeze carries too little way through the wind). */
@@ -231,6 +236,21 @@ function orderScenarios(): string[] {
   const canvasBack = JSON.stringify(she(filled).canvas) === JSON.stringify(canvasFor('battle', HEAVE_FORCE));
   if (!canvasBack || she(filled).backed.some(Boolean) || she(filled).ahead < UNDER_WAY) problems.push(`orders: filled, she is not under battle sail and way again (${(she(filled).ahead / KNOT).toFixed(1)} kn)`);
   out.push(`hove to, still after ${stopped.toFixed(0)} s, within ${(most / KNOT).toFixed(2)} kn; filled, ${(she(filled).ahead / KNOT).toFixed(1)} kn`);
+  // A header at 70° to 80° off the wind under all sail: the helmsman bears away a point at a time until every sail fills (design decision 2026-11-18).
+  const headers: string[] = [];
+  for (const off of HEADER_POINTS) {
+    let head = run(match(ORDERS_FORCE, 'plain', off), SETTLE, undefined, [{ kind: 'steer', ship: 0, heading: FROM + off * DEGREE }]);
+    head = { ...head, wind: { ...head.wind, windFrom: head.wind.windFrom + HEADER } };
+    let last = 0, bore = 0, at = 0;
+    run(head, HEADER_SECONDS, (st, seen) => {
+      at += 1 / STEPS_PER_SECOND;
+      bore += seen.filter((e) => e.kind === 'bore away').length;
+      if (sailAback(she(st), meanWind(st.wind, simTime(st)))) last = at;
+    });
+    if (last > HEADER_FILL) problems.push(`orders: a ${degrees(HEADER)} header at ${off}° off the wind, a sail was still aback ${last.toFixed(0)} s on (at most ${HEADER_FILL} s)`);
+    headers.push(`${off}°: filled after ${last.toFixed(0)} s, ${bore} bearings away`);
+  }
+  out.push(`a ${degrees(HEADER)} header: ${headers.join('; ')}`);
   // The panel's eight compass points from a start under way: each reached, or full and by on its tack when it lies too near the wind.
   const missed: string[] = [];
   STEER_POINTS.forEach((name, i) => {

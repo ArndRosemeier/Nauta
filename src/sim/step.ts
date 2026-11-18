@@ -159,6 +159,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     }
     const carried = carryOut(s.told, setShares(s.sailing, crewed.sails), crewed.done, wind);
     for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
+    if (carried.bore) events.push({ kind: 'bore away', tick, ship: i });
     const here = windAt(state.wind, pose.x, pose.z, t);
     // What her damage leads to this step: the sea in at her holes, spars falling, fire (damage.ts).
     const after = stepAftermath(s.damage, { seed: state.matchSeed, tick, t, ship: i, pose, sea, crew: crewed.crew, sailing: carried.sailing, wind: here, mended: crewed.mended });

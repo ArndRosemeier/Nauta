@@ -87,7 +87,7 @@ Reports are bubbles over the man who makes them, raised by the simulation's even
 | Who | Reports |
 | --- | --- |
 | Lookout | A sail sighted; she tacks, wears, makes or shortens sail; she opens her ports; her mast is gone; she strikes |
-| Master | Wind shifts or freshens; "She won't lie that course"; missed stays; taken aback |
+| Master | Wind shifts or freshens; "She won't lie that course"; missed stays; taken aback ("Bearing away a point, sir, she was taken aback": under a steer order the helmsman bears away by himself, a point at a time at most) |
 | First lieutenant | At quarters; too few hands for what is ordered; fire; the colours shot away |
 | Gunner | Side ready; guns bear; a gun dismounted |
 | Carpenter | Water in the well rising or gaining; holed below the waterline; a mast wounded |

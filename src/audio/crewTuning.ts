@@ -58,8 +58,8 @@ export const STILL_CALL = call('still', 2.6);
 /** An order of the first lieutenant's or heaving to carried out, or she is round on the new tack: Carry On. Quieter, an end, not a start. */
 export const CARRY_ON = call('carry-on', 0.75, PIPE_GAIN * 0.6);
 
-/** What each sailing event of hers is piped with, in turn: come round, the yards are swung and the men carry on; missed stays, all stop. */
-export const SAILED_CALLS: Readonly<Record<SailingEvent, readonly PipeCall[]>> = { tacked: [HAUL_CALL, CARRY_ON], wore: [HAUL_CALL, CARRY_ON], 'missed stays': [STILL_CALL] };
+/** What each sailing event of hers is piped with, in turn: come round, the yards are swung and the men carry on; missed stays, all stop; bearing away is the helmsman's alone, no call. */
+export const SAILED_CALLS: Readonly<Record<SailingEvent, readonly PipeCall[]>> = { tacked: [HAUL_CALL, CARRY_ON], wore: [HAUL_CALL, CARRY_ON], 'missed stays': [STILL_CALL], 'bore away': [] };
 
 /**
  * The orders whose end is piped (Carry On): those that took the hands. A course is the helmsman's alone; a tack or a
