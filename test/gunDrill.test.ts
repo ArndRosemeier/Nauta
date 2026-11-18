@@ -44,7 +44,7 @@ test('every motion of the drill table is in the pack, and the crowd bakes each o
 test('through a reload each man of a gun\'s crew plays his part: ramming at the muzzle, heaving her out at the tackles, her captain crouching once she is ready', () => {
   const crew = crewOf(0);
   assert.equal(crew.length, FULL, 'a pair\'s crew is five men');
-  const seen = new Map<string, Set<string>>();
+  const seen = new Map<string, Set<string | null>>();
   let guns = startGuns();
   for (let k = 0; k < 40 * STEPS_PER_SECOND; k++) {
     guns = stepGuns(guns, places.map(() => FULL), wants(true, true));

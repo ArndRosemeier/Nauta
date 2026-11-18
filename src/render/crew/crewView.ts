@@ -356,7 +356,7 @@ export class CrewView {
   }
 
   /** Her men now at a gun with what the drill has them doing, where they are drawn (her space): for the browser checks, which stand beside a gun crew (tools/shot/guns.mjs `drill`). */
-  gunMen(ship: number): { man: number; gun: number; part: string; step: string; working: boolean; want: string; clip: string | null; x: number; y: number; z: number; shown: boolean; seen: boolean }[] {
+  gunMen(ship: number): { man: number; gun: number; part: string; step: string; working: boolean; want: string | null; clip: string | null; x: number; y: number; z: number; shown: boolean; seen: boolean }[] {
     const state = this.lastState?.ships[ship];
     return (this.byShip[ship] ?? []).flatMap((d) => {
       const w = state ? gunWork(state, d.man, d.m) : null;
