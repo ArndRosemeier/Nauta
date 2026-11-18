@@ -10,6 +10,7 @@
  */
 import { angleDiff, deriveSeed, Rng } from '@futuremagic/core';
 import { openHoles, standingNow } from '../damage';
+import { waterIn } from '../end';
 import { battery, gunAt } from '../guns/guns';
 import { SKILL, BEARS_WITHIN, type Skill } from '../rules/captain';
 import { GUNS } from '../rules/guns';
@@ -17,7 +18,7 @@ import { rigPlan } from '../ship/rig';
 import { MASTS } from '../ship/sailing';
 import type { SimShip, SimState } from '../state';
 import { simTime } from '../state';
-import { apartOnWater, bearingDir, wrapBearing } from '../units';
+import { apartOnWater, bearingDir, bearingTo, wrapBearing } from '../units';
 import { meanWind, type Wind } from '../wind';
 
 /** The enemy as he sees her across the water. */
@@ -82,7 +83,7 @@ export const sideIndex = (off: number): 0 | 1 => (off >= 0 ? 1 : 0);
 export const sideSign = (index: 0 | 1): number => (index === 1 ? 1 : -1);
 
 /** His sides as the gunner reports them, she lying `off` his bow (`trueOff` as the gun captains see it). */
-function sideReports(own: SimShip, off: number, trueOff: number): [SideReport, SideReport] {
+export function sideReports(own: SimShip, off: number, trueOff: number): [SideReport, SideReport] {
   const places = battery(), counts = [{ mounted: 0, ready: 0, readyBearing: 0 }, { mounted: 0, ready: 0, readyBearing: 0 }];
   places.forEach((p, i) => {
     const g = gunAt(own.guns, i), c = counts[p.side > 0 ? 1 : 0]!;
@@ -111,9 +112,9 @@ export function sightOf(state: SimState, ship: number, skill: Skill): Sight {
   const me = own.motion.pose, her = other.motion.pose, row = SKILL[skill];
   const rng = new Rng(deriveSeed(state.matchSeed, 'captain', ship, state.tick));
   const range = apartOnWater(me, her) * Math.max(0, 1 + rng.gaussian(0, row.judgeRange));
-  const bearing = wrapBearing(Math.atan2(her.x - me.x, -(her.z - me.z)) + rng.gaussian(0, row.judgeBearing));
+  const bearing = wrapBearing(bearingTo(me, her) + rng.gaussian(0, row.judgeBearing));
   const wind = meanWind(state.wind, t), windFrom = wind.from, [wx, wz] = bearingDir(windFrom);
-  const off = angleDiff(own.sailing.heading, bearing), trueOff = angleDiff(own.sailing.heading, Math.atan2(her.x - me.x, -(her.z - me.z)));
+  const off = angleDiff(own.sailing.heading, bearing), trueOff = angleDiff(own.sailing.heading, bearingTo(me, her));
   const d = own.damage;
   return {
     tick: state.tick, t, ship, own,
@@ -121,7 +122,7 @@ export function sightOf(state: SimState, ship: number, skill: Skill): Sight {
     wind, windFrom, force: state.wind.windForce, range, bearing, off,
     windward: (me.x - her.x) * wx + (me.z - her.z) * wz,
     sides: sideReports(own, off, trueOff),
-    water: d.flooded[0] + d.flooded[1], leaks: openHoles(d).length,
+    water: waterIn(d), leaks: openHoles(d).length,
     fire: d.fires.reduce((m, f) => Math.max(m, f.size), 0), wreckage: d.alongside.length,
     beaten: state.fight.beaten[ship] ?? false,
   };

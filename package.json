@@ -35,7 +35,8 @@
     "walk:check": "tsx tools/walk/everywhere.ts",
     "check:room": "node tools/net/room.mjs",
     "packs": "node tools/crew/pack.mjs",
-    "shot:ui": "node tools/shot/ui.mjs"
+    "shot:ui": "node tools/shot/ui.mjs",
+    "shot:speech": "node tools/shot/speech.mjs"
   },
   "dependencies": {
     "@actors/core": "https://github.com/ArndRosemeier/Actors/releases/download/v0.34.4/actors-core-0.34.4.tgz",

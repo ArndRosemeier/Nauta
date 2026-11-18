@@ -17,6 +17,8 @@ import { walkKeys } from './app/thumbs';
 import type { Settings } from './app/settings';
 import { Channel } from './audio/channel';
 import { OrderPanel } from './app/orderPanel';
+import { Speech } from './app/speaking';
+import { standIns } from './render/speech/standIns';
 import { sailsSeen } from './app/sailsSeen';
 import { PageMatch, pageSeconds, rudderAngle, sparAngles } from './app/pageMatch';
 import { RoomPanel } from './app/roomPanel';
@@ -62,7 +64,7 @@ import { TWIN_OFFSET, musterCrews } from './app/crew';
 import { CrewTrialRun } from './app/crewTrialRun';
 import { formatBytes } from './probe/report';
 import { Vector3 } from 'three/webgpu';
-import { DEGREE, MS_PER_SECOND, apartOnWater, wrapBearing } from './sim/units';
+import { DEGREE, MS_PER_SECOND, apartOnWater, bearingTo, wrapBearing } from './sim/units';
 import { simTime } from './sim/state';
 import { parseOrder } from './sim/orders';
 import { apparentSpeed } from './sim/ship/sailing';
@@ -161,7 +163,9 @@ async function start(): Promise<void> {
    * in the same state at each picture on a fast machine and a slow one.
    */
   let ahead = 0, pinned: number | null = null;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => (pinned ?? pageSeconds()) + ahead, params.windAsked ? params.wind : null, params.foe, settings.now.matchMinutes) : null;
+  /** The match's clock, s: the page's, or where the browser checks have run it to. The bubbles keep it too. */
+  const matchClock = (): number => (pinned ?? pageSeconds()) + ahead;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, settings.now.matchMinutes) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   const other = build && match ? new ShipView(build, 1) : null;
@@ -328,6 +332,11 @@ async function start(): Promise<void> {
     glassButton.textContent = words(s.language).glass;
   });
   const orders = match ? new OrderPanel(match) : null;
+  // The men speaking (plan N4.5): bubbles over them for answers, orders passed down, reports and cries; until the
+  // officers are drawn (N4.4), faceless stand-ins at their stations carry them.
+  const speech = match && ship ? new Speech(document.body, match, settings.now.language, matchClock) : null;
+  if (speech && ship) standIns(speech.speakers, match!.ship, ship.group, view.camera);
+  settings.watch((s) => { if (speech) speech.language = s.language; });
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
   let jump = 0, jumped: (() => void) | null = null;
   if (match) window.__nautaSail = {
@@ -347,7 +356,7 @@ async function start(): Promise<void> {
     // The other ship's compass bearing from hers, degrees (-1 with none): checks turn her to bring the guns to bear.
     bearingOfOther: () => {
       const a = match.pose(match.ship), b = match.other >= 0 ? match.pose(match.other) : null;
-      return a && b ? wrapBearing(Math.atan2(b.x - a.x, -(b.z - a.z))) / DEGREE : -1;
+      return a && b ? wrapBearing(bearingTo(a, b)) / DEGREE : -1;
     },
     aimAtOther: () => {
       const her = match.other >= 0 ? match.pose(match.other) : null;
@@ -517,6 +526,7 @@ async function start(): Promise<void> {
       view.sun.position.copy(view.sun.target.position).addScaledVector(sky.lightDirection, SUN_DISTANCE);
     }
     sky.update(dt, view.camera);
+    speech?.drawBubbles(view.camera);
     // Each ship's way through the water, as her match sails her; her wake and spray follow it (N2.5, N3.8).
     const mine = match?.state.ships[match.ship]?.sailing, hers = match && match.other >= 0 ? match.state.ships[match.other]?.sailing : undefined;
     way.ahead = mine?.ahead ?? 0; way.leeway = mine?.leeway ?? 0;

@@ -34,6 +34,7 @@
   --on-brass: #16120a;
   /* A signal: a version not yet seen, a cry in danger */
   --signal: #d0533c;
+  --signal-faint: #d0533c55;
   /* Type */
   --title-font: 'Caslon Display', 'Caslon', Georgia, serif;
   --word-font: 'Caslon', Georgia, 'Times New Roman', serif;
@@ -208,3 +209,28 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 #loading .title-hint.gone { opacity: 0; }
 #loading .title-note { bottom: max(5vh, env(safe-area-inset-bottom)); width: calc(100% - 32px); min-height: 1.3em; font: italic 15px/1.3 var(--word-font); color: var(--ivory-soft); text-shadow: 0 1px 3px #000c; }
 @media (max-width: 560px) { #loading .title-hint { white-space: normal; padding: 10px 18px; line-height: 1.25; } }
+
+/* ---------- Speech bubbles (src/app/bubbleLayer.ts; ui-style.md "Speech bubbles", N4.5) ---------- */
+.nt-bubbles { position: fixed; inset: 0; z-index: 5; pointer-events: none; overflow: hidden; }
+.nt-bubble {
+  position: absolute; left: 0; top: 0; max-width: min(320px, 70vw); padding: 7px 14px 9px; box-sizing: border-box; will-change: transform;
+  border: 1px solid var(--brass-line); border-radius: 10px; background: var(--lacquer-over); color: var(--ivory);
+  box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-faint), 0 4px 12px #0007;
+}
+.nt-bubble-rank { font: 13px/1.2 var(--title-font); letter-spacing: 0.12em; font-variant: small-caps; color: var(--brass); margin-bottom: 2px; }
+.nt-bubble-words { font: 18px/1.25 var(--word-font); }
+/* The tail: a lacquer point in the brass rule, its tip on the man's head (--tail: where along the note). */
+.nt-bubble::after {
+  content: ''; position: absolute; left: var(--tail, 50%); bottom: -7px; width: 12px; height: 12px; margin-left: -6px;
+  background: var(--lacquer); border-right: 1px solid var(--brass-line); border-bottom: 1px solid var(--brass-line); transform: rotate(45deg);
+}
+.nt-bubble.far { opacity: 0.88; padding: 5px 11px 7px; }
+.nt-bubble.far .nt-bubble-words { font-size: 15px; }
+.nt-bubble.far .nt-bubble-rank { font-size: 12px; }
+/* A man out of view: at the screen's edge on his side, no tail. */
+.nt-bubble.edge::after { display: none; }
+/* A cry in danger: the same note in a signal rule, the words bold. */
+.nt-bubble.cry { border-color: var(--signal); box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--signal-faint), 0 4px 12px #0007; }
+.nt-bubble.cry .nt-bubble-words { font-weight: bold; }
+.nt-bubble.cry .nt-bubble-rank { color: var(--signal); }
+.nt-bubble.cry::after { border-color: var(--signal); }

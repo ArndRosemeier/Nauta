@@ -158,6 +158,8 @@ export function eventWords(e: SimEvent, ship: number): string | null {
   switch (e.kind) {
     case 'refused': return e.order.ship === ship ? `${at} ✗ ${orderWords(e.order)}: ${e.reason}` : null;
     case 'answered': return e.ship === ship ? `${at} ${orderWords(e.order)}: ${e.reason}` : null;
+    // An order taken without words: the button pressed is its record (the bubble says "Aye aye, sir", N4.5).
+    case 'taken': return null;
     case 'done': return e.ship === ship ? `${at} ✓ ${orderWords(e.order)}: done` : null;
     case 'tacked': return e.ship === ship ? `${at} she has come through the wind` : null;
     case 'wore': return e.ship === ship ? `${at} she has worn round` : null;
