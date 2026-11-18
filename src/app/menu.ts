@@ -24,6 +24,7 @@ import type { SettingsMenu } from './settingsPanel';
 import { choiceRow, row } from './settingsPanel';
 import type { SettingsStore } from './settingsStore';
 import { endCard, Tally, type Ending } from './tally';
+import type { LostHow } from '../sim/end';
 import { FIRST_HOUR, FIRST_MATCH } from './lessons';
 import {
   HOUR_AT, HOURS, hourOf, LENGTHS, MATCH_DAY_MINUTES, matchMinutes, NAVIES, newSeed, NO_LIMIT, otherNavy, readSeed, readTerms, startTerms,
@@ -59,9 +60,9 @@ const NAVY_WORDS: Readonly<Record<Navy, WordKey>> = { british: 'british', french
 const WIND_WORDS: Readonly<Record<WindChoice, WordKey>> = { drawn: 'asItComes', light: 'windLight', fresh: 'windFresh', strong: 'windStrong' };
 const HOUR_WORDS: Readonly<Record<HourChoice, WordKey>> = { drawn: 'asItComes', dawn: 'dawn', day: 'day', dusk: 'dusk', moon: 'moonlight' };
 const MEET_WORDS: Readonly<Record<Meeting, WordKey>> = { even: 'meetEven', weather: 'meetWeather', lee: 'meetLee' };
-const ENDING_WORDS: Readonly<Record<'she' | 'me', Readonly<Record<string, WordKey>>>> = {
-  she: { struck: 'sheStruck', sunk: 'sheSank', burnt: 'sheBurnt', 'blew up': 'sheBlewUp' },
-  me: { struck: 'youStruck', sunk: 'youSank', burnt: 'youBurnt', 'blew up': 'youBlewUp' },
+const ENDING_WORDS: Readonly<Record<'she' | 'me', Readonly<Record<LostHow, WordKey>>>> = {
+  she: { struck: 'sheStruck', sunk: 'sheSank', burnt: 'sheBurnt', 'blew up': 'sheBlewUp', 'broke off': 'sheBrokeOff' },
+  me: { struck: 'youStruck', sunk: 'youSank', burnt: 'youBurnt', 'blew up': 'youBlewUp', 'broke off': 'youBrokeOff' },
 };
 
 /** What the page lends the menu. */
@@ -530,7 +531,8 @@ function resultWord(e: Ending): WordKey {
 
 /** How it ended, in words. */
 function endingWords(e: Ending, say: Say): string {
-  return e.who === 'none' ? say.parted : say[ENDING_WORDS[e.who][e.how] ?? 'parted'];
+  if (e.who === 'none') return e.apart ? say.sailedApart : say.parted;
+  return say[ENDING_WORDS[e.who][e.how] ?? 'parted'];
 }
 
 /** Seconds as `m:ss`. */
