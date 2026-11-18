@@ -6,10 +6,14 @@
 import { AudioEngine, type Vec3 } from '@futuremagic/audio/web';
 import { seaAt, seaSample, type SeaState } from '../sim/sea/sea';
 import { windAt, type Wind, type WindState } from '../sim/wind';
+import { apparentSpeed, type Sailing } from '../sim/ship/sailing';
 import { bedLevels, seaForce, type BedLevel } from './ambience';
 import { SlapWatch, type SlapEvent } from './slaps';
 import type { Room } from './acoustics';
 import { SOUND_MEMORY, UNDER_WATER_HZ } from './tuning';
+
+/** The way of a ship through the water: her heading, way ahead and leeway (sailing.ts). */
+export type Way = Pick<Sailing, 'heading' | 'ahead' | 'leeway'>;
 
 /** Safari's audio session for a game: sound plays even when the device is set to silent, as a video's does. */
 interface AudioSessionNavigator { audioSession?: { type: string } }
@@ -35,16 +39,17 @@ export class SeaSound {
   /**
    * Every frame: what the listener at `eye` looking along `look` (with `up` the top of their head) hears of the sea and
    * the wind at time `t`, in `room` (acoustics.ts: below deck the sea and the wind come through her planking, muffled
-   * and quieter; `ShipSound.aboard` gives it, `OPEN_AIR` off her).
+   * and quieter; `ShipSound.aboard` gives it, `OPEN_AIR` off her). `way`: the way of the ship the ear is aboard (plan
+   * N3.9): the wind is heard as she feels it, the apparent wind (running before it she is quiet, close-hauled loud).
    */
-  hear(sea: SeaState, wind: WindState, t: number, eye: Vec3, look: Vec3, up: Vec3, room: Room): void {
+  hear(sea: SeaState, wind: WindState, t: number, eye: Vec3, look: Vec3, up: Vec3, room: Room, way?: Way): void {
     const e = this.engine;
     if (!e.open) return;
     e.listen(eye, look, up);
     const force = seaForce(sea, t);
     this.blow = windAt(wind, eye[0], eye[2], t, this.blow ?? undefined);
     seaAt(sea, eye[0], eye[2], t, this.water);
-    bedLevels({ seaForce: force, windSpeed: this.blow.speed, rise: this.water.velocity[1], t }, this.seed, this.beds);
+    bedLevels({ seaForce: force, windSpeed: way ? apparentSpeed(way, this.blow) : this.blow.speed, rise: this.water.velocity[1], t }, this.seed, this.beds);
     for (const b of this.beds) e.bed(b.id, b.level * room.through, { glide: b.glide });
     e.settle();
     for (const s of this.watch.listen(sea, t, eye[0], eye[2], force, this.slaps)) e.play(s.kind.id, { at: s.at, gain: s.kind.gain * s.gain * room.through, ref: s.kind.ref });

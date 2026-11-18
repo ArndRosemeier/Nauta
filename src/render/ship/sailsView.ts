@@ -79,7 +79,19 @@ export interface Blowing {
   readonly speed: number;
 }
 
-/** Her sails' and flags' state for the sail kind, and the frames of the lines made fast to her sails. */
+/** How one sail is drawn, as the sound hears it (`SailsView.heard`). */
+export interface SailHeard {
+  /** How far it hangs, 0 clewed up to 1 sheeted home; how far rolled up on its yard (or stowed), 0..1. */
+  readonly drop: number;
+  readonly roll: number;
+  /** Its reef as drawn, a share of its drop (square sails) or area. */
+  readonly reef: number;
+  /** Its belly as drawn, a share of a full belly (1): + filled, - aback (a square sail aback is 0.3 deep). */
+  readonly fill: number;
+  /** Its shiver as a share of a shivering sail's ripples in this wind, 0..1. */
+  readonly shiver: number;
+}
+
 /** The sails as drawn, counted (`SailsView.summary`). */
 export interface SailsSummary {
   readonly sails: number;
@@ -143,6 +155,21 @@ export class SailsView {
       if (Math.abs(d.depth * d.drop) > Math.abs(deepest)) deepest = d.depth * d.drop;
     }
     return { sails: this.drawn.length, set, furled, aback, shivering, deepest };
+  }
+
+  /**
+   * How each sail is drawn, for the sound (N3.9), in the rig plan's order, into `out`: how far it hangs (drop) and is
+   * rolled up, its reef as drawn, its belly as drawn as a share of a full one (+ filled, - aback) and its shiver as a
+   * share of the ripples of this wind.
+   */
+  heard(out: SailHeard[] = []): SailHeard[] {
+    out.length = this.forms.length;
+    const ripples = SHIVER_DEPTH + SHIVER_PER_WIND * this.blowing.speed;
+    for (const f of this.forms) {
+      const d = this.drawn[f.index]!, full = (f.kind === SQUARE ? DEPTH.square : DEPTH.foreAft) * f.breadth;
+      out[f.index] = { drop: d.drop, roll: d.roll, reef: d.taken, fill: (d.depth * d.drop) / full, shiver: Math.min(1, d.shiver / ripples) };
+    }
+    return out;
   }
 
   /** The topsail and topgallant yards' hoists as their sails are drawn (1 hoisted; lowered on the cap when furled, a little down when reefed). */

@@ -111,9 +111,10 @@ export const CREST_LOUDNESS: readonly [number, number] = [0.5, 1.3];
  * The most decoded sound kept, bytes: a 30 s bed decodes to 3.8 MB (32 kHz, 32-bit float), and between two forces nine
  * beds of the sea and the wind play at once (two sea and two wind beds of two takes each, and the swell), 34 MB; the
  * ship's water (N2.8) adds two takes on deck or two below, 8 MB; the slaps, creaks, the counter's slaps and the
- * footsteps about 11 MB; the crew at work (N4.6) about 17 MB, 9 MB of it the crowd's feet and the drum. What is not
- * playing goes first when more is needed, least recently heard first.
+ * footsteps about 11 MB; the crew at work (N4.6) about 17 MB, 9 MB of it the crowd's feet and the drum; under sail
+ * (N3.9) the rigging's two beds between their winds (four takes, 15 MB), the canvas flogging (two takes, 8 MB) and the
+ * canvas, blocks and yards (5 MB). What is not playing goes first when more is needed, least recently heard first.
  */
-export const SOUND_MEMORY = 80 * 1024 * 1024;
+export const SOUND_MEMORY = 108 * 1024 * 1024;
 /** Under water the world's sound is heard through a low-pass at this frequency, Hz. */
 export const UNDER_WATER_HZ = 350;

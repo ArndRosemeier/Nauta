@@ -299,6 +299,72 @@
         "pipe/carry-on.wav"
       ],
       "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Carry On: a short high note falling to the low; the work is done, the men go back to what they were doing."
+    },
+    {
+      "id": "bed/rigging-low-a",
+      "kind": "bed",
+      "prompt": "The sound of a fresh wind whistling through the taut rigging of a tall wooden sailing ship, heard close on her deck: thin airy whistling and singing notes of the wind across many tight ropes and shrouds, a clear high hum that rises and falls with the gusts, bright and close, no deep rumble, no low drone, no flapping, no creaking, no water, no waves, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/rigging-low-b",
+      "kind": "bed",
+      "prompt": "The sound of a steady breeze singing in the taut hemp rigging of an old sailing ship at sea, heard close from her deck: soft high whistles and an airy whining hum of wind over hundreds of tight ropes, gentle tones swelling and fading, clear and close, no deep rumble, no low drone, no flapping, no creaking, no water, no waves, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/rigging-high-a",
+      "kind": "bed",
+      "prompt": "The sound of a gale screaming through the rigging of a tall wooden sailing ship, heard on her deck: high piercing shrieks and wailing whistles of the wind in taut shrouds and stays, a deep vibrating thrum of tight ropes, howling gusts, no flapping, no creaking, no thunder, no water, no waves, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/rigging-high-b",
+      "kind": "bed",
+      "prompt": "The sound of a storm wind shrieking in the rigging of an old sailing ship far out at sea, heard close on her deck: many high wailing whistles at once, piercing screams of wind across taut ropes rising with each gust, a sharp vibrating whine of stays, bright and harsh, no deep rumble, no flapping, no creaking, no thunder, no water, no waves, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/canvas-flog-a",
+      "kind": "bed",
+      "prompt": "The sound of a large heavy canvas sail flogging loose in a strong wind on a wooden sailing ship, heard from close below it: loud cracking snaps and a violent rattling flutter of thick sailcloth whipping back and forth, the slap of loose ropes, no creaking, no water, no waves, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/canvas-flog-b",
+      "kind": "bed",
+      "prompt": "The sound of loose sailcloth flapping hard in the wind on an old sailing ship, heard close by: crisp loud cracks and snaps of canvas whipping again and again, a fast papery rattling flutter rising and falling with the gusts, ropes slapping against it, bright and close, no deep rumble, no creaking, no water, no waves, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "canvas/fill",
+      "kind": "calls",
+      "prompt": "The sound of eight separate single moments a big canvas sail on a wooden sailing ship suddenly fills with wind, each one a crisp sharp snap and pop of heavy sailcloth jerking taut, a short papery crack and a rope creaking tight, close and clear, no deep rumble, one at a time with three seconds of complete silence between them, nothing else, no wind noise, no water, no waves, no voices, no talking, no music",
+      "count": 8,
+      "most": 2,
+      "quiet": 0.03,
+      "gap": 0.5
+    },
+    {
+      "id": "canvas/aback",
+      "kind": "calls",
+      "prompt": "The sound of six separate times a large canvas sail is taken aback on a wooden sailing ship, each a loud sharp crack of sailcloth slamming back against the mast like a whip, a heavy flapping shudder and a rattle of wooden blocks, each about two seconds, close and clear, one at a time with four seconds of complete silence between them, nothing else, no thunder, no water, no waves, no voices, no talking, no music",
+      "count": 6,
+      "most": 3,
+      "quiet": 0.03,
+      "gap": 0.6
+    },
+    {
+      "id": "block/run",
+      "kind": "calls",
+      "prompt": "The sound of eight separate short runs of a rope through a wooden pulley block on an old sailing ship, each a squealing creaking whirr of the wooden sheave turning and the hemp rope rasping through it, about one second long, one at a time with three seconds of complete silence between them, nothing else, no wind, no water, no waves, no voices, no talking, no music",
+      "count": 8,
+      "most": 2,
+      "quiet": 0.03,
+      "gap": 0.5
+    },
+    {
+      "id": "yard/creak",
+      "kind": "calls",
+      "prompt": "The sound of eight separate long creaks of a heavy wooden yard being swung round its mast on a tall sailing ship, each a slow squeaking and grinding creak of wood rubbing on wood and a rope groaning under strain, about two seconds long, close and clear, no deep rumble, one at a time with three seconds of complete silence between them, nothing else, no wind, no water, no waves, no voices, no talking, no music",
+      "count": 8,
+      "most": 3,
+      "quiet": 0.03,
+      "gap": 0.5
     }
   ]
 }
