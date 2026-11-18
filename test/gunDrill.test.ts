@@ -5,9 +5,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GUN_CLIPS, GUN_CLIP_NAMES, gunClip, gunStrains, gunWork, partOf, type GunWork } from '../src/app/gunDrill.ts';
+import { GUN_CLIPS, GUN_CLIP_NAMES, gunClip, gunStrains, gunWork, partOf, stepBack, type GunWork } from '../src/app/gunDrill.ts';
 import { FLINCH_SECONDS, WORD_SECONDS, facesNow, type FaceWhy } from '../src/app/faces.ts';
-import { PACK_CLIPS } from '../src/app/crewLooks.ts';
+import { PACK_CLIPS, PACK_MOCAP } from '../src/app/crewLooks.ts';
 import { battery, dismountGun, fireGun, gunAt, startGuns, stepGuns, type Battery } from '../src/sim/guns/guns.ts';
 import { GUNS } from '../src/sim/rules/guns.ts';
 import { brigRoster, pairOf, placeSpot } from '../src/sim/crew/roster.ts';
@@ -36,7 +36,7 @@ const atQuarters = (guns: Battery): SimShip => {
 const wants = (load: boolean, runOut: boolean) => places.map(() => ({ load: load ? ('round' as const) : null, runOut, train: 0, elevation: 0 }));
 
 test('every motion of the drill table is in the pack, and the crowd bakes each of them', () => {
-  for (const clip of GUN_CLIP_NAMES) assert.ok(PACK_CLIPS.includes(clip), clip);
+  for (const clip of GUN_CLIP_NAMES) assert.ok(PACK_CLIPS.includes(clip) || PACK_MOCAP.includes(clip), clip);
   for (const step of Object.values(GUN_CLIPS)) for (const clip of Object.values(step)) assert.ok(clip === null || GUN_CLIP_NAMES.includes(clip));
   assert.deepEqual([1, 2, 3, 4, 5].map(partOf), ['captain', 'muzzle', 'muzzle', 'tackles', 'tackles']);
 });
@@ -57,8 +57,8 @@ test('through a reload each man of a gun\'s crew plays his part: ramming at the 
       (seen.get(key) ?? seen.set(key, new Set()).get(key)!).add(gunClip(w));
     }
   }
-  assert.deepEqual([...seen.get('ramming/muzzle')!], ['push']);
-  assert.deepEqual([...seen.get('running-out/tackles')!], ['push']);
+  assert.deepEqual([...seen.get('ramming/muzzle')!], ['cmu 80_19']);
+  assert.deepEqual([...seen.get('running-out/tackles')!], ['cmu 62_21']);
   assert.deepEqual([...seen.get('ready/captain')!], ['crouch']);
   assert.deepEqual([...seen.get('ready/tackles')!], [null]);
   assert.ok(seen.has('loading/muzzle') && seen.has('running-out/captain'));
@@ -78,7 +78,7 @@ test('a gun with too few men at her, or dismounted, is not worked: her men stand
   // The whole crew: she is worked, and her men strain.
   const full = gunWork(atQuarters(guns), crew[3]!.man, crew[3]!.m)!;
   assert.ok(full.working && gunStrains(full));
-  assert.equal(gunClip(full), 'push');
+  assert.equal(gunClip(full), 'cmu 62_21');
   // Dismounted, nobody works her.
   const dead = gunWork(atQuarters(dismountGun(guns, 0)), crew[3]!.man, crew[3]!.m)!;
   assert.ok(!dead.working && gunClip(dead) === null);
@@ -107,4 +107,20 @@ test('she fires: the seconds since are her recoil gone, and her captain cries wh
   assert.ok(facesNow(why(hand, 0.1)).includes('flinch') && !facesNow(why(hand, 0.1)).includes('shout'));
   assert.deepEqual(facesNow(why(hand, Math.max(WORD_SECONDS, FLINCH_SECONDS) + 0.1)), ['grim'], 'then the set face of the fight');
   assert.deepEqual(facesNow({ ...why(hand, Infinity), gun: { strains: true, captain: false, sinceFired: Infinity } }), ['strain', 'grim']);
+});
+
+test('at the report the men step back from her and come forward again before the recoil is done', () => {
+  let guns = startGuns();
+  while (gunAt(guns, 0).drill !== 'ready') guns = stepGuns(guns, places.map(() => FULL), wants(true, true));
+  const hand = crewOf(0).find((c) => c.place === 2)!;
+  assert.equal(stepBack(gunWork(atQuarters(guns), hand.man, hand.m)!), 0, 'ready: he stands at his place');
+  let g = fireGun(guns, 0, FULL).guns;
+  const seen: number[] = [];
+  for (let k = 0; k < Math.round(GUNS.carronade.recoil * STEPS_PER_SECOND) - 1; k++) {
+    seen.push(stepBack(gunWork(atQuarters(g), hand.man, hand.m)!));
+    g = stepGuns(g, places.map(() => FULL), wants(true, true));
+  }
+  assert.ok(Math.max(...seen) > 0.5 && Math.max(...seen) < 1, `${Math.max(...seen)} m back at most`);
+  assert.ok(seen[seen.length - 1]! < 0.1, 'forward again at the recoil\'s end');
+  assert.ok(seen.every((d) => d >= 0));
 });

@@ -5,7 +5,7 @@ import { closeWay, openShip, openWay, type Closures } from '../src/sim/crew/clos
 import { goingAt, goingRoute, startGoing, stepGoings, type Going, type Surroundings } from '../src/sim/crew/going.ts';
 import { standable, routeNetwork } from '../src/sim/crew/network.ts';
 import { routeTime } from '../src/sim/crew/route.ts';
-import { WAY_GAP } from '../src/sim/rules/routes.ts';
+import { ASIDE_WAIT, WAY_GAP } from '../src/sim/rules/routes.ts';
 import { QUARTERDECK } from '../src/sim/rules/ships.ts';
 import { shipPlan, type Spot } from '../src/sim/ship/plan.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
@@ -78,14 +78,14 @@ test('the heel slows a man down', () => {
 test('a man walking toward the captain stands aside, and goes on once he has passed', () => {
   const wheel = station('wheel'), capstan = station(QUARTERDECK);
   const g = startGoing(capstan, wheel, 'walk', 0, calm.closures)!;
-  // The captain stands on the man's line two metres along, then walks off to the side after five seconds.
+  // The captain stands on the man's line two metres along, then walks off to the side before the man's patience is gone.
   const line = goingRoute(g).legs[0]!.line, toward = { along: line[2]! - line[0]!, across: line[3]! - line[1]! }, len = Math.hypot(toward.along, toward.across);
   const captainAt: Spot = { space: 'deck', along: capstan.along + toward.along / len * 2, across: capstan.across + toward.across / len * 2 };
-  const gone: Spot = { space: 'deck', along: captainAt.along, across: captainAt.across - 3 };
+  const gone: Spot = { space: 'deck', along: captainAt.along, across: captainAt.across - 3 }, leaves = ASIDE_WAIT - 0.5;
   let asideSeen = false;
-  const took = run([g], (t) => ({ ...calm, captain: t < 5 ? captainAt : gone }), (gs, t) => {
+  const took = run([g], (t) => ({ ...calm, captain: t < leaves ? captainAt : gone }), (gs, t) => {
     const m = gs[0];
-    if (m && t < 5 && m.aside) {
+    if (m && t < leaves && m.aside) {
       asideSeen = true;
       const at = goingAt(m, net);
       assert.ok(Math.hypot(at.along - captainAt.along, at.across - captainAt.across) > 0.4, 'not where the captain stands');
@@ -93,7 +93,16 @@ test('a man walking toward the captain stands aside, and goes on once he has pas
     }
   });
   assert.ok(asideSeen, 'he stood aside');
-  assert.ok(took[0]! > 5 && took[0]! < 5 + routeTime(goingRoute(g), 0, 'walk'), `${took[0]} s`);
+  assert.ok(took[0]! > leaves && took[0]! < leaves + routeTime(goingRoute(g), 0, 'walk'), `${took[0]} s`);
+});
+
+test('a captain who stays on a man\'s line does not hold him for ever: after a few seconds he goes on past, a body\'s width off', () => {
+  const wheel = station('wheel'), capstan = station(QUARTERDECK);
+  const g = startGoing(capstan, wheel, 'walk', 0, calm.closures)!;
+  const line = goingRoute(g).legs[0]!.line, toward = { along: line[2]! - line[0]!, across: line[3]! - line[1]! }, len = Math.hypot(toward.along, toward.across);
+  const captainAt: Spot = { space: 'deck', along: capstan.along + toward.along / len * 2, across: capstan.across + toward.across / len * 2 };
+  const took = run([g], { ...calm, captain: captainAt });
+  assert.ok(took[0]! < ASIDE_WAIT + routeTime(goingRoute(g), 0, 'walk') * 1.5, `${took[0]} s`);
 });
 
 test('a ladder shut ahead of a man sends him round; one shut under him he climbs to its end; a shut door leaves him waiting until it opens', () => {

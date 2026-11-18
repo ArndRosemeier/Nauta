@@ -23,7 +23,7 @@ import { floorApart } from './officers';
 import { standByClip, standToClip } from './standBy';
 import { apartOnWater } from '../sim/units';
 import { BREAKS } from '../sim/rules/ships';
-import { gunClip, gunWork } from './gunDrill';
+import { gunClip, gunWork, stepBack, type GunWork } from './gunDrill';
 
 /** The motion a man hauling plays (at a pin, tailing on a fall). */
 const HAUL = 'pick up';
@@ -280,19 +280,27 @@ export function manDrawn(from: SimShip, to: SimShip, f: number, man: number, m: 
   out.yaw = a.yaw + g * turnBetween(a.yaw, b.yaw);
   out.space = b.space;
   out.way = b.way;
-  out.clip = clipOf(to, man, m, task, b, seed);
+  const gun = !b.moving && !task && !isDown(to, man) ? gunWork(to, man, m) : null;
+  // At the report the men at a gun step clear of her (only the drawing moves them).
+  if (gun) out.x -= Math.sign(out.x) * stepBack(gun);
+  out.clip = clipOf(to, man, m, task, b, seed, gun);
   return out;
 }
 
-/** The motion a man plays: lying if struck down, on his way walking or running, at work by his job, at his gun by her drill (N5.4b), else busy at his home place. */
-function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, seed: number): string {
+/** Whether a man is killed, or badly hurt and lying where he fell. */
+const isDown = (ship: SimShip, man: number): boolean => {
   const harm = harmOf(ship.damage, man);
-  if (harm === 'killed' || harm === 'badly') return LYING;
+  return harm === 'killed' || harm === 'badly';
+};
+
+/** The motion a man plays: lying if struck down, on his way walking or running, at work by his job, at his gun by her drill (N5.4b), else busy at his home place. */
+function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, seed: number, gun: GunWork | null): string {
+  if (isDown(ship, man)) return LYING;
   const hand = ship.crew.men[man]!;
   if (at.moving) return task?.job === 'carry' ? JOB_CLIPS.carry : hand.going?.haste === 'smart' ? RUNNING : WALKING;
   if (task) return task.began === null ? standToClip(m, seed) : JOB_CLIPS[task.job];
   // At his gun he works the drill (gunDrill.ts); the steps that give his part no work, he stands to.
-  const gun = gunWork(ship, man, m), work = gun && gunClip(gun);
+  const work = gun && gunClip(gun);
   if (work) return work;
   // At his home place he busies himself (standBy.ts); away from it (at his gun at quarters) he stands to, ready.
   return hand.stands === null ? standByClip(m, seed) : standToClip(m, seed);

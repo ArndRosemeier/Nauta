@@ -29,6 +29,12 @@ export const PACK_CLIPS = [
   'idle', 'arms folded', 'talk', 'nod', 'lean on rail', 'call from rail', 'interact', 'pick up', 'push', 'crouch', 'repair (kneeling)',
   'chop wood', 'walk', 'walk carrying', 'jog', 'death', 'eat or drink', 'pistol idle', 'pistol aim up', 'shake head',
 ];
+/**
+ * Motion capture (the CMU library, in place: no walking away) for the work the pack's own clips lack, kept in the cut
+ * pack (tools/crew/pack.mjs cuts the library to these): the rammer's stroke (pushing a broom), the sponge (washing a
+ * window), hauling a tackle (coiling a rope, hand over hand).
+ */
+export const PACK_MOCAP = ['cmu 80_19', 'cmu 79_44', 'cmu 62_21'];
 
 /** Where the build serves the cut pack (`npm run packs` fills public/packs), under the page's base. */
 export const PACK = 'packs/human/manifest.json';
@@ -37,7 +43,7 @@ export const packCatalog = (c: CharacterCatalog): CharacterCatalog => ({
   ...c,
   garments: c.garments.filter((g) => PACK_GARMENTS.includes(g.id)),
   hair: c.hair.filter((h) => PACK_HAIR.includes(h.id)),
-  animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id)),
+  animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id) || PACK_MOCAP.includes(a.id)),
 });
 
 /**

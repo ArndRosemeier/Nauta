@@ -107,10 +107,12 @@ export const WAY_ABREAST: Readonly<Record<string, number>> = {
 
 /**
  * The captain. A man walking toward him within ASIDE_RADIUS (m) stops and stands aside ASIDE_STEP (m) off his line,
- * away from the captain, until the captain has passed or moved off.
+ * away from the captain, until the captain has passed or moved off, or ASIDE_WAIT s have gone: then he goes on past him,
+ * still that far off his line (a captain standing at his post does not hold the whole crew).
  */
 export const ASIDE_RADIUS = 1.6;
 export const ASIDE_STEP = 0.5;
+export const ASIDE_WAIT = 2;
 
 /** A spot a little off the walk graph (a place by a gun or a pin) is still reached: the man walks to the nearest square a body fits within this far, m, and steps the rest. */
 export const SNAP_REACH = 0.8;
