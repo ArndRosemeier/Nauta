@@ -1,67 +1,24 @@
 /**
- * The captain's orders (implementation plan N3.4): every order parses from its words and back, is applied and shows in
- * the state, and is carried out by the crew (N4.1) over the time its men take; orders she cannot take are refused with a reason as an
- * event; a course closer than close-hauled is answered and changed; a course on the other tack is reached by wearing,
- * never through the wind; heaving to stops her and she lies still. Whole matches of one brig (sea and wind), a few
- * simulated minutes each.
+ * The captain's orders (implementation plan N3.4): every order parses from its words and back; orders she cannot take
+ * are refused with a reason as an event; a course closer than close-hauled is answered and changed; a course on the
+ * other tack is reached by wearing, never through the wind; heaving to stops her and she lies still. Whole matches of
+ * one brig (sea and wind), a few simulated minutes each. The crew carrying the orders out is in test/ordersCrew.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { angleDiff } from '@futuremagic/core';
 import {
-  carryOut, giveOrder, headingWords, heard, orderWords, parseOrder, startOrders, VOCABULARY, type Order, type OrderKind,
+  carryOut, giveOrder, headingWords, heard, orderWords, parseOrder, startOrders, VOCABULARY, type Order,
 } from '../src/sim/orders.ts';
 import { NO_WAY, POINT } from '../src/sim/rules/orders.ts';
 import { JOBS, PASSED } from '../src/sim/rules/crew.ts';
 import { CLOSE_HAULED } from '../src/sim/rules/sailing.ts';
 import { canvasFor, startSailing } from '../src/sim/ship/sailing.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
-import { simTime, startMatch, type SimState } from '../src/sim/state.ts';
-import { meanWind } from '../src/sim/wind.ts';
-import { step, type SimEvent } from '../src/sim/step.ts';
-import { DEGREE, KNOT, STEPS_PER_SECOND, wrapBearing } from '../src/sim/units.ts';
+import { startMatch } from '../src/sim/state.ts';
+import { DEGREE, KNOT } from '../src/sim/units.ts';
 import { steadyWind } from './support/sail.ts';
-
-const SEED = 1805;
-/** The wind blows from the north: a heading is then the wind's angle off her bow, to starboard of it on the larboard tack. */
-const FROM = 0;
-const FRESH = 5;
-const MODERATE = 4;
-/** The longest any order here takes to carry out, s (plain sail from battle sail: a course, then a topgallant). */
-const MOST_ORDER_SECONDS = 60;
-
-/** One brig in a match, `angle` degrees off the wind (to the east: the wind on her larboard side), sailed on for `settle` s. */
-function underWay(force: number, angle: number, settle = 20, canvas: 'battle' | 'plain' | 'bare' = 'battle', speed = 3): SimState {
-  let s = startMatch({ seed: SEED, windForce: force, windFrom: FROM, ships: [{ x: 0, z: 0, heading: angle * DEGREE, canvas, speed }] });
-  for (let i = 0; i < settle * STEPS_PER_SECOND; i++) s = step(s).state;
-  return s;
-}
-
-/** Stepped on for `seconds`, the `orders` given in the first step; every event with the time it came, s from the start. */
-function run(s: SimState, seconds: number, orders: readonly Order[] = [], each?: (s: SimState, t: number) => void): { state: SimState; events: { t: number; e: SimEvent }[] } {
-  const events: { t: number; e: SimEvent }[] = [];
-  for (let i = 0; i < seconds * STEPS_PER_SECOND; i++) {
-    const r = step(s, i === 0 ? orders : []);
-    s = r.state;
-    for (const e of r.events) events.push({ t: i / STEPS_PER_SECOND, e });
-    each?.(s, i / STEPS_PER_SECOND);
-  }
-  return { state: s, events };
-}
-
-/** The mean wind's bearing in a state (what the master judges by). */
-const windFrom = (s: SimState): number => meanWind(s.wind, simTime(s)).from;
-const kinds = (events: { e: SimEvent }[]) => events.map(({ e }) => e.kind);
-const reasons = (events: { e: SimEvent }[]) => events.flatMap(({ e }) => (e.kind === 'refused' ? [e.reason] : []));
-
-/** One order of each kind of the vocabulary, for ship 0. */
-const EACH: Readonly<Record<OrderKind, Order>> = {
-  steer: { kind: 'steer', ship: 0, heading: 120 * DEGREE },
-  up: { kind: 'up', ship: 0 }, away: { kind: 'away', ship: 0 }, by: { kind: 'by', ship: 0 },
-  tack: { kind: 'tack', ship: 0 }, wear: { kind: 'wear', ship: 0 }, heave: { kind: 'heave', ship: 0 },
-  sail: { kind: 'sail', ship: 0, canvas: 'plain' }, shorten: { kind: 'shorten', ship: 0 },
-  back: { kind: 'back', ship: 0, mast: 'main' }, fill: { kind: 'fill', ship: 0 },
-};
+import { EACH, FRESH, FROM, MODERATE, SEED, kinds, reasons, run, underWay, windFrom } from './support/orders.ts';
 
 test('every order of the vocabulary parses from its own words and back, and from the words a captain might use', () => {
   assert.deepEqual(VOCABULARY.map((w) => w.kind).sort(), Object.keys(EACH).sort());
@@ -91,61 +48,6 @@ test('every order of the vocabulary parses from its own words and back, and from
   assert.match(parseOrder('steer', 0) as string, /which course/);
   assert.match(parseOrder('steer 400', 0) as string, /which course/);
   assert.match(parseOrder('tack now', 0) as string, /takes nothing more/);
-});
-
-test('every order is applied and shows in the state at once, and is carried out by the crew over the time the men take', () => {
-  const start = underWay(MODERATE, 100);
-  for (const order of Object.values(EACH)) {
-    // Fill needs something aback: the main topsail backed in the same step, which the fill then replaces.
-    const orders = order.kind === 'fill' ? [EACH.back, order] : [order];
-    let s = step(start, orders);
-    assert.deepEqual(s.events.filter((e) => e.kind === 'refused'), [], `${order.kind} is taken`);
-    const told = s.state.ships[0]!.told;
-    assert.deepEqual(told.given.map((g) => g.order), [order], `${order.kind} is being carried out`);
-    assert.ok(told.acts.length > 0, `${order.kind} has its work still to do`);
-    let t = 0;
-    while (!s.events.some((e) => e.kind === 'done') && t < MOST_ORDER_SECONDS) { s = step(s.state); t += 1 / STEPS_PER_SECOND; }
-    const done = s.events.find((e) => e.kind === 'done');
-    assert.ok(done && done.kind === 'done' && done.order === order, `${order.kind} is reported done`);
-    assert.ok(t >= 1, `${order.kind} takes time: done after ${t.toFixed(1)} s`);
-  }
-  // What each shows: the course told and steered, the canvas, the yards aback.
-  const steer = run(start, 5, [EACH.steer]).state.ships[0]!;
-  assert.deepEqual(steer.told.helm, { heading: wrapBearing(120 * DEGREE), by: 0 });
-  assert.equal(steer.sailing.steer.heading, steer.told.helm.heading);
-  const plain = run(start, 90, [EACH.sail]).state.ships[0]!;
-  assert.equal(plain.told.canvas, 'plain');
-  assert.deepEqual(plain.sailing.canvas, canvasFor('plain', MODERATE));
-  const back = run(start, 20, [EACH.back]).state.ships[0]!;
-  assert.deepEqual([back.told.backed, back.sailing.backed], [[false, true], [false, true]]);
-});
-
-test('the sails are set when their men have loosed and sheeted them home, and a later order replaces the work not yet done', () => {
-  const start = underWay(MODERATE, 100);
-  const sails = rigPlan().sails, before = start.ships[0]!.sailing.canvas;
-  const setAt = new Map<string, number>();
-  run(start, 90, [EACH.sail], (s, t) => s.ships[0]!.sailing.canvas.forEach((c, i) => {
-    if (c.set && !before[i]!.set && !setAt.has(sails[i]!.id)) setAt.set(sails[i]!.id, t);
-  }));
-  // Plain sail adds the courses and topgallants; each is set no sooner than the order comes down and its work is done.
-  assert.deepEqual([...setAt.keys()].sort(), ['fore-course', 'fore-topgallant', 'main-course', 'main-topgallant']);
-  for (const [id, t] of setAt) {
-    const level = id.endsWith('course') ? 'course' : 'topgallant', work = JOBS.loose.work as Record<string, number>, sheet = JOBS.sheet.work as Record<string, number>;
-    assert.ok(t >= PASSED['first lieutenant'] + work[level]! + sheet[level]!, `${id} set after ${t.toFixed(1)} s`);
-  }
-  // Changed when some are set: battle sail again, and the sails already set come in.
-  const half = run(start, Math.min(...setAt.values()) + 1, [EACH.sail]).state;
-  assert.ok(half.ships[0]!.sailing.canvas.some((c, i) => c.set && !before[i]!.set), 'a sail is set');
-  const back = run(half, 60, [{ kind: 'sail', ship: 0, canvas: 'battle' }]);
-  assert.deepEqual(back.state.ships[0]!.sailing.canvas, before);
-  assert.deepEqual(back.state.ships[0]!.told.given, []);
-  // Changed before any is set: nothing to take in, the work is simply stopped.
-  const early = run(run(start, 2, [EACH.sail]).state, 30, [{ kind: 'sail', ship: 0, canvas: 'battle' }]).state.ships[0]!;
-  assert.deepEqual([early.sailing.canvas, early.told.given, early.told.acts, early.crew.tasks], [before, [], [], []]);
-  // Two courses one after the other: one helm act, the later course.
-  const twice = step(start, [EACH.steer, { kind: 'steer', ship: 0, heading: 110 * DEGREE }]).state.ships[0]!.told;
-  assert.deepEqual(twice.acts.map((a) => a.kind), ['helm']);
-  assert.deepEqual(twice.given.map((g) => g.order.kind), ['steer']);
 });
 
 test('orders that cannot be done are refused with the reason as an event, and change nothing', () => {
