@@ -7,8 +7,12 @@
  *
  * One set of draws per zone of her (zones.ts), put into that zone's group: seen when it is, lit by its lanterns and
  * the openings over it.
+ *
+ * The hammocks in her nettings are drawn apart from the nettings' cranes and ropes, as a kind of their own in the
+ * same draws: the nettings stand empty until she beats to quarters, and then the waist's fill one after another,
+ * nearest the hatches the hammocks come up through first (`stowHammocks`).
  */
-import { Matrix4, Vector3, type Camera, type Object3D, type WebGPURenderer } from 'three/webgpu';
+import { MathUtils, Matrix4, Vector3, type Camera, type Object3D, type WebGPURenderer } from 'three/webgpu';
 import { createInstanceDraws, DITHER, FRAME, KIND, RECORD, type DrawKind, type DrawLod, type InstanceDraws } from '@futuremagic/instances';
 import { hash2f } from '@futuremagic/core';
 import type { Furnishing } from '../../sim/ship/furnish';
@@ -17,7 +21,8 @@ import { OUTSIDE, zoneOfSpaces, zoneUnder } from './zones';
 import { FITTED_GLOW, FITTED_IRON, FITTED_WOOD } from '../materials';
 import { place, type Fittings, type SlotTarget } from './fittings';
 import { OAK, RED } from './looks';
-import { MODEL } from '../../sim/rules/fittings';
+import { HAMMOCK_SLOT, HAMMOCK_WAIST, MODEL } from '../../sim/rules/fittings';
+import { OPENINGS } from '../../sim/rules/ships';
 import { Solid } from './solid';
 import { CARRONADE_PARTS } from './gunPlaces';
 
@@ -71,8 +76,17 @@ const XYZ = 3;
 /** One model's mesh per kind at one level of detail. */
 interface Part { readonly kind: (typeof KINDS)[number][1]; readonly solid: Solid }
 
-/** A model's slots poured into fresh solids, one per kind, in its own frame. */
-function partsOf(fittings: Fittings, name: string): Part[] {
+/** Which of a model's material slots to draw. */
+type SlotsKept = (slot: string) => boolean;
+const EVERY_SLOT: SlotsKept = () => true;
+/** The stowed hammocks of a netting, and the netting without them. */
+const HAMMOCKS: SlotsKept = (slot) => slot === HAMMOCK_SLOT;
+const NO_HAMMOCKS: SlotsKept = (slot) => slot !== HAMMOCK_SLOT;
+/** The openings in her weather deck the men bring their hammocks up through, m forward of the mainmast (their middles). */
+const HAMMOCKS_COME_UP = OPENINGS.filter((o) => o.level === 'weather' && (o.kind === 'hatch' || o.kind === 'ladderway')).map((o) => (o.aft + o.fore) / 2);
+
+/** A model's slots (those `keep` names) poured into fresh solids, one per kind, in its own frame. */
+function partsOf(fittings: Fittings, name: string, keep: SlotsKept): Part[] {
   const solids = { wood: new Solid(), iron: new Solid(), glow: new Solid() };
   const m = fittings.get(name);
   if (!m) throw new Error(`the fittings pack has no ${name}`);
@@ -80,6 +94,7 @@ function partsOf(fittings: Fittings, name: string): Part[] {
   for (const s of m.slotNames) {
     const k = SLOT_KIND[s];
     if (!k) throw new Error(`${name}: no kind draws its slot ${s} (furnishings.ts SLOT_KIND)`);
+    if (!keep(s)) continue;
     const finish = !BARE.has(s) ? null : GUNS.has(name.replace(LOD_SUFFIX, '')) && s === 'wood' ? RED : OAK;
     slots[s] = finish ? { solid: solids[k], paint: finish.paint, rgb: finish.rgb } : { solid: solids[k], paint: 1, own: true };
   }
@@ -97,9 +112,10 @@ function radiusOf(fittings: Fittings, name: string): number {
 
 /**
  * A model's levels of detail: its own and its spec's lower levels, by distance from its size; `shadows`: whether its
- * bigger parts cast the sun's shadow; `farthest`: drawn out to this distance at least, m (a gun seen from the other ship).
+ * bigger parts cast the sun's shadow; `farthest`: drawn out to this distance at least, m (a gun seen from the other
+ * ship); `keep`: which of its material slots are drawn.
  */
-export function drawKind(fittings: Fittings, name: string, shadows: boolean, farthest = 0): DrawKind {
+export function drawKind(fittings: Fittings, name: string, shadows: boolean, farthest = 0, keep: SlotsKept = EVERY_SLOT): DrawKind {
   const names = [name];
   for (let k = 1; k <= MOST_LEVELS && fittings.has(`${name}_lod${k}`); k++) names.push(`${name}_lod${k}`);
   const r = radiusOf(fittings, name), m = fittings.get(name)!;
@@ -110,11 +126,22 @@ export function drawKind(fittings: Fittings, name: string, shadows: boolean, far
     const last = i === names.length - 1, end = last ? far : Math.min(far, r * NEAR_PER_METRE * LEVEL_STEP ** i);
     return {
       ...(i > 0 ? { near } : {}), far: end, ...(last ? { fade: [end * (1 - FADE), end] as [number, number] } : {}),
-      parts: partsOf(fittings, n).map((p) => ({ geometry: p.solid.geometry(), material: p.kind.make(), castShadow: p.kind.shadow.cast && casts, receiveShadow: p.kind.shadow.receive, name: n })),
+      parts: partsOf(fittings, n, keep).map((p) => ({ geometry: p.solid.geometry(), material: p.kind.make(), castShadow: p.kind.shadow.cast && casts, receiveShadow: p.kind.shadow.receive, name: n })),
     };
   });
   return { lods };
 }
+
+/** A fitting's frame on her: its model's space to her space. */
+function frameOf(f: Furnishing): Matrix4 {
+  const lean = new Matrix4(), spin = new Matrix4();
+  return new Matrix4().makeRotationY(f.turn).multiply(lean.makeRotationX(f.lean)).multiply(spin.makeRotationY(f.spin)).setPosition(f.x, f.y, f.z);
+}
+
+/** How far a netting is from the nearest opening the hammocks come up through, m along her. */
+const comesUp = (f: Furnishing): number => Math.min(...HAMMOCKS_COME_UP.map((a) => Math.abs(-f.z - a)));
+
+const stuffed = new Matrix4(), squash = new Matrix4();
 
 /** Her fittings, drawn in her frame: give each zone's group to that zone of her (ShipView.addToZone), and call `update` each frame after she is posed. */
 export class Furnishings {
@@ -127,6 +154,11 @@ export class Furnishings {
   /** How many fittings stand on her, and their triangles at full detail (for the HUD and the plan's notes). */
   readonly count: number;
   readonly triangles: number;
+  /**
+   * The hammocks: the draws they are in, the records there (the zone's fittings first, then one per netting in the
+   * order they fill), each netting's frame with its hammocks stowed, and the share stowed as last drawn (`stowed`).
+   */
+  private readonly hammocks: { draws: InstanceDraws; data: Float32Array; first: number; frames: Matrix4[]; stowed: number } | null = null;
 
   /**
    * `outsideOnly`: only what stands in her outside zone, and casting no shadow (the other ship's, seen from outside
@@ -147,24 +179,49 @@ export class Furnishings {
     for (const [zone, here] of byZone) {
       const models: string[] = [];
       for (const f of here) if (!models.includes(f.model)) models.push(f.model);
-      const kinds = models.map((m) => drawKind(fittings, m, !outsideOnly));
+      const kinds = models.map((m) => drawKind(fittings, m, !outsideOnly, 0, m === MODEL.netting ? NO_HAMMOCKS : EVERY_SLOT));
+      // The nettings' hammocks, a kind of their own after the zone's fittings, in the order they are stowed.
+      const nettings = here.filter((f) => f.model === MODEL.netting && -f.z > HAMMOCK_WAIST.aft && -f.z < HAMMOCK_WAIST.fore).sort((a, b) => comesUp(a) - comesUp(b) || a.x - b.x);
+      const hammockKind = kinds.length;
+      if (nettings.length > 0) kinds.push(drawKind(fittings, MODEL.netting, !outsideOnly, 0, HAMMOCKS));
       const draws = createInstanceDraws(renderer, kinds, { frames: [this.frame], shadow: { dir: this.sunDir, reach: SHADOW_REACH }, capacity: CAPACITY });
       draws.group.name = `furnishings ${zone}`;
-      const data = new Float32Array(here.length * RECORD), m = new Matrix4(), spin = new Matrix4(), lean = new Matrix4();
-      here.forEach((f, i) => {
-        m.makeRotationY(f.turn).multiply(lean.makeRotationX(f.lean)).multiply(spin.makeRotationY(f.spin)).setPosition(f.x, f.y, f.z);
-        const o = i * RECORD, k = models.indexOf(f.model);
+      const all = [...here, ...nettings], data = new Float32Array(all.length * RECORD);
+      const frames = all.map((f, i) => {
+        const o = i * RECORD, k = i < here.length ? models.indexOf(f.model) : hammockKind;
+        const m = frameOf(f);
         m.toArray(data, o);
         data[o + KIND] = k;
         data[o + DITHER] = hash2f(DITHER_SEED, i, k);
         data[o + FRAME] = 1;
         triangles += kinds[k]!.lods[0]!.parts.reduce((n, p) => n + (p.geometry.index?.count ?? 0) / XYZ, 0);
+        return m;
       });
-      draws.set(data, here.length);
+      // Every hammock stowed until told otherwise, so the warm-up builds what draws them.
+      draws.set(data, all.length);
       this.zones.set(zone, draws);
+      if (nettings.length > 0) this.hammocks = { draws, data, first: here.length, frames: frames.slice(here.length), stowed: 1 };
     }
     this.count = [...byZone.values()].reduce((n, here) => n + here.length, 0);
     this.triangles = triangles;
+  }
+
+  /**
+   * Her hammocks `share` of the way stowed in the nettings (0: the nettings stand empty, 1: every one full). The
+   * nettings fill one after another, each growing up out of the rail as the men stuff it.
+   */
+  stowHammocks(share: number): void {
+    const h = this.hammocks;
+    if (!h || share === h.stowed) return;
+    h.stowed = share;
+    let count = h.first;
+    for (const [k, frame] of h.frames.entries()) {
+      const full = MathUtils.clamp(share * h.frames.length - k, 0, 1);
+      if (full <= 0) break;
+      stuffed.copy(frame).multiply(squash.makeScale(1, full, 1)).toArray(h.data, count * RECORD);
+      count++;
+    }
+    h.draws.set(h.data, count);
   }
 
   /** Builds what the draws need ahead (the GPU path's compute shaders); then the Stage's warm-up builds their draw shaders with the groups. */

@@ -499,6 +499,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What the fittings put in a man's way, by height: standing obstacles and overheads for the plan, the low ones stepped over | `src/sim/ship/furnish.ts#fittingSolids` |
 | The room each fitting model takes, in its own frame | `src/sim/rules/fittings.ts#SOLID` |
 | Her fittings drawn as instances in her moving frame, by zone of her and level of detail | `src/render/ship/furnishings.ts#Furnishings` |
+| How far her hammocks are stowed in the waist's nettings as she goes to quarters or secures (plan N2.9) | `src/app/hammocks.ts#HammocksStowed` |
 | Something more of hers put into one of her zones, seen with it and lit by its lanterns (`ShipView.addToZone`) | `src/render/ship/shipView.ts#ShipView` |
 | One of her materials made to draw instances in her frame (they see ship space) | `src/render/ship/fitted.ts#fitted` |
 | The guns' rules: each kind's arcs, reload, recoil, running in and laying rates; the drill's steps and their shares; the short-hands rule (first proposals) | `src/sim/rules/guns.ts#GUNS` |

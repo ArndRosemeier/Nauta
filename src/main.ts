@@ -42,6 +42,7 @@ import { loadShip } from './render/ship/loadShip';
 import { ShipView } from './render/ship/shipView';
 import type { SailHeard, SailsSummary } from './render/ship/sailsView';
 import { Furnishings } from './render/ship/furnishings';
+import { HammocksStowed } from './app/hammocks';
 import { loadFittings } from './render/ship/fittings';
 import { furnish } from './sim/ship/furnish';
 import { shipPlan } from './sim/ship/plan';
@@ -205,6 +206,8 @@ async function start(): Promise<void> {
   // The other ship's fittings on her weather deck (plan N3.8): she is seen only from outside.
   const herFittings = other && fittings ? new Furnishings(view.renderer, fittings, furnish(shipPlan()), true) : null;
   if (other && herFittings) for (const [zone, draws] of herFittings.zones) other.addToZone(zone, draws.group);
+  // The hammocks in the waist's nettings, stowed as each ship goes to quarters (plan N2.9).
+  const myHammocks = new HammocksStowed(), herHammocks = new HammocksStowed();
   // Her guns and port lids, moving as the match works them (plan N5.4a); the other ship's too.
   const guns = ship && fittings ? new GunsView(view.renderer, fittings, furnish(shipPlan())) : null;
   if (ship && guns) ship.addMoving(guns.draws.group);
@@ -560,6 +563,7 @@ async function start(): Promise<void> {
         walking.swingDoors((id, angle) => ship.setDoor(id, angle));
       }
       ship.update(sea, seaTime, dt, view.camera, where, glass ? glass.aim(input.look) : input.look, sky.gain, view.radPerPixel(), seaView.origin);
+      furnished?.stowHammocks(myHammocks.after(!!match?.state.ships[match.ship]?.told.quarters, dt + jump));
       furnished?.update(ship.group, view.camera, sky.lightDirection);
       // Her guns as the match has them: run out and in, leaping back when fired, trained; her lids up and down.
       shots?.watch(match!.state);
@@ -576,6 +580,7 @@ async function start(): Promise<void> {
           other.setRudder(rudderAngle(match.state, match.other));
           if (jump > 0) other.sails.follow(jump);
           other.follow(sea, seaTime, dt, view.camera);
+          herFittings?.stowHammocks(herHammocks.after(!!match.state.ships[match.other]?.told.quarters, dt + jump));
           herFittings?.update(other.group, view.camera, sky.lightDirection);
           const her = match.state.ships[match.other];
           herGuns?.moveGuns(other.group, view.camera, her && shots ? gunsSeen(her, (g) => shots.firedFor(match.other, g, seaTime)) : null, seaTime);
