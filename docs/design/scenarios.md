@@ -18,8 +18,8 @@ Two sides: opposite lines as the duel's, one ship each is exactly `duelStart` (t
 
 | Stage | What | State |
 |---|---|---|
-| 1 | Scenario model, `fleetStart`, the dialog and its placement map. Runs what the duel runs (two ships of two sides in two navies); the rest is shown dimmed with the reason | built (this PR) |
-| 2 | Sim: sides and targets (nearest enemy that bears, "Target her"), end rule by side, parting for N ships | open |
+| 1 | Scenario model, `fleetStart`, the dialog and its placement map. Runs what the duel runs (two ships of two sides in two navies); the rest is shown dimmed with the reason | built (PR 152) |
+| 2 | Sim: sides (`SimShip.side`), `foes.ts` (enemies nearest first, her foe), each gun on the nearest enemy its side faces, the end rule by side (`winningSide`), parting between sides. The duel is unchanged. "Target her" waits for stage 6 with its buttons | built |
 | 3 | The computer captain for N (with "Make captains manoeuvre in battle") | open |
 | 4 | Netcode: room for up to 8, host runs computer captains, scenario in snapshot and meta, coarse crew for unmanned ships | open |
 | 5 | Rendering: N ship views (one near, the rest far), textures, wakes, crews near the camera | open |

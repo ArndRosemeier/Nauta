@@ -160,7 +160,7 @@ interface Canvas {
   abackArmed: boolean;
   last: CanvasDrawn | null;
   /** Its sheet's side (a headsail's), -1 larboard, 1 starboard, 0 not yet seen. */
-  side: number;
+  sheetSide: number;
 }
 
 export class SailWatch {
@@ -173,7 +173,7 @@ export class SailWatch {
 
   constructor(private readonly seed: number) {
     const f = sailFacts();
-    this.canvas = f.sails.map(() => ({ fillArmed: false, abackArmed: false, last: null, side: 0 }));
+    this.canvas = f.sails.map(() => ({ fillArmed: false, abackArmed: false, last: null, sheetSide: 0 }));
     this.blocks = f.groups.map(() => ({ next: -Infinity, n: 0 }));
     this.turning = f.turners.map(() => ({ last: null, rate: 0, next: -Infinity, n: 0 }));
   }
@@ -210,8 +210,8 @@ export class SailWatch {
       const share = looseShare(d) * sail.area, g = loose[sail.group]!;
       g.area += share; g.x += share * sail.middle[0]; g.y += share * sail.middle[1]; g.z += share * sail.middle[2];
       const side = st.angle < 0 ? -1 : 1;
-      if (sail.sheeted && d.drop > 0 && c.side !== 0 && side !== c.side) running[sail.group] = true;
-      c.side = side;
+      if (sail.sheeted && d.drop > 0 && c.sheetSide !== 0 && side !== c.sheetSide) running[sail.group] = true;
+      c.sheetSide = side;
       if (!was) { c.fillArmed = d.fill < FILL_AT; c.abackArmed = d.fill > ABACK_AT; return; }
       if (d.drop !== was.drop || d.roll !== was.roll || d.reef !== was.reef) running[sail.group] = true;
       if (d.fill < FILL_REARM) c.fillArmed = true;
