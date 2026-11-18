@@ -36,7 +36,7 @@ import { shipY, shipZ } from '../../sim/ship/section';
 import { belowDeck } from '../../audio/crewHearing';
 import { BUILDS, DRESSES, HAT_ITEMS, PACK, SHIRT_GROUP, SHIRT_GARMENT, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
 import {
-  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn,
+  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, duckTo, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn,
 } from '../../app/crewDrawn';
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
@@ -454,6 +454,7 @@ export class CrewView {
     const eye = this.eyes[d.ship]!;
     // A man at his place on the captain's floor steps aside as the captain walks up to him (the match does not know where he walks).
     if (at.clip !== WALKING && at.clip !== RUNNING && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT) stepAside(at, eye);
+    at.clip = duckTo(at.clip, d.struck, d.seed, !!at.way || routeNetwork().surfaces.has(at.space));
     d.distance = Math.hypot(at.x - eye.x, at.y + BODY_MIDDLE - eye.y, at.z - eye.z);
     // A man the match puts where the captain's eye is (it does not keep the captain clear) is not drawn: he is not seen inside out.
     const inEye = apartOnWater(at, eye) < EYE_CLEAR && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT;

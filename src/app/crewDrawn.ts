@@ -42,6 +42,19 @@ export const RUNNING = 'jog';
 export const LYING = 'death';
 /** Asleep in his hammock: the mocap of a man lying down (CMU 111_12), its last frame held (crewLooks.ts PACK_MOCAP). */
 export const SLEEPING = 'cmu 111_12';
+/** Shot striking near a man makes him duck (Arnd 2026-11-18, crew realism: ducking at close shot): his own clip is replaced by a crouch for this long, s, each man's start put off by up to `DUCK_SPREAD` s so they do not all move as one. */
+export const DUCK = 'crouch';
+const DUCK_SECONDS = 1.4;
+const DUCK_SPREAD = 0.3;
+const DUCK_STEPS = 4;
+/** Men who do not duck: on their way (a walk is not stopped by a ball), carried, or lying. */
+const NO_DUCK: ReadonlySet<string> = new Set([WALKING, RUNNING, JOB_CLIPS.carry, LYING, SLEEPING]);
+/** The clip a man plays `sinceStruck` seconds after shot struck within reach of him: a crouch for a moment, else his own. A man on a way or aloft keeps his hold (`holding`). */
+export function duckTo(clip: string, sinceStruck: number, seed: number, holding: boolean): string {
+  const late = (seed % DUCK_STEPS) * (DUCK_SPREAD / DUCK_STEPS);
+  return !holding && !NO_DUCK.has(clip) && sinceStruck >= late && sinceStruck < late + DUCK_SECONDS ? DUCK : clip;
+}
+
 /** Clips that play once and hold their last frame. */
 export const ONCE_CLIPS = [LYING, SLEEPING];
 
