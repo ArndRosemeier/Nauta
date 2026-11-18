@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BODY, DECK_CROSSING, DOOR, LADDER, LEAST_HATCH, OPENINGS, PORTS, QUARTERDECK, SPACES } from '../src/sim/rules/ships.ts';
+import { BODY, BREAKS, DECK_CROSSING, DOOR, LADDER, LEAST_HATCH, OPENINGS, PORTS, QUARTERDECK, SPACES } from '../src/sim/rules/ships.ts';
 import { rigObstacles, rigPlan, rigWalk } from '../src/sim/ship/rig.ts';
 import { floorAt, floorsUnder, insideBreadth, overheadAt, sectionGirth, shipPlan, type Space } from '../src/sim/ship/plan.ts';
 import { nodeAt, reachable, walkGraph, WALK_CELL } from '../src/sim/ship/walk.ts';
@@ -64,7 +64,8 @@ test('every space meets the headroom and width rules', () => {
 
 test('every door, hatch and ladder joins two spaces, and fits the body\'s rules', () => {
   for (const w of plan.ways) {
-    assert.notEqual(w.from.space, w.to.space, w.id);
+    // Two spaces, or at a break of her raised decks two floors of the weather deck (N2.12).
+    assert.ok(w.from.space !== w.to.space || nodeAt(graph, w.from) !== nodeAt(graph, w.to), `${w.id} joins one floor to itself`);
     assert.ok(nodeAt(graph, w.from) >= 0 && nodeAt(graph, w.to) >= 0, w.id);
     if (w.kind === 'door') {
       assert.ok(w.width >= DOOR.width - 1e-9 && w.rise <= BODY.stepUp, w.id);
@@ -73,11 +74,13 @@ test('every door, hatch and ladder joins two spaces, and fits the body\'s rules'
       assert.ok(wall, `${w.id} has no bulkhead`);
     }
     if (w.kind === 'ladder') {
-      const o = plan.openings.find((x) => x.id === w.opening)!, below = space(w.from.space), above = space(w.to.space);
-      assert.equal(o.level, above.level, `${w.id}: its opening is in the deck it climbs to`);
+      const below = space(w.from.space), above = space(w.to.space);
       assert.ok(floorAt(above, w.to.along, w.to.across) > floorAt(below, w.from.along, w.from.across), `${w.id} climbs`);
       assert.ok(w.rise <= LADDER.mostRise && w.height >= LEAST_HATCH - 1e-9 && w.width >= Math.min(LADDER.width, LEAST_HATCH) - 1e-9, w.id);
-      // The opening lies over the space below.
+      // A ladder at a break stands under the sky; any other goes up through an opening in the deck it climbs to, over the space below.
+      const o = plan.openings.find((x) => x.id === w.opening);
+      if (!o) continue;
+      assert.equal(o.level, above.level, `${w.id}: its opening is in the deck it climbs to`);
       const mid = (o.aft + o.fore) / 2;
       assert.ok(mid >= below.aft && mid <= below.fore, `${w.id}: ${o.id} is not over ${below.id}`);
     }
@@ -164,10 +167,18 @@ test('a way across the weather deck\'s centreline at least every 6 m, each 0.7 m
     const fore = Math.min(deck.fore, ...solids.filter((o) => o.aft >= middle).map((o) => o.aft));
     assert.ok(fore - aft >= DECK_CROSSING.width - 1e-9, `the way across at ${middle.toFixed(2)} is ${(fore - aft).toFixed(2)} m clear`);
   }
+  // On each of her decks (N2.12: the quarterdeck, the waist, the forecastle), from a break to the next way and between ways.
+  const deckOf = (a: number) => (a <= BREAKS.quarterdeck ? 0 : a >= BREAKS.forecastle ? 2 : 1);
   for (let i = 1; i < ways.length; i++) {
+    if (deckOf(ways[i]!.from) !== deckOf(ways[i - 1]!.to)) continue;
     const shut = ways[i]!.from - ways[i - 1]!.to;
     assert.ok(shut <= DECK_CROSSING.every, `no way across from ${ways[i - 1]!.to.toFixed(2)} to ${ways[i]!.from.toFixed(2)} m forward of the mainmast`);
   }
+  for (const at of Object.values(BREAKS)) {
+    const near = Math.min(...ways.map((w) => (w.to < at ? at - w.to : w.from - at)).filter((d) => d >= 0));
+    assert.ok(near <= DECK_CROSSING.every, `no way across within ${DECK_CROSSING.every} m of the break at ${at}`);
+  }
+  for (const d of [0, 1, 2]) assert.ok(ways.some((w) => deckOf(w.from) === d), `a way across on each deck (${d})`);
   const foremast = plan.obstacles.find((o) => o.id === 'foremast-weather')!;
   assert.ok(ways.some((w) => w.from > foremast.fore), 'a way across forward of the foremast');
 });

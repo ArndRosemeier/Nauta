@@ -106,7 +106,8 @@ test('the calm view keeps the head level and the eye over his feet', () => {
 });
 
 test('walking, his feet step one after the other at a man\'s cadence and his eye bobs a few centimetres', () => {
-  let w = walkerAt(plan, { space: 'deck', along: -4, across: 1.5 });
+  // In the waist, with 8 m of open deck ahead.
+  let w = walkerAt(plan, { space: 'deck', along: 3, across: 1.5 });
   const body = new CaptainBody(worldOf(() => w));
   let steps = 0, last: Record<'L' | 'R', boolean> = { L: false, R: false }, both = false, low = Infinity, high = -Infinity;
   for (let i = 0; i < 6 / DT; i++) {

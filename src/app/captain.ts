@@ -173,7 +173,9 @@ export class Captain {
   private climbEye(): [number, number, number] {
     const { x, y: feet, z } = this.climb.pos, out = this.eyeAt, along = -z, across = x;
     let top = feet + BODY.height - EYE_BELOW_TOP;
-    const o = this.plan.openings.find((p) => p.id === this.climbing!.offer.way.opening)!;
+    const o = this.plan.openings.find((p) => p.id === this.climbing!.offer.way.opening);
+    // A ladder in no opening (at a break, N2.12) is under the sky.
+    if (!o) { out[0] = x; out[1] = top; out[2] = z; return out; }
     // How far into the opening he is (negative: still under the deck beside it), and so how freely his head rises.
     const into = Math.min(along - o.aft, o.fore - along, across - o.port, o.starboard - across);
     const free = Math.min(1, Math.max(0, (into + EDGE_EASE) / (2 * EDGE_EASE)));

@@ -8,13 +8,13 @@
  * her base; section.ts turns them into ship space.
  */
 import {
-  BELAY_HEIGHT, BERTH_BEAM, BODY, BERTH_HEADROOM, BULWARK, CEILING, CELL, DECK_BEAM, DOOR, DOORS, FITTINGS, FORE_SHROUDS, FRAME_DEPTH,
-  GUN_CREW, GUN_FOOTPRINT, LADDER, LADDERS, MAIN_SHROUDS, MASTS, OPEN_JOINS, OPENINGS, PARTNERS, PIN_CLEAR_OF_PORT, PIN_RAIL,
-  PLANKING, PORT_GUNS, PORTS, RAILS, SPACES, STATIONS, WAY_STANDOFF,
+  BELAY_HEIGHT, BERTH_BEAM, BODY, BREAK_LADDERS, BREAKS, BERTH_HEADROOM, BULWARK, CEILING, CELL, CREW_PAST_GUN, DECK_BEAM, DOOR, DOORS, FITTINGS, FORE_SHROUDS, FRAME_DEPTH,
+  GUN_CREW, GUN_FOOTPRINT, LADDER, LADDERS, LEAST_PASSAGE, MAIN_SHROUDS, MASTS, OPEN_JOINS, OPENINGS, PARTNERS, PIN_CLEAR_OF_PORT, PIN_RAIL,
+  PLANKING, PORT_GUNS, PORTS, RAILS, SPACES, STATIONS, WAY_STANDOFF, onRaisedDeck,
   type GunKind, type Level, type OpeningKind, type SpaceRow,
 } from '../rules/ships';
 import { fittingSolids } from './furnish';
-import { HULL_AFT, HULL_FORE, hullBottom, hullHalfBreadth, sheer, sideTop, weatherDeck, weatherDeckUnderside } from './hull';
+import { HULL_AFT, HULL_FORE, hullBottom, hullHalfBreadth, sheer, sideTop, waistDeckUnderside, weatherDeck } from './hull';
 
 /** An oblong in plan, m: along her and across her. */
 export interface Rect {
@@ -188,8 +188,11 @@ export interface ShipPlan {
 
 // --- Levels: floors and overheads -------------------------------------------------------------------------------
 
-/** The berth deck's upper side at a place along her, m above the base: BERTH_HEADROOM below the weather deck's beams, level across. */
-export const berthDeck = (along: number): number => weatherDeckUnderside(along) - DECK_BEAM.moulded - BERTH_HEADROOM;
+/**
+ * The berth deck's upper side at a place along her, m above the base: BERTH_HEADROOM below the beams of the waist's
+ * deck line, level across. Under the raised decks it stays there (plan N2.12), and the cabins have their rise more.
+ */
+export const berthDeck = (along: number): number => waistDeckUnderside(along) - DECK_BEAM.moulded - BERTH_HEADROOM;
 
 /** A space's floor at a place, m above the base. */
 export function floorAt(space: Space, along: number, across: number): number {
@@ -256,6 +259,9 @@ function makeSpace(row: SpaceRow): Space {
 
 const rect = (aft: number, fore: number, port: number, starboard: number): Rect => ({ aft, fore, port, starboard });
 
+/** Whether a body standing at a place along her would stand across a break of her raised decks (N2.12): within half the least passage of it. */
+const byABreak = (along: number): boolean => onRaisedDeck(along - LEAST_PASSAGE / 2) !== onRaisedDeck(along + LEAST_PASSAGE / 2);
+
 /** The gun ports of both sides, with each gun's footprint and crew. */
 function makeGuns(): GunPlace[] {
   const out: GunPlace[] = [];
@@ -265,8 +271,10 @@ function makeGuns(): GunPlace[] {
       const inside = insideBreadth(along, sheer(along)), foot = GUN_FOOTPRINT[gun];
       const half = foot.width / 2, inner = inside - foot.inboard;
       const footprint = side > 0 ? rect(along - half, along + half, inner, inside) : rect(along - half, along + half, -inside, -inner);
-      // At a chase port the bow closes in forward of the gun, so its crew stands abaft it.
-      const crew = GUN_CREW.filter(([, off]) => !chase || off <= 0).map(([inboard, off]) => ({ space: 'deck', along: along + off, across: side * (inside - inboard) }));
+      // At a chase port the bow closes in forward of the gun, so its crew stands abaft it. By a break (N2.12) a man
+      // whose place would be on the other deck, or at its edge, stands on the gun's other side, inboard by the captain.
+      const raised = onRaisedDeck(along), ownDeck = (off: number) => !byABreak(along + off) && onRaisedDeck(along + off) === raised;
+      const crew = GUN_CREW.filter(([, off]) => !chase || off <= 0).map(([inboard, off]): readonly [number, number] => (ownDeck(off) ? [inboard, off] : [inboard + CREW_PAST_GUN, -off])).map(([inboard, off]) => ({ space: 'deck', along: along + off, across: side * (inside - inboard) }));
       out.push({ id: `${mark}${side > 0 ? 's' : 'p'}`, port: mark, side, along, gun, chase, sill, top, width, footprint, crew });
     }
   }
@@ -325,6 +333,18 @@ function makeWays(spaces: ReadonlyMap<string, Space>, openings: ReadonlyMap<stri
       line: { foot: [headAlong - da * run, headAcross - dx * run, bottom], head: [headAlong, headAcross, top], toward: [da, dx], down },
     });
   }
+  for (const l of BREAK_LADDERS) {
+    // Against a break's face, from the waist up onto the raised deck (N2.12): toward the stern at the quarterdeck's, the bow at the forecastle's.
+    const deck = spaces.get(WEATHER_DECK)!, at = BREAKS[l.break], da = l.break === 'quarterdeck' ? -1 : 1;
+    const top = floorAt(deck, at + da * WALK_EDGE, l.across), bottom = floorAt(deck, at - da * WALK_EDGE, l.across);
+    const rise = top - bottom, run = rise / Math.tan(LADDER.slope), steps = Math.max(1, Math.ceil(rise / LADDER.rise));
+    out.push({
+      id: l.id, kind: 'ladder', opening: null, rise: rise / steps, steps, width: LADDER.width, height: Infinity,
+      from: { space: deck.id, along: at - da * (run + WAY_STANDOFF), across: l.across },
+      to: { space: deck.id, along: at + da * WAY_STANDOFF, across: l.across },
+      line: { foot: [at - da * run, l.across, bottom], head: [at, l.across, top], toward: [da, 0], down: [-da, 0] },
+    });
+  }
   for (const d of DOORS) {
     const a = spaces.get(d.between[0])!, b = spaces.get(d.between[1])!;
     // The door's wall: athwart her when the two spaces meet end to end, else along her.
@@ -349,6 +369,10 @@ function makeWays(spaces: ReadonlyMap<string, Space>, openings: ReadonlyMap<stri
 }
 /** Two plan coordinates this close are one, m. */
 const SAME = 1e-6;
+/** The weather deck's space, which runs her whole length over the waist and the raised decks. */
+const WEATHER_DECK = 'deck';
+/** Either side of a break, the floor is read this far from it, m. */
+const WALK_EDGE = 0.05;
 /** The ways a ladder can climb or a head be stepped onto, in plan: [along, across]. */
 const DIRECTION = { aft: [-1, 0], fore: [1, 0], port: [0, -1], starboard: [0, 1] } as const;
 /** Stepping onto a ladder's head from beside the opening: how far out from the coaming one stands, and how far in from its end, m. */
@@ -391,7 +415,8 @@ function makeBelays(): Belay[] {
       for (const side of [-1, 1] as const) {
         for (let k = 0; k < count; k++) {
           const along = r.aft + k * PIN_RAIL.pitch;
-          if (PORTS.some((p) => Math.abs(p[1] - along) < PIN_CLEAR_OF_PORT)) continue;
+          // No pin over a gun port, nor one whose hand would stand by a break.
+          if (PORTS.some((p) => Math.abs(p[1] - along) < PIN_CLEAR_OF_PORT) || byABreak(along)) continue;
           const deck = sheer(along), across = side * (insideBreadth(along, deck + PIN_RAIL.height) - PIN_RAIL.width / 2);
           out.push({ id: `${r.id}-${side > 0 ? 's' : 'p'}${k + 1}`, rail: r.id, along, across, height: deck + PIN_RAIL.height, toward: [0, -side] });
         }

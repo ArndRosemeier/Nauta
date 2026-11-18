@@ -75,7 +75,9 @@ test('two orders at once share the men: the later job waits for hands or starts 
   const tasks = [...both.tasks.values()].sort((a, b) => a.task.id - b.task.id);
   assert.equal(tasks.length, 2);
   assert.ok(skillOf(tasks[0]!.task, roster) >= jobWork(tasks[0]!.task.job, tasks[0]!.task.on).need, 'the first order given is manned in full');
-  assert.ok(both.events.some((e) => e.kind === 'short-handed'), 'the second starts short-handed');
+  // The main braces are belayed on the quarterdeck, up its ladders from the waist (N2.12): the second waits for the
+  // first's men, or starts short-handed.
+  assert.ok(both.events.some((e) => e.kind === 'short-handed') || tasks[1]!.began! >= tasks[0]!.ended!, 'the second waits for hands or starts short-handed');
   assert.ok(tasks[1]!.ended! > alone, `the main yards are round later than alone: ${(tasks[1]!.ended! * STEP_SECONDS).toFixed(1)} s against ${(alone * STEP_SECONDS).toFixed(1)} s`);
   // Freed by the first, men join the second while it works.
   assert.ok(tasks[1]!.task.hands.some((i) => tasks[0]!.task.hands.includes(i)), 'a man of the fore braces went on to the main');

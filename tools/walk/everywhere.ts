@@ -201,6 +201,8 @@ const wayLeft = (path: readonly (readonly [number, number])[], k: number) => {
 
 /** Walk him to a spot of the space he is in (or straight on through a doorway or an open join to `straight`). */
 function walkTo(goal: Spot, label: string, straight = false): boolean {
+  // In another part of her deck (a raised deck, N2.12): over the ways that lead there first.
+  if (!straight && !overTo(goal)) return false;
   const plot = () => (straight ? [[goal.along, goal.across] as [number, number]] : pathTo(goal));
   let path = plot(), on = captain.walker.place;
   if (!path) { fail(`no way on the graph to ${label} (${at(goal)}) from ${at(spotOf(captain.walker))}`); return false; }
@@ -222,6 +224,32 @@ function walkTo(goal: Spot, label: string, straight = false): boolean {
     const [ta, tc] = path[k]!;
     step({ forward: Math.min(1, d / LOOK_AHEAD + 1 / 2), strafe: 0, heading: yawTo(s, ta, tc) });
   }
+}
+
+/**
+ * Over the ways to the part of the deck a goal is in, when it is not his (by the graph's edges, breadth first): the
+ * quarterdeck, the waist and the forecastle are parts of one space joined by the ladders at the breaks.
+ */
+function overTo(goal: Spot): boolean {
+  const s = spotOf(captain.walker), from = nodeAt(graph, s), to = nodeAt(graph, goal);
+  if (from < 0 || to < 0 || from === to || goal.space !== s.space) return true;
+  const prev = new Map<number, { node: number; edge: number }>([[from, { node: from, edge: -1 }]]), queue = [from];
+  for (let qi = 0; qi < queue.length && !prev.has(to); qi++) {
+    graph.edges.forEach((e, i) => {
+      if (!planWays.has(e.way) || (e.a !== queue[qi] && e.b !== queue[qi])) return;
+      const next = e.a === queue[qi] ? e.b : e.a;
+      if (!prev.has(next)) { prev.set(next, { node: queue[qi]!, edge: i }); queue.push(next); }
+    });
+  }
+  if (!prev.has(to)) { fail(`no way over the graph from ${at(s)} to ${at(goal)}`); return false; }
+  const steps: { edge: number; from: number }[] = [];
+  for (let n = to; n !== from; n = prev.get(n)!.node) steps.push({ edge: prev.get(n)!.edge, from: prev.get(n)!.node });
+  for (const { edge, from: here } of steps.reverse()) {
+    const e = graph.edges[edge]!, way = plan.ways.find((w) => w.id === e.way)!;
+    const [a, b] = e.a === here ? [way.from, way.to] : [way.to, way.from];
+    if (!cross(way, a, b)) return false;
+  }
+  return true;
 }
 
 /** Stand still a while: he must not slide. */

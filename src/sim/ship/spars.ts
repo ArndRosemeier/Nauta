@@ -8,7 +8,7 @@ import {
   BOOM, BOWSPRIT, BREAK_SHARES, CHANNEL, BACKSTAYS, GAFF, JIB_BOOM, MAST_RAKE, MAST_SPARS, MASTHEAD_SIDE, STRIKER,
   TOP_DEADEYES, TOPMAST_SHROUDS, CROSSTREES_DEPTH, TRESTLE_DEPTH, YARD_HANG, YARDS, type MastName, type YardLevel,
 } from '../rules/rig';
-import { FORE_SHROUDS, MAIN_CHANNEL, MAIN_SHROUDS, MAIN_TOP, MASTS, PLANKING } from '../rules/ships';
+import { FORE_SHROUDS, MAIN_CHANNEL, MAIN_SHROUDS, MAIN_TOP, MASTS, PLANKING, RAISED } from '../rules/ships';
 import { hullEnds, hullHalfBreadth, sideTop, weatherDeck } from './hull';
 
 /** A point of her rig. */
@@ -159,8 +159,9 @@ function otherSpars(main: MastGeometry): Spar[] {
   ], bowsprit.id);
   const cap = bowsprit.head;
   const striker = spar('dolphin-striker', 'dolphin striker', 'striker', 'bowsprit', cap, point(cap.along, 0, cap.height - STRIKER.length), STRIKER.diameter, [['heel', 0], ['foot', STRIKER.length]], bowsprit.id);
-  // The boom's jaws round the mainmast's after side over the deck, the gaff's under the hounds; both reach aft.
-  const jaws = main.deck + BOOM.jaws;
+  // The boom's jaws round the mainmast's after side over the quarterdeck's level (it swings over the quarterdeck: N2.12),
+  // the gaff's under the hounds; both reach aft.
+  const jaws = main.deck + RAISED.rise + BOOM.jaws;
   const bHeel = point(main.lowerAt(jaws) - MAST_SPARS.main.lower.partners / 2, 0, jaws);
   const boom = spar('boom', 'main boom', 'boom', 'main', bHeel, point(bHeel.along - BOOM.length * Math.cos(BOOM.rise), 0, jaws + BOOM.length * Math.sin(BOOM.rise)), BOOM.diameter, [
     ['jaws', 0], ['middle', BOOM.length * BREAK_SHARES.middle], ['end', BOOM.length],
@@ -203,7 +204,7 @@ export function buildDeadeyes(geometry: Readonly<Record<MastName, MastGeometry>>
     for (const side of SIDES) {
       const s = sideLetter(side);
       (mast === 'main' ? MAIN_SHROUDS : FORE_SHROUDS).forEach((along, k) => {
-        const p = mast === 'main' ? seat(along, MAIN_CHANNEL.top, MAIN_CHANNEL.width, side) : seat(along, sideTop(along) - CHANNEL.underTop, CHANNEL.width, side);
+        const p = seat(along, sideTop(along) - CHANNEL.underTop, mast === 'main' ? MAIN_CHANNEL.width : CHANNEL.width, side);
         out.push({ id: `${mast}-shroud-${s}${k + 1}`, mast, side, on: 'channel', ...p });
       });
       BACKSTAYS[mast].forEach((along, k) => {

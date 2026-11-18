@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BODY_STATIONS, HALF_BREADTH_PLAN, MIDSHIP_SECTION, PROFILE } from '../src/sim/rules/ships.ts';
 import {
-  designWaterline, displacedVolume, HULL_AFT, HULL_FORE, hullBottom, hullEnds, hullHalfBreadth, hullMesh, sheer, sideTop,
+  designWaterline, displacedVolume, HULL_AFT, HULL_FORE, hullBottom, hullEnds, hullHalfBreadth, hullMesh, sideTop, waistDeck,
 } from '../src/sim/ship/hull.ts';
 import { halfBreadth } from '../src/sim/ship/section.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
@@ -40,7 +40,7 @@ test('the fair surface runs through the half-breadth plan: the load waterline an
   for (const [along, waterline, top] of HALF_BREADTH_PLAN) {
     const near = along > BOW_ENDS || along < STERN_ENDS ? AT_THE_STEM : ON_THE_LINES;
     assert.ok(Math.abs(hullHalfBreadth(along, designWaterline(along)) - waterline) < near, `waterline at ${along} m`);
-    assert.ok(Math.abs(hullHalfBreadth(along, sheer(along)) - top) < near, `top breadth at ${along} m`);
+    assert.ok(Math.abs(hullHalfBreadth(along, waistDeck(along)) - top) < near, `top breadth at ${along} m`);
   }
 });
 

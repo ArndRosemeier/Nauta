@@ -28,7 +28,9 @@ test('every door is hinged on a jamb of its doorway and opens into one of its tw
   assert.equal(doorHinge(plan, 'cabin-door').into, 'cabin', "the captain's door opens into his cabin, not into the passage");
   assert.equal(doorHinge(plan, 'magazine-door').into, 'magazine');
   // Standing open, no leaf cuts a space in two (the walk graph keeps clear of open leaves).
-  assert.equal(graph.nodes.length, new Set(graph.nodes.map((n) => n.space)).size, 'one part to each space');
+  // One part to each space; the weather deck's three, the quarterdeck, the waist and the forecastle (N2.12), joined by ladders.
+  assert.equal(graph.nodes.length, new Set(graph.nodes.map((n) => n.space)).size + 2, 'one part to each space');
+  assert.equal(graph.nodes.filter((n) => n.space === 'deck').length, 3, 'the weather deck in its three');
 });
 
 test('a door swings open as he comes near and shut once he has gone, in its own time', () => {

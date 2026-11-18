@@ -105,12 +105,15 @@ export const JIB_BOOM = { length: 11.0, doubling: 3.0, diameter: 0.25 } as const
 /** The dolphin striker under the bowsprit's cap that spreads the martingale: its length down, its diameter, m. Estimated. */
 export const STRIKER = { length: 1.6, diameter: 0.12 } as const;
 /**
- * The main boom and gaff of the boom sail: lengths, diameters, m; the boom's jaws over the deck and how it rises aft,
+ * The main boom and gaff of the boom sail: lengths, diameters, m; the boom's jaws over the quarterdeck's level (so it
+ * clears a man standing there, N2.12) and how it rises aft,
  * rad; the gaff's jaws under the main hounds and its peak (rise from the level), rad; how far each swings out either
- * side of the centreline, rad. The boom reaches 2.7 m past her taffrail, as a brig's did. Estimated.
+ * side of the centreline, rad. The boom reaches 2.7 m past her taffrail, as a brig's did. Estimated. With the boom
+ * raised over the quarterdeck (N2.12) the gaff is 1.7 m longer than first estimated, so the boom sail keeps its area
+ * (133 m²) and her balance on the wind.
  */
 export const BOOM = { length: 15.2, diameter: 0.3, jaws: 2.4, rise: 0.04, swing: 1.31 } as const;
-export const GAFF = { length: 9.5, diameter: 0.2, jaws: -1.0, peak: 0.6, swing: 1.31 } as const;
+export const GAFF = { length: 11.2, diameter: 0.2, jaws: -1.0, peak: 0.6, swing: 1.31 } as const;
 
 /**
  * The places on a spar where it can break, as shares of its length from the heel (each two the ends of one segment:

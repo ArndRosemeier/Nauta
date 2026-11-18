@@ -11,16 +11,16 @@
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
 import {
-  BODY_STATIONS, BULWARK, CEILING, FRAME_DEPTH, KEEL_DEPTH, KEEL_HALF_SIDING, PLANKING, PORTS, TRANSOM, WALE, WATERWAY,
+  BODY_STATIONS, BREAKS, BULWARK, CEILING, FRAME_DEPTH, KEEL_DEPTH, KEEL_HALF_SIDING, PLANKING, PORTS, TRANSOM, WALE, WATERWAY, onRaisedDeck,
 } from '../../sim/rules/ships';
 import {
-  HULL_AFT, HULL_FORE, designWaterline, hullBottom, hullEnds, hullHalfBreadth, keelBottom, sheer, sideTop,
+  HULL_AFT, HULL_FORE, designWaterline, hullBottom, hullEnds, hullHalfBreadth, keelBottom, sheer, sideTop, waistDeck,
 } from '../../sim/ship/hull';
 import { linearCurve } from '../../sim/curve';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { box, roundedProfile, sheet, sweep } from './shapes';
 import type { ZoneParts } from './parts';
-import { BLACK, COPPER, OAK, OCHRE, RED, SIDE_PLANKS } from './looks';
+import { BLACK, BULWARK_BOARDS, COPPER, OAK, OCHRE, RED, SIDE_PLANKS } from './looks';
 import type { Finish } from './solid';
 import { DAMAGE, SIDE_REGIONS } from './damageMap';
 
@@ -35,6 +35,12 @@ const GIRTH_STEP = 0.07;
 const GIRTH_SAMPLES = 96;
 /** Two heights or places this close are one, m. */
 export const EPSILON = 1e-6;
+/** At a break (N2.12) her deck steps up within this much of her length, m. */
+export const BREAK_STEP = 0.002;
+/** Rows along her either side of each break, so what follows her deck steps straight up there. */
+export const BREAK_ROWS: readonly number[] = Object.values(BREAKS).flatMap((b) => [b - BREAK_STEP / 2, b + BREAK_STEP / 2]);
+/** Whether her deck between two places along her steps at a break. */
+export const acrossABreak = (a0: number, a1: number): boolean => onRaisedDeck(a0) !== onRaisedDeck(a1);
 /** How far above the load waterline her copper reaches, m (a hand's breadth, so she shows copper when she rolls). */
 export const COPPER_ABOVE_WATER = 0.28;
 /** The ochre band: how far below the port sills and above the port tops it reaches, m. */
@@ -55,8 +61,8 @@ export const CORNER_REACH = 0.35;
 
 /** The dead flat, where the draught's midship section was read: the wales' and the band's heights are given there. */
 const DEAD_FLAT = BODY_STATIONS.find((s) => s.name === '⊗')!.along;
-/** How far the sheer stands above the dead flat's at a place along her, m: her wales and band follow it. */
-const sheerRise = (along: number): number => sheer(along) - sheer(DEAD_FLAT);
+/** How far the sheer stands above the dead flat's at a place along her, m: her wales and band follow it (her hull's sheer, not her raised decks'). */
+const sheerRise = (along: number): number => waistDeck(along) - waistDeck(DEAD_FLAT);
 
 /** The port line: each port's sill and top across its width, straight between ports, and following the sheer beyond the end ports. */
 const PORT_EDGES = PORTS.flatMap(([, along, , , w]) => [along - w / 2, along + w / 2]);
@@ -219,7 +225,7 @@ function buildBackbone(out: ZoneParts, alongs: readonly number[]): void {
  * their linings and lids; the rail on top; the waterway along the deck's edge.
  */
 export function buildBulwarks(out: ZoneParts, deckAft: number, deckFore: number, detail: Detail = FULL_DETAIL): void {
-  const alongs = rowsAlong(deckAft, deckFore, detail.rowStep).reverse();
+  const alongs = rowsAlong(deckAft, deckFore, detail.rowStep, BREAK_ROWS).reverse();
   const railFoot = (a: number) => sideTop(a);
   for (const side of [1, -1]) {
     const damage = side > 0 ? DAMAGE.starboardBulwark : DAMAGE.portBulwark;
@@ -232,14 +238,17 @@ export function buildBulwarks(out: ZoneParts, deckAft: number, deckFore: number,
     const hss = alongs.map(hsOf);
     const grid = hss.map((hs, i) => hs.map((h) => new Vector3(side * bulwarkInside(alongs[i]!, h), shipY(h), shipZ(alongs[i]!))));
     const inPort = (i: number, j: number) => j >= sillRow && j < topRow && PORTS.some(([, along, , , w]) => Math.min(alongs[i]!, alongs[i + 1]!) >= along - w / 2 - EPSILON && Math.max(alongs[i]!, alongs[i + 1]!) <= along + w / 2 + EPSILON);
-    sheet(out.wood, grid, { ...RED, plank: BULWARK.railWidth, damage }, (i, j) => [shipZ(alongs[i]!), hss[i]![j]! - sheer(alongs[i]!)], (i, j) => !inPort(i, j), side < 0,
+    sheet(out.wood, grid, { ...BULWARK_BOARDS, damage }, (i, j) => [shipZ(alongs[i]!), hss[i]![j]! - sheer(alongs[i]!)], (i, j) => !inPort(i, j), side < 0,
       (i, j) => CORNER_AO + (1 - CORNER_AO) * Math.min(1, (hss[i]![j]! - sheer(alongs[i]!)) / CORNER_REACH));
     // The rail on top, black, rounded, following her sheer and her side.
     const rail = alongs.map((a) => ({ x: side * (outsideX(a, railFoot(a)) - BULWARK_THICK / 2 - BULWARK.railWidth / 2), y: shipY(railFoot(a)), z: shipZ(a) }));
     sweep(out.wood, rail, roundedProfile(BULWARK.railWidth, BULWARK.railThick, BEVEL), side, { ...BLACK, damage: SIDE_REGIONS.rail(side) });
     // The waterway: a heavy timber along the deck's edge, against the bulwark, rounded on its inner edge.
-    const way = alongs.map((a) => ({ x: side * (bulwarkInside(a, sheer(a)) - WATERWAY.width), y: shipY(sheer(a) - PLANKING.deck), z: shipZ(a) }));
-    sweep(out.wood, way, roundedProfile(WATERWAY.width, WATERWAY.rise + PLANKING.deck, BEVEL * 2), side, OAK, CORNER_AO);
+    // One length to each deck: it steps at the breaks with her deck.
+    for (const run of decksAlong(alongs)) {
+      const way = run.map((a) => ({ x: side * (bulwarkInside(a, sheer(a)) - WATERWAY.width), y: shipY(sheer(a) - PLANKING.deck), z: shipZ(a) }));
+      sweep(out.wood, way, roundedProfile(WATERWAY.width, WATERWAY.rise + PLANKING.deck, BEVEL * 2), side, OAK, CORNER_AO);
+    }
     for (const port of PORTS) buildPort(out, port, side);
   }
   // At her bow the two bulwarks close: the knightheads' face between them, and the rail across their tops.
@@ -248,6 +257,16 @@ export function buildBulwarks(out: ZoneParts, deckAft: number, deckFore: number,
   sheet(out.wood, [[at(-1, base), at(-1, foot)], [at(1, base), at(1, foot)]], RED, (i, j) => [i, j * (foot - base)]);
   const across = 2 * (outsideX(bow, foot) - BULWARK_THICK / 2);
   box(out.wood, new Matrix4().makeTranslation(0, shipY(foot) + BULWARK.railThick / 2, z - BULWARK.railWidth / 2), [across, BULWARK.railThick, BULWARK.railWidth], BLACK, BEVEL, 0);
+}
+
+/** Rows along her split where her deck steps at a break: one run of rows to each deck. */
+function decksAlong(alongs: readonly number[]): number[][] {
+  const runs: number[][] = [[alongs[0]!]];
+  for (let i = 1; i < alongs.length; i++) {
+    if (acrossABreak(alongs[i - 1]!, alongs[i]!)) runs.push([]);
+    runs[runs.length - 1]!.push(alongs[i]!);
+  }
+  return runs.filter((r) => r.length > 1);
 }
 
 /** Rows of the bulwark's face across a port's height. */

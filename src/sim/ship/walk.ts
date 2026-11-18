@@ -6,8 +6,8 @@
  * **How it is found.** Each space's floor is laid out as a grid of small squares. A square is free where a body can
  * stand: inside her sides at its feet and shoulders, under enough headroom, and clear of everything standing on that
  * level (fittings, masts, coamings, guns). A body is not a point, so a square is kept only if every square within
- * half the least passage of it is free too; what remains is where the body's middle can be. The kept squares that
- * touch form the graph's nodes (a space split in two by something in its way gives two nodes), and its ladders and
+ * half the least passage of it is free too, on a floor within a step of its own; what remains is where the body's
+ * middle can be. The kept squares that touch, on floors within a step of each other, form the graph's nodes (a space split in two by something in its way gives two nodes), and its ladders and
  * doors are the edges, where they fit the body.
  */
 import { BODY, LEAST_HATCH, LEAST_PASSAGE, LADDER } from '../rules/ships';
@@ -121,15 +121,20 @@ function floorGrid(plan: ShipPlan, space: Space, body: Body, first: number): { g
       ? (along < space.aft ? w.at === space.aft : along > space.fore ? w.at === space.fore : false) && across >= w.from && across <= w.to
       : (across < space.port ? w.at === space.port : across > space.starboard ? w.at === space.starboard : false) && along >= w.from && along <= w.to);
   };
+  // Each square's floor: where it steps by more than a body steps up (the breaks of her raised decks, N2.12), the floor
+  // is two, and a body's middle keeps its footprint's breadth from the edge, on whichever side it stands.
+  const floor = new Float64Array(cols * rows);
+  for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) floor[c * rows + r] = floorAt(space, alongOf(space, c), acrossOf(space, r));
   const kept = new Uint8Array(cols * rows);
   let openCount = 0;
   for (let c = 0; c < cols; c++) {
     for (let r = 0; r < rows; r++) {
       if (!open[c * rows + r]) continue;
       openCount++;
+      const here = floor[c * rows + r]!;
       kept[c * rows + r] = foot.every(([dc, dr]) => {
         const cc = c + dc, rr = r + dr;
-        if (cc >= 0 && cc < cols && rr >= 0 && rr < rows) return open[cc * rows + rr] === 1;
+        if (cc >= 0 && cc < cols && rr >= 0 && rr < rows) return open[cc * rows + rr] === 1 && Math.abs(floor[cc * rows + rr]! - here) <= body.stepUp;
         return !walled(cc, rr) && outsideOpen(plan, space, body, alongOf(space, cc), acrossOf(space, rr));
       }) ? 1 : 0;
     }
@@ -149,7 +154,7 @@ function floorGrid(plan: ShipPlan, space: Space, body: Body, first: number): { g
       for (const [nc, nr] of [[c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]] as const) {
         if (nc < 0 || nc >= cols || nr < 0 || nr >= rows) continue;
         const k = nc * rows + nr;
-        if (kept[k] && node[k] === -1) { node[k] = id; stack.push(k); }
+        if (kept[k] && node[k] === -1 && Math.abs(floor[k]! - floor[j]!) <= body.stepUp) { node[k] = id; stack.push(k); }
       }
     }
     areas.push(count * WALK_CELL * WALK_CELL);
