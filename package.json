@@ -27,9 +27,14 @@
     "check:shots": "node tools/shot/check.mjs",
     "check:ship": "node tools/shot/ship.mjs",
     "walk:check": "tsx tools/walk/everywhere.ts",
-    "check:room": "node tools/net/room.mjs"
+    "check:room": "node tools/net/room.mjs",
+    "packs": "node tools/crew/pack.mjs"
   },
   "dependencies": {
+    "@actors/core": "https://github.com/ArndRosemeier/Actors/releases/download/v0.34.4/actors-core-0.34.4.tgz",
+    "@actors/generator": "https://github.com/ArndRosemeier/Actors/releases/download/v0.34.4/actors-generator-0.34.4.tgz",
+    "@actors/human": "https://github.com/ArndRosemeier/Actors/releases/download/v0.34.4/actors-human-0.34.4.tgz",
+    "@actors/three": "https://github.com/ArndRosemeier/Actors/releases/download/v0.34.4/actors-three-0.34.4.tgz",
     "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/deck": "file:vendor/assetgenerator/packages/deck",

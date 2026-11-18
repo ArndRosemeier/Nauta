@@ -30,6 +30,10 @@ import { SeaSound } from './audio/seaSound';
 import { ShipSound } from './audio/shipSound';
 import { CrewSound } from './audio/crewSound';
 import { OPEN_AIR } from './audio/acoustics';
+import { CrewView } from './render/crew/crewView';
+import { TWIN_OFFSET, musterCrews } from './app/crew';
+import { CrewTrialRun } from './app/crewTrialRun';
+import { formatBytes } from './probe/report';
 import { Vector3 } from 'three/webgpu';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
 import { simTime } from './sim/state';
@@ -59,6 +63,8 @@ const MEGABYTE = 1 << 20;
 const SCENE_FRAMES = 1;
 /** The moment of the sea a scene set for a shot shows, s after it started: foam that lingers has had time to form. */
 const SHOT_SEA_TIME = 60;
+/** Where the crew trial looks from her quarterdeck: forward over her waist, her twin's crew off the starboard bow in view. */
+const CREW_LOOK: Look = { yaw: -0.25, pitch: -0.1 };
 
 declare global {
   interface Window {
@@ -96,6 +102,12 @@ async function start(): Promise<void> {
   // Her fittings (plan N2.6): drawn as instances in her frame, each zone's into that zone of her.
   const furnished = ship ? new Furnishings(view.renderer, await loadFittings(import.meta.env.BASE_URL), furnish(shipPlan())) : null;
   if (ship && furnished) for (const [zone, draws] of furnished.zones) ship.addToZone(zone, draws.group);
+  // `?crew`: the trial's 240 men (plan N4.0), mustered behind the loading screen; how long that takes is part of the trial.
+  const mustered = performance.now();
+  const men = ship && params.crew ? musterCrews(params.crew === 'aboard').filter((m, i, all) => i - all.findIndex((o) => o.crew === m.crew) < params.men) : [], note = loading.querySelector('p')!;
+  const crew = ship && params.crew ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, ship, men, params.crew === 'aboard' ? null : TWIN_OFFSET,
+    (n) => { note.textContent = `mustering the crews: ${n} of ${men.length} (${((performance.now() - mustered) / MS_PER_SECOND).toFixed(0)} s)`; }) : null;
+  const musterSeconds = (performance.now() - mustered) / MS_PER_SECOND;
   view.camera.position.set(0, params.eye, 0);
   const startLook = params.look ?? START_LOOK;
   view.camera.rotation.set(startLook.pitch, startLook.yaw, 0);
@@ -126,6 +138,20 @@ async function start(): Promise<void> {
   const spray = ship ? new SprayView(SPRAY.make()) : null;
   await furnished?.ready();
   await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(furnished ? [...furnished.zones.values()].map((d) => d.group) : [])]);
+  // The crews' shaders, a few men at each level of detail wearing between them all the crew wears, at full speed
+  // behind the loading screen (docs/SHADERS.md rule 5), as MasterWorld warms its townsfolk.
+  // The cap stays open (share 1) until the crews are in: before the first frame no frame frees a slot.
+  // (Set through Object.assign: the owner guard keeps the name `share` for N4.2's men on their way, not the Stage's cap.)
+  const capShare = view.stage.cap.share, capTo = (share: number) => Object.assign(view.stage.cap, { share });
+  if (crew) {
+    const warm = crew.warmObjects();
+    capTo(1);
+    for (const [k, o] of warm.entries()) {
+      note.textContent = `building the crews' shaders: ${k + 1} of ${warm.length}`;
+      await view.stage.prepare(o, { everyCaster: true });
+    }
+    crew.afterWarm();
+  }
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
   await view.stage.add(seaView.deep);
@@ -135,9 +161,16 @@ async function start(): Promise<void> {
   if (ship) for (const id of ship.swingIds) ship.setBrace(id, params.brace);
   if (other) await view.stage.add(other.group);
   if (spray) await view.stage.add(spray.mesh);
+  if (crew) {
+    note.textContent = 'bringing the crews aboard';
+    await view.stage.add(crew.aboard);
+    await view.stage.add(crew.twin);
+  }
+  capTo(capShare);
+  const crewMemory = crew?.memory();
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
-  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : ship ? where.look : startLook, view.radPerPixel, walking ? (e) => walking.input.owns(e) : undefined);
+  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, walking ? (e) => walking.input.owns(e) : undefined);
   /** The scene the address asks for: the hour and the day's pace, the wind and its sea, the eye, the look. */
   const setScene = (p: Params) => {
     sky.hour = p.hour; sky.dayMinutes = p.dayMinutes;
@@ -167,7 +200,8 @@ async function start(): Promise<void> {
     sceneFrames = SCENE_FRAMES; sceneDrawn = done;
   });
   if (ship && !walking) showStandpoints(where, (s) => { where = s; input.look = s.look; });
-  if (params.hud) hud.style.display = 'block';
+  const showHud = params.hud || crew !== null;
+  if (showHud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
   // Walking: the calm view, how much of his body's motion the view takes (plan N2.7).
   if (walking) showMotionSetting(el<HTMLButtonElement>('motion'), params.motion, (s) => { walking.body.strength = s; });
@@ -204,6 +238,13 @@ async function start(): Promise<void> {
   }) : null;
   // The bench's sky stands still, so runs at one hour compare.
   if (bench) sky.dayMinutes = 0;
+  // `?crew`: the trial's measured run, started by its button or by `?trial` (plan N4.0).
+  const trial = crew ? new CrewTrialRun(el('bench'), {
+    settled: () => quality.chosen,
+    about: () => { const px = view.drawnSize(); return `${view.backend} · quality ${quality.knobs.name}, ${px.x}×${px.y} px · ${sky.clock} · force ${wind.windForce} · crews ${params.crew}`; },
+    shaders: () => view.stage.hudLine(),
+  }, params.trial) : null;
+  if (trial) sky.dayMinutes = 0;
 
   let last = performance.now(), frames = 0, shown = last, ms = 0;
   view.renderer.setAnimationLoop(() => {
@@ -226,6 +267,8 @@ async function start(): Promise<void> {
       meanWind(wind, seaTime, blowing);
       sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
     }
+    const phase = trial?.phaseAt(now) ?? null;
+    if (phase) input.look = { ...CREW_LOOK };
     if (ship) {
       if (walking) {
         where = walking.walk(dt, ship.drawn, input);
@@ -234,6 +277,11 @@ async function start(): Promise<void> {
       ship.update(sea, seaTime, dt, view.camera, where, input.look, view.sun, sky.lightDirection, sky.gain, view.radPerPixel(), seaView.origin);
       furnished?.update(ship.group, view.camera, sky.lightDirection);
       other?.show(match && match.other >= 0 ? match.pose(match.other) : null);
+      if (crew) {
+        crew.crews = phase?.crews ?? 2;
+        crew.override = phase?.override ?? {};
+        crew.animate(dt, view.camera, quality.knobs.crew);
+      }
       sky.below = ship.below;
       seaView.sheltered = ship.below > 0;
     } else {
@@ -266,12 +314,13 @@ async function start(): Promise<void> {
     view.renderer.render(view.scene, view.camera);
     orders?.update(now);
     bench?.worked(performance.now() - now);
+    trial?.measured(now, performance.now() - now, crew?.stats.ms ?? 0, view.renderer.info.render.drawCalls);
     frames++;
     if (sceneDrawn && --sceneFrames <= 0) { sceneDrawn(); sceneDrawn = null; held = true; }
-    if (params.hud && now - shown >= HUD_EVERY_MS) {
+    if (showHud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}${match ? `\n${match.line()}` : ''}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
@@ -279,6 +328,14 @@ async function start(): Promise<void> {
       setTimeout(() => loading.remove(), LOADING_FADE_MS);
     }
   });
+}
+
+/** The crew trial's HUD line (plan N4.0): the men by level, how many animate, the crew's page time, what was fetched and how long mustering took. */
+function crewLine(crew: CrewView, musterSeconds: number, held: ReturnType<CrewView['memory']>, gpuBytes: number): string {
+  const s = crew.stats;
+  const pack = performance.getEntriesByType('resource').filter((e) => e.name.includes('/packs/')).reduce((n, e) => n + ((e as PerformanceResourceTiming).encodedBodySize || 0), 0);
+  return `crew ${s.mustered} men · ${s.seen} seen · full ${s.full}, medium ${s.medium}, crowd ${s.crowd} · animated ${Math.round(s.animated)} a frame · shadows ${s.shadows} · ${Math.round(crew.trianglesDrawn() / THOUSAND)}k tris · crew work ${s.ms.toFixed(1)} ms\n`
+    + `pack ${formatBytes(pack)} fetched · mustered in ${musterSeconds.toFixed(1)} s · men hold ${formatBytes(held.geometry)} geometry, ${formatBytes(held.textures)} in ${held.textureCount} textures · GPU memory ${formatBytes(gpuBytes)}${performance.memory ? ` · heap ${formatBytes(performance.memory.usedJSHeapSize)}` : ''}`;
 }
 
 /**

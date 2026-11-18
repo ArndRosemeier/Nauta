@@ -284,6 +284,14 @@ export class ShipView {
     zone.add(object);
   }
 
+  /**
+   * The group drawn for the zone a space of hers is in (her outside for the weather deck): what stands in that space
+   * is drawn when this group is (`visible`, set each frame by what can be seen: visibility.ts).
+   */
+  zoneGroupOf(space: string): Group {
+    return this.zones.get(this.spaceZones.get(space) ?? OUTSIDE)!;
+  }
+
   /** Swings a door to `angle` rad open (0 shut). */
   setDoor(id: string, angle: number): void {
     const d = this.doors.get(id);

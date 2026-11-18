@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { CREW_SIZE } from '../src/app/crew.ts';
 import { joinLink, readParams } from '../src/app/params.ts';
 import { DEGREE } from '../src/sim/units.ts';
 
@@ -7,11 +8,11 @@ import { DEGREE } from '../src/sim/units.ts';
 const BRACED = 30;
 
 test('no query: WebGPU, no HUD, a morning that moves', () => {
-  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false });
+  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, men: CREW_SIZE });
 });
 
 test('the query sets the backend, the HUD, the hour, the day length, the eye and the wind', () => {
-  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false });
+  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, men: CREW_SIZE });
 });
 
 test('nonsense falls back, and numbers are held to their range', () => {
@@ -91,4 +92,13 @@ test('two players: open a room, join one by its code, another key or server, a s
 
 test('the link a room shows joins it on the same page, with the same key', () => {
   assert.equal(joinLink('https://arndrosemeier.github.io/Nauta/?sail&room&key=ghk_x', 'K7Q2ZP'), 'https://arndrosemeier.github.io/Nauta/?sail&key=ghk_x&join=K7Q2ZP');
+});
+
+test('?crew is the crew trial on her deck: her twin\'s crew off her bow, or both aboard; ?trial starts its run', () => {
+  assert.deepEqual([readParams('?crew').crew, readParams('?crew').ship], ['twin', '']);
+  assert.equal(readParams('?crew=aboard').crew, 'aboard');
+  assert.equal(readParams('?crew=aboard&ship=waist').ship, 'waist');
+  assert.equal(readParams('?crew&trial').trial, true);
+  assert.deepEqual([readParams('?crew&men=60').men, readParams('?crew&men=999').men, readParams('?crew').men], [60, CREW_SIZE, CREW_SIZE]);
+  assert.equal(readParams('?ship').crew, null);
 });

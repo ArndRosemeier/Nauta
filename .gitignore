@@ -4,3 +4,5 @@ shots/
 reports/
 *.log
 .DS_Store
+# The crew's character pack, copied out of the Actors release by `npm run packs` (tools/crew/pack.mjs).
+/public/packs/

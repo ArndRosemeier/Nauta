@@ -264,6 +264,19 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A percentile of sorted measurements | `src/app/bench.ts#percentile` |
 | Frame times summed up as the budget reads them (percentiles, worst, on time, hitches) | `src/app/bench.ts#frameStats` |
 | The bench on the page: flying, measuring, the result on screen | `src/app/benchRun.ts#BenchRun` |
+| A button on the page (label and what pressing it does) | `src/app/button.ts#makeButton` |
+| Milliseconds written for the screen | `src/app/bench.ts#msText` |
+| The crew trial's men: who stands where on her (and her twin's place), his rank, navy, clip and beat | `src/app/crew.ts#musterCrews` |
+| Places for men below, on the berth deck's grid | `src/app/crew.ts#berthPlaces` |
+| Where a walker is on his beat | `src/app/crew.ts#walkerPlace` |
+| The turn that faces a man toward a point in ship space | `src/app/crew.ts#facingToward` |
+| A man's look (body, hair, dress by rank and navy) from his seed; what the crew's pack holds (PACK_ lists) | `src/app/crewLooks.ts#lookOf` |
+| The crew's levels of detail, animation rates and shadows, from distance and sight (the quality level's `CrewKnobs`) | `src/app/crewLevels.ts#crewLevels` |
+| A man's animation step at a distance | `src/app/crewLevels.ts#stepAt` |
+| The crew trial's phases and its result's lines | `src/app/crewTrial.ts#trialLines` |
+| The crew trial on the page: its button, phases, result on screen | `src/app/crewTrialRun.ts#CrewTrialRun` |
+| The crews drawn: Actors characters loaded, warmed, placed with her and animated at their levels | `src/render/crew/crewView.ts#CrewView` |
+| The group drawn for the zone a space of hers is in (what stands there is drawn when it is) | `src/render/ship/shipView.ts#ShipView` |
 | The built game in a headless browser (for screenshots) | `tools/shot/browser.mjs#openGame` |
 | A screenshot of the game, its last WebGPU frame painted first where the software GPU cannot present (`tools/shot/swapchain.js`) | `tools/shot/browser.mjs#snap` |
 | The standard sea shots (times of day × seas × eye heights), each scene set on one page by main.ts's `window.__nautaScene` | `tools/shot/sea.mjs#seaShots` |

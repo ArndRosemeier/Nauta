@@ -4,16 +4,14 @@
  * alongside, or out to 50 m and 500 m off.
  */
 import { STANDPOINTS, type Standpoint } from './standpoints';
+import { makeButton } from './button';
 
 /** Shows the row; `chosen` is called with the standpoint a button names, and the button stays marked. */
 export function showStandpoints(first: Standpoint, chosen: (s: Standpoint) => void): void {
   const bar = document.createElement('nav');
   bar.id = 'standpoints';
   const buttons = STANDPOINTS.map((s) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = s.name;
-    b.addEventListener('click', () => {
+    const b = makeButton(s.name, () => {
       for (const o of buttons) o.classList.toggle('on', o === b);
       chosen(s);
     });

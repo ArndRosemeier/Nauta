@@ -20,6 +20,7 @@
       #hud { position: fixed; left: max(8px, env(safe-area-inset-left)); top: max(8px, env(safe-area-inset-top)); margin: 0; white-space: pre; font: 12px/1.35 ui-monospace, monospace; text-shadow: 0 1px 2px #000; pointer-events: none; display: none; }
       #loading, #failed { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1a2a; transition: opacity 0.6s; }
       #loading h1 { font: 300 44px/1 Georgia, serif; letter-spacing: 0.35em; margin: 0 0 0 0.35em; }
+      #loading p { margin: 18px 0 0; min-height: 1.4em; text-align: center; opacity: 0.7; }
       #failed { display: none; padding: 24px; text-align: center; }
       /* ?probe: the report scrolls and can be selected, the buttons fit a finger. */
       #probe { position: fixed; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 24px max(12px, env(safe-area-inset-left)); }
@@ -91,7 +92,7 @@
     <pre id="bench"></pre>
     <button id="version" type="button"></button>
     <button id="motion" type="button"></button>
-    <div id="loading"><h1>NAUTA</h1></div>
+    <div id="loading"><div><h1>NAUTA</h1><p></p></div></div>
     <div id="failed"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

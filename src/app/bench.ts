@@ -101,7 +101,9 @@ export function frameStats(samples: BenchSamples): FrameStats {
   };
 }
 
-const ms = (v: number) => (Number.isFinite(v) ? `${v.toFixed(MS_DIGITS)} ms` : '–');
+/** Milliseconds for the screen (`12.3 ms`; `–` for none). */
+export const msText = (v: number) => (Number.isFinite(v) ? `${v.toFixed(MS_DIGITS)} ms` : '–');
+const ms = msText;
 
 /** The result as lines for the screen: frame times first, then the page's own work. */
 export function statsLines(s: FrameStats): string[] {

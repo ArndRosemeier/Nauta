@@ -36,6 +36,12 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # The crew's character pack (plan N4.0): the Actors release's archive is downloaded once per version and kept.
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/actors
+          key: actors-packs-${{ hashFiles('package-lock.json') }}
+      - run: npm run packs
       - run: npm run build
         env:
           VITE_BASE: /Nauta/
