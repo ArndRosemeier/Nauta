@@ -162,3 +162,18 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Which sound a crest makes at a force of the sea (lap, slap, crest, burst) | `src/audio/slaps.ts#slapKind` |
 | Slaps and crests placed near the listener where crests pass | `src/audio/slaps.ts#SlapWatch` |
 | The sea and the wind heard: the sound engine, the listener's ears, muffling under water and below deck | `src/audio/seaSound.ts#SeaSound` |
+| Plain data to bytes and back, canonical and exact (the state, orders and events as they travel and are saved) | `src/sim/codec.ts#encode` |
+| Bytes back to plain data, bit for bit | `src/sim/codec.ts#decode` |
+| A 64-bit hash of bytes, for comparing machines | `src/sim/codec.ts#hashBytes` |
+| The hash of a plain value (of its canonical bytes) | `src/sim/codec.ts#hashOf` |
+| The match as one value: seed, clock, wind, sea, ships | `src/sim/state.ts#SimState` |
+| Starting a match from its seed, wind and the ships' places | `src/sim/state.ts#startMatch` |
+| The shared clock of a state, s (from its count of steps) | `src/sim/state.ts#simTime` |
+| A state as bytes, and back | `src/sim/state.ts#encodeState` |
+| The state's hash (two machines with the same hash have the same state) | `src/sim/state.ts#hashState` |
+| One step of the match: orders in, the next state and events out | `src/sim/step.ts#step` |
+| What a ship can be ordered (for now: a course, taken at once) | `src/sim/step.ts#Order` |
+| What happened in a step (for drawing, sound and the interface) | `src/sim/step.ts#SimEvent` |
+| Running a match on through a log of orders (a guest, a replay, the tests) | `src/sim/replay.ts#replay` |
+| The knot in m/s | `src/sim/units.ts#KNOT` |
+| The fastest a ship may be told to go until the sailing model works speed out | `src/sim/rules/ships.ts#TOP_SPEED` |

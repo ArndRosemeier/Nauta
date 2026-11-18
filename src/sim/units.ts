@@ -27,3 +27,6 @@ export const GRAVITY = 9.81;
 /** The simulation's fixed step (implementation plan, budgets: 30 steps a second), and its length, s. */
 export const STEPS_PER_SECOND = 30;
 export const STEP_SECONDS = 1 / STEPS_PER_SECOND;
+
+/** A knot (one nautical mile, 1852 m, an hour) in m/s. */
+export const KNOT = 1852 / (MINUTES_PER_HOUR * SECONDS_PER_MINUTE);

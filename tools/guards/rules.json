@@ -69,6 +69,36 @@
       "field": "pose",
       "owner": "src/sim/ship/motion.ts",
       "what": "how a ship lies on the water: her centre, heading, heave, pitch and roll (floating, N2.2)"
+    },
+    {
+      "field": "matchSeed",
+      "owner": "src/sim/state.ts",
+      "what": "the seed every random number of a match comes from (made once by startMatch)"
+    },
+    {
+      "field": "wind",
+      "owner": "src/sim/state.ts",
+      "what": "a match's wind (made once by startMatch; its swings and gusts are a function of time)"
+    },
+    {
+      "field": "tick",
+      "owner": "src/sim/step.ts",
+      "what": "the match's clock: steps since it began, 30 a second"
+    },
+    {
+      "field": "sea",
+      "owner": "src/sim/step.ts",
+      "what": "the match's sea, moved on each step as it follows the wind (its own fields are sea.ts's)"
+    },
+    {
+      "field": "ships",
+      "owner": "src/sim/step.ts",
+      "what": "the ships of a match, each stepped once a step"
+    },
+    {
+      "field": "course",
+      "owner": "src/sim/step.ts",
+      "what": "the heading and speed a ship holds as last ordered (the stand-in until the sailing model, N3.3, owns them)"
     }
   ]
 }
