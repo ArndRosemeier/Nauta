@@ -28,7 +28,7 @@ export interface Standpoint {
 }
 
 /** A man's eye over the deck he stands on, m; stooping under the beams below; crouching in the hold. */
-const EYE = 1.62;
+export const EYE = 1.62;
 const EYE_BELOW = 1.45;
 const EYE_HOLD = 0.95;
 /** Angles, rad: a quarter and a half turn. */

@@ -1,0 +1,270 @@
+/**
+ * The crews drawn, decided (implementation plan N4.3): for every man of both ships, where he is drawn between the last
+ * two steps of the match, which way he faces and what motion he plays, from his task (N4.1), his way through her
+ * (N4.2) and his hurt (N6.1); which men of her crew are drawn as full characters near the captain (the near pool); and
+ * how often each man is placed again (the animation rate). Pure: the crew view (render/crew/crewView.ts) applies it.
+ * Every value Arnd's iPad numbers decide is a knob of the quality table (quality.ts `CrewKnobs`), none is here.
+ *
+ * Ship space (sim/ship/section.ts): x across her (+ starboard), y up from her load waterline, z aft.
+ */
+import { Rng, deriveSeed } from '@futuremagic/core';
+import type { SimShip } from '../sim/state';
+import { harmOf } from '../sim/damage';
+import { manAt, taskOf, type Task } from '../sim/crew/crew';
+import { goingAt, goingRoute } from '../sim/crew/going';
+import { jobWork } from '../sim/crew/drill';
+import { brigRoster, crewPlaces, placeSpot, type Man } from '../sim/crew/roster';
+import { heightAt, routeNetwork, standable } from '../sim/crew/network';
+import type { Spot } from '../sim/ship/plan';
+import type { JobName } from '../sim/rules/crew';
+import { shipY, shipZ } from '../sim/ship/section';
+import type { CrewKnobs } from './quality';
+import { floorApart } from './officers';
+
+/** The motion a man hauling plays (at a pin, tailing on a fall). */
+const HAUL = 'pick up';
+/** What a man at work plays, by his job (crewLooks.ts PACK_CLIPS): hauling at the pins, at the wheel, out on a yard, the repairs. */
+export const JOB_CLIPS: Readonly<Record<JobName, string>> = {
+  helm: 'interact', stations: 'idle', brace: HAUL, sheet: HAUL, clew: HAUL, hoist: HAUL, douse: HAUL,
+  loose: 'interact', furl: 'interact', reef: 'interact',
+  plug: 'repair (kneeling)', fish: 'repair (kneeling)', splice: 'repair (kneeling)', tackle: 'interact', cut: 'chop wood',
+  pump: 'push', fight: 'interact', fetch: 'pick up', carry: 'walk carrying',
+};
+/** A man standing by with nothing to do, by his seed: mostly still, some with their arms folded. */
+const STANDING_BY = ['idle', 'idle', 'arms folded', 'idle', 'nod'] as const;
+/** Waiting at his place for the work to begin. */
+const WAITING = 'idle';
+/** On his way: walking, or smartly at a run. */
+const WALKING = 'walk';
+const RUNNING = 'jog';
+/** Killed, or badly hurt and lying where he fell (he is carried below by others: N6.6 draws the carrying). */
+export const LYING = 'death';
+/** Clips that play once and hold their last frame. */
+export const ONCE_CLIPS = [LYING];
+
+/** Jobs where the men tail on a fall: they spread along it inboard of the pin, a row aft for every so many. */
+const HAULING: ReadonlySet<JobName> = new Set(['brace', 'sheet', 'clew', 'hoist', 'douse']);
+/** Men sharing a pin's fall stand this far apart along it (inboard), and so many abreast before the next row, m. */
+const FALL_SPACING = 0.6;
+const FALL_ABREAST = 4;
+/** Between rows on a fall, m (aft). */
+const FALL_ROWS = 0.75;
+/** Kinds of crew place a man faces outboard at: a pin on the rail, a gun's crew place. */
+const FACING_OUT: ReadonlySet<string> = new Set(['pin', 'gun']);
+/** A man faces forward (a half turn from +z, which is aft). */
+const FORWARD = Math.PI;
+const QUARTER = Math.PI / 2;
+/**
+ * Men the match puts on one spot (several share a post, or a place of their task) stand around it this far apart, m:
+ * the first on it, the rest on the nearest clear deck of a grid about it, along the side before inboard (men at a rail
+ * line it, and leave her middle line clear for the walkers and the captain). Aloft they keep it.
+ */
+const SPREAD = 0.7;
+/** The grid's steps tried about a shared spot (forward, inboard), nearest first; a man beyond them keeps the spot. */
+const SPREAD_STEPS = 5;
+/** A step inboard counts as this many along the side when the nearest point is looked for. */
+const INBOARD_COST = 2;
+const AROUND: readonly (readonly [number, number])[] = (() => {
+  const out: [number, number][] = [];
+  for (let f = -SPREAD_STEPS; f <= SPREAD_STEPS; f++) for (let i = -SPREAD_STEPS; i <= SPREAD_STEPS; i++) out.push([f, i]);
+  const far = ([f, i]: readonly [number, number]) => Math.hypot(f, INBOARD_COST * i);
+  // Nearest first; at one distance, inboard before outboard, then forward before aft.
+  return out.sort((a, b) => far(a) - far(b) || b[1] - a[1] || b[0] - a[0]);
+})();
+
+/** One man as he is to be drawn this frame. */
+export interface ManDrawn {
+  /** His feet, ship space, m. */
+  x: number;
+  y: number;
+  z: number;
+  /** The way he faces, rad about +y (0: aft, toward +z). */
+  yaw: number;
+  /** The space of hers he is in (whose room draws him). */
+  space: string;
+  /** The motion he plays (crewLooks.ts PACK_CLIPS). */
+  clip: string;
+  /** On a way between two floors (a ladder, the shrouds, the climb onto a footrope), its kind; null on a floor or a surface aloft. */
+  way: string | null;
+}
+
+/** A new, empty man drawn (to be filled by `manDrawn`). */
+export const newManDrawn = (): ManDrawn => ({ x: 0, y: 0, z: 0, yaw: FORWARD, space: '', clip: WAITING, way: null });
+
+/** Where a man is in one state, before the frame's in-between. */
+interface At { along: number; across: number; height: number; space: string; yaw: number; way: string | null; moving: boolean }
+
+/** His spot and height in one state, which way he faces and whether he is on his way. */
+function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
+  const hand = ship.crew.men[man]!;
+  if (hand.going) {
+    const w = goingAt(hand.going);
+    return { along: w.along, across: w.across, height: w.height, space: w.space, yaw: Math.atan2(w.facing[1], -w.facing[0]), way: w.way === null ? null : goingRoute(hand.going).legs[hand.going.leg]?.kind ?? null, moving: true };
+  }
+  const at = manAt(hand, m.post), own = !task && !hand.stands ? postSpots().get(man) : undefined;
+  let { along, across } = own ?? at.spot, yaw = FORWARD, height = own?.height ?? at.height;
+  const place = task ? placeOf(task, man) : hand.stands ? null : { id: m.post, rank: 0 };
+  const kind = place ? crewPlaces().get(place.id)?.kind : undefined;
+  if (kind && FACING_OUT.has(kind)) yaw = across >= 0 ? QUARTER : -QUARTER;
+  if (task && place && place.rank > 0 && HAULING.has(task.job)) {
+    // Tailing on the fall: inboard of the pin, abreast, then a row aft.
+    const inboard = across >= 0 ? -1 : 1, row = Math.floor((place.rank - 1) / FALL_ABREAST);
+    across += inboard * FALL_SPACING * (1 + ((place.rank - 1) % FALL_ABREAST));
+    along -= FALL_ROWS * row;
+  } else if (place && place.rank > 0) {
+    const s = spreadAbout(at.spot, place.rank);
+    along = s.along; across = s.across; height = s.height;
+  }
+  return { along, across, height, space: at.spot.space, yaw, way: null, moving: false };
+}
+
+/** A floor point of hers and its height. */
+interface Stand { readonly along: number; readonly across: number; readonly height: number }
+
+/**
+ * Where each man of the roster stands at his post when the match has him there: the first man of each post on it,
+ * then the others on the nearest clear points about theirs (`AROUND`, along the side first), each a step from every man placed
+ * before him (some places of her plan lie closer than that: a pin beside a gun's place). Worked out once: the roster
+ * and her plan do not change. Aloft a man keeps his place (the places on a yard are its own).
+ */
+function postSpots(): Map<number, Stand> {
+  if (posted) return posted;
+  const net = routeNetwork(), roster = brigRoster(), out = new Map<number, Stand>(), taken: Spot[] = [], first = new Set<string>();
+  const clear = (p: Spot, gap: number) => taken.every((t) => floorApart(t, p) >= gap - TINY);
+  const put = (i: number) => {
+    const spot = placeSpot(roster[i]!.post), inboard = spot.across >= 0 ? -1 : 1, aloft = net.surfaces.get(spot.space);
+    // On a yard the places are its own; in a top or on the crosstrees, the men a half step apart round the place.
+    if (aloft && aloft.kind !== 'top' && aloft.kind !== 'crosstrees') return;
+    for (const gap of aloft ? [SPREAD / 2] : [SPREAD, SPREAD / 2]) {
+      for (const [f, k] of AROUND) {
+        if (aloft && Math.max(Math.abs(f), Math.abs(k)) > TOP_STEPS) continue;
+        const p = { space: spot.space, along: spot.along + f * gap, across: spot.across + inboard * k * gap };
+        // His own place is where the match has him, standable or not (a pin at the rail); the others must be clear deck.
+        if ((f !== 0 || k !== 0) && !standable(net, p, [])) continue;
+        if (!clear(p, gap)) continue;
+        taken.push(p);
+        out.set(i, { along: p.along, across: p.across, height: heightAt(net, p) });
+        return;
+      }
+    }
+  };
+  const firsts = roster.map((m, i) => (first.has(m.post) ? -1 : (first.add(m.post), i))).filter((i) => i >= 0);
+  for (const i of firsts) put(i);
+  roster.forEach((_, i) => { if (!firsts.includes(i)) put(i); });
+  return (posted = out);
+}
+let posted: Map<number, Stand> | null = null;
+/** In a top, the men stand within this many half steps of their place (a top is about 3 m across). */
+const TOP_STEPS = 2;
+/** Slack for points on the grid's steps, m. */
+const TINY = 1e-6;
+
+/** Where the `rank`-th man on a shared floor spot stands: the `rank`-th clear point of the grid about it (cached: spots are few). */
+function spreadAbout(spot: Spot, rank: number): Stand {
+  const key = `${spot.space}|${spot.along}|${spot.across}|${rank}`;
+  let s = spread.get(key);
+  if (s) return s;
+  const net = routeNetwork(), inboard = spot.across >= 0 ? -1 : 1;
+  s = { along: spot.along, across: spot.across, height: heightAt(net, spot) };
+  if (!net.surfaces.has(spot.space)) {
+    let n = 0;
+    for (const [f, i] of AROUND) {
+      const p = { space: spot.space, along: spot.along + f * SPREAD, across: spot.across + inboard * i * SPREAD };
+      if (!standable(net, p, [])) continue;
+      if (n++ === rank) { s = { along: p.along, across: p.across, height: heightAt(net, p) }; break; }
+    }
+  }
+  spread.set(key, s);
+  return s;
+}
+const spread = new Map<string, Stand>();
+
+/** The crew place a man of a task stands at, and how many of the task's men are at it before him. */
+function placeOf(task: Task, man: number): { id: string; rank: number } | null {
+  const places = jobWork(task.job, task.on).places, n = task.hands.indexOf(man);
+  if (!places.length || n < 0) return null;
+  return { id: places[n % places.length]!, rank: Math.floor(n / places.length) };
+}
+
+/** The turn from `a` to `b` the short way round, rad. */
+const turnBetween = (a: number, b: number): number => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+
+/**
+ * Man `man` (his place in the roster) of a ship as drawn `f` of the way from her state `from` to `to` (the match's
+ * last two steps), into `out`. `seed`: his own (`manSeed`), for his standing-by motion.
+ */
+export function manDrawn(from: SimShip, to: SimShip, f: number, man: number, m: Man, seed: number, out: ManDrawn): ManDrawn {
+  const task = taskOf(to.crew, man), b = atIn(to, man, m, task);
+  const a = from === to ? b : atIn(from, man, m, taskOf(from.crew, man));
+  const lerp = a.space === b.space && a.way === b.way;
+  const g = lerp ? f : 1;
+  out.x = a.across + g * (b.across - a.across);
+  out.y = shipY(a.height + g * (b.height - a.height));
+  out.z = shipZ(a.along + g * (b.along - a.along));
+  out.yaw = a.yaw + g * turnBetween(a.yaw, b.yaw);
+  out.space = b.space;
+  out.way = b.way;
+  out.clip = clipOf(to, man, task, b, seed);
+  return out;
+}
+
+/** The motion a man plays: lying if struck down, on his way walking or running, at work by his job, else standing by. */
+function clipOf(ship: SimShip, man: number, task: Task | null, at: At, seed: number): string {
+  const harm = harmOf(ship.damage, man);
+  if (harm === 'killed' || harm === 'badly') return LYING;
+  const hand = ship.crew.men[man]!;
+  if (at.moving) return hand.going!.haste === 'smart' ? RUNNING : WALKING;
+  if (task) return task.began === null ? WAITING : JOB_CLIPS[task.job];
+  return STANDING_BY[seed % STANDING_BY.length]!;
+}
+
+/** A man's own seed (his phase in a clip, his standing-by motion), the same on every machine. */
+export const manSeed = (ship: number, man: number): number => deriveSeed(MOTION_SEED, ship, man);
+const MOTION_SEED = 1807;
+/** How far into his clip a man starts, s: no two men move in step. */
+export const clipPhase = (seed: number): number => new Rng(seed).range(0, MAX_PHASE);
+const MAX_PHASE = 4;
+
+/** A man's animation step (placed again every this many frames) at `distance`, seen or not. */
+export function stepAt(k: CrewKnobs, distance: number, seen: boolean): number {
+  if (!seen) return k.hiddenStep;
+  const i = k.stepsTo.findIndex((to) => distance <= to);
+  return k.steps[i < 0 ? k.steps.length - 1 : i]!;
+}
+
+/** Whether a man is placed again this frame: every `step` frames, spread over the frames by his place in the crew. */
+export const dueThisFrame = (frame: number, step: number, man: number): boolean => (frame + man) % step === 0;
+
+/** A man of her crew the near pool could take. */
+export interface PoolCandidate {
+  readonly man: number;
+  /** From the eye, m. */
+  readonly distance: number;
+  /** In view and in a room of hers that is drawn. */
+  readonly seen: boolean;
+  /** He matters now (speaking, just addressed: plan "Faces"): taken before any man who does not, wherever in view. */
+  readonly matters: boolean;
+}
+
+/** How much farther than the pool's reach a man already in it keeps his place, m: two men at the edge do not trade every frame. */
+export const POOL_STICK = 1.5;
+
+/**
+ * The men drawn as full characters this frame (at most `size`, which is the pool loaded, and the knobs' `pool`): those
+ * who matter now and are in view first, then the nearest seen within the pool's reach; a man already in it (`held`)
+ * keeps his place a little beyond the reach.
+ */
+export function choosePool(men: readonly PoolCandidate[], k: CrewKnobs, held: ReadonlySet<number>, size: number): number[] {
+  const most = Math.min(size, k.pool);
+  const reach = (c: PoolCandidate) => k.poolTo + (held.has(c.man) ? POOL_STICK : 0);
+  return men.filter((c) => c.seen && (c.matters || c.distance <= reach(c)))
+    .sort((p, q) => Number(q.matters) - Number(p.matters) || p.distance - q.distance)
+    .slice(0, most).map((c) => c.man);
+}
+
+/** Actors' levels a full character is drawn at: Full near, Medium beyond `fullTo`. */
+export const FULL = 0;
+export const MEDIUM = 1;
+/** The level for a full character at `distance` (a man keeps Full a little longer than its limit, as the pool does). */
+export const poolLevel = (k: CrewKnobs, distance: number, now: number): number =>
+  k.fullTo > 0 && distance <= k.fullTo + (now === FULL ? POOL_STICK : 0) ? FULL : MEDIUM;

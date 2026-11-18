@@ -339,16 +339,22 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The bench on the page: flying, measuring, the result on screen | `src/app/benchRun.ts#BenchRun` |
 | A button on the page (label and what pressing it does) | `src/app/button.ts#makeButton` |
 | Milliseconds written for the screen | `src/app/bench.ts#msText` |
-| The crew trial's men: who stands where on her (and her twin's place), his rank, navy, clip and beat | `src/app/crew.ts#musterCrews` |
-| Places for men below, on the berth deck's grid | `src/app/crew.ts#berthPlaces` |
-| Where a walker is on his beat | `src/app/crew.ts#walkerPlace` |
-| The turn that faces a man toward a point in ship space | `src/app/crew.ts#facingToward` |
-| A man's look (body, hair, dress by rank and navy) from his seed; what the crew's pack holds (PACK_ lists) | `src/app/crewLooks.ts#lookOf` |
-| The crew's levels of detail, animation rates and shadows, from distance and sight (the quality level's `CrewKnobs`) | `src/app/crewLevels.ts#crewLevels` |
-| A man's animation step at a distance | `src/app/crewLevels.ts#stepAt` |
+| A man of either crew drawn between two steps of the match: where, facing which way, playing which motion (from his task, his way, his hurt) | `src/app/crewDrawn.ts#manDrawn` |
+| Where each man stands at his post: men sharing one spread round it, clear of each other | `src/app/crewDrawn.ts#manDrawn` |
+| The motion each job plays | `src/app/crewDrawn.ts#JOB_CLIPS` |
+| A man's animation step at a distance, seen or not, and the frames he is placed on | `src/app/crewDrawn.ts#stepAt` |
+| Which men of her crew the near pool draws as full characters | `src/app/crewDrawn.ts#choosePool` |
+| A full character's level (Full near, Medium beyond) | `src/app/crewDrawn.ts#poolLevel` |
+| What a man looks like (dress by rank and navy, build, hat, hair, skin, tints) from the roster and his seed; what the crew's pack holds (PACK_ lists) | `src/app/crewLooks.ts#figureOf` |
+| The crowd figures' kinds of both crews | `src/app/crewLooks.ts#crowdKinds` |
+| A man as a full character, looking as his crowd figure does | `src/app/crewLooks.ts#fullLook` |
+| What a man wears and his build as a key (alike men differ in colour only) | `src/app/crewLooks.ts#wearing` |
+| What a man's face shows: the causes from the simulation, the table, one frame of it | `src/app/faces.ts#FACES` |
 | The crew trial's phases and its result's lines | `src/app/crewTrial.ts#trialLines` |
 | The crew trial on the page: its button, phases, result on screen | `src/app/crewTrialRun.ts#CrewTrialRun` |
-| The crews drawn: Actors characters loaded, warmed, placed with her and animated at their levels | `src/render/crew/crewView.ts#CrewView` |
+| The crews drawn: crowd figures for both crews, the near pool handed out, men placed with their ships and animated by the knobs; the voices' men as speakers | `src/render/crew/crewView.ts#CrewView` |
+| The near pool: full characters with living faces, dressed as a man and handed over from his crowd figure in the same pose | `src/render/crew/nearPool.ts#NearPool` |
+| Bytes of drawn things' geometry (the HUD, the trial) | `src/render/bytes.ts#geometryBytes` |
 | The group drawn for the zone a space of hers is in (what stands there is drawn when it is) | `src/render/ship/shipView.ts#ShipView` |
 | The built game in a headless browser (for screenshots) | `tools/shot/browser.mjs#openGame` |
 | A screenshot of the game, its last WebGPU frame painted first where the software GPU cannot present (`tools/shot/swapchain.js`) | `tools/shot/browser.mjs#snap` |
@@ -671,10 +677,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | How long a bubble takes to read | `src/app/speech/bubbles.ts#readSeconds` |
 | The bubbles drawn over the men, or at the screen's edge | `src/app/bubbleLayer.ts#BubbleLayer` |
 | The match's events and notices to the bubbles, on the page | `src/app/speaking.ts#Speech` |
-| An Actors man as a speaker: his head for the bubble, his mouth with the words, his look to the captain | `src/render/speech/characterSpeaker.ts#characterSpeaker` |
-| Faceless stand-ins at the stations for the men not yet drawn | `src/render/speech/standIns.ts#standIns` |
+| A man of the crew as a speaker: his head for the bubble, his mouth with the words (brought into the near pool), his look to the captain | `src/render/crew/crewView.ts#CrewView` |
 | A ship's navy in the duel (the first ship's as the match setup chose, the other the other) | `src/app/crewLooks.ts#navyOf` |
-| Each navy's dress for the men drawn (Actors' `navy-rn-*` and `navy-fr-*` presets) | `src/app/crewLooks.ts#DRESS` |
+| Each navy's dress for the men drawn (Actors' `navy-rn-*` and `navy-fr-*` presets) by what a man's dress says he is | `src/app/crewLooks.ts#DRESSES` |
 | Which ships drawn fly the French colours (the flags' uniform) | `src/render/ship/sailMaterial.ts#setFrenchFlags` |
 | The men the captain gives orders to: who they are, where each stands, whom an order goes to, whether his voice reaches them (N4.4) | `src/app/officers.ts#OFFICERS` |
 | How far apart two spots are on one floor (another space: Infinity) | `src/app/officers.ts#floorApart` |
@@ -691,7 +696,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The first match on the page: the lessons said, the man to tap ringed, the fan's orders lit, Skip | `src/app/firstCommand.ts#FirstCommand` |
 | The midshipman: keeps by the captain on her decks, runs with a message and gives it when he arrives | `src/app/midshipman.ts#Midshipman` |
 | The compass bearing looked along from her ("steer there") | `src/app/look.ts#lookBearing` |
-| The officers drawn (six full characters with living faces; N4.3's near pool takes over): where each is on the view, looking at the captain | `src/render/crew/officersView.ts#OfficersView` |
+| The man of the roster each voice is | `src/app/officers.ts#voiceMan` |
+| The officers drawn (the near pool takes them when near): where each is on the view, brought in when addressed | `src/render/crew/crewView.ts#CrewView` |
 | The report log: every line the men said this match, shown or not | `src/app/speech/reportLog.ts#ReportLog` |
 | The reports sheet and its tag and key | `src/app/reportsPanel.ts#ReportsPanel` |
 | The menu: the main screen, the match setup, joining, the waiting room, the captain's pause, the end card; which match the page runs (N7.2) | `src/app/menu.ts#Menu` |

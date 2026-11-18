@@ -32,27 +32,42 @@ export interface QualityKnobs {
   readonly sailGrid: 'fine' | 'coarse';
   /** Her sails cast into the sun's shadow map: their shade on her deck and on each other. */
   readonly sailShadows: boolean;
-  /** The crew's levels of detail and animation rates (plan N4.0, src/app/crewLevels.ts). */
+  /** The crew drawn: the near pool, the crowd's detail by distance, the animation rates (plan N4.3, src/app/crewDrawn.ts). */
   readonly crew: CrewKnobs;
   /** The share of the puffs, splinters and splash drops gunfire throws that are drawn (N5.4a, render/gunfire.ts): fewer and bigger on the lower levels. */
   readonly gunfireShare: number;
 }
 
-/** What a quality level sets for the crew (plan N4.0): how many men get detail, out to where, and how often each animates. */
+/**
+ * What a quality level sets for the crew (plan N4.3, "How 240 men are drawn"): the near pool of full characters, the
+ * crowd figures' detail by distance and every man's animation rate. Arnd's iPad numbers (the `?crew` trial) decide
+ * these values; nothing else in the code does.
+ */
 export interface CrewKnobs {
-  /** At most this many men are drawn above Actors' one-draw crowd level, the nearest seen. */
-  readonly detailed: number;
-  /** Out to here a man in view is drawn in full detail (Actors' "Full", fingers and all), m; 0: never. */
+  /** Full characters near the captain at most (the near pool, each with a living face); the rest are crowd figures. */
+  readonly pool: number;
+  /** Of the pool, how many keep Actors' Full level as well as Medium (a man at Full holds several times the memory). Both are set when the page loads. */
+  readonly poolFull: number;
+  /**
+   * Seconds at least between two men dressed for the pool: dressing one (fitting his clothes to his build) is main-thread
+   * work of several ms, so a crowd coming near is taken in one by one, not all in one frame.
+   */
+  readonly dressEvery: number;
+  /** Out to here from the eye a man of her crew may be drawn as a full character, m; beyond, his crowd figure. */
+  readonly poolTo: number;
+  /** Out to here a full character is drawn at Actors' Full level (fingers and all), m; beyond, Medium. 0: never. */
   readonly fullTo: number;
-  /** Out to here in Actors' "Medium" level (the base mesh, garments at half their triangles), m; beyond, the crowd level. */
-  readonly mediumTo: number;
-  /** Out to each distance a man in view is animated every `steps[i]`-th frame, m; beyond the last, every `steps[last]`-th. */
+  /** Out to each distance a man in view is animated (placed and his clip chosen) every `steps[i]`-th frame, m; beyond the last, every `steps[last]`-th. */
   readonly stepsTo: readonly number[];
   readonly steps: readonly number[];
-  /** Men not seen (out of view, or in a room of hers not drawn) animate every this many frames. */
+  /** Men not seen (out of view, or in a room of hers not drawn) every this many frames. */
   readonly hiddenStep: number;
-  /** Out to here from the eye a man casts the sun's shadow, m. */
+  /** Out to here from the eye men cast the sun's shadow, m: a full character by his own distance, a ship's crowd figures by her nearest man. */
   readonly shadowTo: number;
+  /** Out to here a crowd figure wears his hat and hair, m; beyond, only his body and dress (no hair cards to skin). */
+  readonly dressTo: number;
+  /** Out to here a ship's crowd figures are drawn at all, m (the glass brings them nearer by its magnification). */
+  readonly crowdTo: number;
 }
 
 export interface QualityLevel extends QualityKnobs {
@@ -66,10 +81,10 @@ export interface QualityLevel extends QualityKnobs {
  * rig's rope shadows, her sails' grids and shadows, and how near another ship turns to her far version.
  */
 export const QUALITY_LEVELS: readonly QualityLevel[] = [
-  { name: 'high', renderScale: 1, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, sailGrid: 'fine', sailShadows: true, crew: { detailed: 12, fullTo: 5, mediumTo: 16, stepsTo: [12, 40], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 25 }, gunfireShare: 1 },
-  { name: 'medium', renderScale: 0.8, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, sailGrid: 'fine', sailShadows: true, crew: { detailed: 8, fullTo: 4, mediumTo: 12, stepsTo: [10, 35], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 20 }, gunfireShare: 1 },
-  { name: 'low', renderScale: 0.65, seaCells: 8, fineSeaBands: 2, fineSeaSize: 256, ropeShadows: false, shipFarFrom: 100, wakeLevels: 2, sailGrid: 'coarse', sailShadows: true, crew: { detailed: 6, fullTo: 0, mediumTo: 10, stepsTo: [8, 30], steps: [1, 3, 6], hiddenStep: 12, shadowTo: 15 }, gunfireShare: 0.6 },
-  { name: 'lowest', renderScale: 0.5, seaCells: 8, fineSeaBands: 2, fineSeaSize: 128, ropeShadows: false, shipFarFrom: 80, wakeLevels: 1, sailGrid: 'coarse', sailShadows: false, crew: { detailed: 4, fullTo: 0, mediumTo: 6, stepsTo: [6, 25], steps: [2, 4, 8], hiddenStep: 16, shadowTo: 10 }, gunfireShare: 0.4 },
+  { name: 'high', renderScale: 1, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, sailGrid: 'fine', sailShadows: true, crew: { pool: 12, poolFull: 2, dressEvery: 0.2, poolTo: 8, fullTo: 4, stepsTo: [12, 40], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 40, dressTo: 120, crowdTo: 700 }, gunfireShare: 1 },
+  { name: 'medium', renderScale: 0.8, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, sailGrid: 'fine', sailShadows: true, crew: { pool: 10, poolFull: 1, dressEvery: 0.25, poolTo: 7, fullTo: 3, stepsTo: [10, 35], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 30, dressTo: 100, crowdTo: 600 }, gunfireShare: 1 },
+  { name: 'low', renderScale: 0.65, seaCells: 8, fineSeaBands: 2, fineSeaSize: 256, ropeShadows: false, shipFarFrom: 100, wakeLevels: 2, sailGrid: 'coarse', sailShadows: true, crew: { pool: 8, poolFull: 0, dressEvery: 0.35, poolTo: 6, fullTo: 0, stepsTo: [8, 30], steps: [1, 3, 6], hiddenStep: 12, shadowTo: 20, dressTo: 80, crowdTo: 500 }, gunfireShare: 0.6 },
+  { name: 'lowest', renderScale: 0.5, seaCells: 8, fineSeaBands: 2, fineSeaSize: 128, ropeShadows: false, shipFarFrom: 80, wakeLevels: 1, sailGrid: 'coarse', sailShadows: false, crew: { pool: 6, poolFull: 0, dressEvery: 0.5, poolTo: 5, fullTo: 0, stepsTo: [6, 25], steps: [2, 4, 8], hiddenStep: 16, shadowTo: 12, dressTo: 60, crowdTo: 400 }, gunfireShare: 0.4 },
 ];
 
 /** The frame rate a level must hold. */

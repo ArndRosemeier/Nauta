@@ -21,7 +21,7 @@ import { FigureRig, type LadderClimb, type LimbGoal, type LimbGoals } from '@fut
 import type { BodyPose, FootSide } from '../../app/body';
 import { paceOf, type DeckWalker } from '../../sim/ship/deckWalk';
 import { PACK, captainLook, packCatalog, type Navy } from '../../app/crewLooks';
-import { FULL } from '../../app/crewLevels';
+import { FULL } from '../../app/crewDrawn';
 import { BODY } from '../../sim/rules/ships';
 import { EYE_BELOW_TOP } from '../../sim/rules/walking';
 import { CADENCE, CADENCE_PER_PACE, HIP_SHARE, STANDING_PACE } from '../../sim/rules/body';
