@@ -76,11 +76,9 @@ export const floorApart = (a: Spot, b: Spot): number => (a.space === b.space ? M
 /** Whether a spot is on her decks (or below them), not aloft or out on the bowsprit. */
 export const onDecks = (s: Spot): boolean => !routeNetwork().surfaces.has(s.space);
 
-/** The man an order goes to (orders.md; sim/orders.ts `VOCABULARY`). */
+/** The man an order goes to, and who answers it (orders.md; sim/orders.ts `VOCABULARY`; the first lieutenant for any the vocabulary leaves out). */
 export function takerOf(order: Order): Taker {
-  const word = VOCABULARY.find((w) => w.kind === order.kind);
-  if (!word) throw new Error(`no one takes ${order.kind}`);
-  return word.to;
+  return VOCABULARY.find((w) => w.kind === order.kind)?.to ?? 'first lieutenant';
 }
 
 /**

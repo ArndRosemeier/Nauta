@@ -641,7 +641,6 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The phrase book: what the men say, by line, in English and German, with variants and a French crew's turns of phrase | `src/app/speech/phrases.ts#PHRASES` |
 | A line of the phrase book in words, its terms filled | `src/app/speech/phrases.ts#phraseWords` |
 | The reports table: who says what for an event, a notice or the midshipman sent | `src/app/speech/reports.ts#saysOf` |
-| Who takes an order (for his answer) | `src/app/speech/reports.ts#takerOf` |
 | Which bubbles are on the view and for how long (four at most, cries first, nothing late) | `src/app/speech/bubbles.ts#BubbleQueue` |
 | How long a bubble takes to read | `src/app/speech/bubbles.ts#readSeconds` |
 | The bubbles drawn over the men, or at the screen's edge | `src/app/bubbleLayer.ts#BubbleLayer` |
@@ -652,6 +651,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The men the captain gives orders to: who they are, where each stands, whom an order goes to, whether his voice reaches them (N4.4) | `src/app/officers.ts#OFFICERS` |
 | How far apart two spots are on one floor (another space: Infinity) | `src/app/officers.ts#floorApart` |
 | Where the midshipman gives a message to each man | `src/app/officers.ts#deliverAt` |
+| Who takes an order, and answers it (the speech bubbles ask here too) | `src/app/officers.ts#takerOf` |
 | What the order fan offers each man now: at most six, one more ring, dim and ringed as the match stands | `src/app/fanOrders.ts#fanItems` |
 | What each order key gives | `src/app/fanOrders.ts#KEY_ORDERS` |
 | Which drawn man a finger points at on the view | `src/app/fanOrders.ts#manAt` |

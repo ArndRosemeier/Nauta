@@ -9,7 +9,7 @@
 import { angleDiff } from '@futuremagic/core';
 import { sparParts } from '../../sim/damage/meet';
 import type { LostHow } from '../../sim/end';
-import { VOCABULARY, type Order } from '../../sim/orders';
+import type { Order } from '../../sim/orders';
 import type { Notice } from '../../sim/notices';
 import { POINT } from '../../sim/rules/orders';
 import { LOAD_WATERLINE } from '../../sim/rules/ships';
@@ -17,6 +17,7 @@ import { rigPlan } from '../../sim/ship/rig';
 import type { SimEvent } from '../../sim/step';
 import type { SimState } from '../../sim/state';
 import { bearingTo } from '../../sim/units';
+import { takerOf } from '../officers';
 import type { Line, Term } from './phrases';
 import type { Voice } from './speakers';
 
@@ -62,11 +63,6 @@ const PASSED: Partial<Record<Order['kind'], Line>> = {
   tack: 'pass.tack', wear: 'pass.wear', heave: 'pass.heave', sail: 'pass.sail', shorten: 'pass.shorten', back: 'pass.back',
   fill: 'pass.fill', quarters: 'pass.quarters', stand: 'pass.stand',
 };
-
-/** Who takes an order (the vocabulary's taker: the master, the first lieutenant, the gunner, the carpenter). */
-export function takerOf(order: Order): Voice {
-  return VOCABULARY.find((w) => w.kind === order.kind)?.to ?? 'first lieutenant';
-}
 
 /** The answer to an order taken as given: its own line where the phrase book has one, the plain "Aye aye, sir" else. */
 function ayeLine(order: Order): Line {
