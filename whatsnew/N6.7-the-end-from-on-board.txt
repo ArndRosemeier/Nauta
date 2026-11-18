@@ -1,0 +1,3 @@
+The end of a fight is now seen: a ship that strikes has her colours hauled down, a ship that sinks, burns out or blows up goes down in front of you, and your own sinking brings the sea over your deck and takes you under.
+After it the end card waits until the ending has played out, then offers "Again" and "Back". The guns fall silent when the fight is over.
+To see each end without fighting: ?sail&end=her-struck, ?sail&end=her-sunk, ?sail&end=me-sunk (also her-burnt, her-blew-up, me-struck). On the plain address, ?end=her-sunk then "Fight alone" ends at once and shows the card.

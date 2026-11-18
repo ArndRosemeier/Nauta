@@ -28,7 +28,7 @@ import { midshipmanStart, quarterdeck, type Officer } from './app/officers';
 import { lookBearing } from './app/look';
 import { spotOf } from './sim/ship/deckWalk';
 import type { Spot } from './sim/ship/plan';
-import { sailsSeen } from './app/sailsSeen';
+import { coloursHauled, sailsSeen } from './app/sailsSeen';
 import { PageMatch, pageSeconds, rudderAngle, sparAngles } from './app/pageMatch';
 import { RoomPanel } from './app/roomPanel';
 import { Menu } from './app/menu';
@@ -194,14 +194,14 @@ async function start(): Promise<void> {
   /**
    * Seconds the browser checks have run the match on ahead of the page's clock (`__nautaSail.onward`). Once a check runs
    * it on, the page's clock stands (`pinned`, the page's seconds then): only the check's jumps move the match, so it is
-   * in the same state at each picture on a fast machine and a slow one.
+   * in the same state at each picture on a fast machine and a slow one. `?end=` (N6.7) stands from the start: the end is looked at from its first moment.
    */
-  let ahead = 0, pinned: number | null = null;
+  let ahead = 0, pinned: number | null = params.end && !params.menu ? pageSeconds() : null;
   /** The captain's pause in a match played alone (plan N7.2): the page's clock when it began, and the seconds paused before. */
   let pausedAt: number | null = null, paused = 0;
   /** The match's clock, s: the page's less the pauses, or where the browser checks have run it to. The bubbles keep it too. */
   const matchClock = (): number => (pinned ?? pausedAt ?? pageSeconds()) - paused + ahead;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match)) : null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match), params.end) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   const other = build && match ? new ShipView(build, 1) : null;
@@ -603,6 +603,7 @@ async function start(): Promise<void> {
       // The sails drawn as they stand, the flags in the true wind; after a jump of the browser checks, the sails as
       // drawn catch up with it at once.
       ship.sails.stand(seen?.standing ?? null, seen?.canvas ?? null);
+      ship.sails.colours(match ? coloursHauled(match.state, match.ship) : 0);
       ship.sails.blow(windAt(wind, ship.drawn.x, ship.drawn.z, seaTime));
       if (jump > 0) ship.sails.follow(jump);
       if (walking) {
@@ -625,6 +626,7 @@ async function start(): Promise<void> {
         if (other.group.visible) {
           const hers = sailsSeen(match.state, match.other);
           other.sails.stand(hers?.standing ?? null, hers?.canvas ?? null);
+          other.sails.colours(coloursHauled(match.state, match.other));
           other.sails.blow(windAt(wind, other.drawn.x, other.drawn.z, seaTime));
           for (const [id, angle] of sparAngles(match.state, match.other)) other.setBrace(id, angle);
           other.setRudder(rudderAngle(match.state, match.other));

@@ -4,7 +4,8 @@
  * steps' events as this machine makes them), men out of the fight and spars brought down (read from her damage). Pure.
  */
 import { outOf } from '../sim/damage';
-import { winner, type LostHow } from '../sim/end';
+import { winner, type FightEnd, type LostHow } from '../sim/end';
+import { MOMENT } from '../sim/rules/end';
 import type { SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
 import { STEPS_PER_SECOND } from '../sim/units';
@@ -72,4 +73,13 @@ export function endCard(state: SimState, mine: number, tally: Tally): EndCard | 
     return { ...tally.of(i), men: outOf(d).size, spars: d.fallen.length };
   });
   return { ending, seconds: end.tick / STEPS_PER_SECOND, ships };
+}
+
+/**
+ * How long the match is drawn on after its end before the end card comes, s (plan N6.7): the ending is shown first, the
+ * ship going down, the colours coming down. Of the ships lost, the one whose ending takes longest; nobody lost, they parted.
+ */
+export function quietMoment(end: FightEnd): number {
+  const lost = end.lost.flatMap((how) => (how === null ? [] : [MOMENT[how]]));
+  return lost.length > 0 ? Math.max(...lost) : MOMENT.drawn;
 }

@@ -5,7 +5,7 @@ import { rigPlan } from '../src/sim/ship/rig.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import type { SailStanding } from '../src/sim/ship/sailing.ts';
 import { MOST_FRAMES, swingMatrix, swingsOf } from '../src/render/ship/swings.ts';
-import { ROW_FLOATS, bilerp, clothAt, sailForms, sailPoints, shiftFrame } from '../src/render/ship/sailForm.ts';
+import { ROW, ROW_FLOATS, bilerp, clothAt, sailForms, sailPoints, shiftFrame } from '../src/render/ship/sailForm.ts';
 import { FLAGS, SAIL_ATLAS_SIZE, SAIL_DETAIL, buildSailGrids, sailAtlas } from '../src/render/ship/sailGrid.ts';
 import { SailsView } from '../src/render/ship/sailsView.ts';
 import { HANGING } from '../src/sim/rules/rig.ts';
@@ -131,6 +131,25 @@ test('a sail point\'s frame carries its line to where the sail draws that point,
     assert.ok(p.rest.clone().applyMatrix4(frames.get(p.frame)!).distanceTo(drawn) < 1e-6);
   }
   assert.ok(shiftFrame(new Vector3(1, 2, 3), new Vector3(4, 4, 4)).elements[12] === 3);
+});
+
+test('struck colours (N6.7): the ensign runs down its halliard to a hand over the deck and is gathered in; the pennant stays', () => {
+  const v = viewWith(true);
+  v.blow({ x: 1, z: 0, speed: 5 });
+  const ensign = () => rowOf(v, FORMS.length), top = () => clothAt(ensign(), 0, 0, T), pennant = () => clothAt(rowOf(v, FORMS.length + 1), 0, 0, T);
+  write(v);
+  const flying = top().y, pennantY = pennant().y, spread = ensign()[ROW.fly]!;
+  assert.ok(flying > 8, 'the ensign flies at the gaff peak');
+  const heights: number[] = [];
+  for (const h of [0.25, 0.5, 0.75]) { v.colours(h); write(v); heights.push(top().y); }
+  assert.ok(heights.every((y, i) => y < (i === 0 ? flying : heights[i - 1]!)), `each step lower: ${heights.join(', ')}`);
+  assert.ok(Math.abs(ensign()[ROW.fly]! - spread) < 1e-9, 'whole until it is gathered');
+  v.colours(1); write(v);
+  assert.ok(top().y < flying / 2, 'down to her deck');
+  assert.ok(ensign()[ROW.fly]! < spread / 100, 'gathered in the hands that hauled it');
+  assert.equal(pennant().y, pennantY, 'the pennant stays');
+  v.colours(0); write(v);
+  assert.ok(Math.abs(top().y - flying) < 1e-9, 'flying again for the next match');
 });
 
 test('the grids: every sail and flag at every detail, positions finite, each sail in its own place of the hole map', () => {

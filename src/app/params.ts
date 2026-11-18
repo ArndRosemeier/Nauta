@@ -1,9 +1,10 @@
 /**
  * What the page's address asks for (`?hud&hour=17`, `?eye=30&wind=6`, `?sea=gale`, `?yaw=70&pitch=-10`,
- * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`, `?glass=12`; two players:
+ * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`, `?glass=12`, `?end=her-struck`; two players:
  * `?room`, `?join=K7Q2ZP`, `?key=`, `?hub=`, `?seed=`, `?netcheck`). Pure: it takes the query string.
  */
 import { SKILLS, type Skill } from '../sim/rules/captain';
+import type { EndedAtStart } from '../sim/start';
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
@@ -126,6 +127,18 @@ export interface Params {
   readonly scars: number | null;
   /** The other ship going down from the start, a stand-in (`?sail&down`; app/scars.ts `goingDown`), to look at a ship sinking and what floats after (plan N6.5). */
   readonly down: boolean;
+  /** A match begun with a ship lost (`?end=me-sunk`, `her-struck`, `her-burnt`, `her-blew-up`; plan N6.7), to look at the end of a fight from on board; null: no. */
+  readonly end: EndedAtStart | null;
+}
+
+/** The ships `?end=` names, by their place in a match played alone: mine is the first. */
+const END_SHIPS = ['me', 'her'] as const;
+const END_HOWS: readonly EndedAtStart['how'][] = ['struck', 'sunk', 'burnt', 'blew up'];
+
+/** `her-struck`, `me-blew-up`: a ship and how she is lost; null when it is neither. */
+function readEnd(v: string | null): EndedAtStart | null {
+  const [who, ...how] = (v ?? '').split('-'), ship = END_SHIPS.findIndex((s) => s === who), kind = END_HOWS.find((h) => h === how.join(' '));
+  return ship >= 0 && kind ? { ship, how: kind } : null;
 }
 
 export function readParams(query: string): Params {
@@ -155,6 +168,7 @@ export function readParams(query: string): Params {
     halfSmoke: q.get('smoke') === 'half',
     scars: q.has('scars') ? Math.round(num('scars', 1, 0, SEED_MOST)) : null,
     down: q.has('down'),
+    end: readEnd(q.get('end')),
     menu: !TOOL_SWITCHES.some((name) => q.has(name)),
   };
 }

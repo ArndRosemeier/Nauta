@@ -155,3 +155,10 @@ test('fired as they bear, the guns fire on the roll, each once laid, and keep to
   assert.ok(Math.max(...perStep.values()) <= RIPPLE, 'never more than a ripple in a step');
   assert.ok(Math.abs(LOADED.ships[0]!.motion.pose.roll) < 10 * DEGREE);
 });
+
+test('after the fight is over no gun fires, whatever she was told (N6.7)', () => {
+  const told = run(LOADED, 0.1, [EACH.quarters, EACH.bear]).state;
+  assert.ok(firedIn(run(told, 8).events).length > 0, 'while it goes on she fires');
+  const over: SimState = { ...told, fight: { ...told.fight, end: { tick: told.tick, lost: [null, 'struck'], apart: false } } };
+  assert.equal(firedIn(run(over, 8).events).length, 0, 'once it is over she stands down');
+});

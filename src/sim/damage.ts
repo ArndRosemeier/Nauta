@@ -143,6 +143,20 @@ export function startDamage(): Damage {
   };
 }
 
+/** How a ship stands lost when a match begins so (`?end=`, N6.7): her water at what founders her; fire in three spaces below; her magazine gone up. */
+export type LostAtStart = 'sunk' | 'burnt' | 'blew up';
+
+/** The spaces a ship lost by fire begins with alight, and how far (over `BURNT.size`, rules/end.ts). */
+const ALIGHT = { spaces: ['messdeck', 'cockpit', 'hold'], size: 0.6 } as const;
+
+/** A ship lost already (`how`): the stand-in start that lets her end be looked at without fighting a match first (N6.7). */
+export function lostAtStart(d: Damage, how: LostAtStart): Damage {
+  if (how === 'sunk') return { ...d, flooded: [founderTonnes() / 2, founderTonnes() / 2] };
+  if (how === 'blew up') return { ...d, blownUp: true };
+  const spaces = shipPlan().spaces;
+  return { ...d, fires: ALIGHT.spaces.map((id) => ({ space: spaces.findIndex((s) => s.id === id), size: ALIGHT.size })).sort((p, q) => p.space - q.space) };
+}
+
 // ---- Reading what has been done ----
 
 /** The shots and guns a hole can be from, in the order a hole's mark keeps them. */
@@ -514,6 +528,8 @@ export interface AftermathIn {
   readonly wind: Wind;
   /** The repairs her crew finished this step (crew.ts), mended first. */
   readonly mended?: readonly Mended[];
+  /** She is lost blown up or burnt out (end.ts; N6.7): her bottom gone, the sea pours in as it does over a foundered ship. */
+  readonly breaking?: boolean;
 }
 /** Her damage one step on, what followed, and what it does to her sailing (sailing.ts) and her floating (motion.ts: the water's weight). */
 export interface AftermathOut {
@@ -621,7 +637,7 @@ export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly 
 
   // The sea coming in, and the pumps.
   const holes = leaks(d.holes), [larboard, starboard] = d.flooded;
-  if (holes.length > 0 || larboard + starboard > 0) {
+  if (holes.length > 0 || larboard + starboard > 0 || input.breaking) {
     const roll = input.pose.roll, level = lyingOf(larboard + starboard).level, plugged = d.plugged;
     let inL = 0, inS = 0;
     for (const h of holes) {
@@ -632,8 +648,8 @@ export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly 
       const q = Math.max(under, SEEP * inflow(h.shot, h.gun, AT_WATERLINE)) * (plugged.length > 0 && plugged.includes(h.code) ? WEEP : 1);
       if (h.at[1] < 0) inL += q; else inS += q;
     }
-    // Foundered, the sea pours in over her side.
-    if (larboard + starboard >= founderTonnes()) { const pour = founderTonnes() / AWASH_SECONDS / 2; inL += pour; inS += pour; }
+    // Foundered, or lost blown up or burnt out, the sea pours in over her side.
+    if (larboard + starboard >= founderTonnes() || input.breaking) { const pour = founderTonnes() / AWASH_SECONDS / 2; inL += pour; inS += pour; }
     const flooded = flowed(larboard, starboard, inL, inS, pumped(pumpHands(input.crew, d, roster), larboard + starboard), roll);
     if (flooded[0] !== larboard || flooded[1] !== starboard) next = { ...next, flooded };
   }

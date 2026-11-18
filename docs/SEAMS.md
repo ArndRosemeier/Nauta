@@ -601,6 +601,11 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The winner of an ended fight, or none | `src/sim/end.ts#winner` |
 | A fight at its start, its time as the match setting says | `src/sim/end.ts#startFight` |
 | How a fight ends: beaten, burnt out, the match's time and the master's warning, striking asked twice (first proposals) | `src/sim/rules/end.ts#BEATEN` |
+| Whether a ship was lost blown up or burnt out, so she breaks up and goes down like a foundered one (N6.7) | `src/sim/end.ts#bottomGone` |
+| How long the ending plays out before the end card, by how it ended; the colours' hauling (N6.7, first proposals) | `src/sim/rules/end.ts#MOMENT` |
+| The quiet moment before the end card, from the fight's end | `src/app/tally.ts#quietMoment` |
+| How far a struck ship's colours are hauled down (0 flying to 1 in hand) | `src/app/sailsSeen.ts#coloursHauled` |
+| A match that begins with a ship lost (`?end=`), the stand-in to look at the end of a fight | `src/sim/start.ts#endedStart` |
 | The pair of guns a gun is of (one crew a pair) | `src/sim/crew/roster.ts#pairOf` |
 | What the crew does for her life (N6.3): the repairs wanted now from her damage, her orders and where her men are, in the order they are manned | `src/sim/crew/repairs.ts#repairsDue` |
 | How many of a repair's men are at its spot (a fire party at its fire, the pump hands) | `src/sim/crew/crew.ts#atWork` |

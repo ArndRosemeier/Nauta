@@ -61,6 +61,8 @@ export interface GunneryDeck {
   /** The enemy's pose, or null when there is none to fire at. */
   readonly enemy: ShipPose | null;
   readonly sea: SeaState | null;
+  /** The fight is over (end.ts; N6.7): no gun fires after the end, whatever she was told. */
+  readonly over?: boolean;
 }
 
 /** A step of the guns: the battery after it, the guns fired (the step's events), and whether the captain's word is spent. */
@@ -152,7 +154,7 @@ export function stepGunnery(d: GunneryDeck): Gunnery {
   const fired: GunFired[] = [];
   const word = told.firing === 'hold' && told.word;
   let left = 0;
-  if (told.quarters && (told.firing === 'bear' || word)) {
+  if (told.quarters && !d.over && (told.firing === 'bear' || word)) {
     for (let i = 0; i < places.length; i++) {
       const lay = lays[i], g = gunAt(guns, i), place = places[i]!;
       if (!lay || g.drill !== 'ready' || cannotFire(g, men[i]!)) continue;

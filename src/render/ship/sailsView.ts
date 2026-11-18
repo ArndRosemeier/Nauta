@@ -10,10 +10,12 @@
  * up on its yard; a headsail is hauled down its stay, the boom sail brailed in to the mast; a reef is rolled up at the head.
  */
 import { Matrix4, Quaternion, Vector3 } from 'three/webgpu';
-import { Rng } from '@futuremagic/core';
+import { Rng, smoothstep } from '@futuremagic/core';
 import type { SailStanding } from '../../sim/ship/sailing';
 import { sailShare, type SailSetting } from '../../sim/ship/sails';
 import { HANGING } from '../../sim/rules/rig';
+import { HULL_AFT, HULL_FORE, weatherDeck } from '../../sim/ship/hull';
+import { shipY } from '../../sim/ship/section';
 import { sparOf, type RigPlan } from '../../sim/ship/rig';
 import { FLAG, FORE_AFT, ROW, ROW_FLOATS, SQUARE, clothAt, sailForms, sailPoints, shiftFrame, type SailForm, type SailPoint } from './sailForm';
 import { FLAGS } from './sailGrid';
@@ -50,6 +52,12 @@ const STREAM = { from: 0.5, full: 7 } as const;
 const FLAG_WAVE = 0.035;
 /** In a calm a flag still droops a little away from its halliard (its stream never below this), never lying flat on it. */
 const LIMP_LEAN = 0.25;
+/** The ensign's halliard ends this high over the deck, m: a hand's reach. */
+const ENSIGN_HAND = 1.8;
+/** The share of the hauling at which the ensign starts to be gathered in (and is gone at the end of it). */
+const ENSIGN_GATHERED = 0.8;
+/** A gathered ensign is a speck, never nothing (the cloth's grid stays a grid). */
+const ENSIGN_LEAST = 0.002;
 const FLAG_WAVES: Readonly<Record<string, number>> = { ensign: 1.6, pennant: 3 };
 const FLAG_RATE = { base: 0.8, perWind: 0.12 } as const;
 /** Seed of each sail's and flag's phase. */
@@ -113,6 +121,10 @@ export class SailsView {
   private started = false;
   private readonly gaffEnd: Vector3;
   private readonly truck: Vector3;
+  /** How far the ensign has been hauled down, 0 flying to 1 in hand (`colours`). */
+  private hauled = 0;
+  /** How far the ensign's halliard runs, m: from the gaff's peak down to a hand's reach over the deck below it. */
+  private readonly halliard: number;
   private readonly corner = [new Vector3(), new Vector3(), new Vector3(), new Vector3()];
   private readonly scratch = new Vector3();
   private readonly shift = new Matrix4();
@@ -126,6 +138,13 @@ export class SailsView {
     this.phases = [...this.forms, ...FLAGS].map(() => rng.float() * TURN);
     this.gaffEnd = shipPoint(sparOf(rig, 'gaff').head);
     this.truck = shipPoint(sparOf(rig, 'main-topgallant-mast').head);
+    const along = Math.min(HULL_FORE, Math.max(HULL_AFT, -this.gaffEnd.z));
+    this.halliard = Math.max(0, this.gaffEnd.y - (shipY(weatherDeck(along, 0)) + ENSIGN_HAND));
+  }
+
+  /** How far her colours are hauled down (sim `coloursHauled`): the ensign runs down its halliard and is gathered in at the end. */
+  colours(hauled: number): void {
+    this.hauled = Math.min(1, Math.max(0, hauled));
   }
 
   /** How her sails stand (the simulation's `sailsStanding` and her canvas, in the rig plan's order), or null: all furled. */
@@ -294,13 +313,16 @@ export class SailsView {
     FLAGS.forEach((flag, i) => {
       const index = this.forms.length + i, r = this.rows.subarray(index * ROW_FLOATS, (index + 1) * ROW_FLOATS), R = ROW;
       const top = flag.id === 'ensign' ? this.gaffEnd.clone().applyMatrix4(swing('gaff') ?? new Matrix4()) : this.truck.clone();
-      const foot = top.clone().addScaledVector(down, flag.hoist);
+      // Hauled down: the ensign runs down its halliard, and in the last of it is gathered in the hands that haul.
+      const hauling = flag.id === 'ensign' ? this.hauled : 0, kept = Math.max(ENSIGN_LEAST, 1 - smoothstep(ENSIGN_GATHERED, 1, hauling));
+      top.y -= hauling * this.halliard;
+      const foot = top.clone().addScaledVector(down, flag.hoist * kept);
       r.fill(0);
       r.set([top.x, top.y, top.z], R.p00);
       r.set([foot.x, foot.y, foot.z], R.p01);
       r[R.kind] = FLAG;
-      r[R.fly] = flag.fly;
-      r[R.wave] = FLAG_WAVE * flag.fly * (1 + k) / 2;
+      r[R.fly] = flag.fly * kept;
+      r[R.wave] = FLAG_WAVE * flag.fly * kept * (1 + k) / 2;
       r[R.phase] = this.phases[index]!;
       r.set([fly.x, fly.y, fly.z], R.belly);
       r[R.taper] = flag.taper;

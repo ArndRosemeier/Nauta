@@ -11,7 +11,7 @@ import { DuelSession, type DuelHub } from '../net/duel';
 import { MOST_PLAYERS, roomTerms, type RoomTerms } from '../net/wire';
 import { SKILLS, type Offered } from '../sim/rules/captain';
 import { MEETINGS, WIND_CHOICE_NAMES, type Meeting, type WindChoice } from '../sim/start';
-import { HOURS_PER_DAY, MINUTES_PER_HOUR, SECONDS_PER_MINUTE } from '../sim/units';
+import { HOURS_PER_DAY, MINUTES_PER_HOUR, MS_PER_SECOND, SECONDS_PER_MINUTE } from '../sim/units';
 import { beginOnTap, handOver, titleTheme } from '../title/title';
 import { make } from './dom';
 import { makeButton } from './button';
@@ -23,7 +23,7 @@ import { openSheet, rose, type Sheet } from './sheet';
 import type { SettingsMenu } from './settingsPanel';
 import { choiceRow, row } from './settingsPanel';
 import type { SettingsStore } from './settingsStore';
-import { endCard, Tally, type Ending } from './tally';
+import { endCard, quietMoment, Tally, type Ending } from './tally';
 import type { LostHow } from '../sim/end';
 import { FIRST_HOUR, FIRST_MATCH } from './lessons';
 import {
@@ -45,8 +45,6 @@ const QUIET_SEED = 1805;
 const QUIET_HOUR = 8;
 /** The quiet sea runs on as long as the menu is open: a day's minutes, never reached. */
 const QUIET_MINUTES = HOURS_PER_DAY * MINUTES_PER_HOUR;
-/** After the fight ends, the quiet moment on deck before the end card, ms (menu.md: after N6.7's moment). */
-const END_QUIET_MS = 8000;
 /** Leaving a duel of two: the strike sent, then the room left this long after, ms (the orders on their way first). */
 const STRIKE_LEAVE_MS = 1000;
 /** Digits of seconds on the end card's clock. */
@@ -286,7 +284,7 @@ export class Menu {
   private sail(kind: 'alone' | 'walk', fresh = false): void {
     const t = this.terms, seed = (fresh ? null : t.seed) ?? newSeed(Date.now(), this.seeds++);
     const s = kind === 'alone'
-      ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), foe: t.foe, minutes: matchMinutes(t) })
+      ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), foe: t.foe, minutes: matchMinutes(t), ...(this.h.params.end ? { ended: this.h.params.end } : {}) })
       : new DuelSession({ build: this.h.build, now: this.h.now, seed, alone: true, terms: startTerms(t), minutes: QUIET_MINUTES });
     this.run(s, kind === 'alone' ? { kind, terms: t, seed } : { kind });
     this.h.sky(hourOf(t.hour, seed), MATCH_DAY_MINUTES);
@@ -457,13 +455,14 @@ export class Menu {
     this.main();
   }
 
-  /** The fight is over: after the quiet moment on deck, the end card. */
+  /** The fight is over: after the quiet moment on deck, in which the ending is seen (N6.7, `quietMoment`), the end card. */
   private fightOver(): void {
     const p = this.playing;
     // A room's match before both captains were ready (round 0) is not theirs to end.
     if (p.kind === 'quiet' || p.kind === 'walk' || (p.kind === 'duel' && p.session.round === 0)) return;
     clearTimeout(this.endTimer);
-    this.endTimer = window.setTimeout(() => this.endScreen(), END_QUIET_MS);
+    const end = this.h.match.state.fight.end;
+    this.endTimer = window.setTimeout(() => this.endScreen(), (end ? quietMoment(end) : 0) * MS_PER_SECOND);
   }
 
   /** The end card: how it ended, how long it lasted, a few numbers for each ship; again, or back. */

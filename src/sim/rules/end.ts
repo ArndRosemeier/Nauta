@@ -2,6 +2,7 @@
  * How a fight ends (implementation plan N6.4, design decisions for N6, confirmed 2026-11-18; first proposals, balanced
  * in N7.5). Read by src/sim/end.ts. Pure.
  */
+import { AWASH_SECONDS } from './damage';
 
 /**
  * Beaten: a computer captain strikes, a player's first lieutenant says "We must strike, sir", when any one holds: at
@@ -35,3 +36,20 @@ export const PARTING = { losing: 3000, gone: 4000, seconds: 60, share: 2 / 3 } a
 
 /** Striking is asked twice: the first lieutenant answers "Strike, sir?", and the order given again within this many seconds strikes her. */
 export const ASK_AGAIN = 10;
+
+/** Seconds from the end of a ship foundered until the sea has her: her deck awash at about 85 s, her eye under at about 90 s, her gone down at about 100 s (checked by test/end.test.ts). */
+const SINKING = 105;
+
+/**
+ * The end played out (plan N6.7, design decisions for N6: "a quiet moment, then the way back"): after the fight's end the
+ * match goes on drawn for this many seconds before the end card, by how it ended, so the ship is seen going down or
+ * her colours coming down. One blown up or burnt out takes the sea in from the end and founders `AWASH_SECONDS` later,
+ * so goes down that much later than one that foundered; the colours take `COLOURS.after + COLOURS.down` s, and a quiet few
+ * seconds follow. First proposals (N7.5).
+ */
+export const MOMENT = {
+  struck: 16, sunk: SINKING, burnt: SINKING + AWASH_SECONDS, 'blew up': SINKING + AWASH_SECONDS, 'broke off': 8, drawn: 6,
+} as const;
+
+/** A struck ship's colours (N6.7): the first lieutenant has them hauled down `after` s after she strikes, taking `down` s to come to the deck. */
+export const COLOURS = { after: 2, down: 8 } as const;

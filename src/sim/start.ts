@@ -5,10 +5,12 @@
  * seed gives the same start on every machine.
  */
 import { deriveSeed, Rng } from '@futuremagic/core';
+import { lostAtStart, type LostAtStart } from './damage';
+import { struckAtStart } from './orders';
 import { START_CANVAS } from './rules/sailing';
 import { START_CLOSING, START_MINUTES, START_WAY, WEATHER_TURN_DEGREES, WIND_CHOICES } from './rules/start';
 import { DUEL_FORCES } from './rules/wind';
-import type { MatchSetup } from './state';
+import type { MatchSetup, SimState } from './state';
 import { bearingDir, DEGREE, KNOT, SECONDS_PER_MINUTE, wrapBearing } from './units';
 
 /** A quarter turn, rad: the wind stands square to the line between the ships. */
@@ -60,4 +62,23 @@ export function duelStart(seed: number, terms: StartTerms = {}): MatchSetup {
 export function aloneStart(seed: number, terms: StartTerms = {}): MatchSetup {
   const duel = duelStart(seed, { wind: terms.wind ?? 'drawn' });
   return { ...duel, ships: [{ ...duel.ships[0]!, x: 0, z: 0 }] };
+}
+
+/** A ship lost as a match begins: she has struck, or is sunk, burnt out or blown up already. */
+export interface EndedAtStart {
+  /** Her place in the match. */
+  readonly ship: number;
+  readonly how: 'struck' | LostAtStart;
+}
+
+/**
+ * The match with one ship lost from its first step (`?end=`, plan N6.7): the stand-in that lets the end of a fight be
+ * looked at, from on board, without fighting one first. The fight's end is then judged by the rules in the first step,
+ * and everything after it (the colours, the going down, the end card) is the match's own.
+ */
+export function endedStart(state: SimState, ended: EndedAtStart): SimState {
+  return {
+    ...state,
+    ships: state.ships.map((s, i) => (i !== ended.ship ? s : ended.how === 'struck' ? { ...s, told: struckAtStart(s.told) } : { ...s, damage: lostAtStart(s.damage, ended.how) })),
+  };
 }

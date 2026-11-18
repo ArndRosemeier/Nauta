@@ -178,6 +178,12 @@ export function stepFight(f: Fight, before: readonly SimShip[], after: readonly 
   return { fight: changed ? { ...f, beaten: now, beatenAt, opened: parted.opened, goneSince: parted.goneSince, end } : f, events };
 }
 
+/** Whether ship `ship` was lost blown up or burnt out, in a fight that is over: she breaks up and goes down like a foundered ship (N6.7). */
+export function bottomGone(f: Fight, ship: number): boolean {
+  const how = f.end?.lost[ship];
+  return how === 'blew up' || how === 'burnt';
+}
+
 /** The winner of an ended fight (the one ship not lost), or null: drawn, or not over. */
 export function winner(f: Fight): number | null {
   if (!f.end) return null;

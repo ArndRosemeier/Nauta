@@ -34,7 +34,7 @@ import type { Order } from '../sim/orders';
 import type { Skill } from '../sim/rules/captain';
 import { poseBetween, type ShipPose } from '../sim/ship/motion';
 import type { LoggedOrders } from '../sim/replay';
-import { aloneStart, duelStart, type StartTerms } from '../sim/start';
+import { aloneStart, duelStart, endedStart, type EndedAtStart, type StartTerms } from '../sim/start';
 import { hashState, startMatch, type MatchSetup, type SimState } from '../sim/state';
 import { step, type SimEvent } from '../sim/step';
 import { STEPS_PER_SECOND } from '../sim/units';
@@ -100,6 +100,8 @@ export interface DuelOptions {
    * and he commands her (the first match, plan N7.4: she waits while the first lieutenant teaches sailing).
    */
   readonly foeWaits?: boolean;
+  /** A match played alone that begins with a ship already lost (`?end=`, the stand-in to look at the end of a fight, plan N6.7). */
+  readonly ended?: EndedAtStart;
 }
 
 /** Where the computer captain of a match played alone stands: to heave to (and wait), waiting hove to, to fill, or commanding. */
@@ -186,7 +188,8 @@ export class DuelSession {
       const seed = options.seed ?? SOLO_SEED;
       const start = options.setup ?? this.timed(options.alone ? aloneStart(seed, this.terms) : duelStart(seed, this.terms));
       const crewed = this.foe ? crewedBy(start, FOE_SHIP, this.foe) : start;
-      this.begin(startMatch(options.windForce === undefined ? crewed : { ...crewed, windForce: options.windForce }), [SOLO_PLAYER, null]);
+      const begun = startMatch(options.windForce === undefined ? crewed : { ...crewed, windForce: options.windForce });
+      this.begin(options.ended ? endedStart(begun, options.ended) : begun, [SOLO_PLAYER, null]);
       return;
     }
     this.role = 'joining';

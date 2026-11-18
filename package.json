@@ -41,6 +41,7 @@
     "shot:fan": "node tools/shot/fan.mjs",
     "shot:menu": "node tools/shot/menu.mjs",
     "shot:damage": "node tools/shot/damage.mjs",
+    "shot:end": "node tools/shot/end.mjs",
     "shot:crew": "node tools/shot/crew.mjs",
     "check:offline": "node --import tsx tools/offline/check.mjs",
     "check:transfer": "node --import tsx tools/offline/transfer.mjs"

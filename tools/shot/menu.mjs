@@ -11,8 +11,8 @@ import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { TIMEOUT, frames, openBrowser, snap } from './browser.mjs';
 
-/** The quiet moment on deck before the end card, ms (src/app/menu.ts END_QUIET_MS), and a little more. */
-const END_WAIT_MS = 9500;
+/** The quiet moment on deck before the end card of a ship that struck, ms (src/sim/rules/end.ts MOMENT.struck: 16 s, the colours hauled down in it), and a little more. */
+const END_WAIT_MS = 17500;
 /** Into the first match: the welcome's bubbles up, s; then on to the first lesson (src/app/lessons.ts WELCOME_SECONDS). */
 const FIRST_WELCOME_SECONDS = 3;
 const FIRST_LOOK_SECONDS = 11;

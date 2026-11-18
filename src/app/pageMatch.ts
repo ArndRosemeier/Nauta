@@ -13,6 +13,7 @@ import type { SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
 import { MS_PER_SECOND } from '../sim/units';
 import type { Skill } from '../sim/rules/captain';
+import type { EndedAtStart } from '../sim/start';
 import { DuelSession, type Drawn } from '../net/duel';
 import { navyOf, type Navy } from './crewLooks';
 import type { OrderSession } from './orderReport';
@@ -34,12 +35,12 @@ export class PageMatch implements OrderSession {
 
   /**
    * `windForce`: the address's wind (`?wind=`), over the start's own; null: the start's. `foe`: the other ship's computer
-   * captain (`?foe=`), or null. `minutes`: the player's match length (the settings), or null for the rules' own.
+   * captain (`?foe=`), or null. `minutes`: the player's match length (the settings), or null for the rules' own. `ended`: a ship lost from the first step (`?end=`, N6.7), or null.
    */
-  constructor(build: string, seed: number | null, now = pageSeconds, windForce: number | null = null, foe: Skill | null = null, minutes: number | null = null) {
+  constructor(build: string, seed: number | null, now = pageSeconds, windForce: number | null = null, foe: Skill | null = null, minutes: number | null = null, ended: EndedAtStart | null = null) {
     // The guns' laying tables built now, while the page loads, so no step of the match pays for them.
     warmGunnery();
-    this.current = this.attach(new DuelSession({ build, now, seed: seed ?? undefined, windForce: windForce ?? undefined, foe: foe ?? undefined, minutes: minutes ?? undefined }));
+    this.current = this.attach(new DuelSession({ build, now, seed: seed ?? undefined, windForce: windForce ?? undefined, foe: foe ?? undefined, minutes: minutes ?? undefined, ended: ended ?? undefined }));
     this.drawnNow = this.current.drawn();
     setInterval(() => this.current.pump(), PUMP_MS);
   }

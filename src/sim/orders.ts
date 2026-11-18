@@ -679,6 +679,11 @@ function life(told: ShipOrders, order: LifeOrder, tick: number): OrderAnswer {
   return { refused: false, told: { ...told, [order.kind]: tick }, ...NOTHING_SAID };
 }
 
+/** A ship that has struck already (`?end=`, N6.7): the stand-in start that lets her striking be looked at without fighting a match first. */
+export function struckAtStart(told: ShipOrders): ShipOrders {
+  return { ...told, struck: true };
+}
+
 /** What she is told once the captain's word has been carried out: every gun that could fire on it has fired (guns/gunnery.ts). */
 export function wordSpent(told: ShipOrders): ShipOrders {
   return told.word ? { ...told, word: false } : told;

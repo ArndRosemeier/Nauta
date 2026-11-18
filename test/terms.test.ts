@@ -5,7 +5,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_TERMS, HOUR_AT, hourOf, matchMinutes, newSeed, NO_LIMIT, readSeed, readTerms } from '../src/app/terms.ts';
-import { endCard, Tally } from '../src/app/tally.ts';
+import { endCard, quietMoment, Tally } from '../src/app/tally.ts';
+import type { LostHow } from '../src/sim/end.ts';
+import { MOMENT } from '../src/sim/rules/end.ts';
 import { duelStart } from '../src/sim/start.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import type { SimEvent } from '../src/sim/step.ts';
@@ -56,4 +58,15 @@ test('the end card: guns fired and balls that struck counted once each, how it e
   assert.deepEqual(card.ships.map((s) => s.fired), [1, 2], 'mine first');
   tally.reset();
   assert.deepEqual(tally.of(0), { fired: 0, struck: 0 });
+});
+
+test('the quiet moment before the end card is the ending played out: the longest of the ships lost, or the parting', () => {
+  const at = (lost: readonly (LostHow | null)[], apart = false) => quietMoment({ tick: 0, lost, apart });
+  assert.equal(at([null, 'struck']), MOMENT.struck);
+  assert.equal(at(['sunk', null]), MOMENT.sunk);
+  assert.equal(at(['sunk', 'burnt']), MOMENT.burnt, 'both lost: the slower ending');
+  assert.equal(at([null, null]), MOMENT.drawn);
+  assert.equal(at([null, null], true), MOMENT.drawn);
+  assert.equal(at(['broke off', null], true), MOMENT['broke off']);
+  assert.ok(at([null, 'blew up']) > at([null, 'sunk']) && at([null, 'sunk']) > at([null, 'struck']));
 });

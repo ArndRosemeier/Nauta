@@ -7,7 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { angleDiff } from '@futuremagic/core';
-import { aloneStart, duelStart, startApart } from '../src/sim/start.ts';
+import { aloneStart, duelStart, endedStart, startApart } from '../src/sim/start.ts';
+import { step } from '../src/sim/step.ts';
 import { startMatch } from '../src/sim/state.ts';
 import { meanWind } from '../src/sim/wind.ts';
 import { DUEL_FORCES } from '../src/sim/rules/wind.ts';
@@ -81,4 +82,13 @@ test('one ship alone: the first ship of the same duel, at the middle, with the c
   assert.equal(alone.windForce, duel.windForce);
   assert.equal(alone.ships[0]!.heading, duel.ships[0]!.heading);
   assert.equal(startMatch(alone).ships.length, 1);
+});
+
+test('a ship lost from the start (?end=, plan N6.7) ends the fight in the first step as the rules judge it', () => {
+  const begun = startMatch(duelStart(7));
+  for (const [how, ship] of [['struck', 1], ['sunk', 0], ['burnt', 1], ['blew up', 0]] as const) {
+    const r = step(endedStart(begun, { ship, how }));
+    assert.deepEqual(r.state.fight.end?.lost, ship === 0 ? [how, null] : [null, how], how);
+  }
+  assert.equal(step(begun).state.fight.end, null, 'the others are untouched');
 });
