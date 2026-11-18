@@ -587,6 +587,11 @@ export const STATIONS: readonly StationRow[] = [
   { id: 'marines-s', name: 'the waist, starboard rail', who: 'the marines at quarters', orders: [], space: 'deck', along: 3.0, across: 2.5 },
   { id: 'marines-p', name: 'the waist, larboard rail', who: 'the marines at quarters', orders: [], space: 'deck', along: 3.0, across: -2.5 },
   // Where the hands off watch are until she beats to quarters: asleep below, the floor under each hammock (rules/bunks.ts).
+  // Where the officers of the watch walk to and fro (rules/crew.ts `paces`): two lanes of the quarterdeck, one each side of the capstan and the skylight, where the deck is clear for a man.
+  { id: 'pace-s-aft', name: 'the quarterdeck, starboard walk', who: 'the first lieutenant', orders: [], space: 'deck', along: -5.75, across: 1.0 },
+  { id: 'pace-s-fore', name: 'the quarterdeck, starboard walk', who: 'the first lieutenant', orders: [], space: 'deck', along: -1.75, across: 1.0 },
+  { id: 'pace-p-aft', name: 'the quarterdeck, larboard walk', who: 'the boatswain', orders: [], space: 'deck', along: -5.75, across: -1.0 },
+  { id: 'pace-p-fore', name: 'the quarterdeck, larboard walk', who: 'the boatswain', orders: [], space: 'deck', along: -1.75, across: -1.0 },
   ...BUNK_STATIONS,
 ];
 /**

@@ -12,7 +12,7 @@
  * order) frees its men at once. A man with no task goes back to his post at a walk. Plain data; every step decides
  * from the state alone, in the roster's order, so every machine steps the same crew.
  */
-import { CLIMB_METRES, FEWEST, PASSED, REPAIRS, SENT_PER_STEP, SURGEON, type RepairName } from '../rules/crew';
+import { CLIMB_METRES, FEWEST, PACE_SECONDS, PACE_STAGGER, PASSED, REPAIRS, SENT_PER_STEP, SURGEON, type RepairName } from '../rules/crew';
 import { VOCABULARY, type ShipOrders } from '../orders';
 import { bareSpot, type Spot } from '../ship/plan';
 import { sailShare, type SailSetting } from '../ship/sails';
@@ -157,8 +157,9 @@ function target(i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Ta
  * (roster.ts `quartersPlace`), at his post when she fights both sides (his pair split), and where he stands or is
  * going while neither side bears, if that is at one of his pair's guns.
  */
-function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged | undefined): string {
-  const post = roster[i]!.post, marine = roster[i]!.quarters;
+function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged | undefined, tick: number): string {
+  const post = roster[i]!.post, marine = roster[i]!.quarters, paces = roster[i]!.paces;
+  if (quarters === undefined && paces) return pacePlace(paces, i, tick);
   // A man at no gun with a place at quarters (the marines): there, on the side she fights; while neither or both
   // sides bear, the men take the sides in turn.
   if (quarters !== undefined && marine !== null) return atQuartersOf(marine, typeof quarters === 'number' ? quarters : SIDES[i % SIDES.length]!);
@@ -169,6 +170,10 @@ function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged
   if (!at) return post;
   return SIDES.map((side) => quartersPlace(i, side, roster)).find((p) => p !== null && sameSpot(at, placeSpot(p))) ?? post;
 }
+
+/** The end of his walk a pacing officer is to be at in the match's `tick`: the ends in turn, each for `PACE_SECONDS`, each man's round put on by `PACE_STAGGER`. */
+const pacePlace = (paces: readonly [string, string], i: number, tick: number): string =>
+  paces[Math.floor((tick / STEPS_PER_SECOND + i * PACE_STAGGER) / PACE_SECONDS) % paces.length]!;
 
 /** Whether a man is where he must be, standing. */
 const there = (h: Hand, i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Task>): boolean =>
@@ -323,7 +328,7 @@ function sendMen(men: readonly Hand[], roster: readonly Man[], byMan: ReadonlyMa
   for (const i of order) {
     if (sent >= SENT_PER_STEP) break;
     if (struck.has(i)) continue;
-    const h = men[i]!, to = byMan.has(i) ? target(i, roster, byMan) : placeSpot(restPlace(i, h, roster, deck.quarters));
+    const h = men[i]!, to = byMan.has(i) ? target(i, roster, byMan) : placeSpot(restPlace(i, h, roster, deck.quarters, deck.tick));
     if (h.blocked === deck.closures.waysSerial) continue;
     let from: Spot;
     if (h.going) {
@@ -371,7 +376,8 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
   // An act with nothing left to do (its sail already stands as told) is done at once.
   const idle = told.acts.filter((a) => !c.tasks.some((t) => t.act === a.id)).map((a) => a.id);
   // Nothing to do and every man at home (unless she is at quarters: then the gun crews stand to their posts).
-  if (c.tasks.length === 0 && deck.quarters === undefined && c.men.every((h) => h.going === null && h.stands === null)) return { crew: c, done: idle, events: [], sails: [], mended: [] };
+  const paceDue = deck.quarters === undefined && roster.some((m, i) => m.paces && !c.men[i]!.going && !sameSpot(standing(c.men[i]!, m), placeSpot(pacePlace(m.paces, i, deck.tick))));
+  if (c.tasks.length === 0 && deck.quarters === undefined && !paceDue && c.men.every((h, i) => h.going === null && (h.stands === null || roster[i]!.paces !== null))) return { crew: c, done: idle, events: [], sails: [], mended: [] };
   const events: CrewEvent[] = [];
   let tasks = manTasks(c.tasks, c.men, roster, deck.tick, out);
   const byMan = new Map(tasks.flatMap((t) => t.hands.map((i) => [i, t] as const)));
