@@ -23,6 +23,14 @@ test('the sky blends between its keys and holds past the ends', () => {
   for (let i = 0; i < top.length; i++) assert.ok(Math.abs(mid.top[i] - (top[i] + topB[i]) / 2) < 1e-9);
 });
 
+test('each key of the sky has the colours it is written with (a misread colour draws the whole title black)', () => {
+  const channel = (hex: string, at: number) => Number(`0x${hex.slice(1 + at * 2, 3 + at * 2)}`);
+  for (const key of SKY_KEYS) {
+    const p = paletteAt(key.at);
+    for (const name of ['top', 'horizon', 'sea', 'sun'] as const) assert.deepEqual(p[name], [0, 1, 2].map((i) => channel(key[name], i)));
+  }
+});
+
 test('a finger puts the sun within the sky it may have, the top of the screen highest', () => {
   const high = sunFromFinger(-50, 0, W, H), low = sunFromFinger(W + 50, H, W, H);
   assert.ok(Math.abs(high.height - TITLE_LAYOUT.sunHighest) < 1e-9);

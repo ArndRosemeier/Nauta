@@ -198,10 +198,16 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 #stick .knob { position: absolute; left: 34px; top: 34px; width: 44px; height: 44px; border-radius: 50%; background: var(--brass-ball); opacity: 0.85; }
 
 /* ---------- The title while the game prepares (src/title/title.ts, plan N7.7) ---------- */
-/* Its sky until the worker's first picture, the canvas it draws on, the name on a lacquered plate with brass corners,
-   the tag that invites the first tap, and what the game is doing. Over everything until it fades into the deck. */
-#loading { position: fixed; inset: 0; z-index: 30; overflow: hidden; touch-action: none; transition: opacity 1s; background: var(--title-sky); color: var(--ivory); }
-#loading .title-view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* Its first picture as a still until the worker draws (the stills are inlined in this sheet, so they are there at the
+   page's first paint, before the script has come: vite.config.ts; made by `npm run shot:title -- --still`), the sky's
+   gradient under it for the moment before that, the canvas it draws on fading in over the still, the name on a
+   lacquered plate with brass corners, the tag that invites the first tap, and what the game is doing. Over
+   everything until it fades into the deck. */
+#loading { position: fixed; inset: 0; z-index: 30; overflow: hidden; touch-action: none; transition: opacity 1s; color: var(--ivory);
+  background: url('../title/still-wide.jpg') center / cover no-repeat, var(--title-sky); }
+@media (orientation: portrait) { #loading { background-image: url('../title/still-tall.jpg'), var(--title-sky); } }
+#loading .title-view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 0.8s; }
+#loading .title-view.drawn { opacity: 1; }
 .title-plate {
   position: absolute; left: 50%; top: max(7vh, calc(env(safe-area-inset-top) + 10px)); transform: translateX(-50%); box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px clamp(26px, 5vw, 56px) 20px; pointer-events: none;

@@ -69,8 +69,10 @@ export class Title {
    */
   constructor(private readonly root: HTMLElement, private readonly engine: AudioEngine, onDrawn: (at: number) => void) {
     const canvas = root.querySelector<HTMLCanvasElement>('.title-view')!;
-    // The canvas shows as soon as the worker has drawn on it, even while the page is busy (the gradient behind it until then).
-    this.drawer = typeof canvas.transferControlToOffscreen === 'function' && typeof Worker === 'function' ? workerDrawer(canvas, this.pixels(), MOST_FPS, onDrawn) : pageDrawer(canvas, this.pixels(), MOST_FPS, onDrawn);
+    // The still of the title's first picture is shown until then (nauta.css #loading); the drawn title fades in over it
+    // once the page hears it is drawn, so a busy page only keeps the still up longer.
+    const drawn = (at: number) => { canvas.classList.add('drawn'); onDrawn(at); };
+    this.drawer = typeof canvas.transferControlToOffscreen === 'function' && typeof Worker === 'function' ? workerDrawer(canvas, this.pixels(), MOST_FPS, drawn) : pageDrawer(canvas, this.pixels(), MOST_FPS, drawn);
     addEventListener('resize', () => { const [w, h] = this.pixels(); this.drawer.size(w, h); });
     root.addEventListener('pointerdown', (e) => this.onPress(e));
     root.addEventListener('pointermove', (e) => this.onMove(e));

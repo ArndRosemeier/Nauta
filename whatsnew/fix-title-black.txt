@@ -1,0 +1,2 @@
+The title is no longer black while the game loads: its sunset and the two brigs show at once, as a picture, and the moving title fades in over it a moment later.
+Open the game with a fresh load and watch the first seconds.

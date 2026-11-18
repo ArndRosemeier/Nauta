@@ -636,6 +636,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A key's code as its cap reads (`KeyW` is W) | `src/app/settingsPanel.ts#keyName` |
 | The title while the game prepares: shown first, the finger, the theme on the first tap, the hand-over to the deck (N7.7) | `src/title/title.ts#Title` |
 | The title's picture, drawn in its worker (or on the page) | `src/title/scene.ts#TitleScene` |
+| The title's still, shown from the page's first paint until the drawn title fades in (made by `npm run shot:title -- --still`) | `src/ui/nauta.css#loading`, `src/title/still-*.jpg` |
 | The title's look as data: colours by the sun's height, layout, the brig's drawing, the exchange of fire | `src/title/titleLook.ts#SKY_KEYS` |
 | The page's one sound engine, opened by the first tap (the title's or the game's) | `src/audio/pageEngine.ts#pageEngine` |
 | The interface's words in English and German | `src/app/words.ts#words` |

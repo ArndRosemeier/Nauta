@@ -132,8 +132,9 @@ export interface Exchange {
 export const TITLE_SEED = 0x7171e;
 
 /** A colour's byte and the bits of one, in a hex colour. */
-const BYTE = 0xff, BITS = 8;
-const hex = (s: string): Rgb => { const n = Number.parseInt(s.slice(1), BYTE + 1); return [(n >> (BITS * 2)) & BYTE, (n >> BITS) & BYTE, n & BYTE]; };
+/** A colour written `#rrggbb`: base sixteen, a byte to each channel. */
+const HEX = 16, BYTE = 0xff, BITS = 8;
+const hex = (s: string): Rgb => { const n = Number.parseInt(s.slice(1), HEX); return [(n >> (BITS * 2)) & BYTE, (n >> BITS) & BYTE, n & BYTE]; };
 const PALETTES = SKY_KEYS.map((k) => ({ at: k.at, top: hex(k.top), mid: hex(k.mid), low: hex(k.low), horizon: hex(k.horizon), sun: hex(k.sun), glow: hex(k.glow), sea: hex(k.sea), seaFar: hex(k.seaFar), hull: hex(k.hull), cloud: hex(k.cloud), cloudLit: hex(k.cloudLit), stars: k.stars }));
 const COLOURS = ['top', 'mid', 'low', 'horizon', 'sun', 'glow', 'sea', 'seaFar', 'hull', 'cloud', 'cloudLit'] as const;
 
