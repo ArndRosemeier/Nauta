@@ -1,19 +1,15 @@
 /**
  * The order panel (implementation plan N3.5): its buttons give every order of the vocabulary, its words say how she
- * answers, and with nothing but the panel's taps she can be sailed anywhere: compass points on every side of the wind reached or answered
- * with full and by, round onto the other tack, stopped and made to sail again. Whole matches of one brig through the
- * match the page runs alone (N3.7's session offline, src/net/duel.ts), a few simulated minutes each.
+ * answers, its rings and dim buttons what stands and what she would refuse, and her yards are drawn as she is trimmed.
+ * Short rules on the match the page runs alone (N3.7's session offline, src/net/duel.ts), a few simulated seconds each. That with the panel's taps
+ * alone she reaches every compass point, tacks, heaves to and fills is a scenario of `npm run check:sailing`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { angleDiff } from '@futuremagic/core';
 import { VOCABULARY, type Order } from '../src/sim/orders.ts';
-import { NO_WAY } from '../src/sim/rules/orders.ts';
-import { CLOSE_HAULED } from '../src/sim/rules/sailing.ts';
 import { simTime } from '../src/sim/state.ts';
 import type { SimEvent } from '../src/sim/step.ts';
 import { DEGREE, KNOT, STEP_SECONDS } from '../src/sim/units.ts';
-import { meanWind } from '../src/sim/wind.ts';
 import {
   bearingWords, clockWords, crewLines, eventWords, isStanding, orderButtons, pointOfSail, shipLines, STEER_POINTS, steerPoint, wouldRefuse,
 } from '../src/app/orderReport.ts';
@@ -71,7 +67,6 @@ function sail(match: SoloMatch, seconds: number, orders: readonly Order[] = []):
 const FRAME = 0.1;
 
 const button = (kind: Order['kind']) => orderButtons().find((b) => b.order.kind === kind)!.order;
-const from = (m: SoloMatch) => meanWind(m.state.wind, simTime(m.state)).from;
 const she = (m: SoloMatch) => m.state.ships[0]!.sailing;
 
 test('the buttons give every order of the vocabulary, each canvas and mast its own, courses from the compass', () => {
@@ -113,51 +108,38 @@ test('the answers: taken with words, refused, done, and the events of her sailin
   assert.ok(!wouldRefuse(m.state, button('tack')));
   let heard = sail(m, 1, [button('fill')]);
   assert.deepEqual(heard, ['00:00 ✗ fill: every sail is drawing']);
-  // A course on the other tack (she heads north, the wind on her larboard side; 160 has it on her starboard): she wears, and the master says so.
-  heard = sail(m, 90, [{ kind: 'steer', ship: 0, heading: 160 * DEGREE }]);
+  // A course on the other tack (she heads north, the wind on her larboard side; 160 has it on her starboard): she will
+  // wear, and the master says so; the course is taken and the helm put over when its men have done it.
+  heard = sail(m, 5, [{ kind: 'steer', ship: 0, heading: 160 * DEGREE }]);
   assert.match(heard[0]!, /^00:01 steer 160: wearing round, sir: 160 lies on the other tack$/);
-  assert.ok(heard.some((h) => /she has worn round/.test(h)), heard.join(' | '));
   assert.ok(heard.some((h) => /✓ steer 160: done/.test(h)), heard.join(' | '));
-  // A job begun with fewer hands than it needs is reported too.
-  const short: SimEvent = { kind: 'short-handed', tick: 95 * 30, ship: 0, order: button('heave'), job: 'brace' };
+  // Too near the wind on the other tack: answered, full and by on that tack, by wearing.
+  heard = sail(m, 1, [{ kind: 'steer', ship: 0, heading: steerPoint(STEER_POINTS.indexOf('SW')) }]);
+  assert.match(heard[0]!, /^00:06 steer 225: she will not lie 225: full and by on the starboard tack, \d{3}, wearing round$/);
+  // What happens under sail, and a job begun with fewer hands than it needs.
+  const at = 95 * 30;
+  assert.equal(eventWords({ kind: 'tacked', tick: at, ship: 0 }, m.state, 0), '01:35 she has come through the wind');
+  assert.equal(eventWords({ kind: 'wore', tick: at, ship: 0 }, m.state, 0), '01:35 she has worn round');
+  assert.equal(eventWords({ kind: 'missed stays', tick: at, ship: 0 }, m.state, 0), '01:35 she missed stays and falls back');
+  const short: SimEvent = { kind: 'short-handed', tick: at, ship: 0, order: button('heave'), job: 'brace' };
   assert.equal(eventWords(short, m.state, 0), "01:35 heave to: short-handed: a mast's yards swung round");
   assert.equal(eventWords({ ...short, ship: 1 }, m.state, 0), null);
 });
 
-/** Steered to compass point `i` with one tap and sailed on: there, or full and by on the nearer tack when it lies too near the wind. */
-function reachPoint(i: number): void {
-  const m = new SoloMatch(START), heading = steerPoint(i);
-  sail(m, 90, [{ kind: 'steer', ship: 0, heading }]);
-  const wind = from(m), off = angleDiff(heading, wind);
-  const aim = Math.abs(off) < CLOSE_HAULED ? wind - Math.sign(off || 1) * CLOSE_HAULED : heading;
-  const miss = Math.abs(angleDiff(she(m).heading, aim)) / DEGREE;
-  assert.ok(miss < 8, `${STEER_POINTS[i]}: heading ${(she(m).heading / DEGREE).toFixed(0)}°, aimed ${(aim / DEGREE).toFixed(0)}°`);
-  assert.ok(she(m).ahead > 2 * KNOT, `${STEER_POINTS[i]}: under way at ${(she(m).ahead / KNOT).toFixed(1)} kn`);
-}
-
-test('with taps alone she reaches the compass points: on her tack, by wearing, and full and by where a point lies too near the wind', () => {
-  // E: wind abaft the beam on her own tack; S: round by wearing; SW: too near the wind on the other tack; W: in the wind's eye.
-  for (const name of ['E', 'S', 'SW', 'W'] as const) reachPoint(STEER_POINTS.indexOf(name));
-});
-
-test('with taps alone she tacks to windward, heaves to and lies still, and makes sail again', () => {
+test('standing orders are ringed, and her yards are drawn braced as she is trimmed, round the other way on the other tack', () => {
   const m = new SoloMatch(START);
-  sail(m, 40, [button('by')]);
-  const before = Math.sign(angleDiff(she(m).heading, from(m)));
-  // The yards are drawn braced as she is trimmed: close-hauled, hard round; on the other tack, round the other way.
-  const yard = (st: typeof m) => new Map(sparAngles(st.state, 0)).get('main-topsail-yard')!;
-  const braced = yard(m);
-  assert.ok(Math.abs(braced) > 10 * DEGREE, `main topsail yard braced ${(braced / DEGREE).toFixed(0)}°`);
-  const heard = sail(m, 90, [button('tack')]);
-  assert.equal(Math.sign(yard(m)), -Math.sign(braced), 'braced round for the other tack');
-  assert.ok(heard.some((h) => /come through the wind/.test(h)), heard.join(' | '));
-  assert.equal(Math.sign(angleDiff(she(m).heading, from(m))), -before, 'on the other tack');
-  sail(m, 150, [button('heave')]);
-  assert.ok(Math.abs(she(m).ahead) < 2 * NO_WAY, `hove to at ${(she(m).ahead / KNOT).toFixed(2)} kn`);
-  assert.ok(isStanding(button('heave'), m.state.ships[0]!.told));
-  sail(m, 60, [button('fill')]);
-  assert.ok(she(m).ahead > 2 * NO_WAY, `gathering way again: ${(she(m).ahead / KNOT).toFixed(1)} kn after a minute`);
-  // Drawn between steps: her pose moves smoothly with the clock.
+  sail(m, 1, [button('heave')]);
+  const told = m.state.ships[0]!.told;
+  assert.ok(isStanding(button('heave'), told) && isStanding(button('by'), told), 'hove to, full and by');
+  assert.ok(isStanding(orderButtons().find((b) => b.label === 'back the main topsail')!.order, told));
+  assert.ok(wouldRefuse(m.state, button('heave')), 'hove to already');
+  // The same brig on the mirror course (the wind on her other side): her yards braced the other way.
+  const mirrored = new SoloMatch({ ...START, heading: 2 * START.windFrom });
+  const yard = (st: SoloMatch) => new Map(sparAngles(st.state, 0)).get('main-topsail-yard')!;
+  assert.ok(Math.abs(yard(mirrored)) > 10 * DEGREE, `main topsail yard braced ${(yard(mirrored) / DEGREE).toFixed(0)}°`);
+  assert.equal(Math.sign(yard(mirrored)), -Math.sign(yard(new SoloMatch(START))), 'braced the other way');
+  assert.equal(new Map(sparAngles(m.state, 0)).has('boom'), true, 'the boom swings with the boom sail');
+  // Drawn between steps: her pose moves smoothly with the clock, never past the step ahead.
   const t = simTime(m.state), a = m.pose(t), b = m.pose(t + STEP_SECONDS / 2);
-  assert.ok(Math.hypot(b.x - a.x, b.z - a.z) < she(m).ahead * STEP_SECONDS);
+  assert.ok(Math.hypot(b.x - a.x, b.z - a.z) < Math.max(she(m).ahead, KNOT) * STEP_SECONDS);
 });

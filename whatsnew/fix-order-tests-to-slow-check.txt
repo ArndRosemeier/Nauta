@@ -1,0 +1,1 @@
+Behind the scenes: the long sailing-by-orders runs (wearing round, heaving to until she stops, reaching every compass point by taps) moved from the quick tests into the slow sailing check, so the quick tests stay quick.

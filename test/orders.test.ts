@@ -1,8 +1,10 @@
 /**
  * The captain's orders (implementation plan N3.4): every order parses from its words and back; orders she cannot take
  * are refused with a reason as an event; a course closer than close-hauled is answered and changed; a course on the
- * other tack is reached by wearing, never through the wind; heaving to stops her and she lies still. Whole matches of
- * one brig (sea and wind), a few simulated minutes each. The crew carrying the orders out is in test/ordersCrew.test.ts.
+ * other tack is reached by wearing, never through the wind, and the master says so; heaving to takes in and backs what
+ * the design says. Short rules on one brig in a whole match (sea and wind), a few simulated seconds each. Carried out
+ * over minutes (she wears round, tacks, lies still hove to, gets under way again) they are scenarios of
+ * `npm run check:sailing`; the crew carrying the orders out is in test/ordersCrew.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,15 +12,17 @@ import { angleDiff } from '@futuremagic/core';
 import {
   carryOut, giveOrder, headingWords, heard, orderWords, parseOrder, startOrders, VOCABULARY, type Order,
 } from '../src/sim/orders.ts';
-import { NO_WAY, POINT } from '../src/sim/rules/orders.ts';
-import { JOBS, PASSED } from '../src/sim/rules/crew.ts';
+import { HOVE_TO_IN, POINT } from '../src/sim/rules/orders.ts';
 import { CLOSE_HAULED } from '../src/sim/rules/sailing.ts';
-import { canvasFor, startSailing } from '../src/sim/ship/sailing.ts';
+import { startSailing } from '../src/sim/ship/sailing.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
-import { startMatch } from '../src/sim/state.ts';
-import { DEGREE, KNOT } from '../src/sim/units.ts';
+import { startMatch, type SimState } from '../src/sim/state.ts';
+import { DEGREE } from '../src/sim/units.ts';
 import { steadyWind } from './support/sail.ts';
-import { EACH, FRESH, FROM, MODERATE, SEED, kinds, reasons, run, underWay, windFrom } from './support/orders.ts';
+import { EACH, FROM, MODERATE, SEED, reasons, run, underWay, windFrom } from './support/orders.ts';
+
+/** On the beam in a moderate breeze, settled: built once for the file (states are plain data, never changed). */
+const BEAM = Object.freeze(underWay(MODERATE, 90));
 
 test('every order of the vocabulary parses from its own words and back, and from the words a captain might use', () => {
   assert.deepEqual(VOCABULARY.map((w) => w.kind).sort(), Object.keys(EACH).sort());
@@ -55,7 +59,7 @@ test('orders that cannot be done are refused with the reason as an event, and ch
   const none = run(irons, 1, [EACH.tack, EACH.wear]);
   assert.deepEqual(reasons(none.events), ['she has no way on her', 'she has no way on her']);
   assert.deepEqual(none.state.ships[0]!.told.given, []);
-  const s = underWay(MODERATE, 90);
+  const s = BEAM;
   // A tack during a tack is refused until she is round.
   const tacking = run(s, 10, [EACH.tack]).state;
   assert.match(reasons(run(tacking, 1, [EACH.tack]).events)[0]!, /in stays/);
@@ -79,15 +83,21 @@ test('orders that cannot be done are refused with the reason as an event, and ch
 });
 const STRONGEST_FORCE = 8;
 
+/** Her course told to the helmsman by the act an order puts in hand (the helm put over), and which way he turns: + to starboard. */
+function helmAct(st: SimState): { heading: number; turn: number } {
+  const act = st.ships[0]!.told.acts.find((a) => a.kind === 'helm');
+  assert.ok(act && act.kind === 'helm', 'a helm act');
+  return { heading: act.heading, turn: act.turn };
+}
+
 test('a course closer than close-hauled is answered: she will not lie it, and steers full and by on the nearer tack', () => {
-  const s = underWay(MODERATE, 90), from = windFrom(s);
+  const s = BEAM, from = windFrom(s);
   // 30° to the east of the wind: on her own (larboard) tack.
-  const r = run(s, 60, [{ kind: 'steer', ship: 0, heading: from + 30 * DEGREE }]);
+  const r = run(s, 1, [{ kind: 'steer', ship: 0, heading: from + 30 * DEGREE }]);
   assert.match(reasons(r.events)[0]!, new RegExp(`will not lie ${headingWords(from + 30 * DEGREE)}: full and by on the larboard tack, ${headingWords(from + CLOSE_HAULED)}$`));
-  const ship = r.state.ships[0]!;
-  assert.deepEqual(ship.told.helm, { heading: 0, by: -1 });
-  assert.ok(Math.abs(angleDiff(ship.sailing.heading, windFrom(r.state) + CLOSE_HAULED)) < 6 * DEGREE, `heading ${(ship.sailing.heading / DEGREE).toFixed(1)}°`);
-  assert.ok(!kinds(r.events).includes('tacked') && !kinds(r.events).includes('wore'));
+  assert.deepEqual(r.state.ships[0]!.told.helm, { heading: 0, by: -1 });
+  const helm = helmAct(r.state);
+  assert.ok(Math.abs(angleDiff(helm.heading, from + CLOSE_HAULED)) < 1e-9 && helm.turn === 0, 'the helmsman is told close-hauled, the short way');
   // On the other side of the wind's eye, the nearer tack is the other one: she wears round to it.
   assert.match(reasons(run(s, 1, [{ kind: 'steer', ship: 0, heading: from - 30 * DEGREE }]).events)[0]!, /starboard tack, \d{3}, wearing round/);
   // Coming up a point at a time stops at close-hauled the same way.
@@ -97,38 +107,38 @@ test('a course closer than close-hauled is answered: she will not lie it, and st
   assert.match(reasons(run(up, 1, [EACH.up]).events)[0]!, /will not lie/);
 });
 
-test('a course on the other tack is reached by wearing, never through the wind; tack takes her through it', () => {
-  const s = underWay(MODERATE, 90);
-  const wear = run(s, 120, [{ kind: 'steer', ship: 0, heading: 270 * DEGREE }]);
-  assert.ok(kinds(wear.events).includes('wore') && !kinds(wear.events).includes('tacked'), kinds(wear.events).join(', '));
-  assert.ok(Math.abs(angleDiff(wear.state.ships[0]!.sailing.heading, 270 * DEGREE)) < 5 * DEGREE);
-  const tack = run(underWay(FRESH, 70, 40), 90, [EACH.tack]);
-  const tacked = tack.events.find(({ e }) => e.kind === 'tacked');
-  assert.ok(tacked && tacked.t > PASSED.master + (JOBS.stations.work as number), `through the wind after the hands are at their stations: ${tacked?.t.toFixed(1)} s`);
-  const after = tack.state.ships[0]!;
-  assert.deepEqual(after.told.helm, { heading: 0, by: 1 });
-  assert.ok(Math.abs(angleDiff(after.sailing.heading, -CLOSE_HAULED)) < 8 * DEGREE, `full and by on the starboard tack: ${(after.sailing.heading / DEGREE).toFixed(1)}°`);
+test('a course on the other tack is reached by wearing, never through the wind, and the master says so; tack takes her through it', () => {
+  // On the larboard tack heading east (the wind from the north), 270 lies on the other tack: the helm turns her away
+  // from the wind (to starboard, through south), and the course is still taken.
+  const wear = run(BEAM, 1, [{ kind: 'steer', ship: 0, heading: 270 * DEGREE }]);
+  assert.deepEqual(reasons(wear.events), ['wearing round, sir: 270 lies on the other tack']);
+  assert.deepEqual(wear.state.ships[0]!.told.given.map((g) => g.order.kind), ['steer']);
+  assert.deepEqual(helmAct(wear.state), { heading: 270 * DEGREE, turn: 1 });
+  // A course on her own tack is simply taken.
+  assert.deepEqual(reasons(run(BEAM, 1, [{ kind: 'steer', ship: 0, heading: 120 * DEGREE }]).events), []);
+  // Tack: full and by on the other tack, the helm turning her up through the wind (to larboard), the hands at their stations first.
+  const tack = run(BEAM, 1, [EACH.tack]).state.ships[0]!;
+  assert.deepEqual(tack.told.helm, { heading: 0, by: 1 });
+  const acts = tack.told.acts.filter((a) => a.kind === 'helm');
+  assert.equal(acts.length, 1);
+  const act = acts[0]!;
+  assert.ok(act.kind === 'helm' && act.turn === -1, `turning to larboard: ${JSON.stringify(act)}`);
+  assert.ok(Math.abs(angleDiff(act.heading, windFrom(BEAM) - CLOSE_HAULED)) < 1e-9, 'close-hauled on the starboard tack');
 });
 
-test('heaving to stops her within a couple of minutes in a fresh breeze, she lies still, and filling puts her under way again', () => {
-  const s = underWay(FRESH, 90, 40);
-  assert.ok(s.ships[0]!.sailing.ahead > 6 * KNOT, `under way at ${(s.ships[0]!.sailing.ahead / KNOT).toFixed(1)} kn`);
-  let stopped = Infinity, most = 0;
-  const hove = run(s, 240, [EACH.heave], (st, t) => {
-    const v = st.ships[0]!.sailing.ahead;
-    if (stopped === Infinity && v < NO_WAY) stopped = t;
-    if (stopped < t) most = Math.max(most, Math.abs(v));
-  });
-  assert.ok(stopped < 120, `her way off after ${stopped.toFixed(0)} s`);
-  assert.ok(most < 1 * KNOT, `then she lies within ${(most / KNOT).toFixed(2)} kn of still`);
-  const ship = hove.state.ships[0]!;
+test('heaving to: the courses, boom sail and headsails taken in, both topsails aback, full and by; filling lets them draw again', () => {
+  const hove = run(BEAM, 1, [EACH.heave]).state, ship = hove.ships[0]!, sails = rigPlan().sails;
   assert.ok(ship.told.hove);
-  assert.ok(ship.sailing.canvas.every((c, i) => !c.set || rigPlan().sails[i]!.id.includes('topsail')), 'only the topsails set');
-  const filled = run(hove.state, 90, [EACH.fill]).state.ships[0]!;
+  assert.deepEqual(ship.told.helm, { heading: 0, by: -1 });
+  const aback = ship.told.acts.flatMap((a) => (a.kind === 'yards' && a.aback ? [a.mast] : [])).sort();
+  assert.deepEqual(aback, [0, 1], 'both masts laid aback');
+  const takenIn = ship.told.acts.flatMap((a) => (a.kind === 'sail' && !a.set ? [sails[a.sail]!.id] : []));
+  const setNow = BEAM.ships[0]!.sailing.canvas.flatMap((c, i) => (c.set && HOVE_TO_IN.includes(sails[i]!.id) ? [sails[i]!.id] : []));
+  assert.deepEqual(takenIn.sort(), setNow.sort(), 'what she carries of the sails hove to keeps in comes in');
+  const filled = run(hove, 1, [EACH.fill]).state.ships[0]!;
   assert.ok(!filled.told.hove && filled.told.helm.by === -1);
-  assert.deepEqual(filled.sailing.canvas, canvasFor('battle', FRESH));
-  assert.deepEqual(filled.sailing.backed, [false, false]);
-  assert.ok(filled.sailing.ahead > 2 * KNOT, `under way again at ${(filled.sailing.ahead / KNOT).toFixed(1)} kn`);
+  assert.deepEqual(filled.told.backed, [false, false]);
+  assert.ok(filled.told.acts.some((a) => a.kind === 'yards' && !a.aback), 'her yards filled');
 });
 
 test('full and by, the helmsman follows the wind as it shifts; missing stays, the master bears away and that is her course', () => {
