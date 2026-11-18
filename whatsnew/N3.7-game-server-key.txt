@@ -1,0 +1,1 @@
+Two players now connects to the real game server with nothing to add to the address: open ?sail on the PC and on the iPad, tap "Two players" on both, open a room on one and tap it in the list on the other.

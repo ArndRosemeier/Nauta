@@ -87,7 +87,7 @@ export interface Params {
   readonly room: boolean;
   /** Join the room with this code at once (`?join=K7Q2ZP`, the link a room shows); null: none. */
   readonly join: string | null;
-  /** GameHub's app key for this game (`?key=ghk_...`), when the build has none; null: the build's. */
+  /** Another GameHub app key (`?key=ghk_...`); null: the game's own (hub.ts `GAMEHUB_KEY`). */
   readonly key: string | null;
   /** Another GameHub server (`?hub=http://127.0.0.1:8787`, the checks' stand-in); null: GameHub itself. */
   readonly hub: string | null;

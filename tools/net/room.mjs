@@ -5,7 +5,8 @@
  * guest must take over and run the match on. Run `npm run build` first.
  *
  *   npm run check:room                      against a GameHub stand-in on this machine (tools/net/standin.mjs)
- *   GAMEHUB_URL=https://games.futuremagic.de GAMEHUB_KEY=ghk_... npm run check:room     against the live server
+ *   GAMEHUB_URL=https://games.futuremagic.de npm run check:room     against the live server, with the game's key
+ *   (GAMEHUB_KEY=ghk_... names another)
  *
  * The pages are `?netcheck` (src/app/netCheck.ts): the match without drawing, so no GPU is needed.
  */

@@ -87,11 +87,9 @@ jobs:
         run: node tools/guards/budget.mjs 120 180 -- npm test -- --isolated
       - name: Two headless browsers play one match through a GameHub stand-in, and the guest takes over when the host leaves (N3.7)
         run: node tools/guards/budget.mjs 120 180 -- npm run check:room
-      - name: The same against the live GameHub, once the game's app key is a repository variable (N3.7)
-        if: vars.GAMEHUB_KEY != ''
+      - name: The same against the live GameHub, with the game's own app key (N3.7)
         env:
           GAMEHUB_URL: https://games.futuremagic.de
-          GAMEHUB_KEY: ${{ vars.GAMEHUB_KEY }}
         run: node tools/guards/budget.mjs 120 180 -- npm run check:room
       - uses: actions/upload-artifact@v4
         if: always()
