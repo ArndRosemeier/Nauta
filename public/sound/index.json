@@ -665,12 +665,12 @@
   },
   "music/title": {
    "kind": "music",
-   "take": "music/title-a",
+   "take": "music/title-b",
    "files": [
     "music/title.mp3"
    ],
    "seconds": [
-    176
+    178.9
    ]
   },
   "pipe/back": {
