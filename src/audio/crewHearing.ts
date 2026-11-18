@@ -29,7 +29,7 @@ import {
   CROWD_BEDS, CROWD_FULL, CROWD_GAIN, CROWD_GLIDE, CROWD_REACH, CROWD_REF, DRUM, DRUM_GLIDE, DRUM_HEIGHT, FEET_HEIGHT,
   HAULING, HAUL_HEIGHT, HAUL_LEAST, HAUL_PERIOD, HAUL_PULL, HAUL_SPREAD,
   LIFE_CALLS, LIFE_PARTIES, NEAR_FEET, NEAR_REACH, ORDER_CALLS, PIPED_DONE, PIPE_HEIGHT, RUN_STEP, RUN_STRIDE, SAILED_CALLS, SHORT_HANDED_AGAIN,
-  SHORT_HANDED_GAIN, STRIKES_A_PAIR, SWING_PERIOD, SWING_PULLS, THROUGH_DECK, WALK_GAIN, WALK_STRIDE, type PipeCall,
+  SHORT_HANDED_GAIN, STRIKES_A_PAIR, SWING_PERIOD, SWING_PULLS, THROUGH_DECK, WALK_GAIN, WALK_STRIDE, WATCH_CALL, type PipeCall,
 } from './crewTuning';
 import { clearHeard, type Heard, type PlacedBed, type PlacedShot } from './heard';
 import type { SlapKind } from './tuning';
@@ -195,6 +195,7 @@ export class CrewWatch {
     for (const e of this.events) {
       if (e.kind === 'done') { if (PIPED_DONE.has(e.order.kind)) this.wait(CARRY_ON, CARRY_ON.gain, s.t); }
       else if (e.kind === 'short-handed') this.pipeAgain(e.order, s.t);
+      else if (e.kind === 'watch') this.wait(WATCH_CALL, WATCH_CALL.gain, s.t);
       else if (e.kind === 'tacked' || e.kind === 'wore' || e.kind === 'missed stays') {
         for (const c of SAILED_CALLS[e.kind]) this.wait(c, c.gain, s.t);
         if (e.kind !== 'missed stays') this.bracePulls = Array.from({ length: SWING_PULLS }, (_, k) => s.t + k * SWING_PERIOD);

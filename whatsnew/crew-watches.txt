@@ -1,0 +1,2 @@
+Walking the ship alone now keeps watches: half the sleeping hands are on the watch below, and the watch on deck has lookouts in the tops and on the forecastle and men coiling down at the pin rails; the rest sleep on. At each change of watch the boatswain pipes, the relieved men go below to their hammocks and the others come up.
+Try it: ?sail&alone&hour=3.9 (or Walk the ship from the menu) and wait a few seconds for four o'clock.

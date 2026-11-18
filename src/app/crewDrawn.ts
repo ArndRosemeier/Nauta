@@ -21,7 +21,7 @@ import type { Bunk } from '../sim/rules/bunks';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { CrewKnobs } from './quality';
 import { floorApart } from './officers';
-import { standByClip, standToClip } from './standBy';
+import { standByClip, standToClip, watchClip } from './standBy';
 import { apartOnWater } from '../sim/units';
 import { BREAKS } from '../sim/rules/ships';
 import { gunClip, gunWork, stepBack, type GunWork } from './gunDrill';
@@ -355,6 +355,7 @@ function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, s
   const work = gun && gunClip(gun);
   if (work) return work;
   // At his home place he busies himself (standBy.ts); away from it (at his gun at quarters) he stands to, ready.
+  if (hand.stands !== null && m.watchPost !== null && sameSpot(hand.stands, placeSpot(m.watchPost))) return watchClip(m);
   return hand.stands === null ? standByClip(m, seed) : standToClip(m, seed);
 }
 

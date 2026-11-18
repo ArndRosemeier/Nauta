@@ -3,6 +3,7 @@
  * and the length of a day. Pure data.
  */
 import { HOURS_PER_DAY, MINUTES_PER_HOUR } from '../units';
+import type { Part } from './crew';
 
 /** Game minutes that pass in a real minute of the sandbox: a four-hour watch takes eight minutes, a half-hour bell one. */
 export const DAY_PACE = 30;
@@ -29,3 +30,22 @@ export const BELL_MINUTES = 30;
 /** The first dog watch ends on four bells (its second hour begins the count again); every other watch ends on eight. */
 export const BELLS_AT_WATCH_END = 8;
 export const FIRST_DOG_END_BELLS = 4;
+
+/**
+ * The watch on deck at its jobs (design ruling 2026-11-18: the watch on deck is at its jobs, the watch below asleep; people
+ * of no use right now stay below): the places a watch's hands stand at while it has the deck, each taken by the first
+ * hand of that part in the watch who has none, so each watch has the same few on deck at the same places: a lookout in
+ * each top and on the forecastle, and men coiling down at the pin rails. Every other hand of the watch stays in his
+ * hammock until called. Only the sandbox keeps watches (`SimState.dayStart`).
+ */
+export const DECK_WATCH: readonly { readonly part: Part; readonly place: string }[] = [
+  { part: 'foretop', place: 'top-fore-p' },
+  { part: 'maintop', place: 'top-main-p' },
+  { part: 'forecastle', place: 'station-forecastle' },
+  { part: 'forecastle', place: 'pin-fore-pins-s1' },
+  { part: 'forecastle', place: 'pin-fore-pins-p1' },
+  { part: 'afterguard', place: 'pin-quarter-pins-s1' },
+  { part: 'afterguard', place: 'pin-quarter-pins-p1' },
+  { part: 'waist', place: 'pin-waist-pins-s6' },
+  { part: 'waist', place: 'pin-waist-pins-p6' },
+];

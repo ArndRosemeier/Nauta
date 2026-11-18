@@ -293,6 +293,14 @@
       "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: The Still: one high plain note, ended sharply; every man stops what he is doing. Piped when she misses stays. Shortened from the Navy's eight seconds."
     },
     {
+      "id": "pipe/watch",
+      "kind": "call",
+      "from": [
+        "pipe/watch.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Relieve the watch: the general call that turns out the watch below and sends the relieved watch down at a change of watch (the sandbox's day)."
+    },
+    {
       "id": "pipe/carry-on",
       "kind": "call",
       "from": [

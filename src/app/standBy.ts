@@ -33,6 +33,11 @@ const HANDING = ['pick up', 'interact', 'pick up'] as const;
 /** The midshipman at the captain's side: attentive, glancing about, ready to be sent off. */
 const ATTENTIVE = ['arms folded', 'nod', 'shake head'] as const;
 
+/** A lookout at the rail of a top or the forecastle, watching the sea. */
+const LOOKING_OUT = 'lean on rail';
+/** A hand of the watch on deck at the pin rails, coiling down a rope (CMU 62_21, crewLooks.ts PACK_MOCAP). */
+const COILING = 'cmu 62_21';
+
 /** The places of a kind of man by the id's start: the clips he plays there, by his seed. */
 const BY_PLACE: readonly (readonly [prefix: string, clips: readonly string[]])[] = [
   [WHEEL, [STEERING]],
@@ -53,6 +58,14 @@ export function standByClip(m: Man, seed: number): string {
   return clips[seed % clips.length]!;
 }
 
+/** Where the watch on deck stands (rules/day.ts `DECK_WATCH`), by the id's start: what a hand of the watch does there. */
+const BY_WATCH_PLACE: readonly (readonly [prefix: string, clip: string])[] = [['top-', LOOKING_OUT], ['station-forecastle', LOOKING_OUT], ['pin-', COILING]];
+
+/** The clip of a hand of the watch on deck at his post (`Man.watchPost`): a lookout looking out, a hand coiling down. */
+export function watchClip(m: Man): string {
+  return BY_WATCH_PLACE.find(([prefix]) => m.watchPost?.startsWith(prefix))?.[1] ?? TINKERING;
+}
+
 /** The clip of a man at his place at quarters, or waiting there for his work to begin: ready at his gun, arms at hand, or alert. */
 export function standToClip(m: Man, seed: number): string {
   const clips = m.gun !== null ? AT_GUN : m.part === 'marines' ? ARMED : m.part === 'boys' ? HANDING : m.part === 'officers' ? CALLING : ALERT;
@@ -64,5 +77,5 @@ export const attentiveClip = (seed: number): string => ATTENTIVE[seed % ATTENTIV
 
 /** Every clip a man standing by or standing to can play (the crowd bakes them). */
 export const STAND_BY_CLIPS: readonly string[] = [
-  ...new Set([STEERING, ON_WATCH, TINKERING, COOKING, MENDING, ...TALKING, ...CLEANING, ...AT_GUN, ...ARMED, ...HANDING, ...CALLING, ...ALERT, ...ATTENTIVE]),
+  ...new Set([LOOKING_OUT, COILING, STEERING, ON_WATCH, TINKERING, COOKING, MENDING, ...TALKING, ...CLEANING, ...AT_GUN, ...ARMED, ...HANDING, ...CALLING, ...ALERT, ...ATTENTIVE]),
 ];

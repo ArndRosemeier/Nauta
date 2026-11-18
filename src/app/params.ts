@@ -8,6 +8,7 @@ import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
 import { CALM_LEAST } from '../sim/rules/body';
+import { DAY_REAL_MINUTES } from '../sim/rules/day';
 import { GLASS_POWER } from './glass';
 
 /** The hour a game starts at when the address names none: a clear morning. */
@@ -46,7 +47,7 @@ const SEED_MOST = 2 ** 32 - 1;
  * `?motion=`, `?smoke=`, `?key=`, `?hub=`, `?notitle` and a room's `?join=` keep the menu.)
  */
 export const TOOL_SWITCHES = [
-  'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'nocrew', 'trial', 'bench', 'probe', 'netcheck', 'title', 'rig',
+  'sail', 'alone', 'room', 'walk', 'ship', 'slice', 'crew', 'nocrew', 'trial', 'bench', 'probe', 'netcheck', 'title', 'rig',
   'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed', 'scars', 'casualties', 'down', 'watch',
 ] as const;
 
@@ -91,6 +92,8 @@ export interface Params {
   readonly brace: number;
   /** Sail her by orders (`?sail`, plan N3.5): the brig under way in a match on this machine, and the order panel; with the ship of `?ship` (and `?walk` if asked). */
   readonly sail: boolean;
+  /** The sandbox (`?sail&alone`, `?hour=` the hour it starts at): her alone at sea with the day's watches and bells, as the menu's "Walk the ship"; the sky runs at its day clock's pace unless `?day=` says otherwise. */
+  readonly alone: boolean;
   /** The working order panel of N3.5 beside the order fan (`?panel`): a test tool, with every order and the answers in words. */
   readonly panel: boolean;
   /** Open a room for a second captain at once (`?room`, plan N3.7). */
@@ -149,7 +152,7 @@ export function readParams(query: string): Params {
   const named = NAMED_SEAS[q.get('sea') ?? ''], force = q.has('wind') || named === undefined ? num('wind', WIND_FORCE, 0, WIND_PRESETS.length - 1) : named;
   return {
     hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
-    dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
+    dayMinutes: num('day', q.has('alone') ? DAY_REAL_MINUTES : DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
     ship: q.get('ship') ?? q.get('slice') ?? (q.has('crew') ? '' : null), quality: q.get('quality'), walk: q.get('walk'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(force), windAsked: q.has('wind') || named !== undefined,
     look: q.has('yaw') || q.has('pitch')
       ? { yaw: num('yaw', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE, pitch: num('pitch', 0, -PITCH_LIMIT / DEGREE, PITCH_LIMIT / DEGREE) * DEGREE }
@@ -158,7 +161,7 @@ export function readParams(query: string): Params {
     bench: q.has('bench') ? num('bench', BENCH_SECONDS, BENCH_SHORTEST, BENCH_LONGEST) : 0,
     motion: q.has('motion') ? num('motion', 1, CALM_LEAST, 1) : null,
     brace: num('brace', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE,
-    sail: q.has('sail'), panel: q.has('panel'),
+    sail: q.has('sail'), alone: q.has('alone'), panel: q.has('panel'),
     room: q.has('room'), join: q.get('join') || null, key: q.get('key') || null, hub: q.get('hub') || null,
     seed: q.has('seed') ? Math.round(num('seed', 0, 0, SEED_MOST)) : null, netcheck: q.has('netcheck'),
     crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'), noCrew: q.has('nocrew'),

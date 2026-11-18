@@ -144,6 +144,7 @@ export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
       if (!hers) return [];
       if (e.order.kind === 'sail') return [report('lookout', ship, 'her makes sail')];
       return e.order.kind === 'shorten' ? [report('lookout', ship, 'her shortens')] : [];
+    case 'watch': return [];
     case 'short-handed': return mine ? [report('first lieutenant', ship, 'short-handed')] : [];
     // ---- What shot does to her, and what follows ----
     case 'hit':

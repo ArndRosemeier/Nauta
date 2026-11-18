@@ -228,7 +228,7 @@ async function start(): Promise<void> {
   let pausedAt: number | null = null, paused = 0;
   /** The match's clock, s: the page's less the pauses, or where the browser checks have run it to. The bubbles keep it too. */
   const matchClock = (): number => (pinned ?? pausedAt ?? pageSeconds()) - paused + ahead;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match), params.casualties === null ? undefined : (state) => casualtiesOf(state, params.casualties!)) : null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match), params.casualties === null ? undefined : (state) => casualtiesOf(state, params.casualties!), params.alone ? { hour: params.hour } : null) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   // `?watch` (plan N7.8): the match is a battle of two computer captains, none of the ships mine.
