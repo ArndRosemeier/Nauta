@@ -1,0 +1,1 @@
+Behind the scenes: the checks that look for copied code run about twice as fast (they no longer read the source twice or compare every name with every other), so they stop failing now and then on a busy build machine.

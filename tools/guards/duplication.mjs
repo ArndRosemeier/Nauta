@@ -15,26 +15,32 @@ import { scan as scanRepeated } from '../repeated-code/find-repeated-code.mjs';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.join(HERE, '../..');
 export const BASELINE_FILE = path.join(HERE, 'duplication-baseline.json');
+/** The source the finders read. */
+export const SOURCE_DIR = path.join(REPO, 'src');
 
 /**
  * The two finders: copied bodies and repeated idioms (`repeated`), and alike functions of one name (`names`). Each
  * finding's key starts with the kind that finds it, so the ratchet can be held one finder at a time (the test suite
- * runs them as two tests, each inside one test's time).
+ * runs them as two tests, each inside one test's time, after a third that reads the source for both).
  */
 export const FINDERS = ['repeated', 'names'];
 const FINDER_OF = { 'clone: ': 'repeated', 'idiom: ': 'repeated', 'same name: ': 'names' };
 const finderOf = (key) => Object.entries(FINDER_OF).find(([prefix]) => key.startsWith(prefix))?.[1];
 
-/** What the finders (`finders`, all by default) find under `dir`, as stable keys (names and files, never line numbers). */
-export function duplicationFindings(dir = path.join(REPO, 'src'), finders = FINDERS) {
+/**
+ * What the finders (`finders`, all by default) find under `dir`, as stable keys (names and files, never line numbers).
+ * `cache`: a Map the caller keeps (`readSource`), so several calls read and tokenize each file once.
+ */
+export function duplicationFindings(dir = SOURCE_DIR, finders = FINDERS, cache = undefined) {
   const found = [];
   if (finders.includes('repeated')) {
-    const rep = scanRepeated(dir, { displayBase: dir });
+    const rep = scanRepeated(dir, { displayBase: dir, cache });
     found.push(...rep.clones.clusters.map((c) => `clone: ${[...new Set(c.fns.map((f) => `${f.file}#${f.name}`))].sort().join(' + ')}`));
     found.push(...rep.idioms.idioms.map((d) => `idiom: [${d.names.join(' ')}] in ${[...new Set(d.at.map((a) => a.file))].sort().join(' + ')}`));
   }
   if (finders.includes('names')) {
-    const g = groupCandidates(scanTree(dir, { displayBase: dir }).functions);
+    // Only the exact and the normalised names are held to the ratchet: the near-name tier is not built (nearNames).
+    const g = groupCandidates(scanTree(dir, { displayBase: dir, cache }).functions, { nearNames: false });
     found.push(...[...g.tier1, ...g.tier2]
       .filter((p) => (p.status === 'compared' || p.status === 'confirmed') && p.sim >= DEFAULT_CONFIRM_FLOOR)
       .map((p) => `same name: ${[`${p.a.file}#${p.a.name}`, `${p.b.file}#${p.b.name}`].sort().join(' + ')}`));

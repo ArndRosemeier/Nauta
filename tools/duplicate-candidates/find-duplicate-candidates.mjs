@@ -957,9 +957,9 @@ function isBareTypeSignature(body) {
  * @param {string} source
  * @returns {{name: string, line: number, kind: string, tokens: object[]}[]}
  */
-export function extractFunctions(source, lang = 'js') {
-  if (lang === 'rust') return extractRustFunctions(source);
-  const tokens = tokenize(maskCode(source));
+export function extractFunctions(source, lang = 'js', tokens = tokenize(maskCode(source, lang))) {
+  if (lang === 'rust') return extractRustFunctions(source, tokens);
+  // `tokens`: the source already tokenized as `tokenize(maskCode(source, lang))`, for a caller that needs them too.
   const found = [];
   const push = (name, line, kind, body) => {
     if (!body) return;
@@ -1051,8 +1051,7 @@ export function extractFunctions(source, lang = 'js') {
  * @param {string} source
  * @returns {{name: string, line: number, kind: string, tokens: object[]}[]}
  */
-export function extractRustFunctions(source) {
-  const tokens = tokenize(maskCode(source, 'rust'));
+export function extractRustFunctions(source, tokens = tokenize(maskCode(source, 'rust'))) {
   const found = [];
   for (let i = 0; i < tokens.length; i += 1) {
     if (tokens[i].v !== 'fn') continue;
@@ -1184,27 +1183,45 @@ export function skipSuffixesFor(extensions) {
 }
 
 /**
+ * A file's text, read once when `cache` (a Map kept by the caller, file -> entry) is given: `{ source, lang, tokens }`
+ * with `tokens` filled in by `tokensOf`. The tokens are shared by every scan that uses the cache, so a scan must not
+ * change them.
+ */
+export function readSource(file, cache) {
+  let entry = cache?.get(file);
+  if (!entry) {
+    entry = { source: fs.readFileSync(file, 'utf8'), lang: languageOf(file), tokens: null };
+    cache?.set(file, entry);
+  }
+  return entry;
+}
+
+/** The entry's source masked and tokenized, once. */
+export const tokensOf = (entry) => (entry.tokens ??= tokenize(maskCode(entry.source, entry.lang)));
+
+/**
  * Walk `rootDir` for source files in the supported languages and extract
  * functions. Never follows symlinks, never throws on an individual file (it is
  * counted as skipped instead).
  *
  * @param {string} rootDir absolute path
- * @param {{displayBase?: string, extensions?: string[]}} [opts]
+ * @param {{displayBase?: string, extensions?: string[], cache?: Map}} [opts] `cache`: a Map the caller keeps to read
+ *   and tokenize each file once for several scans (`readSource`, `tokensOf`)
  */
 export function scanTree(rootDir, opts = {}) {
   const { files, skipped, display, extensions } = listSourceFiles(rootDir, opts);
 
   const functions = [];
   for (const file of files) {
-    let source;
+    let entry;
     try {
-      source = fs.readFileSync(file, 'utf8');
+      entry = readSource(file, opts.cache);
     } catch (err) {
       skipped.push({ file: display(file), reason: `read: ${err.code || err.message}` });
       continue;
     }
     try {
-      for (const fn of extractFunctions(source, languageOf(file))) {
+      for (const fn of extractFunctions(entry.source, entry.lang, tokensOf(entry))) {
         functions.push({
           name: fn.name,
           file: display(file),
@@ -1410,7 +1427,9 @@ function sortIgnored(pairs) {
  * `ignoreList: []` disables the filter entirely (the `--no-ignore` flag).
  *
  * @param {object[]} functions output of scanTree().functions
- * @param {{floor?:number, confirmFloor?:number, sizeRatio?:number, stats?:object, ignoreList?:string[]|null}} [opts]
+ * @param {{floor?:number, confirmFloor?:number, sizeRatio?:number, stats?:object, ignoreList?:string[]|null, nearNames?:boolean}} [opts]
+ *   `nearNames: false` skips tier 3 (it compares every name with every other, the costly part: about 0.5 s on this
+ *   repo's source), which comes back empty; tiers 1 and 2 are the same either way (tier 3 is built last).
  */
 export function groupCandidates(functions, opts = {}) {
   const stats = opts.stats || newPruneStats();
@@ -1469,7 +1488,7 @@ export function groupCandidates(functions, opts = {}) {
     if (!byName.has(fn.name)) byName.set(fn.name, []);
     byName.get(fn.name).push(fn);
   }
-  const names = [...byName.keys()].sort();
+  const names = opts.nearNames === false ? [] : [...byName.keys()].sort();
   const prep = new Map();
   for (const name of names) {
     const words = stripAffixes(splitNameTokens(name));

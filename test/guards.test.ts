@@ -8,7 +8,9 @@ import { breaches, disciplineBreaches, importsOf, readRules } from '../tools/gua
 // @ts-expect-error -- a plain script without types
 import { magicNumbers, ownerBreaches, seamProblems, seamRows } from '../tools/guards/discipline.mjs';
 // @ts-expect-error -- a plain script without types
-import { FINDERS, checkDuplication, duplicationFindings, readBaseline } from '../tools/guards/duplication.mjs';
+import { FINDERS, SOURCE_DIR, checkDuplication, duplicationFindings, readBaseline } from '../tools/guards/duplication.mjs';
+// @ts-expect-error -- a plain script without types
+import { scanTree } from '../tools/duplicate-candidates/find-duplicate-candidates.mjs';
 
 test('the source keeps the layer rules', () => {
   assert.deepEqual(breaches(readRules()), []);
@@ -31,10 +33,20 @@ test('a pure file that reaches the renderer or rolls unseeded dice is reported',
   assert.ok(found.some((l) => l.includes('src/render/view.ts') && l.includes('Math.random')));
 });
 
-// One test per finder: the source has grown past one test's time for both (docs/CHECKS.md).
+// The source grows by whole files a day, and reading and tokenizing it is most of what the finders cost. It is done
+// once, in a test of its own that also proves the finders see all of it (a file they could not read or parse would
+// drop out of the ratchet unseen); then one test per finder, so no one test takes more than a share of the time
+// (docs/CHECKS.md). The finders do not change what they were given.
+const read = new Map();
+test('the finders read the whole source: no file skipped, every one tokenized', () => {
+  const tree = scanTree(SOURCE_DIR, { displayBase: SOURCE_DIR, cache: read });
+  assert.deepEqual(tree.skipped, []);
+  assert.ok(tree.filesScanned > 100 && tree.functions.length > 1000, `${tree.filesScanned} files, ${tree.functions.length} functions`);
+});
+
 for (const finder of FINDERS) {
   test(`the source holds no copy that is not accounted for (${finder})`, () => {
-    assert.deepEqual(checkDuplication(duplicationFindings(undefined, [finder]), readBaseline(), [finder]), []);
+    assert.deepEqual(checkDuplication(duplicationFindings(undefined, [finder], read), readBaseline(), [finder]), []);
   });
 }
 

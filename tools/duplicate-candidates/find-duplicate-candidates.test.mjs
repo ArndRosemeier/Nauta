@@ -235,6 +235,21 @@ test('compare: partially overlapping bodies are fully compared with an exact sim
   assert.equal(result.simIsLowerBound, undefined);
 });
 
+test('groupCandidates without near names keeps tiers 1 and 2 as they were and leaves tier 3 empty', () => {
+  const mkFn = (name, file, line) => ({
+    name, file, line, kind: 'function', size: 6,
+    tokens: ['a', 'b', 'c', 'd', 'e', 'f'].map((v) => ({ v, kind: 'punct', line: 1 })), _shapeSet: null,
+  });
+  // The same name, a name that differs by case, and a name one letter off: tiers 1, 2 and 3.
+  const functions = [mkFn('shared', 'src/a.ts', 1), mkFn('shared', 'src/b.ts', 2), mkFn('Shared', 'src/c.ts', 3), mkFn('sharedd', 'src/d.ts', 4)];
+  const all = groupCandidates(functions), cheap = groupCandidates(functions, { nearNames: false });
+  assert.ok(all.tier3.length > 0, 'near names find the one-letter-off name');
+  assert.equal(cheap.tier3.length, 0);
+  const key = (p) => p.key;
+  assert.deepEqual(cheap.tier1.map(key), all.tier1.map(key));
+  assert.deepEqual(cheap.tier2.map(key), all.tier2.map(key));
+});
+
 test('groupCandidates prune counters account for every candidate pair', () => {
   const mkFn = (name, file, line, values) => ({
     name,
