@@ -2,7 +2,7 @@
  * Orders given to one brig in a whole match (sea and wind), shared by the order tests (test/orders.test.ts, the
  * vocabulary, refusals and manoeuvres; test/ordersCrew.test.ts, the crew carrying them out).
  */
-import type { Order, OrderKind } from '../../src/sim/orders.ts';
+import { isGunnery, isKeep, isLife, type Order, type OrderKind } from '../../src/sim/orders.ts';
 import { simTime, startMatch, type SimState } from '../../src/sim/state.ts';
 import { meanWind } from '../../src/sim/wind.ts';
 import { step, type SimEvent } from '../../src/sim/step.ts';
@@ -54,3 +54,10 @@ export const EACH: Readonly<Record<OrderKind, Order>> = {
   pumps: { kind: 'pumps', ship: 0 }, fires: { kind: 'fires', ship: 0 }, wreckage: { kind: 'wreckage', ship: 0 },
   plug: { kind: 'plug', ship: 0 }, pumping: { kind: 'pumping', ship: 0 }, strike: { kind: 'strike', ship: 0 },
 };
+
+/**
+ * The orders of `EACH` the sailing drill's hands carry out: not the gunnery orders (none of its hands), the orders for
+ * her life (they stand until there is work), the master's standing helm orders (they need an enemy) or the sounding
+ * (it changes nothing).
+ */
+export const DRILL: readonly Order[] = Object.values(EACH).filter((o) => !isGunnery(o) && !isLife(o) && !isKeep(o) && o.kind !== 'sound');

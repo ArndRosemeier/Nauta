@@ -26,8 +26,7 @@ import { step } from '../../src/sim/step.ts';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../../src/sim/units.ts';
 import { CREW_ORDERS, fullCrewOrder } from '../../test/support/crew.ts';
 import { duelSetup } from '../../test/support/match.ts';
-import { EACH, MODERATE, run, underWay } from '../../test/support/orders.ts';
-import { isGunnery, isLife } from '../../src/sim/orders.ts';
+import { DRILL, EACH, MODERATE, run, underWay } from '../../test/support/orders.ts';
 
 /** The longest any order takes to carry out in a whole match, s (plain sail from battle sail: a course, then a topgallant). */
 const MOST_ORDER_SECONDS = 60;
@@ -63,8 +62,8 @@ const start = underWay(MODERATE, 100);
 
 scenario('every order carried out in a whole match', () => {
   const times: string[] = [];
-  // The sailing orders: the gunnery orders take none of the sailing drill's hands (test/gunnery.test.ts).
-  for (const order of Object.values(EACH).filter((o) => !isGunnery(o) && !isLife(o))) {
+  // The sailing drill's orders (test/support/orders.ts DRILL).
+  for (const order of DRILL) {
     // Fill needs something aback: the main topsail backed in the same step, which the fill then replaces.
     let s = step(start, order.kind === 'fill' ? [EACH.back, order] : [order]), ticks = 0;
     if (s.events.some((e) => e.kind === 'refused')) throw new Error(`${order.kind} was refused`);
