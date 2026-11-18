@@ -7,11 +7,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isGunnery, isKeep, isLife, type Order } from '../src/sim/orders.ts';
+import type { Order } from '../src/sim/orders.ts';
 import type { SimState } from '../src/sim/state.ts';
 import { step } from '../src/sim/step.ts';
 import { DEGREE, wrapBearing } from '../src/sim/units.ts';
-import { EACH, MODERATE, run, underWay } from './support/orders.ts';
+import { DRILL, EACH, MODERATE, run, underWay } from './support/orders.ts';
 
 /** Her way settles in this long from the match's start, s (enough for a tack to be taken). */
 const SETTLE = 2;
@@ -30,9 +30,8 @@ let built: SimState | null = null;
 const start = (): SimState => (built ??= Object.freeze(underWay(MODERATE, 100, SETTLE)));
 
 test('every order is applied and shows in the state at once: taken, being carried out, its work still to do', () => {
-  // The gunnery orders take none of the sailing drill's hands (test/gunnery.test.ts), the orders for her life stand until there is work (test/repairs.test.ts);
-  // the master's standing helm orders need an enemy and the sounding changes nothing (test/keepHer.test.ts).
-  for (const order of Object.values(EACH).filter((o) => !isGunnery(o) && !isLife(o) && !isKeep(o) && o.kind !== 'sound')) {
+  // The gunnery orders: test/gunnery.test.ts; her life: test/repairs.test.ts; standing helm orders and the sounding: test/keepHer.test.ts.
+  for (const order of DRILL) {
     const s = step(start(), ordersFor(order)), told = s.state.ships[0]!.told;
     assert.deepEqual(s.events.filter((e) => e.kind === 'refused'), [], `${order.kind} is taken`);
     assert.deepEqual(told.given.map((g) => g.order), [order], `${order.kind} is being carried out`);
