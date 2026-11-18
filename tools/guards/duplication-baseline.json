@@ -2,9 +2,5 @@
   {
     "key": "same name: audio/channel.ts#play + render/captain/captainView.ts#play",
     "reason": "False alarm: the channel plays a sound at its part's level (the engine's play, so Speaker matches it); the captain's view plays an animation clip on his figure."
-  },
-  {
-    "key": "idiom: [.aft .fore] in render/ship/decks.ts + sim/ship/furnish.ts + sim/ship/plan.ts",
-    "reason": "False alarm: reading a space's or an opening's aft and fore bounds (o.aft, o.fore) from the ship plan's own rectangles is how those files use the plan, not a copied routine; it was there before and showed only when the title's files (src/title, N7.7) changed the finder's word weights over files."
   }
 ]
