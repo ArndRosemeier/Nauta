@@ -635,7 +635,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Giving an action a key without two actions sharing one | `src/app/settings.ts#withKey` |
 | Keeping the settings on the device and telling the page of every change (the address's for one visit) | `src/app/settingsStore.ts#SettingsStore` |
 | The settings on the page: the rose button, the sheet's pages and controls | `src/app/settingsPanel.ts#SettingsMenu` |
-| A key's code as its cap reads (`KeyW` is W) | `src/app/settingsPanel.ts#keyName` |
+| A key's code as its cap reads (`KeyW` is W) | `src/app/settings.ts#keyName` |
 | The title while the game prepares: shown first, the finger, the theme on the first tap, the hand-over to the deck (N7.7) | `src/title/title.ts#Title` |
 | The title's picture, drawn in its worker (or on the page) | `src/title/scene.ts#TitleScene` |
 | The title's still, shown from the page's first paint until the drawn title fades in (made by `npm run shot:title -- --still`) | `src/ui/nauta.css#loading`, `src/title/still-*.jpg` |
@@ -694,3 +694,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A kept value read back: a plain object, one of a few | `src/app/kept.ts#oneOf` |
 | The rooms waiting, as buttons from GameHub's lobby; a room's link to share | `src/app/roomPanel.ts#waitingRooms` |
 | The title asking for the tap that begins once the game is ready; its theme on and off | `src/title/title.ts#beginOnTap` |
+| The mouse taken for looking (pointer lock) or free; a plain click on the view takes it, a sheet or Escape frees it | `src/app/mouse.ts#MouseTaker` |
+| The browser's own menus and navigation kept off the game (right click, wheel button, side buttons) | `src/app/mouse.ts#keepBrowserMenusAway` |
+| How the game is played, as lists for a desk and a tablet (the controls card's rows) | `src/app/controls.ts#DESK_CONTROLS` |
+| The controls card over the view: once at a device's first match, from the pause and from Settings | `src/app/controlsCard.ts#openControls` |
+| A key's small cap beside what it does, shown only where a mouse points | `src/app/dom.ts#keyCap` |
+| The key that gives what a fan's item gives (its cap on the tag) | `src/app/fanOrders.ts#keyOfItem` |
+| A press on the screen, and whether its lift makes a tap or a click | `src/app/press.ts#isTap` |

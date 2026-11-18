@@ -1,0 +1,3 @@
+On a PC the right mouse button no longer opens the browser's menu anywhere in the game; it steps back out of the order fan.
+Click the sea to look about with the mouse (a small brass dot shows the middle), put the dot on an officer and click for his orders; Esc frees the mouse, and Esc again opens the pause.
+A Controls card shows how to play at your first match, and again from the pause or Settings, Controls; with a mouse, the fan, Fire!, the glass and Reports show their keys.

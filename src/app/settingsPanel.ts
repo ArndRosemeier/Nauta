@@ -6,13 +6,15 @@
  */
 import { MOTION_STEPS } from '../sim/rules/body';
 import { make } from './dom';
+import { makeButton } from './button';
 import { rose, openSheet, type Sheet } from './sheet';
 import {
   DEFAULT_SETTINGS, KEY_ACTIONS, LANGUAGES, QUALITY_CHOICES, SPEED_LEAST, SPEED_MOST,
-  THUMB_SIDES, VIOLENCE_LEVELS, withKey, type KeyAction, type Settings, type SoundPart,
+  THUMB_SIDES, VIOLENCE_LEVELS, keyName, withKey, type KeyAction, type Settings, type SoundPart,
 } from './settings';
 import type { SettingsStore } from './settingsStore';
 import { openWhatsNew, unseenVersion, versionLabel } from './whatsNew';
+import { openControls } from './controlsCard';
 import { words, type WordKey } from './words';
 
 /** What the panel shows of the page beside the settings. */
@@ -53,11 +55,6 @@ const FIRST_ORDER_KEY: KeyAction = 'steer';
 const SOUND_WORDS: Readonly<Record<SoundPart, readonly [WordKey, WordKey | null]>> = {
   all: ['soundAll', null], sea: ['soundSea', null], ship: ['soundShip', 'soundShipHelp'], crew: ['soundCrew', 'soundCrewHelp'], battle: ['soundBattle', null],
 };
-/** Keys named as people read them, where the key's code does not say it plainly. */
-const KEY_NAMES: Readonly<Record<string, string>> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: '␣' };
-
-/** A key's code (`KeyW`, `Digit1`, `ShiftLeft`) as its cap reads. */
-export const keyName = (code: string): string => KEY_NAMES[code] ?? code.replace(/^Key|^Digit/, '').replace(/(Left|Right)$/, ' $1');
 
 export class SettingsMenu {
   private readonly button = make('button', 'nt-pill round', '');
@@ -73,7 +70,7 @@ export class SettingsMenu {
     this.button.id = 'settings';
     this.button.type = 'button';
     this.button.append(rose());
-    this.button.addEventListener('click', () => (this.rose ? this.rose() : this.open()));
+    this.button.addEventListener('click', () => this.press());
     document.body.append(this.button);
     store.watch((now, before) => {
       const say = words(now.language);
@@ -81,6 +78,12 @@ export class SettingsMenu {
       this.button.classList.toggle('fresh', unseenVersion());
       if (this.sheet && before && before.language !== now.language) { this.sheet.title.textContent = say.settings; this.sheet.close.setAttribute('aria-label', say.close); this.redraw(); }
     });
+  }
+
+  /** What the rose does: the settings, or in a match chosen from the menu the captain's pause (the Escape key too). */
+  press(): void {
+    if (this.rose) this.rose();
+    else this.open();
   }
 
   /** Opens the settings at the page shown last. */
@@ -141,7 +144,9 @@ export class SettingsMenu {
         choiceRow(say.reportsButton, say.reportsButtonHelp, [say.off, say.on], s.reportsButton ? 1 : 0, (i) => set({ reportsButton: i === 1 })),
       );
     } else if (p === 'controls') {
-      el.append(section(say.touch), choiceRow(say.thumb, say.thumbHelp, THUMB_WORDS.map((w) => say[w]), THUMB_SIDES.indexOf(s.thumb), (i) => set({ thumb: THUMB_SIDES[i]! })));
+      const card = makeButton(say.controlsShow, () => openControls(this.store));
+      card.className = 'nt-link';
+      el.append(card, section(say.touch), choiceRow(say.thumb, say.thumbHelp, THUMB_WORDS.map((w) => say[w]), THUMB_SIDES.indexOf(s.thumb), (i) => set({ thumb: THUMB_SIDES[i]! })));
       el.append(section(say.keys), make('p', 'nt-note', say.keysHelp));
       for (const a of KEY_ACTIONS) {
         if (a === FIRST_ORDER_KEY) el.append(section(say.keysOrders));

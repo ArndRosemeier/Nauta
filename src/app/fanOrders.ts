@@ -208,3 +208,22 @@ export const KEY_ORDERS: Readonly<Partial<Record<KeyAction, Order | 'steer there
   cease: plain('cease'),
 };
 
+
+/** Whether two orders say the same (their every field alike): a fan's order and a key's. */
+const sameOrder = (a: Order, b: Order): boolean => {
+  const x = a as unknown as Record<string, unknown>, y = b as unknown as Record<string, unknown>;
+  return Object.keys(x).length === Object.keys(y).length && Object.keys(x).every((k) => x[k] === y[k]);
+};
+
+/**
+ * The key that gives what a fan's item gives, or null (a ring, an order with no key): shown on the tag on a desk, so
+ * the fan teaches the keys. "Fire as they bear" is F (which, while the guns wait for the word, gives the word).
+ */
+export function keyOfItem(item: FanItem): KeyAction | null {
+  const a = item.act;
+  if (a.kind === 'steer there') return 'steer';
+  if (a.kind !== 'order') return null;
+  if (a.order.kind === 'bear') return 'fire';
+  const found = (Object.keys(KEY_ORDERS) as KeyAction[]).find((k) => { const o = KEY_ORDERS[k]; return typeof o === 'object' && sameOrder(o, a.order); });
+  return found ?? null;
+}

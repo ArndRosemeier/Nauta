@@ -64,6 +64,8 @@ The fight is watched, not read (design thread, 2026-11-18): **nothing stays on t
 - the room tag ("Two players") beside the rose, until the menus (N7.2) take it;
 - the walking thumb's ring: a brass ring and a brass knob, only while the thumb is down;
 - the large "Fire!" while a broadside is held for the captain's word (orders.md): a polished brass tag by the thumb.
+- on a desk only (a mouse pointing): a key's small cap (`.nt-cap`, a lacquer key in a brass rule) beside what it does on the fan's tags, Fire!, the glass and the Reports tag; the taken mouse's brass dot in the middle; the man under the mouse named in brass small capitals with "click for his orders" under it.
+- the controls card (`src/app/controlsCard.ts`): a sheet, once on a device at its first match, and from the pause and Settings, Controls.
 
 ## The order fan (for N4.4)
 

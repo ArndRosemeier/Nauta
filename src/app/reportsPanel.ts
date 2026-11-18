@@ -6,7 +6,7 @@
  * again closes it. While open it follows the log, at most four times a second (ui-style.md "Cost").
  */
 import { makeButton } from './button';
-import { make, onKeyPress } from './dom';
+import { keyCap, make, onKeyPress } from './dom';
 import { clockWords } from './orderReport';
 import { openSheet, type Sheet } from './sheet';
 import type { SettingsStore } from './settingsStore';
@@ -28,7 +28,7 @@ export class ReportsPanel {
     this.button.id = 'reports-button';
     document.body.append(this.button);
     store.watch((s, before) => {
-      this.button.textContent = words(s.language).reports;
+      this.button.replaceChildren(words(s.language).reports, keyCap(s.keys.reports));
       this.button.style.display = s.reportsButton ? '' : 'none';
       if (this.sheet && before && before.language !== s.language) this.reopen();
     });

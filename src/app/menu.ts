@@ -30,6 +30,7 @@ import {
   type HourChoice, type MatchTerms, type Navy,
 } from './terms';
 import { openWhatsNew, unseenVersion, versionLabel } from './whatsNew';
+import { openControls, showControlsOnce } from './controlsCard';
 import { words, type WordKey } from './words';
 import { LANGUAGES } from './settings';
 import { oneOf } from './kept';
@@ -264,6 +265,10 @@ export class Menu {
     this.theme(false);
     this.h.settingsMenu.rose = () => this.pauseScreen();
     this.redraw = () => {};
+    // How to play, once on a device, at the start of its first match (the guided first match teaches it its own way);
+    // played alone, the match waits while it is read.
+    const p = this.playing.kind, alone = p !== 'duel';
+    if ((p === 'alone' || p === 'walk' || p === 'duel') && showControlsOnce(this.h.settings, () => { if (alone) this.h.pause(false); }) && alone) this.h.pause(true);
   }
 
   /**
@@ -418,12 +423,13 @@ export class Menu {
       const sheet = this.open('menu-pause', say.pauseTitle, () => { this.h.pause(false); this.redraw = () => {}; });
       const resume = menuButton('nt-button menu-go', say.resume, () => { this.closeSheet(); this.h.pause(false); this.redraw = () => {}; });
       const settings = menuButton('nt-button', say.settings, () => this.h.settingsMenu.open());
+      const controls = menuButton('nt-button', say.controlsShow, () => openControls(this.h.settings));
       let asked = p.kind === 'walk';
       const leave = menuButton('nt-button', p.kind === 'walk' ? say.leaveWalk : say.leaveMatch, () => {
         if (!asked) { asked = true; leave.textContent = say.leaveSure; leave.classList.add('on'); return; }
         this.leaveMatch();
       });
-      sheet.body.append(make('p', 'room-say', alone ? say.standsStill : say.goesOn), resume, settings, leave);
+      sheet.body.append(make('p', 'room-say', alone ? say.standsStill : say.goesOn), resume, settings, controls, leave);
     };
     this.redraw = drawScreen;
     drawScreen();

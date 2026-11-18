@@ -23,7 +23,7 @@ The game never pauses while orders are open, and the view keeps moving with the 
 - Slide the finger to an order and lift it, or tap the man and then the order: both work. Lifting outside the fan gives no order.
 - An order that cannot be done now is shown dim. Choosing it makes the man say why in his bubble ("She has no way on her, sir").
 - The order now being carried out carries a ring, so opening the fan also answers "what did I tell him".
-- With a mouse the fan opens on a click; the middle of the view picks the man when the pointer is locked.
+- With a mouse the fan opens on a click; the middle of the view picks the man when the pointer is locked. As built (2026-11-18, after Arnd found the PC controls unclear; `src/app/mouse.ts`): the mouse is **free** at first (a drag looks, a left click on a man opens his fan round the cursor, the man under the cursor is named) and a plain click on the sea or deck **takes** it (pointer lock: it looks without a button, a brass dot marks the middle, a click opens the fan of the man under the dot and moving the mouse moves a brass pointer from the hub onto an order). The right button never opens anything: it steps back out of a ring, closes the fan, lowers the pointing arm. Escape frees the mouse; Escape again opens the captain's pause. A sheet frees it too. On a desk each tag with a key shows the key's cap.
 
 ## Who takes which orders
 

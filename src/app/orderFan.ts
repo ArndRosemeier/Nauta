@@ -6,20 +6,25 @@
  * there" raises the captain's arm: he looks where she is to go and gives it. The game never pauses.
  *
  * Slide the finger onto an order and lift, or lift on the man and tap the order: both work; lifting outside the fan
- * gives nothing. Nothing is written about what follows: the men answer in their bubbles (N4.5, from the match's
+ * gives nothing. With a mouse (mouse.ts) the left button does what a finger does and the right one steps back (out of
+ * a ring, the fan closed, the arm lowered); with the mouse taken, a click opens the fan of the man under the dot in
+ * the middle, and moving the mouse moves a brass pointer from the hub onto an order. On a desk each tag that has a key
+ * shows it. Nothing is written about what follows: the men answer in their bubbles (N4.5, from the match's
  * events), and what they do is seen. The fan's contents are fanOrders.ts (pure); this file is the DOM and the input.
  */
 import type { Order } from '../sim/orders';
 import type { Closures } from '../sim/crew/closures';
 import type { Spot } from '../sim/ship/plan';
-import { make } from './dom';
+import { keyCap, make } from './dom';
 import { makeButton } from './button';
-import { FAN_MOST, KEY_ORDERS, RANK_WORDS, waitingForWord, fanItems, fanSlots, manAt, manOnScreen, slotAt, slotPlaces, type FanItem, type FanSlot, type ManOnScreen } from './fanOrders';
+import { FAN_MOST, KEY_ORDERS, RANK_WORDS, waitingForWord, fanItems, fanSlots, keyOfItem, manAt, manOnScreen, slotAt, slotPlaces, type FanItem, type FanSlot, type ManOnScreen } from './fanOrders';
 import { inVoice, postOf, takerOf, type Officer, type Taker } from './officers';
 import type { Midshipman, Message } from './midshipman';
 import type { OrderSession } from './orderReport';
 import { KEY_ACTIONS, type KeyAction, type Settings } from './settings';
 import type { WordKey } from './words';
+import { LEFT_BUTTON, RIGHT_BUTTON } from './mouse';
+import { isTap, pressOf, type Press } from './press';
 
 /** The fan's ring round the finger, px (ui-style.md: tags 96 px across on a ring 132 px out). */
 const RING = 132;
@@ -76,6 +81,8 @@ export interface FanPage {
   thumb(e: PointerEvent): boolean;
   settings(): Settings;
   wording(): Readonly<Record<WordKey, string>>;
+  /** Whether the mouse is taken for looking (mouse.ts): the fan opens in the middle and a pointer of its own chooses. */
+  taken(): boolean;
 }
 
 /** The fan open now: whose, its items as shown, where its hub is, and how the order will travel. */
@@ -100,6 +107,13 @@ export class OrderFan {
   private readonly steer = make('div', 'nt-steer');
   private fireShown = false;
   private readonly mark = make('div', 'nt-steer-mark');
+  /** The taken mouse's pointer in the open fan, and where it is (it starts at the hub). */
+  private readonly pointer = make('div', 'nt-fan-pointer');
+  private virtual = { x: 0, y: 0 };
+  /** The man the mouse is on (under the cursor, or under the dot), named beside it; where the free mouse is over the view. */
+  private readonly aimName = make('div', 'nt-aim-name');
+  private aimed: Officer | null = null;
+  private hover: { x: number; y: number } | null = null;
   private open: Open | null = null;
   private slots: FanSlot[] = [];
   private tags: HTMLButtonElement[] = [];
@@ -109,9 +123,11 @@ export class OrderFan {
   private under = -1;
   /** The finger held went down on the open fan (a tap on its hub closes it), not on the man. */
   private onFan = false;
+  /** Where the held pointer went down. */
+  private downAt = { x: 0, y: 0 };
   private judged = -Infinity;
   /** A finger down on the walking thumb's half: where and when (a tap there opens a man's fan). */
-  private tap: { id: number; x: number; y: number; t: number } | null = null;
+  private tap: Press | null = null;
   /** Steer there: who will be told, and how. */
   private pointing: { runner: boolean } | null = null;
   private pointFor = 0;
@@ -122,17 +138,19 @@ export class OrderFan {
 
   constructor(private readonly view: HTMLElement, private readonly page: FanPage) {
     this.thumb.append(this.fire, this.steer);
-    document.body.append(this.root, this.thumb, this.mark);
+    document.body.append(this.root, this.thumb, this.mark, this.pointer, this.aimName);
+    this.pointer.style.display = 'none';
+    this.aimName.style.display = 'none';
     this.fire.type = 'button';
     this.fire.style.display = 'none';
     // The word: no walk, no fan, no midshipman; given the moment the thumb comes down (orders.md).
-    this.fire.addEventListener('pointerdown', (e) => { e.preventDefault(); this.word(); });
+    this.fire.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' && e.button !== LEFT_BUTTON) return; e.preventDefault(); this.word(); });
     this.root.style.display = 'none';
     this.showSteer(false);
     // Before the look's own listener (capture): a finger on a man opens his fan instead of turning the look.
     view.addEventListener('pointerdown', (e) => this.down(e), { capture: true });
     this.root.addEventListener('pointerdown', (e) => this.downOnFan(e));
-    window.addEventListener('pointermove', (e) => this.move(e));
+    window.addEventListener('pointermove', (e) => { this.track(e); this.move(e); });
     window.addEventListener('pointerup', (e) => this.up(e));
     window.addEventListener('pointercancel', (e) => { if (e.pointerId === this.finger) this.finger = null; });
     window.addEventListener('keydown', (e) => this.key(e));
@@ -141,6 +159,27 @@ export class OrderFan {
   /** The speech bubbles hear each order spoken (and the lookout asked) here. */
   onSent(fn: (s: Sent) => void): void {
     this.heard.add(fn);
+  }
+
+  /** Whether the fan holds the taken mouse (it moves the fan's pointer, not the look). */
+  get holdsLook(): boolean {
+    return this.open !== null && this.page.taken();
+  }
+
+  /** Escape: the fan closed and the arm lowered; false when neither was up (then Escape is the page's, the pause). */
+  escape(): boolean {
+    if (!this.open && !this.pointing) return false;
+    this.close();
+    this.stopPointing();
+    return true;
+  }
+
+  /** The mouse freed (Escape, a sheet): a fan opened in the middle for the dot is closed. */
+  freed(): void {
+    this.close();
+    this.aimed = null;
+    this.aimName.style.display = 'none';
+    this.view.style.cursor = '';
   }
 
   /** Whether a pointer is the fan's (the look leaves it alone). */
@@ -159,7 +198,7 @@ export class OrderFan {
     const waiting = waitingForWord(this.page.session.state, this.page.session.ship);
     if (waiting !== this.fireShown) {
       this.fireShown = waiting;
-      this.fire.textContent = this.page.wording().fire;
+      this.fire.replaceChildren(this.page.wording().fire, keyCap(this.page.settings().keys.fire));
       this.fire.style.display = waiting ? 'block' : 'none';
     }
     this.hailFor = Math.max(0, this.hailFor - dt);
@@ -208,9 +247,17 @@ export class OrderFan {
 
   /** A finger or a click on the view: on a man, his fan opens round it and the finger is the fan's. */
   private down(e: PointerEvent): void {
-    if (this.pointing) return;
-    if (this.open) { this.close(); return; }
-    if (this.page.thumb(e)) { this.tap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp }; return; }
+    const mouse = e.pointerType === 'mouse', taken = mouse && this.page.taken();
+    if (mouse && e.button !== LEFT_BUTTON) {
+      // The right button never opens anything: it steps back. Otherwise it drags the look, as the left one does.
+      if (e.button === RIGHT_BUTTON && (this.open || this.pointing)) { this.back(); e.stopImmediatePropagation(); }
+      return;
+    }
+    if (this.pointing) { if (taken) { this.giveSteer(); e.stopImmediatePropagation(); } return; }
+    if (taken) { this.downTaken(e); return; }
+    // A click beside the open fan closes it, and does no more (it neither looks nor takes the mouse).
+    if (this.open) { this.close(); if (mouse) e.stopImmediatePropagation(); return; }
+    if (this.page.thumb(e)) { this.tap = pressOf(e); return; }
     const r = this.view.getBoundingClientRect();
     const who = manAt(this.page.men(), e.clientX - r.left, e.clientY - r.top, MAN_REACH);
     if (!who || !this.openFor(who, e.clientX, e.clientY)) return;
@@ -218,22 +265,66 @@ export class OrderFan {
     e.stopImmediatePropagation();
   }
 
-  /** A finger on the open fan (a tap on a tag or the hub): the fan holds it until it lifts. */
+  /** The taken mouse clicked: the fan of the man under the dot opens in the middle; on the open fan, the click is on its pointer. */
+  private downTaken(e: PointerEvent): void {
+    if (this.open) { this.hold(e, true); this.light(this.virtual); e.stopImmediatePropagation(); return; }
+    const c = this.middle(), r = this.view.getBoundingClientRect(), who = manAt(this.page.men(), c.x - r.left, c.y - r.top, MAN_REACH);
+    if (!who || !this.openFor(who, c.x, c.y)) return;
+    this.hold(e);
+    e.stopImmediatePropagation();
+  }
+
+  /** A finger on the open fan (a tap on a tag or the hub): the fan holds it until it lifts. A right click steps back. */
   private downOnFan(e: PointerEvent): void {
+    e.stopPropagation();
+    if (e.pointerType === 'mouse' && e.button !== LEFT_BUTTON) { if (e.button === RIGHT_BUTTON) this.back(); return; }
     this.hold(e, true);
     this.move(e);
-    e.stopPropagation();
+  }
+
+  /** The right button: out of a ring to the fan it came from, the fan closed, or the arm lowered. */
+  private back(): void {
+    if (this.pointing) { this.stopPointing(); return; }
+    const o = this.open;
+    if (o?.back) this.layOut(o.back);
+    else this.close();
+  }
+
+  /** The middle of the view, where the taken mouse's dot is. */
+  private middle(): { x: number; y: number } {
+    const r = this.view.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  /** Where a pointer is: the taken mouse's is the fan's own pointer, any other where it is on the screen. */
+  private pointAt(e: PointerEvent): { x: number; y: number } {
+    return e.pointerType === 'mouse' && this.page.taken() ? this.virtual : { x: e.clientX, y: e.clientY };
+  }
+
+  /** The free mouse over the view (the man under it is named); off the view, or a finger, nothing. */
+  private track(e: PointerEvent): void {
+    if (e.pointerType !== 'mouse') return;
+    this.hover = !this.page.taken() && e.target === this.view ? { x: e.clientX, y: e.clientY } : null;
   }
 
   private hold(e: PointerEvent, onFan = false): void {
     this.finger = e.pointerId;
     this.onFan = onFan;
+    this.downAt = this.pointAt(e);
     this.under = -1;
   }
 
   private move(e: PointerEvent): void {
-    if (e.pointerId !== this.finger || !this.open) return;
-    const i = this.slotUnder(e.clientX, e.clientY);
+    if (!this.open) return;
+    // The taken mouse moves the fan's pointer whether a button is held or not (click, move, click; or hold, flick, lift).
+    if (e.pointerType === 'mouse' && this.page.taken()) this.nudge(e.movementX, e.movementY);
+    else if (e.pointerId !== this.finger) return;
+    this.light(this.pointAt(e));
+  }
+
+  /** The order under a point lit as under the finger. */
+  private light(p: { x: number; y: number }): void {
+    const i = this.slotUnder(p.x, p.y);
     if (i === this.under) return;
     this.tags[this.under]?.classList.remove('under');
     this.under = i;
@@ -244,7 +335,7 @@ export class OrderFan {
     const tap = this.tap;
     if (tap && tap.id === e.pointerId) {
       this.tap = null;
-      if (e.timeStamp - tap.t <= TAP_MS && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) <= TAP_SLOP) {
+      if (isTap(tap, e, TAP_MS, TAP_SLOP)) {
         const r = this.view.getBoundingClientRect(), who = manAt(this.page.men(), e.clientX - r.left, e.clientY - r.top, MAN_REACH);
         if (who) this.openFor(who, e.clientX, e.clientY);
       }
@@ -252,15 +343,53 @@ export class OrderFan {
     }
     if (e.pointerId !== this.finger || !this.open) return;
     this.finger = null;
-    const i = this.slotUnder(e.clientX, e.clientY), o = this.open;
+    const p = this.pointAt(e), i = this.slotUnder(p.x, p.y), o = this.open;
     if (i >= 0) { this.choose(this.slots[i]!.item); return; }
     // On the hub: a tap on the man (the fan stays for the next tap), or inside a ring, back to the fan it came from.
-    if (Math.hypot(e.clientX - o.x, e.clientY - o.y) <= HUB_REACH) {
+    // (A man near the screen's edge has his fan's hub moved inside it: lifting where the press went down is on the man too.)
+    if (Math.hypot(p.x - o.x, p.y - o.y) <= HUB_REACH || (!this.onFan && Math.hypot(p.x - this.downAt.x, p.y - this.downAt.y) <= HUB_REACH)) {
       if (o.back) this.layOut(o.back);
       else if (this.onFan) this.close();
       return;
     }
     this.close();
+  }
+
+  /** The taken mouse's pointer moved, kept within the fan's reach of its hub. */
+  private nudge(dx: number, dy: number): void {
+    const o = this.open!, most = RING + TAG / 2;
+    let x = this.virtual.x + dx - o.x, y = this.virtual.y + dy - o.y;
+    const d = Math.hypot(x, y);
+    if (d > most) { x *= most / d; y *= most / d; }
+    this.virtual = { x: o.x + x, y: o.y + y };
+    this.placePointer();
+  }
+
+  private placePointer(): void {
+    const on = this.open !== null && this.page.taken();
+    this.pointer.style.display = on ? 'block' : 'none';
+    if (on) this.pointer.style.transform = `translate(${this.virtual.x}px, ${this.virtual.y}px)`;
+  }
+
+  /**
+   * After each frame is drawn (the men where they were drawn): the man the mouse is on, named beside it with what a
+   * click does, under the free cursor (which becomes a hand), or under the dot in the middle when the mouse is taken.
+   * Never for a finger, never while a fan is open or he points.
+   */
+  nameAimed(): void {
+    const taken = this.page.taken(), at = taken ? this.middle() : this.hover;
+    let who: Officer | null = null;
+    if (at && !this.open && !this.pointing && !document.body.classList.contains('in-menu')) {
+      const r = this.view.getBoundingClientRect();
+      who = manAt(this.page.men(), at.x - r.left, at.y - r.top, MAN_REACH);
+    }
+    if (who !== this.aimed) {
+      this.aimed = who;
+      this.aimName.style.display = who ? 'block' : 'none';
+      if (who) { const say = this.page.wording(); this.aimName.replaceChildren(make('span', '', say[RANK_WORDS[who]]), make('small', '', say.aimOrders)); }
+      this.view.style.cursor = who && !taken ? 'pointer' : '';
+    }
+    if (who && at) { this.aimName.style.left = `${at.x}px`; this.aimName.style.top = `${at.y}px`; }
   }
 
   private slotUnder(x: number, y: number): number {
@@ -349,10 +478,18 @@ export class OrderFan {
     if (!on) return;
     const say = this.page.wording();
     this.steer.replaceChildren();
-    const give = makeButton(say.steerGive, () => { const p = this.pointing; this.stopPointing(); if (p) this.steerNow(p.runner, p.runner ? 'midshipman' : 'hail'); });
+    const give = makeButton(say.steerGive, () => this.giveSteer());
     const cancel = makeButton(say.steerCancel, () => this.stopPointing());
     give.className = 'nt-steer-give'; cancel.className = 'nt-link';
-    this.steer.append(make('span', 'nt-steer-help', say.steerHelp), give, cancel);
+    give.append(keyCap(this.page.settings().keys.steer));
+    this.steer.append(make('span', 'nt-steer-help', say.steerHelp), make('span', 'nt-steer-help nt-desk', say.steerMouse), give, cancel);
+  }
+
+  /** "Steer there" given where he points now (the tag, the key, or the taken mouse's click). */
+  private giveSteer(): void {
+    const p = this.pointing;
+    this.stopPointing();
+    if (p) this.steerNow(p.runner, p.runner ? 'midshipman' : 'hail');
   }
 
   // ---------- Keys ----------
@@ -361,7 +498,6 @@ export class OrderFan {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') || document.querySelector('.nt-backdrop')) return;
-    if (e.key === 'Escape') { this.close(); this.stopPointing(); return; }
     const keys = this.page.settings().keys, action = KEY_ACTIONS.find((a) => keys[a] === e.code);
     if (action) this.byKey(action);
   }
@@ -404,7 +540,7 @@ export class OrderFan {
     const most = RING + TAG / 2 + EDGE;
     const x = Math.min(window.innerWidth - most, Math.max(most, o.x)), y = Math.min(window.innerHeight - most, Math.max(most, o.y));
     this.open = { ...o, x, y };
-    const say = this.page.wording();
+    const say = this.page.wording(), keys = this.page.settings().keys;
     this.root.replaceChildren();
     this.root.style.display = 'block';
     this.root.style.left = `${x}px`;
@@ -419,6 +555,8 @@ export class OrderFan {
       tag.type = 'button';
       tag.append(make('span', '', say[item.word]));
       if (item.detail) tag.append(make('small', '', say[item.detail]));
+      const key = keyOfItem(item);
+      if (key) tag.append(keyCap(keys[key]));
       tag.style.left = `${places[i]![0]}px`;
       tag.style.top = `${places[i]![1]}px`;
       this.root.append(tag);
@@ -427,6 +565,9 @@ export class OrderFan {
     this.under = -1;
     this.judged = -Infinity;
     this.judge();
+    // The taken mouse's pointer starts at the hub of every fan and ring laid out.
+    this.virtual = { x, y };
+    this.placePointer();
   }
 
   /** Dim and ringed, as the match stands now. */
@@ -446,5 +587,6 @@ export class OrderFan {
     this.root.replaceChildren();
     this.tags = [];
     this.hub = null;
+    this.pointer.style.display = 'none';
   }
 }
