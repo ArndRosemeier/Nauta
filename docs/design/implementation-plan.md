@@ -395,7 +395,7 @@ Two captains sail around each other in the same sea, giving orders as text or bu
 - **Pace.** N3.3's first proposal stands as built: the speed table (plain sail, force 5: no way within 60° of the wind, 5 knots close-hauled, 10 on the beam, 11 to 11.5 on the quarter, 10 running), turns about three times as tight as a real brig's, a tack at speed through the wind in 20 to 55 s, stays missed from about 1 knot with about two and a half minutes to gather way again. Nothing here is tuned further before Arnd has sailed her at G3; what he judges there is whether closing takes too long, whether a tack feels like a risk worth taking, and whether a missed tack punishes too hard.
 - **Heaving to stops her.** "Heave to" is one order that does all of it: the main yards laid aback, the courses hauled up, the boom sail brailed, the helm put down. She loses her way within about a minute in a fresh breeze (force 5 and up) and lies still enough to fight or wait; in light winds the heavy hull coasts longer (about 100 s in force 4, 150 s in force 3, over four minutes in force 2, as N3.4 measured). That is left as it is for Arnd to feel at G3. Backing a mast alone stays possible as its own order.
 - **A course she cannot lie is refused in words, not obeyed into irons.** Ordered to steer closer than close-hauled, the master answers that she will not lie that course (an event with the reason) and steers close-hauled on the nearer tack. Tacking is the order that takes her through the wind: a course order never does. A course on the other tack is reached by wearing, and a course she cannot lie that falls on the other tack ends close-hauled on that tack, by wearing; a course in the wind's eye itself keeps the tack she is on. Whenever a course order makes her wear, the master says so (an event, "Wearing round, sir"), so the captain is never surprised by the long way round and can order a tack instead.
-- **The start.** The two ships start 1,500 m apart with the wind on the beam of the line between them, each under battle sail and steering to close, so neither has the weather position and the first decision is who works for it. The match's seed turns the whole picture round the compass and picks the force (2 to 6). Other starts (a chase, one ship to windward) come with the match settings in N7.
+- **The start.** (The distance is now set by time, see the balance sheet under N7: about three minutes of closing.) The two ships start 1,500 m apart with the wind on the beam of the line between them, each under battle sail and steering to close, so neither has the weather position and the first decision is who works for it. The match's seed turns the whole picture round the compass and picks the force (2 to 6). Other starts (a chase, one ship to windward) come with the match settings in N7.
 
 - **A sail's state is one number the crew moves** (2026-11-18, found by N3.10). How far each sail is set is a share from furled to sheeted home, held in the ship's state and advanced by the crew's work on it; the wind's force on the sail grows with it, and the drawing shows exactly that share, with no timer of its own. So what the captain sees being set is what is already driving her, on every machine.
 - **Every sail she carries draws on every course the master accepts** (2026-11-18, found by N3.10: full and by left square sails aback and shivering). "Full and by" means as close as she lies with every set sail full: the helmsman steers by the sails, not by a fixed angle. A sail shivers or lies aback only while she turns through the wind, when a mast is backed by order, or when she is caught by a shift, and then the master says so. `check:sailing` holds this for every wind and canvas.
@@ -674,12 +674,33 @@ A stranger can open the page and play a full duel alone or with a friend.
 | N7.2 | **From the title to the deck.** Title, play alone, host a match, join by code or from the list of open rooms, choice of navy, weather set or drawn by seed, a rematch. Listed in GameHub's lobby. | From a cold page to standing on deck in three taps; two strangers can find each other. | N3.7 | open |
 | N7.3 | **Settings.** Quality, violence, view motion, controls (touch layout, keys, sensitivity), sound levels. Kept on the device. | Every setting holds across a restart and works mid-match. | | open |
 | N7.4 | **The first match.** A new captain is led through sailing and fighting by his first lieutenant, in bubbles and by what the crew does, against a weak opponent. Skippable. | Someone who has never seen the game wins the first duel without reading anything outside it. | N7.1, N4.5 | open |
+| N7.5a | **First balance pass.** Pulled forward (2026-11-18) because the first computer duels all ended drawn after 25 to 30 minutes of broadsides. The damage, gunnery and ending rules retuned to the balance sheet below, with N7.1's duel check as the measure, and the design changes listed under it built. | N7.1's duel check prints a sheet inside the balance sheet's ranges, and from then on fails outside them. | N7.1 | open |
 | N7.5 | **Pace and balance.** The rule tables tuned together so a duel is tense, lasts 10 to 20 minutes and rewards seamanship. | The design thread's balance sheet is met in the 100-duel check and in play. | N7.1 | open |
 | N7.6 | **Tablet finish.** Loading within budget, download size within budget, a service worker so the app starts without a network once loaded, memory held over an hour of matches, heat and battery looked at. | `?bench` and an hour's play on the iPad within the budgets. | all | open |
 
 **Gate G7 (Arnd):** the game is good enough to show to others.
 
 ---
+
+**The balance sheet (design thread, 2026-11-18; what N7.5a and N7.5 tune to, measured over N7.1's computer duels between equal captains of middle skill):**
+
+| Measure | Wanted |
+| --- | --- |
+| From the start to the first broadside | about 3 minutes, in every wind |
+| From the first broadside to the end | most between 6 and 14 minutes; none under 4 |
+| The whole match | most between 10 and 20 minutes |
+| Draws by the clock | fewer than 1 in 20 |
+| How it ends | struck most often; sunk, burnt and blown up each seen, none more than a quarter; a dismasted ship is beaten within about 3 minutes |
+| The better captain (one skill level up) | wins about 3 in 4 |
+| Weather position | worth having: the ship that holds it wins clearly more than half between equals |
+
+**Design changes that go with it** (the first duels showed where the rules, not only the numbers, were wrong):
+
+- **The start is by time, not by distance.** The ships start as far apart as they close in about three minutes under battle sail in that wind (about 700 m in force 2 to 3, up to 1,500 m in force 5 to 6). This replaces the fixed 1,500 m of the N3 decisions.
+- **"Hull" means between wind and water.** Gun captains ordered to fire at her hull lay their guns at her waterline, not at her side 1.25 m up, as gunners did: with her roll and the waves a fair share of those balls strike below the water, and that is what sinks ships. A plugged hole still weeps, so water gains slowly even with a good carpenter.
+- **A helpless ship is beaten.** A ship that cannot sail, facing one that still can and still has half her guns, is beaten: the other lies off her bow or stern and rakes her. This joins the three conditions of N6.4.
+- **Splinters and grape hurt.** About half the men struck are killed or badly hurt, not a quarter, so a well-served broadside thins a gun deck and the fire slackens on the losing side: the fight tips instead of grinding on.
+- **Raking pays.** A ball that enters by the bow or stern travels the length of the deck, and each such ball counts for several fired into her side. The computer captain already tries for it; the damage must reward it.
 
 ## After N7
 
