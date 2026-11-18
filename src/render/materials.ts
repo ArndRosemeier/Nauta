@@ -11,6 +11,7 @@ import { SOLID_ATTRIBUTES, SOLID_STRIDES } from './ship/solid';
 import { ROPE_ATTRIBUTES, ROPE_STRIDES } from './ship/rope';
 import { DROP_ATTRIBUTE, DROP_STRIDE, FLING_ATTRIBUTE, makeSprayMaterial } from './spray';
 import { BALL_FROM, BALL_TO, BIT_ATTRIBUTE, BIT_FLING, BIT_LOOK, BIT_STRIDE, makeBallMaterial, makeGunfireMaterial } from './gunfire';
+import { PUFF_ATTRIBUTE, PUFF_LOOK, PUFF_STRIDE, PUFF_THROW, makeSmokeMaterial } from './smoke';
 import { SAIL_ATTRIBUTES, SAIL_STRIDES } from './ship/sailGrid';
 import { makeSailMaterial } from './ship/sailMaterial';
 import { makeCopperMaterial, makeGlowMaterial, makeIronMaterial, makeRopeMaterial, makeWoodMaterial } from './ship/shipMaterials';
@@ -29,7 +30,8 @@ export const defineKind = kinds.define.bind(kinds);
 /** Numbers per vertex of the game's own attributes. */
 const STRIDES: Readonly<Record<string, number>> = {
   [SEA_TILE_ATTRIBUTE]: SEA_TILE_STRIDE, [DROP_ATTRIBUTE]: DROP_STRIDE, [FLING_ATTRIBUTE]: DROP_STRIDE,
-  [BIT_ATTRIBUTE]: BIT_STRIDE, [BIT_FLING]: BIT_STRIDE, [BIT_LOOK]: BIT_STRIDE, [BALL_FROM]: BIT_STRIDE, [BALL_TO]: BIT_STRIDE, ...SOLID_STRIDES, ...ROPE_STRIDES, ...SAIL_STRIDES,
+  [BIT_ATTRIBUTE]: BIT_STRIDE, [BIT_FLING]: BIT_STRIDE, [BIT_LOOK]: BIT_STRIDE, [BALL_FROM]: BIT_STRIDE, [BALL_TO]: BIT_STRIDE,
+  [PUFF_ATTRIBUTE]: PUFF_STRIDE, [PUFF_THROW]: PUFF_STRIDE, [PUFF_LOOK]: PUFF_STRIDE, ...SOLID_STRIDES, ...ROPE_STRIDES, ...SAIL_STRIDES,
 };
 
 /** Sets an attribute of the game's own kinds on the Stage's stand-in of 3 vertices (StageOptions.attribute). */
@@ -64,6 +66,8 @@ export const SPRAY = defineKind('spray', ['position', DROP_ATTRIBUTE, FLING_ATTR
 export const GUNFIRE = defineKind('gunfire', ['position', BIT_ATTRIBUTE, BIT_FLING, BIT_LOOK], makeGunfireMaterial, NO_SHADOW);
 /** Shot in flight (gunfire.ts): a streak per ball, one instanced mesh. */
 export const SHOT_IN_FLIGHT = defineKind('shot in flight', ['position', BALL_FROM, BALL_TO], makeBallMaterial, NO_SHADOW);
+/** Powder smoke (smoke.ts, N5.5): big puffs poured from the ports, drifting with the wind, one instanced mesh the warm-up builds too (main.ts). */
+export const SMOKE = defineKind('smoke', ['position', PUFF_ATTRIBUTE, PUFF_THROW, PUFF_LOOK], makeSmokeMaterial, NO_SHADOW);
 /** The deep around an eye under water (seaView.ts): a sphere about the eye in the murk's colour. */
 export const DEEP = defineKind('deep water', ['position', 'normal', 'uv'], makeDeepMaterial, NO_SHADOW);
 

@@ -17,17 +17,17 @@
  */
 import { Rng } from '@futuremagic/core';
 import {
-  BufferGeometry, CustomBlending, InstancedBufferAttribute, Mesh, MeshBasicNodeMaterial, OneFactor, OneMinusSrcAlphaFactor, Vector3,
+  BufferGeometry, InstancedBufferAttribute, Mesh, MeshBasicNodeMaterial, Vector3,
   type Material,
 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, cameraProjectionMatrix, cross, float, length, max, mix, modelViewMatrix, normalize, positionGeometry, saturate,
+  abs, attribute, cameraProjectionMatrix, cross, float, length, max, mix, modelViewMatrix, normalize, oneMinus, positionGeometry, saturate,
   select, smoothstep, uniform, varyingProperty, vec3, vec4,
 } from 'three/tsl';
 import { GRAVITY } from '../sim/units';
 import type { Wind } from '../sim/wind';
 import type { BallSeen, Flash, Splash, Strike } from '../app/shotsSeen';
-import { eyeQuad, facingEye, flown, shiftStarts, type SprayView } from './spray';
+import { ageOf, eyeQuad, facingEye, flown, flownMaterial, flownMesh, keepFlown, passCorner, type SprayView } from './spray';
 import type { WakeMap } from './wakeMap';
 import { daylight } from './seaMaterial';
 import { SHIP_INPUTS } from './ship/shipMaterials';
@@ -119,46 +119,30 @@ export const GUNFIRE_INPUTS = {
   wind: uniform(new Vector3()),
 };
 
-/** Premultiplied alpha: fire adds (alpha 0), smoke and shards cover. */
-function premultiplied(m: MeshBasicNodeMaterial): MeshBasicNodeMaterial {
-  m.transparent = true;
-  m.depthWrite = false;
-  m.fog = false;
-  m.blending = CustomBlending;
-  m.blendSrc = OneFactor;
-  m.blendDst = OneMinusSrcAlphaFactor;
-  // The colours are premultiplied already: three's own premultiplying (`premultipliedAlpha`) would black out the fire.
-  m.premultipliedAlpha = false;
-  return m;
-}
-
 /** The bits' material: quads facing the eye, flown in the vertex stage; fire, smoke, dust or a shard by their kind. */
 export function makeGunfireMaterial(): MeshBasicNodeMaterial {
   const I = GUNFIRE_INPUTS;
-  const m = premultiplied(new MeshBasicNodeMaterial());
-  m.name = 'gunfire';
   const vCorner = varyingProperty('vec2', 'vBitCorner'), vAge = varyingProperty('float', 'vBitAge'), vKind = varyingProperty('float', 'vBitKind');
-  m.vertexNode = Fn(() => {
+  return flownMaterial('gunfire', true, () => {
     const bit = attribute(BIT_ATTRIBUTE, 'vec4'), fling = attribute(BIT_FLING, 'vec4'), look = attribute(BIT_LOOK, 'vec4');
-    const age = I.now.sub(bit.w), life = look.y, k = look.z;
+    const age = ageOf(I.now, bit), life = look.y, k = look.z;
     const alive = select(age.greaterThanEqual(0).and(age.lessThan(life)), float(1), float(0));
     // dv/dt = k·(wind − v) − fall·g: v drifts to u = wind − fall·g/k; x = x0 + u·t + (v0 − u)·(1 − e^(−k·t))/k.
     const t = max(age, 0), u = vec3(I.wind.x, look.w.mul(-GRAVITY).div(k), I.wind.z);
     const centre = flown(bit.xyz, fling.xyz, u, k, t);
     const swell = select(look.x.equal(PUFF), float(PUFF_SWELL - 1), select(look.x.equal(DUST), float(DUST_SWELL - 1), select(look.x.equal(FLASH), float(1), float(0))));
     const size = fling.w.mul(swell.mul(t).add(1));
-    vCorner.assign(positionGeometry.xy);
+    passCorner(vCorner);
     vAge.assign(age.div(life));
     vKind.assign(look.x);
     return facingEye(centre, size.mul(alive));
-  })();
-  m.colorNode = Fn(() => {
-    const r = length(vCorner), fade = float(1).sub(smoothstep(float(1 - FADE_OUT), float(1), vAge));
-    const soft = saturate(float(1).sub(r)).pow(2);
-    const hard = float(1).sub(smoothstep(float(1 - SHARD_EDGE), float(1), r));
+  }, () => {
+    const r = length(vCorner), fade = oneMinus(smoothstep(float(1 - FADE_OUT), float(1), vAge));
+    const soft = saturate(oneMinus(r)).pow(2);
+    const hard = oneMinus(smoothstep(float(1 - SHARD_EDGE), float(1), r));
     const day = daylight();
     // Fire: bright, added (alpha 0), dying fast.
-    const left = saturate(float(1).sub(vAge)), fire = vec3(...FLASH_COLOUR).mul(FLASH_GLOW).mul(soft).mul(left).mul(left);
+    const left = saturate(oneMinus(vAge)), fire = vec3(...FLASH_COLOUR).mul(FLASH_GLOW).mul(soft).mul(left).mul(left);
     const smoke = soft.mul(PUFF_DENSITY).mul(fade);
     const dust = soft.mul(fade).mul(1 / 2);
     const shard = hard.mul(fade);
@@ -167,16 +151,13 @@ export function makeGunfireMaterial(): MeshBasicNodeMaterial {
     const a = select(isFire, float(0), select(isPuff, smoke, select(isShard, shard, dust)));
     const albedo = select(isPuff, vec3(SMOKE_ALBEDO), select(isShard, vec3(...SHARD_ALBEDO), vec3(...DUST_ALBEDO)));
     return vec4(select(isFire, fire, day.mul(albedo).mul(a)), a);
-  })();
-  return m;
+  });
 }
 
 /** The balls' material: each a streak from its back end to its front, facing the eye, at least a pixel wide. */
 export function makeBallMaterial(): MeshBasicNodeMaterial {
-  const m = premultiplied(new MeshBasicNodeMaterial());
-  m.name = 'shot in flight';
   const vCover = varyingProperty('float', 'vBallCover'), vAcross = varyingProperty('float', 'vBallAcross');
-  m.vertexNode = Fn(() => {
+  return flownMaterial('shot in flight', true, () => {
     const a = attribute(BALL_FROM, 'vec4'), b = attribute(BALL_TO, 'vec4');
     // In the view's space (the eye at its origin): along the streak by the corner's x (−1 back, +1 front), across it
     // by y, and out a radius past each end.
@@ -188,12 +169,10 @@ export function makeBallMaterial(): MeshBasicNodeMaterial {
     vCover.assign(radius.div(w).mul(b.w));
     vAcross.assign(positionGeometry.y);
     return cameraProjectionMatrix.mul(vec4(p.add(side.mul(w).mul(positionGeometry.y)).add(ahead.mul(w).mul(positionGeometry.x)), 1));
-  })();
-  m.colorNode = Fn(() => {
-    const a = saturate(float(1).sub(abs(vAcross))).mul(2).min(1).mul(vCover);
+  }, () => {
+    const a = saturate(oneMinus(abs(vAcross))).mul(2).min(1).mul(vCover);
     return vec4(daylight().mul(BALL_ALBEDO).mul(a), a);
-  })();
-  return m;
+  });
 }
 
 /** A unit quad's geometry with instanced attributes of `stride` numbers each. */
@@ -228,31 +207,19 @@ export class GunfireView {
     [this.bit, this.fling, this.look] = b.attributes as [InstancedBufferAttribute, InstancedBufferAttribute, InstancedBufferAttribute];
     const d = this.bit.array as Float32Array, l = this.look.array as Float32Array;
     for (let i = 0; i < MOST_BITS; i++) { d[i * BIT_STRIDE + W] = DEAD; l[i * BIT_STRIDE + Y] = 1; l[i * BIT_STRIDE + Z] = 1; }
-    this.bits = this.quadMesh(b.geometry, bitMaterial, 'gunfire', MOST_BITS);
+    this.bits = flownMesh(b.geometry, bitMaterial, 'gunfire', MOST_BITS, GUNFIRE_ORDER);
     const s = quads(MOST_BALLS, [BALL_FROM, BALL_TO]);
     [this.ballFrom, this.ballTo] = s.attributes as [InstancedBufferAttribute, InstancedBufferAttribute];
-    this.balls = this.quadMesh(s.geometry, ballMaterial, 'shot in flight', 1);
+    this.balls = flownMesh(s.geometry, ballMaterial, 'shot in flight', 1, GUNFIRE_ORDER);
   }
 
-  private quadMesh(g: BufferGeometry, material: Material, name: string, count: number): Mesh {
-    const m = new Mesh(g, material);
-    m.name = name;
-    m.count = count;
-    m.frustumCulled = false;
-    m.renderOrder = GUNFIRE_ORDER;
-    return m;
-  }
 
   /**
    * Once a frame: the clock `t`, the wind, the sea's `origin`; the guns' flashes and the strikes whose time has come
    * (strikes as world points: `struck`), and the balls flying now.
    */
   showGunfire(t: number, wind: Wind, origin: Vector3, flashes: readonly Flash[], strikes: readonly { readonly s: Strike; readonly at: Vector3; readonly out: Vector3 }[], balls: readonly BallSeen[], longSix: (f: Flash) => boolean): void {
-    if (!origin.equals(this.origin)) this.follow(origin);
-    this.bits.position.copy(this.origin);
-    this.balls.position.copy(this.origin);
-    GUNFIRE_INPUTS.now.value = t;
-    GUNFIRE_INPUTS.wind.value.set(wind.x * wind.speed, 0, wind.z * wind.speed);
+    keepFlown(GUNFIRE_INPUTS, t, wind, this.origin, origin, [this.bit], [this.bits, this.balls]);
     for (const f of flashes) this.muzzleBurst(f, longSix(f) ? LONG_SIX_SHARE : 1);
     for (const s of strikes) this.splinter(s.s.t, s.at, s.out);
     if (this.written) { this.bit.needsUpdate = this.fling.needsUpdate = this.look.needsUpdate = true; this.written = false; }
@@ -308,11 +275,6 @@ export class GunfireView {
     }
   }
 
-  /** The frame follows the sea's origin: every bit moved by the step. */
-  private follow(origin: Vector3): void {
-    shiftStarts(this.bit, origin.x - this.origin.x, origin.z - this.origin.z);
-    this.origin.copy(origin);
-  }
 
 }
 

@@ -5,7 +5,10 @@
  * for the word, closes to about 450 m, turns to bring the other brig abeam to starboard and runs on a minute (lids up,
  * guns run out); then the word, and the broadside in pieces of the match's clock: the flash through the port from the
  * gun standpoint, the whole side firing from 50 m off, the gun leaping back, and the fall of shot about her through the
- * glass from the crosstrees (splashes, white water, splinters). `dusk`: the same at 20:00. `foe`: the other brig
+ * glass from the crosstrees (splashes, white water, splinters); then her smoke (N5.5) hiding the other brig from
+ * her rail and clearing on the wind, over half a minute. `larboard`: the other brig brought abeam to larboard instead
+ * (the other tack's smoke, blown the other way; seen from 50 m off and aloft, the gun standpoint being on the
+ * starboard side). `dusk`: the same at 20:00. `foe`: the other brig
  * commanded by the computer captain (`&foe=master`) instead, and her broadside received: through the glass as she
  * fires, then from 50 m off and over the rail as her shot arrives.
  * Each picture is `<out dir>/<name>.png`; fails if the page throws or a broadside never comes.
@@ -19,16 +22,22 @@ mkdirSync(out, { recursive: true });
 const SEED = 1;
 const HOUR = words.includes('dusk') ? 20 : 11;
 const FOE = words.includes('foe');
+/** Which side she fires: +1 the other brig abeam to starboard, -1 to larboard. */
+const SIDE = words.includes('larboard') ? -1 : 1;
 /** She turns to bring the other abeam once within this far, m, and runs on so long, s, for the guns to be run out. */
 const TURN_AT = 450;
+/** To larboard: the two close within so far (m) and pass, apart again by so far, before she turns. */
+const PASSED = { close: 150, past: 220 };
 const READYING = 60;
 /** The match runs on in steps of so many seconds while waiting, at most so long. */
 const WAIT = { step: 5, most: 900 };
 const COMPASS = 360;
 const ABEAM = 90;
 
-/** The pictures of a broadside fired: each the standpoint (`glass-<standpoint>`: through the glass at her) and the seconds the match runs on before it. */
-const FIRED = [['gun', 0.08], ['50-m-off', 0.03], ['gun', 0.12], ['glass-crosstrees', 1], ['glass-crosstrees', 0.4]];
+/** The pictures of a broadside fired: each the standpoint (`glass-<standpoint>`: through the glass at her) and the seconds the match runs on before it; then her smoke. */
+const FIRED = SIDE > 0
+  ? [['gun', 0.08], ['50-m-off', 0.03], ['gun', 0.12], ['glass-crosstrees', 1], ['glass-crosstrees', 0.4], ['glass-rail', 1.5], ['50-m-off', 2], ['glass-rail', 5], ['50-m-off', 0.1], ['glass-rail', 20]]
+  : [['50-m-off', 0.08], ['glass-crosstrees', 1.4], ['50-m-off', 2], ['glass-crosstrees', 5], ['50-m-off', 0.1], ['50-m-off', 20]];
 /** The pictures of her broadside received, from the instant she is seen to fire. */
 const RECEIVED = [['glass-crosstrees', 0], ['glass-crosstrees', 0.3], ['50-m-off', 0.4], ['rail', 0.4], ['50-m-off', 0.6]];
 
@@ -74,7 +83,13 @@ if (FOE) {
   await say('hold for my word');
   let waited = 0;
   while (waited < WAIT.most && (await sail('apart')) > TURN_AT) { await sail('onward', WAIT.step, false); waited += WAIT.step; }
-  const abeam = Math.round(((await sail('bearingOfOther')) - ABEAM + COMPASS) % COMPASS);
+  // To larboard: the two start heading at each other square to the wind, so she cannot bring the other abeam to
+  // larboard as they close (that heading is into the wind's eye); they pass, and then she bears away before the wind.
+  if (SIDE < 0) {
+    while (waited < WAIT.most && (await sail('apart')) > PASSED.close) { await sail('onward', WAIT.step, false); waited += WAIT.step; }
+    while (waited < WAIT.most && (await sail('apart')) < PASSED.past) { await sail('onward', WAIT.step, false); waited += WAIT.step; }
+  }
+  const abeam = Math.round(((await sail('bearingOfOther')) - SIDE * ABEAM + COMPASS) % COMPASS);
   await say(`steer ${String(abeam).padStart(3, '0')}`);
   await sail('onward', READYING, false);
   console.log(`the other brig ${Math.round(await sail('apart'))} m off; fire`);

@@ -34,11 +34,12 @@ import { watchGlass } from './app/glassInput';
 import { earthDrop } from './render/earth';
 import { VERSION } from 'virtual:nauta/version';
 import { SprayView } from './render/spray';
-import { GUNFIRE, SHOT_IN_FLIGHT, SPRAY } from './render/materials';
+import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
 import { GunfireView, fallInSea } from './render/gunfire';
+import { SmokeView } from './render/smoke';
 import { gunsSeen } from './app/gunsSeen';
-import { ShotsSeen, type Strike } from './app/shotsSeen';
+import { ShotsSeen, type Flash, type Strike } from './app/shotsSeen';
 import { battery } from './sim/guns/guns';
 import { toWorld, type ShipPose } from './sim/ship/motion';
 import { shipY, shipZ } from './sim/ship/section';
@@ -219,6 +220,8 @@ async function start(): Promise<void> {
   const spray = ship ? new SprayView(SPRAY.make()) : null;
   // Gunfire (plan N5.4a): flashes, puffs, splinters and the balls in flight, both ships' as the match fires them.
   const fireDrawn = match ? new GunfireView(GUNFIRE.make(), SHOT_IN_FLIGHT.make()) : null;
+  // Powder smoke (N5.5): poured from the ports as the guns fire, drifting with the wind.
+  const smoke = match ? new SmokeView(SMOKE.make()) : null;
   const shots = match ? new ShotsSeen() : null;
   if (match && shots) match.on('events', (events) => shots.take(events));
   await furnished?.ready();
@@ -227,7 +230,7 @@ async function start(): Promise<void> {
   await herGuns?.ready();
   const fittingGroups = [furnished, herFittings].flatMap((f) => (f ? [...f.zones.values()].map((d) => d.group) : []));
   const gunGroups = [guns, herGuns].flatMap((g) => (g ? [g.draws.group] : []));
-  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(fireDrawn ? [fireDrawn.bits, fireDrawn.balls] : []), ...fittingGroups, ...gunGroups]);
+  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(fireDrawn ? [fireDrawn.bits, fireDrawn.balls] : []), ...(smoke ? [smoke.mesh] : []), ...fittingGroups, ...gunGroups]);
   // The crews' shaders, a few men at each level of detail wearing between them all the crew wears, at full speed
   // behind the loading screen (docs/SHADERS.md rule 5), as MasterWorld warms its townsfolk.
   // The cap stays open (share 1) until the crews are in: before the first frame no frame frees a slot.
@@ -257,6 +260,7 @@ async function start(): Promise<void> {
   if (other) await view.stage.add(other.group);
   if (spray) await view.stage.add(spray.mesh);
   if (fireDrawn) { await view.stage.add(fireDrawn.bits); await view.stage.add(fireDrawn.balls); }
+  if (smoke) await view.stage.add(smoke.mesh);
   if (crew) {
     note.textContent = 'bringing the crews aboard';
     await view.stage.add(crew.aboard);
@@ -365,6 +369,7 @@ async function start(): Promise<void> {
     view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k);
     for (const w of seaView.wakes) w.levels = k.wakeLevels;
     if (fireDrawn) fireDrawn.plenty = k.gunfireShare;
+    if (smoke) smoke.plenty = k.gunfireShare;
   };
   apply(quality.knobs);
   // The quality the player chose (plan N7.3): a level fixed, or measured again from the top for `auto`.
@@ -514,7 +519,9 @@ async function start(): Promise<void> {
     // and white water on the sea), splinters where they strike.
     if (match && shots && fireDrawn) {
       const seen = shots.sightsAt(seaTime), struck = seen.strikes.map((s) => strikeInWorld(s, match.pose(s.ship)));
-      fireDrawn.showGunfire(seaTime, blowing, seaView.origin, seen.flashes, struck.filter((s) => s !== null), seen.balls, (f) => battery()[f.gun]?.gun === 'long6');
+      const longSix = (f: Flash) => battery()[f.gun]?.gun === 'long6';
+      fireDrawn.showGunfire(seaTime, blowing, seaView.origin, seen.flashes, struck.filter((s) => s !== null), seen.balls, longSix);
+      smoke?.showSmoke(seaTime, blowing, seaView.origin, seen.flashes, longSix);
       if (spray) fallInSea(seen.splashes, spray, seaView.wakes, [ship?.drawn ?? null, other?.group.visible ? other.drawn : null], fireDrawn.plenty);
     }
     for (const w of seaView.wakes) w.laySplashes(seaTime, seaView.origin.x, seaView.origin.z);
