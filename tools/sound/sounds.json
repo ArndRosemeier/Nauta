@@ -114,6 +114,63 @@
       "count": 6,
       "most": 5,
       "gap": 1.2
+    },
+    {
+      "id": "bed/hull-run-a",
+      "kind": "bed",
+      "prompt": "The sound of water running along the wooden side of a sailing ship at sea, heard leaning over her rail close to the water: a steady rushing and gurgling wash streaming past the planks, small swirls and sucking eddies, now and then a soft surge as she lifts and settles, no wind, no breaking waves, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/hull-run-b",
+      "kind": "bed",
+      "prompt": "The sound of the sea sliding past the hull of a wooden ship far from land, heard close to the water at her side: a lively hiss and chuckle of water streaming aft along the planks, bubbles and foam fizzing in her wake, gentle rising and falling swashes, no wind, no breaking waves, no shore, no beach, no surf, no seagulls, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/hull-inside-a",
+      "kind": "bed",
+      "prompt": "The sound of the sea heard from inside the hold of a wooden sailing ship, close against her planking: water sloshing, gurgling and trickling on the other side of the oak boards, wet knocks and bubbling swirls as she rolls, a dull enclosed wash rising and draining away, clear and close but muffled by the wood, no wind, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/hull-inside-b",
+      "kind": "bed",
+      "prompt": "The sound of water rushing past the outside of a wooden hull, heard from inside a small cabin below deck of a sailing ship at sea: a muffled deep gurgling and swishing through the planks, slow rising and falling surges, a low enclosed rumble, no wind, no creaking, no voices, no talking, no music, continuous for thirty seconds"
+    },
+    {
+      "id": "creak/timber",
+      "kind": "calls",
+      "prompt": "The sound of ten separate creaks of the timbers of an old wooden sailing ship's deck as she rolls at sea, each a single dry woody creak or squeak of oak and rope straining, some short and some drawn out, one at a time with three seconds of complete silence between them, no water, no wind, no voices, no talking, no music",
+      "count": 10,
+      "most": 2.5,
+      "quiet": 0.03,
+      "gap": 0.5
+    },
+    {
+      "id": "creak/hull",
+      "kind": "calls",
+      "prompt": "The sound of ten separate deep groans of a wooden ship's hull working in a seaway, heard from below deck, each a long low creaking moan of heavy oak frames and planks straining against each other, one at a time with three seconds of complete silence between them, no water, no wind, no voices, no talking, no music",
+      "count": 10,
+      "most": 3.5
+    },
+    {
+      "id": "slap/counter",
+      "kind": "calls",
+      "prompt": "The sound of eight separate waves slapping up under the overhanging stern of a wooden ship, each a hollow heavy smack of water against the planks above it and a gurgling splash falling back, one at a time with three seconds of complete silence between them, no wind, no voices, no talking, no music",
+      "count": 8,
+      "most": 3,
+      "quiet": 0.05,
+      "gap": 0.5
+    },
+    {
+      "id": "step/deck",
+      "kind": "steps",
+      "prompt": "The sound of a man walking slowly in leather shoes across the wooden deck of a sailing ship, footsteps on thick oak planks, each step a solid hollow knock with a faint creak, about one step a second, nothing else, no water, no wind, no voices, no talking, no music",
+      "count": 12
+    },
+    {
+      "id": "step/rung",
+      "kind": "steps",
+      "prompt": "The sound of a man climbing a steep wooden ladder on a ship, one step at a time, each a hard knock of a leather shoe on a wooden rung with a small creak, about one step a second, nothing else, no water, no wind, no voices, no talking, no music",
+      "count": 8
     }
   ]
 }

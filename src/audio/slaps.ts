@@ -52,6 +52,9 @@ export function seaRms(sea: SeaState, t: number): number {
   return Math.sqrt(energy);
 }
 
+/** The `n`th seeded draw of stream `what` from `seed`, 0..1 (each watch's draws are counted, so each is new). */
+export const seededDraw = (seed: number, n: number, what: number): number => hashToFloat(hash3i(seed, n, what, 0));
+
 /** The watch's seeded draws, each kind its own stream (counted, so each draw is new). */
 const DRAW = { angle: 0, reach: 1, chance: 2, kind1: 3, kind2: 4, kind3: 5 } as const;
 
@@ -94,7 +97,7 @@ export class SlapWatch {
   }
 
   private pick(what: number, n: number): number {
-    return hashToFloat(hash3i(this.seed, n, what, 0));
+    return seededDraw(this.seed, n, what);
   }
 
   /** Give a point a new seeded place around the listener; it waits to see the water rise there before it hears a crest. */

@@ -164,7 +164,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The zone under a place on a deck | `src/render/ship/zones.ts#zoneUnder` |
 | The portals between zones (deck openings, doors) | `src/render/ship/zones.ts#portals` |
 | The openings through one deck | `src/render/ship/zones.ts#openingsOn` |
-| The middle of an oblong of the plan | `src/render/ship/zones.ts#rectCentre` |
+| The middle of an oblong of the plan | `src/sim/ship/plan.ts#rectCentre` |
 | Which zones can be seen from the eye (portals on screen) | `src/render/ship/visibility.ts#Visibility` |
 | Each zone's solids and ropes, and her doors | `src/render/ship/parts.ts#ShipParts` |
 | Her outside: bands of planking, wales, copper, keel, stem, transom | `src/render/ship/hullSide.ts#buildOutside` |
@@ -203,7 +203,20 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The sea's RMS height at a moment | `src/audio/slaps.ts#seaRms` |
 | Which sound a crest makes at a force of the sea (lap, slap, crest, burst) | `src/audio/slaps.ts#slapKind` |
 | Slaps and crests placed near the listener where crests pass | `src/audio/slaps.ts#SlapWatch` |
-| The sea and the wind heard: the sound engine, the listener's ears, muffling under water and below deck | `src/audio/seaSound.ts#SeaSound` |
+| The sea and the wind heard: the sound engine, the listener's ears, muffling under water and through the room the ear is in | `src/audio/seaSound.ts#SeaSound` |
+| The `n`th seeded draw of a stream (the sound watches' draws) | `src/audio/slaps.ts#seededDraw` |
+| The ship's own sound as data: creaks, the counter's slap, the water along her, below deck's muffle and echo, footsteps (the takes and their prompts: tools/sound/sounds.json) | `src/audio/shipTuning.ts#CREAK_WORK` |
+| The room the ear is in: open air on deck, below deck muffled by how near an opening to the sky is, its echo | `src/audio/acoustics.ts#roomAt` |
+| A space and the spaces open to it, as one room | `src/audio/acoustics.ts#roomSpaces` |
+| A room's echo time by Sabine's rule from the plan | `src/audio/acoustics.ts#roomT60` |
+| The distance in plan from a place to an oblong | `src/audio/acoustics.ts#distanceToRect` |
+| How hard she works in a frame (the change of her roll and pitch rates) | `src/audio/creaks.ts#workOf` |
+| Her timber creaking as she works, placed in her near the ear | `src/audio/creaks.ts#CreakWatch` |
+| The sea slapping up under her counter | `src/audio/counter.ts#CounterWatch` |
+| The water along her sides (on deck from over each side, below deck from inside her planking) by its flow | `src/audio/hullWater.ts#HullWater` |
+| The water's speed along her side from her way and the sea's rise and fall against it | `src/audio/hullWater.ts#flowOf` |
+| The captain's footfalls as his body's soles come down, and on ladder treads | `src/audio/footsteps.ts#Footsteps` |
+| The brig herself heard: her sounds played, the room returned for the sea's | `src/audio/shipSound.ts#ShipSound` |
 | Plain data to bytes and back, canonical and exact (the state, orders and events as they travel and are saved) | `src/sim/codec.ts#encode` |
 | Bytes back to plain data, bit for bit | `src/sim/codec.ts#decode` |
 | A 64-bit hash of bytes, for comparing machines | `src/sim/codec.ts#hashBytes` |

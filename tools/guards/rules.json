@@ -12,7 +12,13 @@
     "src/probe/waves.ts",
     "src/audio/ambience.ts",
     "src/audio/slaps.ts",
-    "src/audio/tuning.ts"
+    "src/audio/tuning.ts",
+    "src/audio/shipTuning.ts",
+    "src/audio/acoustics.ts",
+    "src/audio/creaks.ts",
+    "src/audio/counter.ts",
+    "src/audio/hullWater.ts",
+    "src/audio/footsteps.ts"
   ],
   "banned": [
     "three",

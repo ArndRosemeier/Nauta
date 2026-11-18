@@ -16,6 +16,8 @@ import { makeTestBodies } from './render/testBodies';
 import { loadShip } from './render/ship/loadShip';
 import { ShipView } from './render/ship/shipView';
 import { SeaSound } from './audio/seaSound';
+import { ShipSound } from './audio/shipSound';
+import { OPEN_AIR } from './audio/acoustics';
 import { Vector3 } from 'three/webgpu';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
 import { makeWind, meanWind } from './sim/wind';
@@ -138,6 +140,8 @@ async function start(): Promise<void> {
   document.addEventListener('visibilitychange', () => quality.interrupt());
   // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want.
   const sound = new SeaSound(import.meta.env.BASE_URL, MATCH_SEED);
+  // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
+  const shipSound = ship ? new ShipSound(sound.engine, MATCH_SEED) : null;
   const ear = new Vector3(), facing = new Vector3(), crown = new Vector3();
   // `?bench`: the fixed flight, measured once the quality level is chosen (plan N1.9).
   const bench = params.bench > 0 ? new BenchRun(el('bench'), params.bench, {
@@ -180,7 +184,10 @@ async function start(): Promise<void> {
     view.camera.getWorldPosition(ear);
     view.camera.getWorldDirection(facing);
     crown.copy(view.camera.up).applyQuaternion(view.camera.quaternion);
-    sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], ship?.below ?? 0);
+    // Her own sound first: it gives the room the sea and the wind are heard through. She has no way on her yet (way 0).
+    const body = walking?.drawnBody, soles = body ? [body.feet.L, body.feet.R] : null;
+    const room = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: where.eye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: 0 }) : OPEN_AIR;
+    sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], room);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
     bench?.worked(performance.now() - now);
