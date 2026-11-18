@@ -180,7 +180,7 @@ body.watching:not(.in-menu) .nt-watch-hint { display: block; left: 50%; transfor
 body.watching:not(.in-menu) .nt-watch-caption { display: block; right: max(14px, env(safe-area-inset-right)); top: calc(max(14px, env(safe-area-inset-top)) + 8px); padding: 6px 16px; border-radius: 22px; background: var(--lacquer-over); color: var(--ivory-soft); font: 15px/1.2 var(--word-font); pointer-events: none; }
 .nt-watch-hint[hidden], .nt-watch-bar[hidden], .nt-watch-arrows[hidden], .nt-watch-caption[hidden] { display: none !important; }
 /* Nobody is commanded from here: nothing of the order tools shows. */
-body.watching #orders, body.watching .nt-bubbles, body.watching .nt-fan, body.watching .nt-thumb, body.watching .nt-steer-mark, body.watching #reports-button { display: none !important; }
+body.watching #orders, body.watching .nt-bubbles, body.watching .nt-fan, body.watching .nt-officers, body.watching .nt-aim, body.watching .nt-aim-name, body.watching .nt-fan-pointer, body.watching .nt-thumb, body.watching .nt-steer-mark, body.watching #reports-button { display: none !important; }
 
 /* ?sail: the order panel (src/app/orderPanel.ts), a working panel until the order fan (N4.4) */
 #orders {

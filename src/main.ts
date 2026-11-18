@@ -88,7 +88,7 @@ import { CaptainView } from './render/captain/captainView';
 import { CrewTrialRun } from './app/crewTrialRun';
 import { formatBytes } from './probe/report';
 import { Vector3 } from 'three/webgpu';
-import { DEGREE, MS_PER_SECOND, apartOnWater, bearingTo, wrapBearing } from './sim/units';
+import { DEGREE, MS_PER_SECOND, STEPS_PER_SECOND, apartOnWater, bearingTo, wrapBearing } from './sim/units';
 import { simTime } from './sim/state';
 import { parseOrder } from './sim/orders';
 import { apparentSpeed } from './sim/ship/sailing';
@@ -104,6 +104,8 @@ const NOT_ORDER_KEYS: readonly KeyAction[] = ['forward', 'back', 'left', 'right'
 const START_LOOK: Look = { yaw: -1.2, pitch: 0.12 };
 /** The longest step of time one frame may take, seconds (a tab that slept does not jump the clock). */
 const MAX_FRAME_SECONDS = 0.1;
+/** The checks' flight (`__nautaWatch.fly`) steps the eye at the simulation's step, s. */
+const DRIVE_STEP = 1 / STEPS_PER_SECOND;
 /** How often the HUD's numbers are written anew, ms. */
 const HUD_EVERY_MS = 500;
 /** The match's seed until matches exist (N3.1): the same wind and sea on every load. */
@@ -179,6 +181,15 @@ declare global {
     };
     /** The crews drawn (N4.3), for the browser checks: what they hold and where. */
     __nautaCrew?: CrewView;
+    /**
+     * Watching a battle (`?watch`, plan N7.8), for the browser checks: `company` glides the eye to a ship or both (or leaves it); `flyFor`
+     * holds a push (forward, strafe, climb; -1..1; `boost`) for so many seconds at once without drawing, looking `yaw` and `pitch`
+     * (rad, the world's) if given; answers where the eye is (x, y, z) and the ships' distances from it.
+     */
+    __nautaWatch?: {
+      company: (to: 'british' | 'both' | 'french' | 'stay') => void;
+      flyFor: (seconds: number, push?: { forward?: number; strafe?: number; climb?: number; boost?: boolean }, look?: { yaw?: number; pitch?: number }) => { eye: number[]; apart: number[] };
+    };
     __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string; press: (forward?: number, strafe?: number) => void };
   }
 }
@@ -369,7 +380,18 @@ async function start(): Promise<void> {
   const glassField = el('glass');
   // Watching a battle (plan N7.8): the free camera and its controls; while it is active the captain is not drawn and no order is given.
   const hullsNow = (): Hull[] => (match ? match.state.ships.flatMap((_, i) => { const p = match.pose(i); return p ? [{ x: p.x, z: p.z, heading: p.heading }] : []; }) : []);
-  const spectator = ship && match ? new Spectator({ words: () => words(settings.now.language), push: () => stick?.push() ?? NO_PUSH, desk: () => matchMedia('(hover: hover) and (pointer: fine)').matches, orderKey: (code) => KEY_ACTIONS.some((a) => !NOT_ORDER_KEYS.includes(a) && settings.now.keys[a] === code) }) : null;
+  const spectator = ship && match ? new Spectator({ hulls: hullsNow, spoken: () => words(settings.now.language), push: () => stick?.push() ?? NO_PUSH, desk: () => matchMedia('(hover: hover) and (pointer: fine)').matches, orderKey: (code) => KEY_ACTIONS.some((a) => !NOT_ORDER_KEYS.includes(a) && settings.now.keys[a] === code) }) : null;
+  if (spectator) window.__nautaWatch = {
+    company: (to) => spectator.choose(to),
+    flyFor: (seconds, push = {}, look = {}) => {
+      input.look = { yaw: look.yaw ?? input.look.yaw, pitch: look.pitch ?? input.look.pitch };
+      spectator.forced = { push: { forward: push.forward ?? 0, strafe: push.strafe ?? 0 }, climb: push.climb ?? 0, boost: push.boost ?? false };
+      for (let t = 0; t < seconds; t += DRIVE_STEP) { const f = spectator.eyeFor(DRIVE_STEP, input.look, hullsNow(), (x, z) => surfaceAt(sea, x, z, seaTime).height); input.look = f.look; }
+      spectator.forced = null;
+      const [x, y, z] = spectator.eye;
+      return { eye: [x, y, z], apart: hullsNow().map((h) => Math.hypot(h.x - x, h.z - z)) };
+    },
+  };
   const watching = (caption: string | null) => {
     if (!spectator) return;
     if (caption === null) spectator.leaveBattle(); else input.look = spectator.begin(hullsNow(), caption);
@@ -490,7 +512,7 @@ async function start(): Promise<void> {
     eyeAt: (eye, yaw, pitch) => { where = { name: 'check', eye, look: { yaw, pitch } }; input.look = { yaw, pitch }; },
     firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
   };
-  if (match && !params.menu) {
+  if (match && !params.menu && !params.watch) {
     const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.useSession(s), () => words(settings.now.language), () => matchMinutes(settings.now.match));
     match.onChange(() => rooms.refresh());
     settings.watch((s, before) => { if (before && before.language !== s.language) rooms.refresh(); });
@@ -685,7 +707,7 @@ async function start(): Promise<void> {
         crew.poolInUse = phase && !phase.pool ? 0 : startCrew.pool;
         crew.everyFrame = phase?.everyFrame ?? false;
         crew.noShadows = phase?.noShadows ?? false;
-        crew.animate(dt, { state: between, mine: spectator?.watching ? spectator.nearestShip : match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds(), violence: settings.now.violence });
+        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds(), violence: settings.now.violence });
       }
       jump = 0;
       sky.below = ship.below;

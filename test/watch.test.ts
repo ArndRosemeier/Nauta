@@ -103,6 +103,13 @@ test('the eye keeps company with a ship: carried by what she moves; staying, it 
   c.onward(1 / 30, { yaw: 0, pitch: 0 }, still, null);
   c.onward(1 / 30, { yaw: 0, pitch: 0 }, still, null);
   assert.deepEqual([c.x, c.z], [13, 8]);
+  // Changing company: not carried by the difference between the old and the new.
+  c.onward(1 / 30, { yaw: 0, pitch: 0 }, still, { x: 0, z: 0 });
+  c.parted();
+  c.onward(1 / 30, { yaw: 0, pitch: 0 }, still, { x: 500, z: 500 });
+  assert.deepEqual([c.x, c.z], [13, 8]);
+  c.onward(1 / 30, { yaw: 0, pitch: 0 }, still, { x: 501, z: 500 });
+  assert.deepEqual([c.x, c.z], [14, 8]);
 });
 
 test('a glide arrives at its place and look, goes with the ship while it goes, and ends at the viewer\'s hand', () => {

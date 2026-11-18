@@ -86,11 +86,11 @@ export function vantageOf(ship: Hull): Vantage {
 }
 
 /** The share of the distance between the ships the eye stands off the line between them, and how high (also a share), for seeing both. */
-const BOTH_OFF = 0.8;
-const BOTH_HEIGHT = 0.3;
+const BOTH_OFF = 1.1;
+const BOTH_HEIGHT = 0.12;
 /** The least the eye stands off the line, and the least height, m: the ships may start close. */
-const BOTH_OFF_LEAST = 160;
-const BOTH_HEIGHT_LEAST = 45;
+const BOTH_OFF_LEAST = 200;
+const BOTH_HEIGHT_LEAST = 40;
 
 /** A good place to see both ships at once: to one side of the line between them, high enough to see over the nearer. */
 export function vantageOfBoth(a: Hull, b: Hull): Vantage {
@@ -124,6 +124,11 @@ export class FreeCam {
 
   get gliding(): boolean {
     return this.glide !== null;
+  }
+
+  /** The company is changing: the eye is not carried by the difference between the old company and the new one, only by the new one's moves from here. */
+  parted(): void {
+    this.company = null;
   }
 
   /** Glides to a vantage (its place given where the company is now, as the world has it). */

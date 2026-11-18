@@ -36,21 +36,17 @@ const START_HEIGHT = 60;
 const HINT_MS = 12000;
 /** A ship's middle stands this high over the water for the distance to her, m: the eye's nearness is to her hull, not her waterline. */
 const SHIP_MIDDLE = 8;
-/**
- * The ship farther from the eye is taken as the nearer only when it is this much nearer than the one held (the crews'
- * near figures follow it; swapping them costs, so they do not flicker when the eye is between).
- */
-const CLOSER = 0.6;
-
 /** The words the controls speak with, by key. */
 type Say = Readonly<Record<WordKey, string>>;
 
 /** What the controls ask of the page. */
 export interface SpectatorPage {
   /** The words now (the language chosen). */
-  readonly words: () => Say;
+  readonly spoken: () => Say;
   /** What the walking thumb and the walking keys push now. */
   readonly push: () => Push;
+  /** Where the ships lie now (the match as it stands, not as the last frame drew it). */
+  readonly hulls: () => readonly Hull[];
   /** Whether the pointing device is a desk's (keys and mouse) rather than a finger. */
   readonly desk: () => boolean;
   /** Whether a key (its `code`) is one of the player's order keys: a watcher gives no order, so it is held back from the order fan. */
@@ -64,7 +60,6 @@ export class Spectator {
   private held = new Set<string>();
   private buttonClimb = 0;
   private hulls: readonly Hull[] = [];
-  private nearest = 0;
   private readonly bar = make('nav', 'nt-watch-bar');
   private readonly arrows = make('div', 'nt-watch-arrows');
   private readonly hint = make('p', 'nt-watch-hint');
@@ -73,6 +68,8 @@ export class Spectator {
   private up!: HTMLButtonElement;
   private down!: HTMLButtonElement;
   private hintTimer = 0;
+  /** For the browser checks: a push, a climb and the boost held in place of the thumb and keys (null: the thumb and keys). */
+  forced: { readonly push: Push; readonly climb: number; readonly boost: boolean } | null = null;
 
   constructor(private readonly page: SpectatorPage) {
     const hide = (el: HTMLElement) => { el.hidden = true; document.body.append(el); };
@@ -84,14 +81,14 @@ export class Spectator {
     this.relabel();
   }
 
+  /** Where the eye is now (world metres). */
+  get eye(): Vec3 {
+    return this.cam.at;
+  }
+
   /** Whether a battle is being watched now: the page draws no captain and takes no orders while it is. */
   get watching(): boolean {
     return this.on;
-  }
-
-  /** Which ship the eye is nearest, with the hold of `CLOSER` (the crews' near figures are on her). */
-  get nearestShip(): number {
-    return this.nearest;
   }
 
   /**
@@ -125,7 +122,7 @@ export class Spectator {
 
   /** The words are drawn again (a change of language, a change of device): buttons, hint. */
   relabel(): void {
-    const say = this.page.words();
+    const say = this.page.spoken();
     const companyButton = (name: Company, label: string) => {
       const b = makeButton(label, () => this.choose(name));
       b.classList.toggle('on', name === this.company);
@@ -152,11 +149,14 @@ export class Spectator {
   }
 
   /** A button chosen (or the key beside it): where the eye keeps company, and gliding there for a ship or both. */
-  private choose(to: Company): void {
+  choose(to: Company): void {
     this.company = to;
+    this.cam.parted();
     for (const [name, b] of this.buttons) b.classList.toggle('on', name === to);
-    if (to === 'stay' || this.hulls.length === 0) return;
+    if (to === 'stay') return;
+    this.hulls = this.page.hulls();
     const [a, b] = this.hulls;
+    if (!a) return;
     this.cam.glideTo(to === 'both' && b ? vantageOfBoth(a!, b) : vantageOf(to === 'french' && b ? b : a!));
   }
 
@@ -186,18 +186,11 @@ export class Spectator {
   eyeFor(dt: number, look: Look, ships: readonly Hull[], water: (x: number, z: number) => number): { readonly where: Standpoint; readonly look: Look } {
     this.hulls = ships;
     const c = this.cam;
-    let near = Infinity, nearestNow = this.nearest, best = Infinity;
-    ships.forEach((s, i) => {
-      const d = Math.hypot(s.x - c.x, SHIP_MIDDLE - c.y, s.z - c.z);
-      near = Math.min(near, d);
-      if (d < best) { best = d; nearestNow = i; }
-    });
-    // Held until the other is clearly the nearer.
-    const held = ships[this.nearest];
-    if (!held || best < Math.hypot(held.x - c.x, SHIP_MIDDLE - c.y, held.z - c.z) * CLOSER) this.nearest = nearestNow;
+    const near = Math.min(Infinity, ...ships.map((s) => Math.hypot(s.x - c.x, SHIP_MIDDLE - c.y, s.z - c.z)));
     const pressed = (keys: readonly string[]) => keys.some((k) => this.held.has(k));
     const climb = (pressed(CLIMB_KEYS) ? 1 : 0) - (pressed(DESCEND_KEYS) ? 1 : 0) + this.buttonClimb;
-    const turned = c.onward(dt, look, { push: this.page.push(), climb: Math.max(-1, Math.min(1, climb)), boost: pressed(BOOST_KEYS), near, water: water(c.x, c.z) }, this.companyNow());
+    const f = this.forced, ask = { push: f?.push ?? this.page.push(), climb: f?.climb ?? Math.max(-1, Math.min(1, climb)), boost: f?.boost ?? pressed(BOOST_KEYS) };
+    const turned = c.onward(dt, look, { ...ask, near, water: water(c.x, c.z) }, this.companyNow());
     const eye: Vec3 = c.at;
     return { where: { name: 'watch', eye, look: turned, off: true, world: true }, look: turned };
   }

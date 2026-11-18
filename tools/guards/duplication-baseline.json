@@ -22,5 +22,9 @@
   {
     "key": "same name: render/crew/crewView.ts#warm + render/crew/nearPool.ts#warm",
     "reason": "The crew view's warm builds the crowd figures' shaders and hands the pool the dresses to warm; the pool's warm dresses its characters in each and gives them to the Stage's warm-up."
+  },
+  {
+    "key": "idiom: [.rng] in render/gunfire.ts + render/smoke.ts + render/spray.ts",
+    "reason": "False alarm: each effect keeps its own seeded generator for its own drops, puffs and bits (`this.rng.range`, `this.rng.next`); there is nothing to share. It shows or not as other files change the finder's word weights (it appeared when the free camera's files were added)."
   }
 ]
