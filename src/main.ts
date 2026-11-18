@@ -19,6 +19,7 @@ import { SeaView } from './render/seaView';
 import { makeTestBodies } from './render/testBodies';
 import { loadShip } from './render/ship/loadShip';
 import { ShipView } from './render/ship/shipView';
+import type { SailsSummary } from './render/ship/sailsView';
 import { Furnishings } from './render/ship/furnishings';
 import { loadFittings } from './render/ship/fittings';
 import { furnish } from './sim/ship/furnish';
@@ -82,11 +83,13 @@ declare global {
      */
     __nautaScene?: (query: string) => Promise<void>;
     /**
-     * Sailing (`?sail`), for the browser checks: `give` an order in words (as the order panel takes them; answers why
-     * not, or ''), and run the match `onward` by so many seconds at once (the sails as drawn catch up with it), resolving
-     * once the next frame is drawn; `sails`: how many of her sails are drawn set and furled (tools/shot/sails.mjs).
+     * Sailing (`?sail`), for the browser checks: `say` an order in words (as the order panel takes them; answers why
+     * not, or ''), and run the match `onward` by so many seconds at once (the sails as drawn catch up with it on the next
+     * frame), resolving once that frame is drawn, or at once when `draw` is false; `sails`: how her sails are drawn
+     * (set, furled, aback, shivering); `aback`: how many of her sails the match has aback now; `windFrom`: the
+     * bearing the mean wind blows from, degrees (tools/shot/sails.mjs).
      */
-    __nautaSail?: { give: (words: string) => string; onward: (seconds: number) => Promise<void>; sails: () => { sails: number; set: number; furled: number; deepest: number } };
+    __nautaSail?: { say: (words: string) => string; onward: (seconds: number, draw?: boolean) => Promise<void>; sails: () => SailsSummary; aback: () => number; windFrom: () => number };
   }
 }
 
@@ -221,13 +224,16 @@ async function start(): Promise<void> {
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
   let jump = 0, jumped: (() => void) | null = null;
   if (match) window.__nautaSail = {
-    give: (words) => { const o = parseOrder(words, match.ship); if (typeof o === 'string') return o; match.give(o); return ''; },
-    onward: (seconds) => new Promise((done) => {
+    say: (words) => { const o = parseOrder(words, match.ship); if (typeof o === 'string') return o; match.give(o); return ''; },
+    onward: (seconds, draw = true) => new Promise((done) => {
       // The match runs on piece by piece, each pumped at once: one jump of minutes would leave it running late instead.
       for (let left = seconds; left > 0; left -= JUMP_PIECE) { ahead += Math.min(JUMP_PIECE, left); match.frame(); }
-      jump += seconds; jumped = done;
+      jump += seconds;
+      if (draw) jumped = done; else done();
     }),
     sails: () => ship!.sails.summary(),
+    aback: () => sailsSeen(match.state, match.ship)?.standing.filter((st) => st.aback).length ?? 0,
+    windFrom: () => blowing.from / DEGREE,
   };
   // Walking, the calm view's button has the top right corner: the panel stands below it.
   if (orders && walking) el('orders').classList.add('under-motion');

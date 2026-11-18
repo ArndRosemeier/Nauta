@@ -161,7 +161,7 @@ export interface SailPoint {
 }
 
 /** Points nearer than this are one, in the cloth's coordinates. */
-const SAME_POINT = 1e-3;
+export const SAME_POINT = 1e-3;
 /** Newton steps to find a point's place in its sail, and the least change worth another. */
 const SOLVE_STEPS = 24;
 const SOLVE_CLOSE = 1e-7;
@@ -239,7 +239,10 @@ export function clothAt(row: ArrayLike<number>, u: number, v: number, t: number,
   if (row[R.kind] === FLAG) return flagAt(row, u, v, t, out);
   const square = row[R.kind] === SQUARE ? 1 : 0, taken = row[R.taken]!, uKeep = row[R.uKeep]!, vKeep = row[R.vKeep]!;
   const vs = taken > NONE ? Math.min(1, Math.max(0, (v - taken) / (1 - taken))) : v;
-  const ug = square ? 1 / 2 + (u - 1 / 2) * (1 + (uKeep - 1) * vs) : u * uKeep;
+  // Gathered: a square sail toward its yard's middle; a fore-and-aft sail toward its luff, a headsail (its head one
+  // corner) as a smaller triangle whose head has come down its stay and whose clew has come in.
+  const tri = !square && corners[2]!.distanceTo(corners[3]!) < SAME_POINT ? 1 : 0;
+  const ug = square ? 1 / 2 + (u - 1 / 2) * (1 + (uKeep - 1) * vs) : (u * uKeep * (1 - vs * tri)) / Math.max(1 - vs * vKeep * tri, NONE);
   const vg = vs * vKeep + square * (1 - vKeep) * SCALLOP * vs * scallop(u);
   bilerp(corners, ug, vg, out);
   vec(row, R.belly, belly);

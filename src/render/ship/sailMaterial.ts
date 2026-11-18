@@ -15,7 +15,7 @@ import {
   round, select, sin, smoothstep, step, texture, textureLoad, transformNormalToView, uniform, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import {
-  BREATHE_HZ, BREATHE_U, BREATHE_V, BUNT, FLAG, NONE, REEF_ROLL, ROLL_ENDS, ROLL_IN, ROLL_TURNS, ROW_TEXELS, SCALLOP, SHIVER_FALL, SHIVER_HZ,
+  BREATHE_HZ, BREATHE_U, BREATHE_V, BUNT, FLAG, NONE, REEF_ROLL, SAME_POINT, ROLL_ENDS, ROLL_IN, ROLL_TURNS, ROW_TEXELS, SCALLOP, SHIVER_FALL, SHIVER_HZ,
   SHIVER_SLANT, SHIVER_WAVES,
 } from './sailForm';
 import { ENSIGN_PATTERN, FLAGS, PENNANT_PATTERN, SAIL_ATLAS_SIZE } from './sailGrid';
@@ -41,6 +41,8 @@ export const SAIL_TIME = uniform(0);
 const TURN = 2 * Math.PI;
 /** The step for the cloth's slope in its own coordinates (the normal), and the farthest a point's slope is taken from its head. */
 const SLOPE = 0.004;
+/** Below this squared length the two slopes make no normal (a sail's head where its edges meet; some software GPUs lose a short one): the cloth is lit as if facing up. */
+const NO_NORMAL = 1e-14;
 
 // --- The shape (sailForm.ts clothAt, line for line).
 /** A row's texels by number. */
@@ -62,7 +64,10 @@ const sailCloth = Fn(([row, u, v, t]) => {
   const p00 = t0.xyz, p10 = t1.xyz, p01 = t2.xyz, p11 = t3.xyz;
   const square = float(1).sub(min(t0.w, 1)), taken = t6.w, uKeep = t6.y, vKeep = t6.z, reefed = taken.greaterThan(NONE);
   const vs = select(reefed, clamp(v.sub(taken).div(max(float(1).sub(taken), NONE)), 0, 1), v);
-  const ug = mix(u.mul(uKeep), float(1 / 2).add(u.sub(1 / 2).mul(float(1).add(uKeep.sub(1).mul(vs)))), square);
+  // Gathered toward the yard's middle (square), the luff (fore-and-aft), or a headsail as a smaller triangle down its stay (clothAt).
+  const tri = float(1).sub(square).mul(step(p01.distance(p11), SAME_POINT));
+  const gathered = u.mul(uKeep).mul(float(1).sub(vs.mul(tri))).div(max(float(1).sub(vs.mul(vKeep).mul(tri)), NONE));
+  const ug = mix(gathered, float(1 / 2).add(u.sub(1 / 2).mul(float(1).add(uKeep.sub(1).mul(vs)))), square);
   const vg = vs.mul(vKeep).add(square.mul(float(1).sub(vKeep)).mul(SCALLOP).mul(vs).mul(scallop(u)));
   const belly = t4.xyz;
   // The belly's shape: each edge's share by how near it lies, and the middle's (t5: the v = 0, v = 1, u = 0, u = 1 edges).
@@ -200,7 +205,8 @@ export function makeSailMaterial(crossfade = false): MeshStandardNodeMaterial {
     const vd = min(v, 1 - 2 * SLOPE), su = select(u.greaterThan(1 - SLOPE), float(-SLOPE), float(SLOPE)), sv = select(vd.greaterThan(1 - 2 * SLOPE), float(-SLOPE), float(SLOPE));
     const q = clothShape(row, u, vd, t);
     const du = clothShape(row, u.add(su), vd, t).sub(q).mul(su.sign()), dv = clothShape(row, u, vd.add(sv), t).sub(q).mul(sv.sign());
-    normal.assign(normalize(cross(du, dv)));
+    const n = cross(du, dv), n2 = n.dot(n);
+    normal.assign(select(n2.greaterThan(NO_NORMAL), n.mul(n2.inverseSqrt()), vec3(0, 1, 0)));
     return p;
   })();
   m.normalNode = transformNormalToView(normal).mul(faceDirection);

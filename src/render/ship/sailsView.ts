@@ -41,6 +41,8 @@ const CLEWED_UP = { drop: 0.2, foot: 0.55 } as const;
 const BRAILED = 0.1;
 const HAULED_DOWN = { luff: 0.12, foot: 0.2 } as const;
 const STOWED = 0.7;
+/** A headsail's clew, its sheet slack (hauled down, or not yet sheeted home), hangs this share of its foot lower. */
+const SLACK_CLEW = 0.35;
 /** How long the crew takes, s: to let a furled sail's gaskets go, to sheet it home and hoist, to clew it up, to roll it up on the yard; to take a reef in or shake it out. */
 const SECONDS = { loose: 5, sheet: 12, clew: 10, furl: 25, reef: 30 } as const;
 /** How quickly the drawn belly and shiver follow the wind, s (a gust fills a sail, it does not jump). */
@@ -48,6 +50,8 @@ const FOLLOW = { belly: 0.5, shiver: 0.6 } as const;
 /** The flags: they stream fully out from this wind (m/s), hang limp below this; their waves' depth as a share of the fly, how many along it, and their rate (Hz, and more per m/s). */
 const STREAM = { from: 0.5, full: 7 } as const;
 const FLAG_WAVE = 0.035;
+/** In a calm a flag still droops a little away from its halliard (its stream never below this), never lying flat on it. */
+const LIMP_LEAN = 0.25;
 const FLAG_WAVES: Readonly<Record<string, number>> = { ensign: 1.6, pennant: 3 };
 const FLAG_RATE = { base: 0.8, perWind: 0.12 } as const;
 /** Seed of each sail's and flag's phase. */
@@ -76,6 +80,16 @@ export interface Blowing {
 }
 
 /** Her sails' and flags' state for the sail kind, and the frames of the lines made fast to her sails. */
+/** The sails as drawn, counted (`SailsView.summary`). */
+export interface SailsSummary {
+  readonly sails: number;
+  readonly set: number;
+  readonly furled: number;
+  readonly aback: number;
+  readonly shivering: number;
+  readonly deepest: number;
+}
+
 export class SailsView {
   /** One row per sail, then the flags (sailForm.ts ROW). */
   readonly rows: Float32Array;
@@ -115,15 +129,20 @@ export class SailsView {
     this.blowing = wind;
   }
 
-  /** How many sails she has, how many are drawn sheeted home, how many rolled up or hauled down, and the deepest belly drawn (m, + filled, - aback): what the browser checks read. */
-  summary(): { sails: number; set: number; furled: number; deepest: number } {
-    let set = 0, furled = 0, deepest = 0;
+  /**
+   * How many sails she has, how many are drawn sheeted home, how many rolled up or hauled down, how many drawn aback
+   * and how many shivering, and the deepest belly drawn (m, + filled, - aback): what the browser checks read.
+   */
+  summary(): SailsSummary {
+    let set = 0, furled = 0, aback = 0, shivering = 0, deepest = 0;
     for (const d of this.drawn) {
       if (d.drop >= 1) set++;
       if (d.drop <= 0 && d.roll >= 1) furled++;
+      if (d.depth * d.drop < 0) aback++;
+      if (d.shiver * d.drop > SHIVER_DEPTH / 2) shivering++;
       if (Math.abs(d.depth * d.drop) > Math.abs(deepest)) deepest = d.depth * d.drop;
     }
-    return { sails: this.drawn.length, set, furled, deepest };
+    return { sails: this.drawn.length, set, furled, aback, shivering, deepest };
   }
 
   /** The topsail and topgallant yards' hoists as their sails are drawn (1 hoisted; lowered on the cap when furled, a little down when reefed). */
@@ -147,10 +166,15 @@ export class SailsView {
       if (first) {
         d.drop = set ? 1 : 0; d.roll = set ? 0 : 1; d.taken = taken;
       } else if (set) {
-        if (d.roll > 0) d.roll = Math.max(0, d.roll - dt / SECONDS.loose);
-        else d.drop = Math.min(1, d.drop + dt / SECONDS.sheet);
-      } else if (d.drop > 0) d.drop = Math.max(0, d.drop - dt / SECONDS.clew);
-      else d.roll = Math.min(1, d.roll + dt / SECONDS.furl);
+        // Let fall, then sheeted home: a long step (a jump of the browser checks) goes on into the next part.
+        const loosed = Math.min(d.roll, dt / SECONDS.loose);
+        d.roll -= loosed;
+        if (d.roll <= 0) d.drop = Math.min(1, d.drop + (dt - loosed * SECONDS.loose) / SECONDS.sheet);
+      } else {
+        const clewed = Math.min(d.drop, dt / SECONDS.clew);
+        d.drop -= clewed;
+        if (d.drop <= 0) d.roll = Math.min(1, d.roll + (dt - clewed * SECONDS.clew) / SECONDS.furl);
+      }
       const reefRate = (f.sail.reefShare * dt) / SECONDS.reef;
       d.taken += Math.max(-reefRate, Math.min(reefRate, taken - d.taken));
       if (first) d.taken = taken;
@@ -203,6 +227,8 @@ export class SailsView {
       // A headsail or staysail: its clew swung to its sheet, about its luff.
       const luff = this.scratch.subVectors(c[2]!, c[0]!).normalize();
       c[1]!.sub(c[0]!).applyAxisAngle(luff, angle).add(c[0]!);
+      // Its sheet slack while it is hauled down or not yet sheeted home: the clew hangs lower.
+      c[1]!.y -= (1 - d.drop) * SLACK_CLEW * c[1]!.distanceTo(c[0]!);
       belly.crossVectors(luff, new Vector3().subVectors(c[1]!, c[0]!)).normalize();
       if (belly.x * side < 0) belly.negate();
     }
@@ -259,7 +285,7 @@ export class SailsView {
       r[R.taper] = flag.taper;
       r[R.waves] = FLAG_WAVES[flag.id]!;
       r[R.waveRate] = FLAG_RATE.base + FLAG_RATE.perWind * speed;
-      r[R.stream] = k;
+      r[R.stream] = LIMP_LEAN + (1 - LIMP_LEAN) * k;
     });
   }
 }
