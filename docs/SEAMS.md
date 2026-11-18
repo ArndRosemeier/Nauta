@@ -373,9 +373,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A man as a full character, looking as his crowd figure does | `src/app/crewLooks.ts#fullLook` |
 | What a man wears and his build as a key (alike men differ in colour only) | `src/app/crewLooks.ts#wearing` |
 | What a man's face shows: the causes from the simulation, the table, one frame of it | `src/app/faces.ts#FACES` |
-| What the violence setting shows at each level (blood, stains, the killed on deck or taken below, the trail) | `src/app/violence.ts#SHOWN` |
+| What the violence setting shows at each level (blood, stains, the killed bare or covered, the trail) | `src/app/violence.ts#SHOWN` |
 | The blood about a man struck down (pools, drops, spatter), seeded | `src/app/violence.ts#bloodOf` |
-| A shirt colour stained toward blood, how far a hurt stains it, how much of the killed is taken below at mild | `src/app/violence.ts#stained` |
+| A shirt colour stained toward blood, how far a hurt stains it, how far the canvas is laid over the killed at mild | `src/app/violence.ts#stained` |
 | Blood on a ship's decks: dishes of paint written on the page, falls kept so a level change shows them all | `src/render/crew/blood.ts#Blood` |
 | A man being carried below: held between his two bearers | `src/app/crewDrawn.ts#carryOf` |
 | A stand-in for a fight's casualties (`?sail&casualties=`), to look at the men under fire | `src/app/scars.ts#casualtiesOf` |
@@ -612,6 +612,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A fight at its start, its time as the match setting says | `src/sim/end.ts#startFight` |
 | How a fight ends: beaten, burnt out, the match's time and the master's warning, striking asked twice (first proposals) | `src/sim/rules/end.ts#BEATEN` |
 | The pair of guns a gun is of (one crew a pair) | `src/sim/crew/roster.ts#pairOf` |
+| Where the killed are carried: a place of each man's own in the hold | `src/sim/crew/dead.ts#deadSpot` |
+| The men killed, as a set (roster places) | `src/sim/damage.ts#killedOf` |
+| The canvas over a man killed at the mild level | `src/render/crew/shroud.ts#Shrouds` |
 | What the crew does for her life (N6.3): the repairs wanted now from her damage, her orders and where her men are, in the order they are manned | `src/sim/crew/repairs.ts#repairsDue` |
 | How many of a repair's men are at its spot (a fire party at its fire, the pump hands) | `src/sim/crew/crew.ts#atWork` |
 | The men the first lieutenant takes from the guns, in the quarter bill's order (waisters, then the last places of each gun) | `src/sim/crew/roster.ts#billOrder` |

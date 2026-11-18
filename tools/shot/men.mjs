@@ -4,8 +4,8 @@
  * some men of both crews killed, badly and lightly wounded from the start, and the crews do what they do for them. For
  * each violence level (mild, plain, unsparing; `SHOT_LEVELS=plain,unsparing` picks) a page is opened with that level
  * kept on the device, and pictures are taken: the fallen and the first bearers, the bearers carrying the badly wounded
- * below, and the deck some time on (the blood grown, the killed taken below at mild). Each is
- * `<out dir>/<level>-<name>.png`. It fails unless the page reports ready and throws nothing.
+ * below, and the deck some time on (the blood grown, the killed under canvas at mild). Each is
+ * `<out dir>/<level>-<name>.png`. `SHOT_MOMENTS=4,12` picks the seconds to photograph at. It fails unless the page reports ready and throws nothing.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,9 +16,9 @@ const out = process.argv[2] ?? 'shots/men';
 mkdirSync(out, { recursive: true });
 const levels = (process.env.SHOT_LEVELS ?? 'mild,plain,unsparing').split(',');
 /** The seconds the match runs on between pictures: the fallen and the bearers setting out, carrying, and long after. */
-const MOMENTS = [['fallen', 0], ['carrying', 9], ['later', 50]];
+const MOMENTS = process.env.SHOT_MOMENTS ? process.env.SHOT_MOMENTS.split(',').map((t) => [`t${t}`, Number(t)]) : [['fallen', 0], ['carrying', 9], ['later', 50]];
 /** What each picture looks at: the first man hurt so (killed, badly, wounded) on the weather deck, from this far aft and this high, m, looking down this much, rad. */
-const VIEWS = [['killed', 'killed'], ['badly', 'carried'], ['wounded', 'wounded']];
+const VIEWS = (process.env.SHOT_VIEWS ?? 'killed,badly,wounded').split(',').map((h) => [h, h === 'badly' ? 'carried' : h]);
 const FROM = { aft: 0.6, up: 3.2 };
 const PITCH = -1.3;
 /** Real seconds given the near pool to dress the men now nearest before a picture. */
@@ -36,11 +36,11 @@ for (const level of levels) {
   await page.addStyleTag({ content: '#version,#orders,#room{display:none!important}' });
   /** The eye put beside the n-th man hurt so, looking forward at him; false when none. */
   const lookAt = (harm) => page.evaluate(([h, f, pitch]) => {
-    // The highest of them: on the weather deck, not below it.
-    const man = window.__nautaCrew.hurtMen(0).filter((x) => x.harm === h).sort((p, q) => q.y - p.y)[0];
+    // The highest of them, nearest the middle of the deck (where the eye can stand over him): on the weather deck, not below it.
+    const man = window.__nautaCrew.hurtMen(0).filter((x) => x.harm === h).sort((p, q) => Math.round(q.y) - Math.round(p.y) || Math.abs(p.x) - Math.abs(q.x))[0];
     if (!man) return false;
     window.__nautaSail.eyeAt([man.x, man.y + f.up, man.z + f.aft], 0, pitch);
-    return `${man.man} at ${man.x.toFixed(1)}, ${man.y.toFixed(1)}, ${man.z.toFixed(1)} in ${man.space} (${man.clip}, ${man.shown ? 'shown' : 'hidden'}, ${man.seen ? 'seen' : 'not in view'})`;
+    return `${man.man} at ${man.x.toFixed(1)}, ${man.y.toFixed(1)}, ${man.z.toFixed(1)} in ${man.space} (${man.clip}, ${man.shown ? 'shown' : 'hidden'}, ${man.seen ? 'seen' : 'not in view'}, ${man.covered.toFixed(1)} covered, shroud ${man.shroud ? `at ${man.shroud.x.toFixed(1)}, ${man.shroud.y.toFixed(1)}, ${man.shroud.z.toFixed(1)} x${man.shroud.scale.toFixed(2)}` : 'none'})`;
   }, [harm, FROM, PITCH]);
   const shot = async (name) => {
     await page.evaluate(() => window.__nautaSail.onward(0));

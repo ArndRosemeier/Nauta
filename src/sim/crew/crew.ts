@@ -20,6 +20,7 @@ import type { SailWork } from '../ship/sailing';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../units';
 import type { Closures } from './closures';
 import { goingAt, goingRoute, startGoing, stepGoings, type Going } from './going';
+import { deadSpot } from './dead';
 import { heightAt, lineLength, routeNetwork } from './network';
 import { drill, isRepair, jobLeft, jobWork, shareAt, type Job, type JobWork } from './drill';
 import { atQuartersOf, billOrder, brigRoster, placeSpot, quartersPlace, type Man } from './roster';
@@ -79,6 +80,8 @@ export interface Deck {
   readonly canvas: readonly SailSetting[];
   /** The men out of the quarter bill (badly hurt or killed: damage.ts `outOf`), and the repairs wanted now (crew/repairs.ts), in the order they are manned. */
   readonly out?: ReadonlySet<number>;
+  /** Of them, the killed (damage.ts `killedOf`): carried below like the badly wounded, but to the hold (dead.ts). */
+  readonly killed?: ReadonlySet<number>;
   readonly repairs?: readonly Repair[];
   /** At quarters, the side she fights on (gunnery.ts `engagedSide`): where the gun crews stand (`restPlace`); left out when she is not at quarters. */
   readonly quarters?: Engaged;
@@ -385,12 +388,12 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
   tasks = work(tasks, men, roster, byMan, deck.tick, events);
   // Jobs with no work left are done, and their men free; an act is done with its last job. A wounded man lifted is carried below next.
   const finished = tasks.filter((t) => t.toDo <= 0 && t.job !== 'fetch');
-  tasks = tasks.flatMap((t) => (t.toDo > 0 ? [t] : t.job === 'fetch' ? [{ ...t, job: 'carry' as const, at: placeSpot(SURGEON), began: null, toDo: REPAIRS.carry.work }] : []));
+  tasks = tasks.flatMap((t) => (t.toDo > 0 ? [t] : t.job === 'fetch' ? [{ ...t, job: 'carry' as const, at: deck.killed?.has(t.on) ? deadSpot(t.on) : placeSpot(SURGEON), began: null, toDo: REPAIRS.carry.work }] : []));
   const mended: Mended[] = [];
   for (const t of finished) {
     if (t.act !== NO_ACT || !isRepair(t.job)) continue;
     mended.push({ job: t.job, on: t.on });
-    if (t.job === 'carry') men = men.map((h, i) => (i === t.on ? { stands: placeSpot(SURGEON), going: null, blocked: null } : h));
+    if (t.job === 'carry') men = men.map((h, i) => (i === t.on ? { stands: t.at!, going: null, blocked: null } : h));
   }
   const done = [...idle, ...new Set(finished.flatMap((t) => (t.act === NO_ACT ? [] : [t.act])))].filter((a) => !tasks.some((t) => t.act === a));
   c = { ...c, men, tasks };

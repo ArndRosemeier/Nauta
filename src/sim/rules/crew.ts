@@ -222,7 +222,8 @@ export const SENT_PER_STEP = 2;
  * - cut: a fallen spar cut away from alongside, six forecastle men with axes, about 60 s (the first lieutenant's order).
  * - pump, fight: eight men at the pumps, eight at a fire, for as long as there is water in her or the fire burns (his
  *   orders), taken from the guns by the quarter bill (`bill`: the waisters first, then the last places of each gun).
- * - fetch, carry: a badly wounded man lifted by the two nearest waisters where he lies, then carried below to the surgeon.
+ * - fetch, carry: a badly wounded man lifted by the two nearest waisters where he lies, then carried below to the surgeon;
+ *   a man killed the same, to the hold (`DEAD_ROOM`), after the wounded.
  */
 export type RepairName = 'plug' | 'fish' | 'splice' | 'tackle' | 'cut' | 'pump' | 'fight' | 'fetch' | 'carry';
 
@@ -265,5 +266,10 @@ export const CARRY_PARTIES = 4;
 export const PLUG_ABOVE = 0.6;
 /** Where the badly wounded are carried (the surgeon's station in the cockpit). */
 export const SURGEON = 'station-surgeon';
+/**
+ * Where the killed are carried (design ruling 2026-11-18: the dead are carried below, in the match and not only drawn): to
+ * the main hold, each to a place of his own on a grid this far apart (m) starting at this far along it (m, the ladder's foot).
+ */
+export const DEAD_ROOM = { space: 'hold', along: 3, step: 0.5 } as const;
 /** Where the relieving tackles are rigged: the tiller, in the space over the rudder head (the plan's space). */
 export const TILLER_SPACE = 'breadroom';

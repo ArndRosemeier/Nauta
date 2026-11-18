@@ -1,12 +1,12 @@
 /**
  * What the violence setting shows (implementation plan N6.6, "Violence"): the same simulation at every level, only
- * what is drawn changes. Mild: men fall and are carried below, nothing more is shown. Plain (the default): the wounds
- * and the blood are seen, the killed lie where they fell. Unsparing: a gun deck in action as it was. Faces are not
+ * what is drawn changes. Mild: men fall, the killed are covered with canvas, and all are carried below, nothing more is shown. Plain (the default): the wounds
+ * and the blood are seen, the killed lie bare until their shipmates lift them. Unsparing: a gun deck in action as it was. Faces are not
  * touched: fear and pain are shown at every level (plan "Faces").
  *
  * One table (`SHOWN`) says what each level draws; the functions here turn it into what the view draws for a man hurt:
  * the blood about him (`bloodOf`), the stain on his shirt (`stained`), and whether the killed are still on deck
- * (`takenBelow`). Pure, seeded: the same fall looks the same on every machine at a level.
+ * (`coveredOf`). Pure, seeded: the same fall looks the same on every machine at a level.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { Harm } from '../sim/rules/damage';
@@ -14,7 +14,7 @@ import type { Violence } from './settings';
 
 /** What one level draws. */
 export interface Shown {
-  /** The killed lie where they fell for the rest of the fight (false: they are taken below a little after, `takenBelow`). */
+  /** The killed lie bare until carried below (false: they are covered with canvas a moment after, `coveredOf`). */
   readonly bodies: boolean;
   /** The blood under a man killed or badly hurt where he lies: its radius when grown, m (0: none). */
   readonly pool: number;
@@ -35,15 +35,18 @@ export const SHOWN: Readonly<Record<Violence, Shown>> = {
   unsparing: { bodies: true, pool: 0.95, drops: 0.22, spatter: 4, trail: true, stain: [0.8, 1, 1] },
 };
 
-/** At the mild level a man killed lies this long before his shipmates take him below, s (the time the badly wounded wait for their bearers). */
-export const LAID_SECONDS = 6;
-/** And is carried out of sight over this long, s (a fade: no man is gone in one frame). */
-export const TAKEN_SECONDS = 2.5;
+/** At the mild level a man killed lies this long before his shipmates throw a sheet of canvas over him, s. */
+export const COVER_AFTER = 2;
+/** And the sheet is laid over him in this long, s (it rises over him: a body is not hidden in one frame). */
+export const COVER_SECONDS = 1.5;
 
-/** How much of a man drawn is gone from the deck, 0 (all of him) to 1 (taken below), `lying` seconds after he was killed. */
-export function takenBelow(level: Violence, harm: Harm | null, lying: number): number {
+/**
+ * How far the sheet is laid over a man, 0 (not at all) to 1 (he is covered and no longer drawn, his shroud is), `lying`
+ * seconds after he was killed. Only at the mild level; the match carries the killed below at every level, covered or not.
+ */
+export function coveredOf(level: Violence, harm: Harm | null, lying: number): number {
   if (SHOWN[level].bodies || harm !== 'killed') return 0;
-  return Math.min(1, Math.max(0, (lying - LAID_SECONDS) / TAKEN_SECONDS));
+  return Math.min(1, Math.max(0, (lying - COVER_AFTER) / COVER_SECONDS));
 }
 
 /** One splash of blood on the deck: where from the man's feet (ship space, m), how wide it grows, how stretched, and how long it takes. */

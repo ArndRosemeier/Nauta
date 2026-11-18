@@ -2,14 +2,14 @@
  * The men under fire (implementation plan N6.6): the wounded carried below between their bearers, repair parties
  * crowded about their work and not inside one another, pain that passes for the lightly wounded and stays for the
  * badly hurt, and the violence setting: the same fall at each level, blood and stained shirts from plain up, the killed
- * taken below at mild. Each from a state built for the purpose (CHECKS.md).
+ * covered with canvas at mild (the match carries them below at every level: repairs.test.ts). Each from a state built for the purpose (CHECKS.md).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { casualtiesOf } from '../src/app/scars.ts';
 import { JOB_CLIPS, carryOf, manDrawn, manSeed, newManDrawn, type ManDrawn } from '../src/app/crewDrawn.ts';
 import { FACES, PAIN_SECONDS, facesNow, type FaceWhy } from '../src/app/faces.ts';
-import { LAID_SECONDS, SHOWN, TAKEN_SECONDS, TRAIL_EVERY, bloodOf, stainOf, stained, takenBelow } from '../src/app/violence.ts';
+import { COVER_AFTER, COVER_SECONDS, SHOWN, TRAIL_EVERY, bloodOf, coveredOf, stainOf, stained } from '../src/app/violence.ts';
 import { VIOLENCE_LEVELS } from '../src/app/settings.ts';
 import { startDamage, type Damage } from '../src/sim/damage.ts';
 import { atWork, NO_ACT } from '../src/sim/crew/crew.ts';
@@ -107,7 +107,7 @@ test('each level shows more of the same fall: nothing at mild, a pool and drops 
   assert.ok(TRAIL_EVERY > 0);
 });
 
-test('shirts are stained by how badly their man is hurt, never at mild; the killed are taken below at mild only, after a while and by a fade', () => {
+test('shirts are stained by how badly their man is hurt, never at mild; the killed are covered with canvas at mild only, a moment after they fall', () => {
   for (const harm of ['wounded', 'badly', 'killed'] as const) {
     assert.equal(stainOf('mild', harm), 0);
     assert.ok(stainOf('plain', harm) > 0 && stainOf('unsparing', harm) >= stainOf('plain', harm));
@@ -118,13 +118,13 @@ test('shirts are stained by how badly their man is hurt, never at mild; the kill
   assert.equal(stained('#e8e2d4', 1), '#4a0c0a');
   const half = stained('#ffffff', 0.5);
   assert.ok(half.startsWith('#') && half.length === 7 && half !== '#ffffff');
-  for (const level of ['plain', 'unsparing'] as const) assert.equal(takenBelow(level, 'killed', 1000), 0, 'they lie where they fell');
-  assert.equal(takenBelow('mild', 'killed', 0), 0);
-  assert.equal(takenBelow('mild', 'killed', LAID_SECONDS), 0, 'laid a while first');
-  const half2 = takenBelow('mild', 'killed', LAID_SECONDS + TAKEN_SECONDS / 2);
-  assert.ok(half2 > 0 && half2 < 1, 'carried out by a fade');
-  assert.equal(takenBelow('mild', 'killed', 1000), 1);
-  assert.equal(takenBelow('mild', 'badly', 1000), 0, 'the badly wounded are carried below by the match itself');
+  for (const level of ['plain', 'unsparing'] as const) assert.equal(coveredOf(level, 'killed', 1000), 0, 'they lie bare until lifted');
+  assert.equal(coveredOf('mild', 'killed', 0), 0);
+  assert.equal(coveredOf('mild', 'killed', COVER_AFTER), 0, 'laid a moment first');
+  const half2 = coveredOf('mild', 'killed', COVER_AFTER + COVER_SECONDS / 2);
+  assert.ok(half2 > 0 && half2 < 1, 'the canvas is thrown over him, not switched on');
+  assert.equal(coveredOf('mild', 'killed', 1000), 1);
+  assert.equal(coveredOf('mild', 'badly', 1000), 0, 'only the killed are covered');
 });
 
 test('the casualties stand-in strikes down the same number of men on each ship, never the captain, as the state keeps them', () => {
