@@ -101,6 +101,8 @@ export class ShipView {
   private readonly far = new Group();
   private readonly farParts: Part[] = [];
   private readonly doors = new Map<string, { pivot: Group; shut: number; opens: number; zones: readonly [string, string]; angle: number }>();
+  /** Each zone's ranges in her shaders' light lists. */
+  private readonly ranges: Map<string, Vector4>;
   private readonly visibility: Visibility;
   private readonly plan = shipPlan();
   private readonly spaceZones = zoneOfSpaces(this.plan);
@@ -119,6 +121,7 @@ export class ShipView {
     this.drawn = this.motion.pose;
     this.group.name = 'ship';
     const ranges = this.lights(build);
+    this.ranges = ranges;
     let tris = 0;
     for (const z of build.zones) {
       const g = new Group();
@@ -266,7 +269,12 @@ export class ShipView {
     this.toClip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(g.matrixWorld);
     const seen = distance > INSIDE_REACH ? new Set([OUTSIDE]) : this.visibility.seen(zone, this.toClip, (id) => (this.doors.get(id)?.angle ?? 0) > DOOR_OPEN, eyeShip);
     for (const [name, group] of this.zones) group.visible = !seen || seen.has(name);
-    for (const d of this.doors.values()) d.pivot.visible = !seen || seen.has(d.zones[0]) || seen.has(d.zones[1]);
+    for (const d of this.doors.values()) {
+      d.pivot.visible = !seen || seen.has(d.zones[0]) || seen.has(d.zones[1]);
+      // A door is lit by the lamps of the room it is seen from.
+      const lit = this.ranges.get(zone !== null && d.zones.includes(zone) ? zone : d.zones[0]);
+      for (const m of d.pivot.children) m.userData.light = lit;
+    }
     this.crossfade(distance);
     this.trianglesDrawn = this.countDrawn();
 
