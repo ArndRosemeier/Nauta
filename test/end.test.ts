@@ -68,10 +68,11 @@ test('after the end every order is refused, and a foundered ship goes on going d
   assert.deepEqual(ofKind(r.events, 'refused').map((e) => (e.kind === 'refused' ? e.code : '')), ['fight over', 'fight over']);
   s = r.state;
   const heave = s.ships[0]!.motion.pose.heave, water = s.ships[0]!.damage.flooded[0] + s.ships[0]!.damage.flooded[1];
-  for (let k = 0; k < 60 * STEPS_PER_SECOND; k++) s = once(s).state;
+  // Half a minute is enough to see it (a whole one cost 2.5 s on CI, past the 2 s one test may take, with the crews stepped too).
+  for (let k = 0; k < 30 * STEPS_PER_SECOND; k++) s = once(s).state;
   const d = s.ships[0]!.damage;
-  assert.ok(d.flooded[0] + d.flooded[1] > water + founderTonnes() * 0.8, 'the sea pours in over her side: as much again in about a minute');
-  assert.ok(s.ships[0]!.motion.pose.heave < heave - 2, `she settles: ${heave.toFixed(1)} to ${s.ships[0]!.motion.pose.heave.toFixed(1)} m`);
+  assert.ok(d.flooded[0] + d.flooded[1] > water + founderTonnes() * 0.4, 'the sea pours in over her side: half as much again in about half a minute');
+  assert.ok(s.ships[0]!.motion.pose.heave < heave - 1, `she settles: ${heave.toFixed(1)} to ${s.ships[0]!.motion.pose.heave.toFixed(1)} m`);
   assert.equal(s.fight, ended, 'the end stays as it was');
 });
 
