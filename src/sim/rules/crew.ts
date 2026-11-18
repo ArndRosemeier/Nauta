@@ -94,13 +94,13 @@ export const ROSTER: readonly RankRow[] = [
   { rank: 'carpenter', count: 1, part: 'officers', skill: ABLE, posts: ['station-pumps'], idle: ['station-bunk'] },
   { rank: "boatswain's mate", count: 2, part: 'officers', skill: ABLE, posts: ['station-waist', 'pin-bow-pins-s6'], idle: ['station-bunk'] },
   { rank: "gunner's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-magazine'] },
-  { rank: "carpenter's mate", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
+  { rank: "carpenter's mate", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-workshop-a'] },
   { rank: 'quartermaster', count: 4, part: 'helm', skill: ABLE, posts: ['station-wheel'], idle: ['station-wheel', 'station-wheel', 'station-bunk'] },
-  { rank: 'cook', count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-fore-ladder-foot'] },
+  { rank: 'cook', count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-fore-ladder-foot'], idle: ['station-galley-cook'] },
   { rank: "captain's steward", count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-companion-ladder-foot'] },
-  { rank: 'sailmaker', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
+  { rank: 'sailmaker', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-sailroom-bench'] },
   { rank: 'armourer', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
-  { rank: "carpenter's crew", count: 2, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
+  { rank: "carpenter's crew", count: 2, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-workshop-b', 'station-workshop-c'] },
   // The marines (design ruling 2026-11-18: the quarterdeck is the captain's). Before quarters two sentries aft by the
   // taffrail, one at the cabin door, the rest in the waist or below on the berth deck; at quarters the two stay aft,
   // six go to the tops, six to the forecastle and five line the waist's engaged side.

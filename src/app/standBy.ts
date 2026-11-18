@@ -14,6 +14,10 @@ const TALKING = ['talk', 'nod', 'talk'] as const;
 const CLEANING = ['interact', 'interact', 'talk', 'interact'] as const;
 /** A sentry on watch, his pistol ready. */
 const ON_WATCH = 'pistol idle';
+/** The cook at his stove, stirring and tending. */
+const COOKING = 'interact';
+/** The sailmaker and the carpenter's hands below, kneeling at their mending. */
+const MENDING = 'repair (kneeling)';
 /** Anyone else. */
 const TINKERING = 'interact';
 /** At his gun at quarters, ready: heaving with a handspike, sponging and ramming, crouched low by the carriage, eyes on the enemy. */
@@ -35,6 +39,9 @@ const BY_PLACE: readonly (readonly [prefix: string, clips: readonly string[]])[]
   ['station-sentries', [ON_WATCH]],
   ['station-cabin-door', [ON_WATCH]],
   ['station-marines', CLEANING],
+  ['station-galley-cook', [COOKING]],
+  ['station-sailroom', [MENDING]],
+  ['station-workshop', [MENDING]],
   ['station-quarterdeck', TALKING],
   ['station-waist', TALKING],
 ];
@@ -57,5 +64,5 @@ export const attentiveClip = (seed: number): string => ATTENTIVE[seed % ATTENTIV
 
 /** Every clip a man standing by or standing to can play (the crowd bakes them). */
 export const STAND_BY_CLIPS: readonly string[] = [
-  ...new Set([STEERING, ON_WATCH, TINKERING, ...TALKING, ...CLEANING, ...AT_GUN, ...ARMED, ...HANDING, ...CALLING, ...ALERT, ...ATTENTIVE]),
+  ...new Set([STEERING, ON_WATCH, TINKERING, COOKING, MENDING, ...TALKING, ...CLEANING, ...AT_GUN, ...ARMED, ...HANDING, ...CALLING, ...ALERT, ...ATTENTIVE]),
 ];
