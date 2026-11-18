@@ -596,6 +596,13 @@ export const STATIONS: readonly StationRow[] = [
   { id: 'pace-s-fore', name: 'the quarterdeck, starboard walk', who: 'the first lieutenant', orders: [], space: 'deck', along: -1.75, across: 1.0 },
   { id: 'pace-p-aft', name: 'the quarterdeck, larboard walk', who: 'the boatswain', orders: [], space: 'deck', along: -5.75, across: -1.0 },
   { id: 'pace-p-fore', name: 'the quarterdeck, larboard walk', who: 'the boatswain', orders: [], space: 'deck', along: -1.75, across: -1.0 },
+  // Where the hands who work below stand while they have no orders (rules/crew.ts `idle`): the cook aft of his stove, the sailmaker
+  // in the sail room, the carpenter's mate and crew in the fore hold among the carpenter's stores.
+  { id: 'galley-cook', name: 'the galley, aft of the stove', who: 'the cook', orders: [], space: 'galley', along: 11.3, across: 0 },
+  { id: 'sailroom-bench', name: 'the sail room', who: 'the sailmaker', orders: [], space: 'sailroom', along: 11.9, across: -2.5 },
+  { id: 'workshop-a', name: "the fore hold, the carpenter's stores", who: "the carpenter's mate", orders: [], space: 'fore-hold', along: 12.5, across: 0.45 },
+  { id: 'workshop-b', name: "the fore hold, the carpenter's stores", who: "the carpenter's crew", orders: [], space: 'fore-hold', along: 13.4, across: 0.45 },
+  { id: 'workshop-c', name: "the fore hold, the carpenter's stores", who: "the carpenter's crew", orders: [], space: 'fore-hold', along: 13.4, across: -0.45 },
   ...BUNK_STATIONS,
 ];
 /**
