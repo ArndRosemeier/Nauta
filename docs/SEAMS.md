@@ -577,6 +577,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | How a ship is lost now: blown up, sunk, burnt out, struck | `src/sim/end.ts#lostHow` |
 | Whether a ship is beaten (a computer captain strikes, a player's first lieutenant says so) | `src/sim/end.ts#beaten` |
 | Whether her fire is past saving | `src/sim/end.ts#burntOut` |
+| Sailing out of the fight (menu.md): losing her past 3 km, broken off or drawn after a minute past 4 km | `src/sim/end.ts#parting` |
 | The winner of an ended fight, or none | `src/sim/end.ts#winner` |
 | A fight at its start, its time as the match setting says | `src/sim/end.ts#startFight` |
 | How a fight ends: beaten, burnt out, the match's time and the master's warning, striking asked twice (first proposals) | `src/sim/rules/end.ts#BEATEN` |

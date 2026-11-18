@@ -25,5 +25,13 @@ export const MATCH_MINUTES = 40;
 /** The master warns the captain this many minutes before the light fails. */
 export const LIGHT_WARNING_MINUTES = 5;
 
+/**
+ * Sailing out of the fight (menu.md, "Sailing out of the fight"): past `losing` m apart the master says they are losing
+ * her; `gone` m apart for `seconds` s ends the match. The ship that sailed at least `share` of the distance opened
+ * since they were last within `losing` has broken off the action and loses; if neither did, both sailed apart and it
+ * is drawn.
+ */
+export const PARTING = { losing: 3000, gone: 4000, seconds: 60, share: 2 / 3 } as const;
+
 /** Striking is asked twice: the first lieutenant answers "Strike, sir?", and the order given again within this many seconds strikes her. */
 export const ASK_AGAIN = 10;

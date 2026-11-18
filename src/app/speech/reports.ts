@@ -118,7 +118,7 @@ export function soundingLine(water: number): Line {
 const WATER_CRY = 2;
 
 /** The lookout's line for the other ship's end. */
-const HER_END: Readonly<Record<LostHow, Line>> = { struck: 'her struck', sunk: 'her sinking', burnt: 'her burning', 'blew up': 'her blew up' };
+const HER_END: Readonly<Record<LostHow, Line>> = { struck: 'her struck', sunk: 'her sinking', burnt: 'her burning', 'blew up': 'her blew up', 'broke off': 'her broke off' };
 
 /** What the men of my ship `ship` say for an event of a step, a thing her officers noticed, or the midshipman sent: in the order it is said. */
 export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
@@ -170,8 +170,9 @@ export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
     // ---- The fight ----
     case 'beaten': return mine ? [report('first lieutenant', ship, 'beaten')] : [];
     case 'light': return [report('master', ship, 'light')];
+    case 'losing': return [report('master', ship, 'losing')];
     case 'end': {
-      if (e.lost.every((l) => l === null)) return [report('master', ship, 'nightfall')];
+      if (e.lost.every((l) => l === null)) return [report('master', ship, e.apart ? 'apart' : 'nightfall')];
       const her = e.lost[1 - ship];
       return her ? [cry('lookout', ship, HER_END[her])] : [];
     }

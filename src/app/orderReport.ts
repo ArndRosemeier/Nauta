@@ -181,19 +181,22 @@ export function eventWords(e: SimEvent, ship: number): string | null {
     // What the first lieutenant and the master say of the fight, until the phrase book's bubbles (N4.5); and its end.
     case 'beaten': return e.ship === ship ? `${at} we must strike, sir` : null;
     case 'light': return `${at} the light is failing, sir`;
-    case 'end': return `${at} the fight is over: ${endWords(e.lost, ship)}`;
+    case 'losing': return `${at} we are losing her, sir`;
+    case 'end': return `${at} the fight is over: ${endWords(e.lost, e.apart, ship)}`;
   }
 }
 
 /** How the panel says a fight ended, for my ship `ship`. */
-function endWords(lost: readonly (LostHow | null)[], ship: number): string {
+function endWords(lost: readonly (LostHow | null)[], apart: boolean, ship: number): string {
   const how = (l: LostHow, ours: boolean): string => {
     if (l === 'struck') return ours ? 'we have struck' : 'she has struck';
+    if (l === 'broke off') return ours ? 'we have broken off the action' : 'she has broken off the action';
     if (l === 'blew up') return ours ? 'our magazine has gone up' : 'she has blown up';
     return ours ? `we are ${l === 'sunk' ? 'sinking' : 'burnt out'}` : `she is ${l === 'sunk' ? 'sinking' : 'burnt out'}`;
   };
   const words = lost.flatMap((l, i) => (l === null ? [] : [how(l, i === ship)]));
-  return words.length === 0 ? 'they part at nightfall, drawn' : words.join(', ');
+  if (words.length > 0) return words.join(', ');
+  return apart ? 'we sailed apart, drawn' : 'they part at nightfall, drawn';
 }
 
 /**
