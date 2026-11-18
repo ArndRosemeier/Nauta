@@ -4,7 +4,8 @@
  * look's yaw 0 is forward, growing to port. An eye on board rides with her; one off her (`off`) stands still on the
  * water where she lies, turned with her heading only.
  */
-import { HOLD_FLOOR, MAIN_MAST, MAIN_TOP, PORTS } from '../sim/rules/ships';
+import { HOLD_FLOOR, PORTS } from '../sim/rules/ships';
+import { rigPlan } from '../sim/ship/rig';
 import { shipY, shipZ } from '../sim/ship/section';
 import { sheer, weatherDeck } from '../sim/ship/hull';
 import { berthDeck, insideBreadth } from '../sim/ship/plan';
@@ -30,8 +31,6 @@ export interface Standpoint {
 const EYE = 1.62;
 const EYE_BELOW = 1.45;
 const EYE_HOLD = 0.95;
-/** The main top's floor over the hounds: trestle trees and its planks, m (rig.ts). */
-const TOP_FLOOR = 0.36;
 /** Angles, rad: a quarter and a half turn. */
 const QUARTER = Math.PI / 2;
 const HALF = Math.PI;
@@ -43,30 +42,37 @@ const AT = {
   quarterdeck: { along: -6.9, x: 1.6, look: { yaw: 0.12, pitch: -0.06 } },
   waist: { along: 4.6, x: -1.9, look: { yaw: -0.35, pitch: -0.1 } },
   bow: { along: 17.6, x: 0.5, look: { yaw: HALF - 0.12, pitch: -0.08 } },
-  top: { along: -0.95, x: 1.15, look: { yaw: 0.6, pitch: -0.95 } },
+  /** On the main top: aft of the masthead, m along from the mast there; and on the main crosstrees, beside the topmast. */
+  top: { aft: 0.8, x: 1.0, look: { yaw: 0.4, pitch: -0.5 } },
+  crosstrees: { aft: 0.3, x: 0.8, look: { yaw: 0.2, pitch: -0.6 } },
   berth: { along: 9.6, x: 0.6, look: { yaw: HALF - 0.2, pitch: 0.02 } },
   cabin: { along: -6.1, x: -0.85, look: { yaw: HALF + 0.35, pitch: -0.08 } },
   hold: { along: 10.2, x: 0.3, look: { yaw: HALF - 0.1, pitch: 0.05 } },
   alongside: { along: 1.5, x: 15, up: 1.3, look: { yaw: QUARTER, pitch: 0.16 } },
   near: { along: 9, x: 50, up: 3.5, look: { yaw: QUARTER + 0.12, pitch: 0.02 } },
   far: { along: 120, x: 480, up: 4.5, look: { yaw: QUARTER + 0.25, pitch: 0 } },
+  farthest: { along: 500, x: 1940, up: 4.5, look: { yaw: QUARTER + 0.25, pitch: 0.004 } },
 } as const;
 
 const deckEye = (along: number, x: number): [number, number, number] => [x, shipY(weatherDeck(along, x)) + EYE, shipZ(along)];
-const topY = shipY(MAIN_MAST.step + MAIN_MAST.length - MAIN_MAST.head) + TOP_FLOOR + MAIN_TOP.thick;
+/** The main mast's heights and rake (the rig plan, N3.2): its top and crosstrees are stood on. */
+const MAIN = rigPlan().masts.main;
+const aloftEye = (aft: number, x: number, floor: number, at: (h: number) => number): [number, number, number] => [x, shipY(floor) + EYE, shipZ(at(floor) - aft)];
 
 export const STANDPOINTS: readonly Standpoint[] = [
   { name: 'Quarterdeck', eye: deckEye(AT.quarterdeck.along, AT.quarterdeck.x), look: AT.quarterdeck.look },
   { name: 'Waist', eye: deckEye(AT.waist.along, AT.waist.x), look: AT.waist.look },
   { name: 'Gun', eye: deckEye(GUN_PORT[1], insideBreadth(GUN_PORT[1], sheer(GUN_PORT[1])) - GUN_INBOARD), look: { yaw: -QUARTER, pitch: -0.2 } },
   { name: 'Bow', eye: deckEye(AT.bow.along, AT.bow.x), look: AT.bow.look },
-  { name: 'Top', eye: [AT.top.x, topY + EYE, shipZ(AT.top.along)], look: AT.top.look },
+  { name: 'Top', eye: aloftEye(AT.top.aft, AT.top.x, MAIN.topFloor, MAIN.lowerAt), look: AT.top.look },
+  { name: 'Crosstrees', eye: aloftEye(AT.crosstrees.aft, AT.crosstrees.x, MAIN.crosstrees, MAIN.topmastAt), look: AT.crosstrees.look },
   { name: 'Berth deck', eye: [AT.berth.x, shipY(berthDeck(AT.berth.along)) + EYE_BELOW, shipZ(AT.berth.along)], look: AT.berth.look },
   { name: 'Cabin', eye: [AT.cabin.x, shipY(berthDeck(AT.cabin.along)) + EYE_BELOW, shipZ(AT.cabin.along)], look: AT.cabin.look },
   { name: 'Hold', eye: [AT.hold.x, shipY(HOLD_FLOOR) + EYE_HOLD, shipZ(AT.hold.along)], look: AT.hold.look },
   { name: 'Alongside', eye: [AT.alongside.x, AT.alongside.up, shipZ(AT.alongside.along)], look: AT.alongside.look },
   { name: '50 m off', eye: [AT.near.x, AT.near.up, shipZ(AT.near.along)], look: AT.near.look, off: true },
   { name: '500 m off', eye: [AT.far.x, AT.far.up, shipZ(AT.far.along)], look: AT.far.look, off: true },
+  { name: '2 km off', eye: [AT.farthest.x, AT.farthest.up, shipZ(AT.farthest.along)], look: AT.farthest.look, off: true },
 ];
 
 /** The standpoint named `name` (any case, spaces as dashes or left out), or the first. */

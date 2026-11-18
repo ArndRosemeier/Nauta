@@ -29,6 +29,8 @@ test('the levels go from best to cheapest, and every knob is one the renderer ca
     if (!up) return;
     assert.ok(l.renderScale < up.renderScale, 'each level draws fewer pixels than the one above');
     assert.ok(l.seaCells <= up.seaCells && l.fineSeaBands <= up.fineSeaBands && l.fineSeaSize <= up.fineSeaSize);
+    assert.ok(!l.ropeShadows || up.ropeShadows, 'rope shadows only go off on the way down');
+    assert.ok(l.shipFarFrom <= up.shipFarFrom, 'the far ship takes over no later than the level above');
   });
   assert.equal(QUALITY_LEVELS[0]!.seaCells, SEA_TILE_CELLS, 'the top level draws the sea at its densest');
 });

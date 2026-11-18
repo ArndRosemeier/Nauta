@@ -66,6 +66,9 @@ export interface ShipBuild {
   readonly zones: readonly ZoneBuild[];
   /** The coarse outside for the far ship. */
   readonly far: ZoneBuild;
+  /** The spars that turn (yards, boom, gaff), each named by its spar id, near and on the far ship. */
+  readonly swings: readonly ZoneBuild[];
+  readonly farSwings: readonly ZoneBuild[];
   readonly doors: readonly { readonly id: string; readonly wood: Packed; readonly iron: Packed; readonly hinge: readonly [number, number, number]; readonly shut: number; readonly opens: number; readonly zones: readonly [string, string] }[];
   readonly lamps: readonly { readonly zone: string; readonly at: readonly [number, number, number] }[];
   readonly skies: readonly SkyOpening[];
@@ -78,7 +81,7 @@ export interface ShipBuild {
 export function shipBuffers(build: ShipBuild): ArrayBuffer[] {
   const out: ArrayBuffer[] = [];
   const add = (p: Packed) => { for (const a of p.attributes) out.push(a.data.buffer as ArrayBuffer); out.push(p.index.buffer as ArrayBuffer); };
-  for (const z of [...build.zones, build.far]) for (const p of [z.wood, z.iron, z.copper, z.glow, z.ropes]) add(p);
+  for (const z of [...build.zones, build.far, ...build.swings, ...build.farSwings]) for (const p of [z.wood, z.iron, z.copper, z.glow, z.ropes]) add(p);
   for (const d of build.doors) { add(d.wood); add(d.iron); }
   return [...new Set(out)];
 }
@@ -99,17 +102,20 @@ export function buildShip(fittings: Fittings): ShipBuild {
   buildDeckOpenings(ctx, COAMING_THICK);
   const lamps = buildRooms(ctx, fittings);
   buildGuns(fittings, out);
-  buildRigs(fittings, out, (along, h) => {
+  buildRigs(fittings, plan, out, (along, h) => {
     const z = zoneUnder(plan, zones, levelAt(along, h), along, 0);
     return z ? parts.zone(z) : null;
-  });
+  }, (id) => parts.swing(id));
 
   const far = buildFar(fittings);
   let rope = 0;
   for (const z of parts.zones.values()) rope += z.ropes.length;
+  for (const z of parts.swings.values()) rope += z.ropes.length;
   return {
     zones: [...parts.zones].map(([name, z]) => pack(name, z)),
-    far: pack(OUTSIDE, far),
+    far: pack(OUTSIDE, far.out),
+    swings: [...parts.swings].map(([name, z]) => pack(name, z)),
+    farSwings: [...far.parts.swings].map(([name, z]) => pack(name, z)),
     doors: parts.doors.map((d) => ({ id: d.id, wood: d.wood.packed(), iron: d.iron.packed(), hinge: d.hinge, shut: d.shut, opens: d.opens, zones: d.zones })),
     lamps: lamps.map((l) => ({ zone: l.zone, at: [l.at.x, l.at.y, l.at.z] as const })),
     skies: skyOpenings(plan, zones),
@@ -118,8 +124,8 @@ export function buildShip(fittings: Fittings): ShipBuild {
   };
 }
 
-/** Her outside alone, coarse, for when she is far off: hull, bulwarks, deck, openings and the lower rigs; no guns, no rooms. */
-function buildFar(fittings: Fittings): ZoneParts {
+/** Her outside alone, coarse, for when she is far off: hull, bulwarks, deck, openings and the rig; no guns, no rooms. */
+function buildFar(fittings: Fittings): { out: ZoneParts; parts: ShipParts } {
   const plan = shipPlan(), parts = new ShipParts(), ctx: DeckContext = { plan, zones: new Map(), parts, far: true };
   const out = parts.zone(OUTSIDE);
   const { aft, fore } = deckEnds();
@@ -127,8 +133,8 @@ function buildFar(fittings: Fittings): ZoneParts {
   buildBulwarks(out, aft, fore, FAR_DETAIL);
   buildWeatherDeck(ctx, aft, fore, FAR_DETAIL.rowStep);
   buildDeckOpenings(ctx, COAMING_THICK);
-  buildRigs(fittings, out, () => null, true);
-  return out;
+  buildRigs(fittings, plan, out, () => null, (id) => parts.swing(id), true);
+  return { out, parts };
 }
 
 /** The carronades at their ports, both sides, run out, with their breechings and the port lids' lanyards (the long sixes come with N2.6). */

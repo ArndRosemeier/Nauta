@@ -19,7 +19,9 @@ import {
   SHIP_COPPER, SHIP_COPPER_FADING, SHIP_GLOW, SHIP_IRON, SHIP_IRON_FADING, SHIP_ROPE, SHIP_WOOD, SHIP_WOOD_FADING,
 } from '../materials';
 import { SEA_CUT } from '../seaCut';
-import { MOST_LAMPS, MOST_SKIES, SHIP_INPUTS } from './shipMaterials';
+import { MOST_LAMPS, MOST_SKIES, SHIP_INPUTS, setShipFrame } from './shipMaterials';
+import { rigPlan } from '../../sim/ship/rig';
+import { swingMatrix, swingsOf, type Swing } from './swings';
 import type { Kind } from '@futuremagic/stage';
 import { geometryOf, packedTriangles, type Packed } from './gathered';
 import type { ShipBuild, ZoneBuild } from './ship';
@@ -54,8 +56,9 @@ const FLICKER = { depth: 0.12, slow: 1.3, fast: 7.7 } as const;
 const TURN = 2 * Math.PI;
 /** Seed of the flames' phases. */
 const FLICKER_SEED = 1797;
-/** The far ship crossfades in between these distances of the eye from her middle, m. */
-const FADE = { from: 130, to: 170 } as const;
+/** The far ship crossfades in from this distance of the eye from her middle (the quality level may bring it nearer), over this share of it more, m. */
+const FADE_FROM = 130;
+const FADE_SPAN = 0.3;
 /** Beyond this distance from her middle no room inside her is drawn, m (no opening of hers shows anything at that range). */
 const INSIDE_REACH = 60;
 /** A door counts as open, and its doorway as a portal, from this angle on, rad. */
@@ -70,6 +73,7 @@ const DOORS_AJAR: Readonly<Record<string, number>> = {
 };
 /** Numbers per lamp and opening in the build's lists. */
 const XYZ = 3;
+
 
 /** Her kinds, and what each draws with while it is being crossfaded. */
 const KINDS = { wood: SHIP_WOOD, iron: SHIP_IRON, copper: SHIP_COPPER, glow: SHIP_GLOW, ropes: SHIP_ROPE } as const;
@@ -101,6 +105,9 @@ export class ShipView {
   private readonly far = new Group();
   private readonly farParts: Part[] = [];
   private readonly doors = new Map<string, { pivot: Group; shut: number; opens: number; zones: readonly [string, string]; angle: number }>();
+  /** The spars that turn (swings.ts): each one's groups near and far, its brace or swing (rad) and hoist (1 hoisted). */
+  private readonly swings = new Map<string, { swing: Swing; groups: Group[]; angle: number; hoist: number }>();
+  private swingsMoved = true;
   /** Each zone's ranges in her shaders' light lists. */
   private readonly ranges: Map<string, Vector4>;
   private readonly visibility: Visibility;
@@ -152,6 +159,24 @@ export class ShipView {
     }
     this.far.name = 'far ship';
     this.farParts.push(...this.meshes(build.far, this.far, undefined, true));
+    // The turning spars: each in a group of its own, near inside her outside (seen and crossfaded with it), and on the far ship.
+    for (const swing of swingsOf(rigPlan(this.plan))) {
+      const groups: Group[] = [];
+      for (const [list, into, parts, fading] of [[build.swings, this.zones.get(OUTSIDE)!, this.outside, false], [build.farSwings, this.far, this.farParts, true]] as const) {
+        const z = list.find((x) => x.name === swing.id);
+        if (!z) continue;
+        const g = new Group();
+        g.name = `swing ${swing.id}`;
+        g.matrixAutoUpdate = false;
+        const made = this.meshes(z, g, undefined, fading);
+        for (const p of made) p.mesh.userData.toShip = g.matrix;
+        parts.push(...made);
+        if (!fading) tris += zoneTriangles(z);
+        into.add(g);
+        groups.push(g);
+      }
+      this.swings.set(swing.id, { swing, groups, angle: 0, hoist: 1 });
+    }
     this.far.visible = false;
     this.group.add(this.far);
     this.triangles = tris;
@@ -188,6 +213,7 @@ export class ShipView {
       // Below deck only her timber casts: the sun comes in through her openings alone, and her timber is what stops it.
       m.castShadow &&= light === undefined || kind === SHIP_WOOD;
       into.add(m);
+      if (kind === SHIP_ROPE) this.ropeMeshes.push(m);
       out.push({ mesh: m, plain: kind.make(), fading: fade });
     }
     return out;
@@ -232,6 +258,44 @@ export class ShipView {
     d.pivot.updateMatrix();
   }
 
+  /** Braces a yard round, or swings the boom or gaff, to `angle` rad (swings.ts: + a yard's starboard arm aft, the boom's end to starboard). */
+  setBrace(id: string, angle: number): void { this.setSwing(id, 'angle', angle); }
+
+  /** Hoists a topsail or topgallant yard (1) or lowers it onto its cap (0), or anything between. */
+  setHoist(id: string, share: number): void { this.setSwing(id, 'hoist', share); }
+
+  private setSwing(id: string, key: 'angle' | 'hoist', value: number): void {
+    const w = this.swings.get(id);
+    if (!w || w[key] === value) return;
+    w[key] = value;
+    this.swingsMoved = true;
+  }
+
+  /** The turning spars' ids. */
+  get swingIds(): string[] { return [...this.swings.keys()]; }
+
+  /** The turning spars' frames into their groups and her ropes' shaders, when one has moved. */
+  private moveSwings(): void {
+    if (!this.swingsMoved) return;
+    this.swingsMoved = false;
+    for (const { swing, groups, angle, hoist } of this.swings.values()) {
+      const m = swingMatrix(swing, angle, hoist, this.swingFrame);
+      for (const g of groups) g.matrix.copy(m);
+      setShipFrame(swing.frame, m);
+    }
+  }
+  private readonly swingFrame = new Matrix4();
+  /** Where the far ship starts to fade in, m (quality.ts `shipFarFrom`). */
+  private fadeFrom = FADE_FROM;
+  /** Her rope meshes, whose shadow is a quality knob. */
+  private readonly ropeMeshes: Mesh[] = [];
+
+  /** The quality level's knobs for her (quality.ts): whether her ropes cast shadows, and how far off the far ship starts. */
+  setQuality(ropeShadows: boolean, farFrom: number): void {
+    for (const m of this.ropeMeshes) m.castShadow = ropeShadows && m.userData.light === undefined;
+    this.fadeFrom = farFrom;
+  }
+
   /**
    * Once a frame: her pose on the water at `t`, the eye at `where` looking `look`, what of her is drawn, the sun's
    * shadow round her, and what her shaders read. `seaOrigin`: where the sea's own frame stands (seaView.ts).
@@ -239,6 +303,7 @@ export class ShipView {
   update(sea: SeaState, t: number, dt: number, camera: PerspectiveCamera, where: Standpoint, look: Look, sun: DirectionalLight, sunDir: Vector3, gain: number, radPerPixel: number, seaOrigin: Vector3): void {
     this.time += dt;
     this.float(sea, t);
+    this.moveSwings();
     const g = this.group;
     g.position.set(...shipOrigin(this.drawn, this.origin));
     // Pitch: bow up turns her about +x the other way (bow is -z); roll to starboard turns her about -z the other way.
@@ -302,9 +367,9 @@ export class ShipView {
     this.drawn = poseBetween(this.previous.pose, this.motion.pose, (t - this.stepped) / STEP_SECONDS);
   }
 
-  /** Near her the whole of her is drawn; between FADE.from and FADE.to the far ship is dithered in as she is dithered out. */
+  /** Near her the whole of her is drawn; over the fade's span the far ship is dithered in as she is dithered out. */
   private crossfade(distance: number): void {
-    const t = Math.min(1, Math.max(0, (distance - FADE.from) / (FADE.to - FADE.from)));
+    const t = Math.min(1, Math.max(0, (distance - this.fadeFrom) / (this.fadeFrom * FADE_SPAN)));
     const near = this.zones.get(OUTSIDE)!;
     near.visible &&= t < 1;
     this.far.visible = t > 0;

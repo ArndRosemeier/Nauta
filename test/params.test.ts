@@ -1,13 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readParams } from '../src/app/params.ts';
+import { DEGREE } from '../src/sim/units.ts';
+
+/** A brace the address asks for, degrees. */
+const BRACED = 30;
 
 test('no query: WebGPU, no HUD, a morning that moves', () => {
-  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, look: null, toLight: null, bench: 0, walk: null, motion: null });
+  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0 });
 });
 
 test('the query sets the backend, the HUD, the hour, the day length, the eye and the wind', () => {
-  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, look: null, toLight: null, bench: 0, walk: null, motion: null });
+  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0 });
 });
 
 test('nonsense falls back, and numbers are held to their range', () => {
@@ -66,4 +70,9 @@ test('?bench flies for 60 s, or the seconds named within its range', () => {
   assert.equal(readParams('?bench=30').bench, 30);
   assert.equal(readParams('?bench=1').bench, 5);
   assert.equal(readParams('').bench, 0);
+});
+
+test('the address braces her yards round, in degrees, held to a half turn', () => {
+  assert.equal(readParams('?brace=30').brace, BRACED * DEGREE);
+  assert.equal(readParams('?brace=-30').brace, -BRACED * DEGREE);
 });
