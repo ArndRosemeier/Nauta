@@ -582,7 +582,7 @@ export class OrderFan {
     this.tags = shown.map((item, i) => {
       const tag = make('button', this.guided.includes(item.id) ? 'nt-fan-tag lesson' : 'nt-fan-tag');
       tag.type = 'button';
-      tag.append(make('span', '', say[item.word]));
+      tag.append(make('span', '', item.text ?? say[item.word]));
       if (item.detail) tag.append(make('small', '', say[item.detail]));
       const key = keyOfItem(item);
       if (key) tag.append(keyCap(keys[key]));

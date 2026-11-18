@@ -76,6 +76,9 @@ test('each gunnery order changes what her guns are told, or is refused with its 
   assert.deepEqual([told.shot, told.aim], ['chain', 'rigging']);
   assert.equal(give(told, EACH.shot).code, 'loading it already');
   assert.equal(give(told, EACH.aim).code, 'laid there already');
+  told = give(told, EACH.target).told;
+  assert.equal(told.target, 1, 'the guns are told which enemy to go for');
+  assert.equal(give(told, EACH.target).code, 'laid there already');
   told = give(told, EACH.quarters).told;
   assert.equal(told.quarters, true);
   assert.equal(give(told, EACH.quarters).code, 'at quarters already');

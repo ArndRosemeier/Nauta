@@ -52,6 +52,8 @@ export const PHRASES = {
   'aye.shot.grape': p(['Grape, sir!', 'Grape it is, sir.'], ['Kartätschen, Herr Kapitän!', 'Jawohl, Kartätschen.']),
   'aye.aim.hull': p(['Her hull, sir.', 'Laid for her hull, sir.'], ['Auf den Rumpf, Herr Kapitän.', 'Jawohl, auf den Rumpf.']),
   'aye.aim.rigging': p(['Her rigging, sir.', 'High, sir, for her spars.'], ['Auf die Takelage, Herr Kapitän.', 'Hoch, Herr Kapitän, auf die Rahen.']),
+  'aye.target': p(['Laying on her, sir.', 'Aye, sir, we lay on her.'], ['Wir richten uns auf sie, Herr Kapitän.', 'Jawohl, wir halten auf sie.']),
+  'aye.target.nearest': p(['The nearest, sir.', 'Whichever is nearest, sir.'], ['Auf den nächsten, Herr Kapitän.', 'Jawohl, auf den nächsten.']),
   'aye.aim.deck': p(['Sweep her deck, sir.', 'Her deck, sir.'], ['Auf ihr Deck, Herr Kapitän.', 'Jawohl, das Deck fegen.']),
   'aye.bear': p(['Fire as they bear, sir!', 'As they bear, aye aye!'], ['Feuer, sobald sie tragen, Herr Kapitän!', 'Jawohl, Feuer nach Belieben!']),
   'aye.hold': p(['Hold for your word, sir.', 'We wait your word, sir.'], ['Wir warten auf Ihr Wort, Herr Kapitän.', 'Jawohl, Feuer halten.']),

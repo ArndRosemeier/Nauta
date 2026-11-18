@@ -1,0 +1,1 @@
+With two or more enemy ships standing, the gunner's fan has a new "Target" ring: tap an enemy ship (named by compass point and range) and the guns that bear on her lay on her, and the master steers for her. "Nearest" goes back to the old way.

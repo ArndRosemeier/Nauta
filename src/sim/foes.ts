@@ -1,6 +1,7 @@
 /**
  * Who a ship fights (docs/design/scenarios.md, stage 2): her enemies are the ships of every other side, and her foe, the
- * one "her" means to her master, her lookout and her gunner, is the nearest of them. A ship that is lost (sunk, burnt,
+ * one "her" means to her master, her lookout and her gunner, is the nearest of them, or the one the captain told the gunner
+ * to go for (`told.target`) while she stands. A ship that is lost (sunk, burnt,
  * blown up, struck) is no enemy while any other enemy stands; when none stands the lost are still the enemy, as the
  * duel's other ship is after the fight's end. Two ships of two sides are exactly the duel: the other ship, always. Pure.
  */
@@ -16,7 +17,9 @@ export function enemiesOf(ships: readonly SimShip[], i: number, out: readonly bo
   const all = ships.flatMap((s, k) => (s.side !== me.side ? [k] : []));
   const standing = all.filter((k) => !out[k]);
   const pose = me.motion.pose, range = (k: number) => apartOnWater(pose, ships[k]!.motion.pose);
-  return (standing.length > 0 ? standing : all).sort((a, b) => range(a) - range(b) || a - b);
+  const ranked = (standing.length > 0 ? standing : all).sort((a, b) => range(a) - range(b) || a - b), wish = me.told.target;
+  // The ship the captain told the gunner to go for comes first while she stands.
+  return wish !== null && standing.includes(wish) ? [wish, ...ranked.filter((k) => k !== wish)] : ranked;
 }
 
 /** Which ships are lost now (end.ts `lostHow`). */

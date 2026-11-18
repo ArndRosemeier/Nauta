@@ -9,7 +9,9 @@
 import type { GunsOrder, KeepOrder, LifeOrder, Order, PlainOrder, SoundOrder } from '../sim/orders';
 import type { SimState } from '../sim/state';
 import { MASTS } from '../sim/ship/sailing';
-import { isStanding, wouldRefuse } from './orderReport';
+import { enemiesOf, lostNow } from '../sim/foes';
+import { apartOnWater, bearingTo } from '../sim/units';
+import { STEER_POINTS, isStanding, steerPoint, wouldRefuse } from './orderReport';
 import type { KeyAction } from './settings';
 import type { WordKey } from './words';
 import { OFFICERS, TAKERS, inVoice, postOf, type Officer, type Taker } from './officers';
@@ -34,6 +36,8 @@ export interface FanItem {
   readonly word: WordKey;
   readonly detail: WordKey | null;
   readonly act: FanAct;
+  /** Words of its own instead of `word` (a ship by her bearing and range). */
+  readonly text?: string;
 }
 
 /** An item as shown now: dim (he would refuse it now), ringed (it is what he is carrying out). */
@@ -98,6 +102,32 @@ export function waitingForWord(state: SimState, ship: number): boolean {
   return !!told && told.quarters && told.firing === 'hold' && !told.word;
 }
 
+/** The most enemy ships the gunner's ring "Target" names (with "Nearest", the ring holds a fan's six). */
+const TARGETS_MOST = FAN_MOST - 1;
+/** Metres in a kilometre. */
+const KILOMETRE = 1000;
+
+/** A ship as the target ring names her: the compass point she lies on from `from`, and the range. */
+function shipWords(from: Place, at: Place): string {
+  const point = Math.round((((bearingTo(from, at) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / steerPoint(1)) % STEER_POINTS.length, range = apartOnWater(from, at);
+  return `${STEER_POINTS[point]} · ${range < KILOMETRE ? `${Math.round(range)} m` : `${(range / KILOMETRE).toFixed(1)} km`}`;
+}
+type Place = { readonly x: number; readonly z: number };
+
+/**
+ * The gunner's ring "Target" (scenarios: which enemy ship the guns lay on), only while two or more enemy ships stand:
+ * "Nearest", and the enemy ships nearest first, each by her compass point and range.
+ */
+function targetRing(state: SimState, ship: number): FanItem[] {
+  const me = state.ships[ship];
+  if (!me) return [];
+  const lost = lostNow(state.ships), pose = me.motion.pose;
+  const enemies = enemiesOf(state.ships, ship, lost).filter((k) => !lost[k]).sort((a, b) => apartOnWater(pose, state.ships[a]!.motion.pose) - apartOnWater(pose, state.ships[b]!.motion.pose));
+  if (enemies.length < 2) return [];
+  const ships = enemies.slice(0, TARGETS_MOST).map((k): FanItem => ({ id: `target-${k}`, word: 'fanTarget', detail: null, text: shipWords(pose, state.ships[k]!.motion.pose), act: { kind: 'order', order: { kind: 'target', ship: 0, at: k } } }));
+  return [{ id: 'target', word: 'fanTarget', detail: null, act: { kind: 'ring', items: [order('target-nearest', 'fanTargetNearest', { kind: 'target', ship: 0, at: null }), ...ships] } }];
+}
+
 /** The orders a man takes, as offered now (the midshipman's are the men he can carry a message to). */
 export function fanItems(who: Officer, state: SimState, ship: number): readonly FanItem[] {
   switch (who) {
@@ -120,6 +150,7 @@ export function fanItems(who: Officer, state: SimState, ship: number): readonly 
     case 'gunner': return [
       { id: 'shot', word: 'fanShot', detail: null, act: { kind: 'ring', items: SHOTS } },
       { id: 'aim', word: 'fanAim', detail: null, act: { kind: 'ring', items: AIMS } },
+      ...targetRing(state, ship),
       order('bear', 'fanBear', plain('bear')),
       order('hold', 'fanHold', plain('hold'), 'fanHoldDetail'),
       order('cease', 'fanCease', plain('cease')),
