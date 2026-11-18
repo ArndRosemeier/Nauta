@@ -178,7 +178,7 @@ interface Help {
 }
 
 const sailOrder = (canvas: 'plain'): Order => ({ kind: 'sail', ship: 0, canvas });
-const plainOrder = (kind: 'by' | 'tack' | 'follow' | 'abeam' | 'quarters' | 'hold' | 'fire' | 'pumps' | 'fires' | 'wreckage'): Order => ({ kind, ship: 0 } as Order);
+const plainOrder = (kind: 'by' | 'tack' | 'follow' | 'abeam' | 'quarters' | 'hold' | 'bear' | 'fire' | 'pumps' | 'fires' | 'plug' | 'wreckage'): Order => ({ kind, ship: 0 } as Order);
 const told = (s: Seen) => s.state.ships[s.ship]!.told;
 
 /** The two ships' distance, m (Infinity alone): as orders are given against it. */
@@ -237,7 +237,13 @@ const COURSE: readonly Lesson[] = [
     id: 'abeam', says: ['lesson.abeam'], again: 'lesson.abeam.again', well: ['lesson.abeam.well'], tap: 'master', items: ['keep', 'abeam'], wants: plainOrder('abeam'),
     starts: (s) => shipsApart(s) <= ABEAM_RANGE, done: (s) => told(s).keep?.kind === 'abeam',
   },
-  { id: 'fight', says: ['lesson.fight'], starts: (_, m) => m.heard.has('fired word'), done: () => false },
+  {
+    // The first broadside on his word; after it the gunner offers "Fire as they bear" (design thread, 2026-11-18: the word
+    // alone gets too few guns off for a new captain).
+    id: 'volley', voice: 'gunner', says: ['lesson.volley'], again: 'lesson.volley.again', well: ['lesson.volley.well'], tap: 'gunner', items: ['bear'],
+    wants: plainOrder('bear'), starts: (_, m) => m.heard.has('fired word'), done: (s) => told(s).firing === 'bear',
+  },
+  { id: 'fight', says: ['lesson.fight'], done: () => false },
 ];
 
 /** The course's lessons a wakened enemy close by cuts short: the sailing ones, up to steering for her. */
@@ -262,11 +268,12 @@ const TIPS: readonly Lesson[] = [
 ];
 
 /**
- * In the first match the first lieutenant sends the hands to the pumps and the fire party himself, once, and says so
+ * In the first match the first lieutenant sends the hands to the pumps, the carpenter's crew to plug and the fire party himself, once, and says so
  * (whether the lessons run or were skipped): a new captain learns what they are for before he must think of them.
  */
 const HELPS: readonly Help[] = [
   { id: 'pumps', says: ['lesson.pumps'], gives: plainOrder('pumps'), starts: (s, m) => m.heard.has('water') && told(s).pumps === null },
+  { id: 'plug', says: ['lesson.plug'], gives: plainOrder('plug'), starts: (s, m) => m.heard.has('water') && told(s).carpenter === null },
   { id: 'fires', says: ['lesson.fires'], gives: plainOrder('fires'), starts: (s, m) => (m.heard.has('hit:fire') || m.heard.has('aftermath:fire')) && told(s).fires === null },
 ];
 
