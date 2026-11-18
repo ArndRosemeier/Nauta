@@ -9,17 +9,15 @@
  * the Stage's warm-up, so no shader is built on the render path (docs/SHADERS.md) when a man changes level.
  */
 import { Group, Mesh, Vector3, type Object3D, type PerspectiveCamera, type WebGPURenderer } from 'three/webgpu';
-import { Character, type CharacterCatalog } from '@actors/generator';
+import { Character } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
 import type { ShipView } from '../ship/shipView';
 import { WALK_SPEED, walkerPlace, type Man } from '../../app/crew';
-import { PACK_CLIPS, PACK_GARMENTS, PACK_HAIR, lookOf } from '../../app/crewLooks';
+import { PACK, lookOf, packCatalog } from '../../app/crewLooks';
 import { CROWD, FULL, MEDIUM, crewLevels, type CrewOverride, type ManLevel, type ManSeen } from '../../app/crewLevels';
 import type { CrewKnobs } from '../../app/quality';
 
-/** Where the build serves the pack (`npm run packs` fills public/packs). */
-const PACK = 'packs/human/manifest.json';
 /** Workers that make the men's shapes side by side, and men dressed at once (the page builds one's meshes while the workers shape the others). */
 const WORKERS = 4;
 const LANES = 8;
@@ -95,12 +93,7 @@ export class CrewView {
    */
   static async load(renderer: WebGPURenderer, base: string, ship: ShipView, men: readonly Man[], offset: { x: number; z: number } | null, progress: (ready: number) => void): Promise<CrewView> {
     // Only what the crew's pack has (tools/crew/pack.mjs).
-    const catalog = (c: CharacterCatalog): CharacterCatalog => ({
-      ...c,
-      garments: c.garments.filter((g) => PACK_GARMENTS.includes(g.id)),
-      hair: c.hair.filter((h) => PACK_HAIR.includes(h.id)),
-      animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id)),
-    });
+    const catalog = packCatalog;
     const pack = `${base}${PACK}`;
     // The first loads the pack; a few more lead a worker each, and the rest share with the leads in turn, several
     // at a time: the shapes are made in the workers side by side while the page builds the meshes.

@@ -8,6 +8,9 @@ import { handholdNear } from '../src/sim/ship/handholds.ts';
 import { pointVelocity, startMotion, toWorld, type ShipPose } from '../src/sim/ship/motion.ts';
 import { CaptainBody, type BodyPose, type BodyWorld } from '../src/app/body.ts';
 import { CALM_LEAST } from '../src/sim/rules/body.ts';
+import { BODY } from '../src/sim/rules/ships.ts';
+import { EYE_BELOW_TOP } from '../src/sim/rules/walking.ts';
+import { PACK_GARMENTS, captainLook } from '../src/app/crewLooks.ts';
 import { WALK_PACE } from '../src/sim/rules/walking.ts';
 
 const plan = shipPlan(), graph = walkGraph(plan), doors = shutDoors(plan), DT = 1 / 60;
@@ -167,4 +170,29 @@ test('her heeled deck slows him as it slows every man aboard', () => {
     return Math.hypot(w.vx, w.vz);
   };
   assert.ok(pace(0.35) < pace(0) * 0.8 && pace(0.35) > pace(0) * 0.4, `level ${pace(0).toFixed(2)} m/s, heeled 20° ${pace(0.35).toFixed(2)}`);
+});
+
+test('his drawn body leans as far as the view\'s eye moves: the eye it carries is where the view is, and the calm view stills both', () => {
+  const most = (strength: number) => {
+    const w = walkerAt(plan, quarterdeck), body = new CaptainBody(worldOf(() => w)), eye = eyeOf(w), top = BODY.height - EYE_BELOW_TOP;
+    body.strength = strength;
+    let lean = 0;
+    run(body, w, 10, (t) => rolling(0.17, 6.3, t), (b) => {
+      lean = Math.max(lean, Math.hypot(b.lean[0], b.lean[1]));
+      assert.ok(Math.abs(b.eye[0] - eye[0] - b.lean[0] * top) < 1e-9 && Math.abs(b.eye[2] - eye[2] - b.lean[1] * top) < 1e-9, 'the drawn eye is the view\'s');
+      assert.equal(b.bend, 0, 'no stoop on her open deck');
+    });
+    return lean;
+  };
+  const full = most(1), calm = most(CALM_LEAST);
+  assert.ok(full > 0.03, `leans ${full.toFixed(3)}`);
+  assert.ok(calm < full * 0.15, `calm ${calm.toFixed(3)} of ${full.toFixed(3)}`);
+});
+
+test('the captain wears an officer\'s dress from the crew\'s pack, the same on every machine', () => {
+  const look = captainLook();
+  assert.deepEqual(look, captainLook());
+  for (const g of look.outfit!) assert.ok(PACK_GARMENTS.includes(g), g);
+  assert.ok(look.outfit!.includes('longsleeve') && look.outfit!.includes('wool-pants'), 'coat and trousers');
+  assert.equal(look.beard, 'none');
 });
