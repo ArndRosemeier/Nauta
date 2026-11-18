@@ -713,7 +713,7 @@ A stranger can open the page and play a full duel alone or with a friend.
 | From the first broadside to the end | most between 6 and 14 minutes; none under 4 |
 | The whole match | most between 10 and 20 minutes |
 | Draws by the clock | fewer than 1 in 20 |
-| How it ends | struck most often; sunk, burnt and blown up each seen, none more than a quarter; a dismasted ship is beaten within about 3 minutes |
+| How it ends | between computer captains nearly always struck, since a captain who follows the rule gives up before she sinks; burnt and blown up seen now and then, mostly under a green captain whose fire party comes late. Sunk is a player's ending (he may fight on) and is judged in play. A dismasted ship is beaten within about 3 minutes |
 | The better captain (one skill level up) | wins about 3 in 4 |
 | Weather position | worth having: the ship that holds it wins clearly more than half between equals |
 
@@ -724,6 +724,7 @@ A stranger can open the page and play a full duel alone or with a friend.
 - **A helpless ship is beaten.** A ship that cannot sail, facing one that still can and still has half her guns, is beaten: the other lies off her bow or stern and rakes her. This joins the three conditions of N6.4.
 - **Splinters and grape hurt.** About half the men struck are killed or badly hurt, not a quarter, so a well-served broadside thins a gun deck and the fire slackens on the losing side: the fight tips instead of grinding on.
 - **Flooding is a contest, not a switch.** The first duels had ships either dry (under 7 t) or lost (200 t), with nothing between. Wanted: the carpenter's crew at the pumps holds about two open holes at the waterline; "Hands to the pumps" doubles that; each plug takes its time and more holes arrive while he works, so water rises and falls with the fight and the captain sees it coming, is told by the carpenter, and can answer by sending men or by turning her wounded side away from the enemy so the holes lift clear.
+- **Beaten, first pass** (N7.5a, confirmed 2026-11-18): a quarter of her men killed or badly hurt, not half (only about 70 stand exposed on deck, so half was never reached); by water at 0.95 of the level at which she founders, not two thirds, so a ship strikes for water only when she is truly going. These replace the two numbers in the N6 decisions. Fire is a contest too: it outgrows the two men at hand, so a fire party must come within about a minute.
 - **Raking pays.** A ball that enters by the bow or stern travels the length of the deck, and each such ball counts for several fired into her side. The computer captain already tries for it; the damage must reward it.
 
 **Notes:** N7.1 (the computer captain), `src/sim/captain/` (`captain.ts` the orders, `sight.ts` what he knows, `helm.ts` how he handles her), his numbers in `src/sim/rules/captain.ts`; the duels in `npm run check:captains` (tools/sim/captains.ts).
