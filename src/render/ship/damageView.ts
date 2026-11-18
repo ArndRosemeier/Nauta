@@ -25,7 +25,7 @@ export class DamageView {
   private shown: DamageShown = { hullCut: false, sailsCut: false };
 
   /** `ship`: her block in the shared maps (0 the captain's own, 1 the other's). */
-  constructor(ship: number) {
+  constructor(private readonly ship: number) {
     this.hull = new HullMarks({ data: DAMAGE_TEXTURE.image.data as Uint8Array, width: DAMAGE_TEXTURE.image.width, row: ship * HULL_BLOCK_ROWS, rows: HULL_BLOCK_ROWS });
     const forms = sailForms(rigPlan(shipPlan()));
     this.sails = new SailMarks(
@@ -38,10 +38,12 @@ export class DamageView {
   marksFor(d: Damage | null, gone: readonly boolean[] = []): DamageShown {
     if (!d) return this.shown;
     if (this.hull.bringUpTo(d)) {
+      DAMAGE_TEXTURE.addLayerUpdate(this.ship);
       DAMAGE_TEXTURE.needsUpdate = true;
       this.shown = { ...this.shown, hullCut: this.shown.hullCut || this.hull.cut };
     }
     if (this.sails.bringUpTo(d.rent, gone)) {
+      SAIL_DAMAGE_TEXTURE.addLayerUpdate(this.ship);
       SAIL_DAMAGE_TEXTURE.needsUpdate = true;
       this.shown = { ...this.shown, sailsCut: true };
     }

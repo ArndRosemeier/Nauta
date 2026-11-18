@@ -59,6 +59,11 @@ export class PageMatch implements OrderSession {
     return navyOf(this.ship, this.first);
   }
 
+  /** The navy ship `ship` of the match wears (the first ship's is the session's `first`; the others the opposite, until the scenario names them). */
+  navyAt(ship: number): Navy {
+    return navyOf(ship, this.first);
+  }
+
   get herNavy(): Navy {
     return navyOf(1 - this.ship, this.first);
   }

@@ -47,6 +47,10 @@ import { ShipView } from './render/ship/shipView';
 import type { SailHeard, SailsSummary } from './render/ship/sailsView';
 import { Furnishings } from './render/ship/furnishings';
 import { HammocksStowed } from './app/hammocks';
+import { Rivals, type Rival } from './app/rivals';
+import type { ShipWay } from './render/ship/shipView';
+import { LEAST_SHIPS, MOST_SHIPS, type Scenario } from './sim/scenario';
+import type { Offered } from './sim/rules/captain';
 import { loadFittings } from './render/ship/fittings';
 import { furnish } from './sim/ship/furnish';
 import { shipPlan } from './sim/ship/plan';
@@ -60,7 +64,7 @@ import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
 import { setFrenchFlags } from './render/ship/sailMaterial';
 import type { Navy } from './app/crewLooks';
-import { SHIPS_DRAWN, lightThrough } from './render/ship/shipMaterials';
+import { SHIPS_DRAWN, lightThrough, setWakeSlots } from './render/ship/shipMaterials';
 import { casualtiesOf, goingDown, scarsOf } from './app/scars';
 import { GunfireView, fallInSea } from './render/gunfire';
 import { SmokeView, useSmokeDepth } from './render/smoke';
@@ -103,6 +107,10 @@ const ESCAPE = 'Escape';
 const NOT_ORDER_KEYS: readonly KeyAction[] = ['forward', 'back', 'left', 'right', 'glass', 'reports'];
 /** Where the captain looks at the start: a little above the horizon, toward the morning sun. */
 const START_LOOK: Look = { yaw: -1.2, pitch: 0.12 };
+/** The ships whose crews are drawn: the first two of a match, until the crowd serves every ship (scenarios stage 5b). */
+const CREWS_DRAWN = 2;
+/** The other ship that has the second wake map keeps it until another is nearer by this factor and this many metres: the map's trail would otherwise start afresh at every change. */
+const WAKE_KEEP = 1.25, WAKE_KEEP_MORE = 20;
 /** The longest step of time one frame may take, seconds (a tab that slept does not jump the clock). */
 const MAX_FRAME_SECONDS = 0.1;
 /** The checks' flight (`__nautaWatch.fly`) steps the eye at the simulation's step, s. */
@@ -232,12 +240,8 @@ async function start(): Promise<void> {
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   // `?watch` (plan N7.8): the match is a battle of two computer captains, none of the ships mine.
-  if (match && params.watch) match.useSession(new DuelSession({ build: VERSION, now: matchClock, seed: params.seed ?? undefined, windForce: params.windAsked ? params.wind : undefined, watch: { first: params.watch.british, second: params.watch.french }, minutes: matchMinutes(settings.now.match) }), 'british');
-  const other = build && match ? new ShipView(build, 1) : null;
+  if (match && params.watch) match.useSession(new DuelSession({ build: VERSION, now: matchClock, seed: params.seed ?? undefined, windForce: params.windAsked ? params.wind : undefined, ...(params.ships > LEAST_SHIPS ? { scenario: watchedFleet(params.ships, params.watch) } : { watch: { first: params.watch.british, second: params.watch.french } }), minutes: matchMinutes(settings.now.match) }), 'british');
   if (ship && match) ship.poseFrom = () => match.pose(match.ship)!;
-  if (other && match) other.poseFrom = () => match.pose(match.other) ?? match.pose(match.ship)!;
-  // `?down` (N6.5): the other ship goes down off her beam from the start, a stand-in to look at a ship sinking and what floats after.
-  if (other && match && params.down) other.poseFrom = (t) => goingDown(match.pose(match.ship)!, match.pose(match.other) ?? match.pose(match.ship)!, t);
   // The spyglass (plan N3.8), held steady against her motion as the hands can.
   const glass = ship ? new Spyglass(MATCH_SEED, params.glass) : null;
   if (ship) ship.steadying = glass;
@@ -252,16 +256,19 @@ async function start(): Promise<void> {
   const fittings = ship ? await loadFittings(import.meta.env.BASE_URL) : null;
   const furnished = ship && fittings ? new Furnishings(view.renderer, fittings, furnish(shipPlan())) : null;
   if (ship && furnished) for (const [zone, draws] of furnished.zones) ship.addToZone(zone, draws.group);
-  // The other ship's fittings on her weather deck (plan N3.8): she is seen only from outside.
-  const herFittings = other && fittings ? new Furnishings(view.renderer, fittings, furnish(shipPlan()), true) : null;
-  if (other && herFittings) for (const [zone, draws] of herFittings.zones) other.addToZone(zone, draws.group);
+  // The other ships (plan N3.8, scenarios): seen only from outside, each with her fittings on her weather deck, her guns and hammocks.
+  const rivals = build && match ? Rivals.make(build, view.renderer, fittings, MOST_SHIPS - 1) : null;
+  if (rivals && match) {
+    rivals.assign(match);
+    for (const r of rivals.all) r.view.poseFrom = () => match.pose(r.ship) ?? match.pose(match.ship)!;
+    // `?down` (N6.5): the other ship goes down off her beam from the start, a stand-in to look at a ship sinking and what floats after.
+    if (params.down) rivals.all[0]!.view.poseFrom = (t) => goingDown(match.pose(match.ship)!, match.pose(rivals.all[0]!.ship) ?? match.pose(match.ship)!, t);
+  }
   // The hammocks in the waist's nettings, stowed as each ship goes to quarters (plan N2.9).
-  const myHammocks = new HammocksStowed(), herHammocks = new HammocksStowed();
+  const myHammocks = new HammocksStowed();
   // Her guns and port lids, moving as the match works them (plan N5.4a); the other ship's too.
   const guns = ship && fittings ? new GunsView(view.renderer, fittings, furnish(shipPlan())) : null;
   if (ship && guns) ship.addMoving(guns.draws.group);
-  const herGuns = other && fittings ? new GunsView(view.renderer, fittings, furnish(shipPlan()), 1) : null;
-  if (other && herGuns) other.addMoving(herGuns.draws.group);
   const note = loading.querySelector('.title-note')!;
   // Walking, his own body (plan N2.7): an Actors figure from the crew's pack, his head not drawn.
   if (walking && ship) note.textContent = 'dressing the captain';
@@ -271,7 +278,7 @@ async function start(): Promise<void> {
   const mustered = performance.now();
   const otherCrew: OtherCrewAt = params.crew === 'aboard' ? { aboard: true } : params.crew ? { offset: TWIN_OFFSET } : null;
   const startCrew = QUALITY_LEVELS[Math.max(0, levelNamed(params.quality ?? settings.now.quality))]!.crew;
-  const crew = match && ship && !params.noCrew ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, match.state.ships.map((_, i) => (i === match.ship ? ship : i === match.other ? other : null)), startCrew, otherCrew,
+  const crew = match && ship && !params.noCrew ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, (i) => (i === match.ship ? ship : rivals?.of(i)?.view ?? null), CREWS_DRAWN, startCrew, otherCrew,
     (what) => { note.textContent = what; }) : null;
   const musterSeconds = (performance.now() - mustered) / MS_PER_SECOND;
   if (crew) window.__nautaCrew = crew;
@@ -315,11 +322,10 @@ async function start(): Promise<void> {
   if (match && shots) match.on('events', (events) => shots.take(events));
   if (match && crew) match.on('events', (events) => crew.onEvents(events));
   await furnished?.ready();
-  await herFittings?.ready();
+  await rivals?.built();
   await guns?.ready();
-  await herGuns?.ready();
-  const fittingGroups = [furnished, herFittings].flatMap((f) => (f ? [...f.zones.values()].map((d) => d.group) : []));
-  const gunGroups = [guns, herGuns].flatMap((g) => (g ? [g.draws.group] : []));
+  const fittingGroups = [furnished, ...(rivals?.all.map((r) => r.fittings) ?? [])].flatMap((f) => (f ? [...f.zones.values()].map((d) => d.group) : []));
+  const gunGroups = [guns, ...(rivals?.all.map((r) => r.guns) ?? [])].flatMap((g) => (g ? [g.draws.group] : []));
   await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(fireDrawn ? [fireDrawn.bits, fireDrawn.balls] : []), ...(smoke && !halfSmoke ? [smoke.mesh] : []), ...(flotsam ? [flotsam.mesh] : []), ...fittingGroups, ...gunGroups]);
   // The crews' shaders, a few men at each level of detail wearing between them all the crew wears, at full speed
   // behind the loading screen (docs/SHADERS.md rule 5), as MasterWorld warms its townsfolk.
@@ -354,7 +360,7 @@ async function start(): Promise<void> {
   if (ship) for (const id of ship.swingIds) ship.setBrace(id, params.brace);
   // `?scars=3`: both ships drawn shot about by a stand-in for a fight's damage (plan N6.5), instead of the match's.
   const scarred = params.scars !== null ? [scarsOf(params.scars, 0), scarsOf(params.scars, 1)] as const : null;
-  if (other) await view.stage.add(other.group);
+  if (rivals) for (const r of rivals.all) await view.stage.add(r.view.group);
   if (spray) await view.stage.add(spray.mesh);
   if (flotsam) await view.stage.add(flotsam.mesh);
   if (fireDrawn) { await view.stage.add(fireDrawn.bits); await view.stage.add(fireDrawn.balls); }
@@ -511,7 +517,7 @@ async function start(): Promise<void> {
       glass.raised = glass.up ? 1 : 0;
       if (power !== null) glass.power = power;
     },
-    other: () => (other?.group.visible ? { drawn: other.trianglesDrawn, near: other.nearDrawn, apart: Math.round(other.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null),
+    other: () => { const her = rivals?.of(match.other)?.view; return her?.group.visible ? { drawn: her.trianglesDrawn, near: her.nearDrawn, apart: Math.round(her.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null; },
     eyeAt: (eye, yaw, pitch) => { where = { name: 'check', eye, look: { yaw, pitch } }; input.look = { yaw, pitch }; },
     drill: (index) => { const guns = match.state.ships[index]?.guns; return guns ? battery().map((_, g) => gunAt(guns, g).drill) : []; },
     firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
@@ -568,7 +574,7 @@ async function start(): Promise<void> {
     let dressed: Navy = 'british';
     const dress = () => {
       const navy = match.navy;
-      setFrenchFlags(navy === 'french', match.herNavy === 'french');
+      setFrenchFlags(flagsOf(match));
       if (navy === dressed) return;
       dressed = navy;
       void captain?.changeCoat(navy);
@@ -603,7 +609,9 @@ async function start(): Promise<void> {
   let aloft = meanWind(wind, 0);
   const ear = new Vector3(), facing = new Vector3(), crown = new Vector3(), gust = meanWind(wind, 0);
   /** Her way through the water, sailed by a match (`?sail`); still without one. Her wake follows it (N2.5). */
-  const way = { ahead: 0, leeway: 0 }, herWay = { ahead: 0, leeway: 0 };
+  const way = { ahead: 0, leeway: 0 };
+  /** The other ship that has the second wake map (the nearest, kept while she is not much farther than another). */
+  let wakeRival: Rival | null = null;
   // `?bench`: the fixed flight, measured once the quality level is chosen (plan N1.9).
   const bench = params.bench > 0 ? new BenchRun(el('bench'), params.bench, {
     settled: () => quality.chosen,
@@ -654,7 +662,7 @@ async function start(): Promise<void> {
       view.magnify(glass.magnification);
       glassField.style.opacity = String(glass.raised);
       if (ship) ship.zoom = glass.magnification;
-      if (other) other.zoom = glass.magnification;
+      if (rivals) for (const r of rivals.all) r.view.zoom = glass.magnification;
     }
     if (ship) {
       // The sails drawn as they stand, the flags in the true wind; after a jump of the browser checks, the sails as
@@ -682,25 +690,12 @@ async function start(): Promise<void> {
       shots?.watch(match!.state);
       const mine = match?.state.ships[match.ship];
       guns?.moveGuns(ship.group, view.camera, match && mine && shots ? gunsSeen(mine, (g) => shots.firedFor(match.ship, g, seaTime)) : null, seaTime, sky.lightDirection);
-      if (other && match) {
-        // The other ship as her match says she sails: her sails and yards as her crew has them, her flags in the wind where she is.
-        other.group.visible = match.other >= 0;
-        if (other.group.visible) {
-          const hers = sailsSeen(match.state, match.other);
-          other.sails.stand(hers?.standing ?? null, hers?.canvas ?? null);
-          other.sails.blow(windAt(wind, other.drawn.x, other.drawn.z, seaTime));
-          for (const [id, angle] of sparAngles(match.state, match.other)) other.setBrace(id, angle);
-          other.setRudder(rudderAngle(match.state, match.other));
-          other.showDamage(scarred?.[1] ?? match.state.ships[match.other]?.damage ?? null);
-          if (jump > 0) other.sails.follow(jump);
-          other.follow(sea, seaTime, dt, view.camera);
-          herFittings?.stowHammocks(herHammocks.after(!!match.state.ships[match.other]?.told.quarters, dt + jump));
-          herFittings?.update(other.group, view.camera, sky.lightDirection);
-          const her = match.state.ships[match.other];
-          herGuns?.moveGuns(other.group, view.camera, her && shots ? gunsSeen(her, (g) => shots.firedFor(match.other, g, seaTime)) : null, seaTime);
-        }
+      if (rivals && match) {
+        // The other ships as their match says they sail: sails and yards as their crews have them, flags in the wind where they are.
+        rivals.assign(match);
+        rivals.drawAll({ match, sea, wind, seaTime, dt, jump, camera: view.camera, light: sky.lightDirection, shots, scarred: (i) => scarred?.[Math.min(i, 1)] ?? null });
       }
-      ship.shade(view.sun, sky.lightDirection, other);
+      ship.shade(view.sun, sky.lightDirection, rivals?.nearest(view.camera)?.view ?? null);
       // The orders: the midshipman on his way, the fan judged anew; the officers drawn; the captain's arm pointing or his hand at his mouth.
       fan?.onFrame(now, dt);
       const arm = fan?.arm;
@@ -725,27 +720,36 @@ async function start(): Promise<void> {
     sky.update(dt, view.camera);
     speech?.drawBubbles(view.camera);
     first?.frame();
-    // Each ship's way through the water, as her match sails her; her wake and spray follow it (N2.5, N3.8).
-    const mine = match?.state.ships[match.ship]?.sailing, hers = match && match.other >= 0 ? match.state.ships[match.other]?.sailing : undefined;
+    // Each ship's way through the water, as her match sails her; her wake and spray follow it (N2.5, N3.8). The sea's shader
+    // reads two wake maps: the captain's ship has one, and the nearest of the others (kept while she is not much farther than another).
+    const mine = match?.state.ships[match.ship]?.sailing;
     way.ahead = mine?.ahead ?? 0; way.leeway = mine?.leeway ?? 0;
-    herWay.ahead = hers?.ahead ?? 0; herWay.leeway = hers?.leeway ?? 0;
-    const herWater = other?.group.visible ? other.water(herWay) : null;
-    seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky, [ship?.water(way) ?? null, herWater]);
+    const wayOf = (r: Rival): ShipWay => { const sailed = match?.state.ships[r.ship]?.sailing; return { ahead: sailed?.ahead ?? 0, leeway: sailed?.leeway ?? 0 }; };
+    const drawnRivals = rivals?.all.filter((r) => r.ship >= 0) ?? [];
+    const near = (r: Rival) => apartOnWater(r.view.group.position, view.camera.position);
+    const nearest = drawnRivals.reduce<Rival | null>((best, r) => (best === null || near(r) < near(best) ? r : best), null);
+    if (wakeRival && (wakeRival.ship < 0 || !drawnRivals.includes(wakeRival))) wakeRival = null;
+    if (nearest && (!wakeRival || near(wakeRival) > WAKE_KEEP * near(nearest) + WAKE_KEEP_MORE)) wakeRival = nearest;
+    setWakeSlots(wakeRival ? [0, ...Array.from({ length: SHIPS_DRAWN - 1 }, (_, k) => (k + 1 === wakeRival!.view.index ? 1 : -1))] : [0]);
+    seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky, [ship?.water(way) ?? null, wakeRival ? wakeRival.view.water(wayOf(wakeRival)) : null]);
     if (ship && spray) {
       const bow = ship.bow(way);
-      const from = [{ slams: ship.slams, bow }, ...(other && herWater ? [{ slams: other.slams, bow: other.bow(herWay) }] : [])];
+      const from = [{ slams: ship.slams, bow }, ...drawnRivals.map((r) => ({ slams: r.view.slams, bow: r.view.bow(wayOf(r)) }))];
       spray.show(from, windAt(wind, bow.stem[0], bow.stem[2], seaTime, gust), seaTime, dt, seaView.origin);
     }
     // Going down (N6.5): what floats after each ship that has sunk.
     if (match && flotsam) {
       if (ship) flotsam.show(0, ship.drawn, sea, seaTime, seaView.origin);
-      if (other && match.other >= 0) flotsam.show(1, other.drawn, sea, seaTime, seaView.origin);
+      for (const r of drawnRivals) flotsam.show(r.view.index, r.view.drawn, sea, seaTime, seaView.origin);
     }
-    // Fire (N6.5): her fires' flames and soot, poured before the smoke is shown so they are drawn this frame.
+    // Fire (N6.5): her fires' flames and soot, poured before the smoke is drawnRivals so they are drawn this frame.
     if (match && burning) {
-      const mine = scarred?.[0] ?? match.state.ships[match.ship]?.damage, hers = scarred?.[1] ?? (match.other >= 0 ? match.state.ships[match.other]?.damage : undefined);
-      if (ship && mine) burning.burn(0, mine.fires, ship.drawn, seaTime);
-      if (other && hers) burning.burn(1, hers.fires, other.drawn, seaTime);
+      const mine = scarred?.[0] ?? match.state.ships[match.ship]?.damage;
+      if (ship && mine) burning.burn(match.ship, mine.fires, ship.drawn, seaTime);
+      for (const r of drawnRivals) {
+        const hers = scarred?.[1] ?? match.state.ships[r.ship]?.damage;
+        if (hers) burning.burn(r.ship, hers.fires, r.view.drawn, seaTime);
+      }
     }
     // Gunfire (N5.4a): flashes and first puffs at the muzzles, the balls in flight, splashes where they fall (spray
     // and white water on the sea), splinters where they strike.
@@ -754,7 +758,7 @@ async function start(): Promise<void> {
       const longSix = (f: Flash) => battery()[f.gun]?.gun === 'long6';
       fireDrawn.showGunfire(seaTime, blowing, seaView.origin, seen.flashes, struck.filter((s) => s !== null), seen.balls, longSix);
       smoke?.showSmoke(seaTime, blowing, seaView.origin, seen.flashes, longSix);
-      if (spray) fallInSea(seen.splashes, spray, seaView.wakes, [ship?.drawn ?? null, other?.group.visible ? other.drawn : null], fireDrawn.plenty);
+      if (spray) fallInSea(seen.splashes, spray, seaView.wakes, [ship?.drawn ?? null, wakeRival?.view.drawn ?? null], fireDrawn.plenty);
     }
     for (const w of seaView.wakes) w.laySplashes(seaTime, seaView.origin.x, seaView.origin.z);
     seaView.fine.run(view.renderer);
@@ -800,7 +804,7 @@ async function start(): Promise<void> {
     if (showHud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''}${other?.group.visible ? ` · other ship ${Math.round(other.trianglesDrawn / THOUSAND)}k drawn` : ''}${glass?.up ? ` · glass ×${glass.power.toFixed(0)}` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}\n${offline.line(formatBytes)}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''}${rivals ? rivals.all.filter((r) => r.ship >= 0).map((r) => ` · ship ${r.ship + 1} ${Math.round(r.view.trianglesDrawn / THOUSAND)}k drawn`).join('') : ''}${glass?.up ? ` · glass ×${glass.power.toFixed(0)}` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}\n${offline.line(formatBytes)}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
@@ -809,6 +813,20 @@ async function start(): Promise<void> {
       if (menu) menu.ready(); else handOver();
     }
   });
+}
+
+/** `?watch&ships=4`: that many computer captains in two sides in turn, the British skill on the even ships and the French on the odd. */
+function watchedFleet(n: number, skills: { british: Offered; french: Offered }): Scenario {
+  return {
+    sideNavies: ['british', 'french', 'british', 'french'],
+    ships: Array.from({ length: n }, (_, i) => ({ side: i % 2, navy: null, command: { kind: 'computer', skill: i % 2 === 0 ? skills.british : skills.french }, at: null })),
+  };
+}
+
+/** Which ships drawn fly the French colours, by the index drawn: the captain's own, then the others in the match's order. */
+function flagsOf(match: PageMatch): boolean[] {
+  const others = match.state.ships.flatMap((_, i) => (i === match.ship ? [] : [i]));
+  return [match.navy === 'french', ...others.map((i) => match.navyAt(i) === 'french')];
 }
 
 /** Shot striking a ship (shotsSeen.ts `Strike`) in the world as she lies at `pose`, and which way out of her side; null: no such ship. */

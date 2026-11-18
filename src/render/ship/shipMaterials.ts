@@ -8,17 +8,18 @@
  * deck no sky comes in but through the hatch, so the sky's fill there falls off with the distance from it; and the
  * lantern's light is added to what it shines on, in the shader (a light of the scene's would be in every lit shader).
  */
-import { Color, DataTexture, DoubleSide, FloatType, FrontSide, LinearFilter, Matrix4, MeshBasicNodeMaterial, MeshStandardNodeMaterial, NearestFilter, RGBAFormat, UnsignedByteType, Vector2, Vector4 } from 'three/webgpu';
+import { Color, DataArrayTexture, DataTexture, DoubleSide, FloatType, FrontSide, LinearFilter, Matrix4, MeshBasicNodeMaterial, MeshStandardNodeMaterial, NearestFilter, RGBAFormat, UnsignedByteType, Vector2, Vector4 } from 'three/webgpu';
 import {
   Fn, Loop, abs, attribute, clamp, dot, float, floor, fract, fwidth, hash, int, ivec2, length, max, min, mix, modelViewMatrix, normalGeometry,
   normalLocal, normalize, positionGeometry, positionLocal, screenCoordinate, sin, smoothstep, step, texture, textureLoad, transformNormalToView,
   uniform, uniformArray, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import { DECK_PLANK_LENGTH } from '../../sim/rules/ships';
+import { MOST_SHIPS } from '../../sim/scenario';
 import { GRAIN_SPAN, makeGrainTexture } from './grain';
 import { DAMAGE_MAP_SIZE, DAMAGE_REGIONS, DAMAGE_TEXEL } from './damageMap';
 import { MOST_FRAMES } from './swings';
-import { wetHull } from '../wakeMap';
+import { WAKE_SLOTS, wetHull } from '../wakeMap';
 import { filtered } from '../dataTexture';
 
 /** How many lanterns and sky openings her shaders can hold. */
@@ -27,11 +28,11 @@ export const MOST_SKIES = 24;
 /** Rows of a moving frame (an affine 3 × 4). */
 const FRAME_ROWS = 3;
 /**
- * Ships her kinds draw at once (plan N3.8): hers and the other captain's. Each mesh says whose it is
- * (`SHIP_OBJECT.ship`), and the per-ship textures (her moving frames here, the sails' rows in sailMaterial.ts) hold a
- * block of rows per ship, so the second ship draws with the same shaders.
+ * Ships her kinds draw at once (plan N3.8; scenarios of up to eight ships): hers and the others'. Each mesh says whose
+ * it is (`SHIP_OBJECT.ship`), and the per-ship textures (her moving frames here, the sails' rows in sailMaterial.ts) hold a
+ * block of rows per ship, the hole maps a layer per ship, so every ship draws with the same shaders.
  */
-export const SHIPS_DRAWN = 2;
+export const SHIPS_DRAWN = MOST_SHIPS;
 
 /** What the ship's shaders read, written by the ship's view (shipView.ts). */
 export const SHIP_INPUTS = {
@@ -84,6 +85,15 @@ const IDENTITY = new Matrix4();
 /** Drawn whole: no fading. */
 const WHOLE = new Vector2(0, 1);
 
+/** Each ship drawn's wake slot (seaView.ts: the ships nearest the eye have a wake map), by her index drawn; -1 none. Set each frame by `setWakeSlots`. */
+const WAKE_SLOT_OF = uniformArray(Array.from({ length: SHIPS_DRAWN }, () => -1), 'float');
+export const setWakeSlots = (slots: readonly number[]): void => setPerShip(WAKE_SLOT_OF, slots, -1);
+/** Fills a uniform array of one number per ship drawn from `values` (true is 1, false 0), `missing` where `values` has none. */
+export function setPerShip(array: { readonly array: unknown }, values: readonly (number | boolean | undefined)[], missing: number): void {
+  const a = array.array as number[];
+  for (let i = 0; i < SHIPS_DRAWN; i++) a[i] = Number(values[i] ?? missing);
+}
+
 /** What each mesh of her tells her shaders, read as each is drawn (mesh.userData, written by shipView.ts). */
 export const SHIP_OBJECT = {
   /** Which lanterns light it and which openings let the sky in: [first lamp, past the last, first opening, past the last]; all -1 outside. */
@@ -101,10 +111,12 @@ export const SHIP_OBJECT = {
 const RGBA = 4;
 /**
  * The damage map (damageMap.ts): one texel per 4 cm of her hull and decks, a block of rows per ship drawn (her own
- * first), into which damageView.ts writes each ship's marks (damageMarks.ts: hole, scorch, rim, cut). Filtered, so a
+ * first), a layer of an array texture (a stack of them would be taller than a GPU's default texture limit), into which damageView.ts writes each ship's marks (damageMarks.ts: hole, scorch, rim, cut). Filtered, so a
  * hole's edge is drawn between texels.
  */
-export const DAMAGE_TEXTURE = new DataTexture(new Uint8Array(DAMAGE_MAP_SIZE.width * DAMAGE_MAP_SIZE.height * SHIPS_DRAWN * RGBA), DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height * SHIPS_DRAWN, RGBAFormat, UnsignedByteType);
+export const DAMAGE_TEXTURE = new DataArrayTexture(new Uint8Array(DAMAGE_MAP_SIZE.width * DAMAGE_MAP_SIZE.height * SHIPS_DRAWN * RGBA), DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height, SHIPS_DRAWN);
+DAMAGE_TEXTURE.format = RGBAFormat;
+DAMAGE_TEXTURE.type = UnsignedByteType;
 filtered(DAMAGE_TEXTURE, LinearFilter);
 /** Each region's least u and v (m) and its corner in the map (texels), by region number less one. */
 const REGIONS = uniformArray(DAMAGE_REGIONS.map((r) => new Vector4(r.u, r.v, r.x, r.y)), 'vec4');
@@ -218,9 +230,9 @@ function damageAt(gr, region) {
   const i = int(clamp(region.sub(1 / 2), 0, DAMAGE_REGIONS.length - 1)), k = REGIONS.element(i);
   const laid = step(1 / 2, region).mul(step(region, DAMAGE_REGIONS.length + 1 / 2));
   const v = mix(gr.y, k.y.add(DAMAGE_TEXEL / 2), BY_PLACE.element(i));
-  const row = k.w.add(v.sub(k.y).div(DAMAGE_TEXEL)).add(SHIP_OBJECT.ship.mul(DAMAGE_MAP_SIZE.height));
-  const uv = vec2(k.z.add(gr.x.sub(k.x).div(DAMAGE_TEXEL)), row).div(vec2(DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height * SHIPS_DRAWN));
-  return texture(DAMAGE_TEXTURE, uv).mul(laid);
+  const row = k.w.add(v.sub(k.y).div(DAMAGE_TEXEL));
+  const uv = vec2(k.z.add(gr.x.sub(k.x).div(DAMAGE_TEXEL)), row).div(vec2(DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height));
+  return texture(DAMAGE_TEXTURE, uv).depth(int(SHIP_OBJECT.ship)).mul(laid);
 }
 /** Charred timber (linear RGB). */
 const CHAR = [0.008, 0.007, 0.006];
@@ -303,7 +315,7 @@ export function makeWoodMaterial(crossfade = false, holed = crossfade): MeshStan
   const seamColour = mix(vec3(...PITCH), surface.mul(SEAM_UNDER_PAINT), cover);
   // Her outside wet where the sea has climbed it (wakeMap.ts `wetHull`); inside, dry.
   const dmg = damageAt(gr, sh.z), marked = damaged(mix(surface, seamColour, seam), dmg, g);
-  const wet = wetHull(positionLocal, marked, mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), SHIP_OBJECT.ship, SHIPS_DRAWN);
+  const wet = wetHull(positionLocal, marked, mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), WAKE_SLOT_OF.element(int(SHIP_OBJECT.ship)), WAKE_SLOTS);
   const outside = float(1).sub(step(0, SHIP_OBJECT.light.w));
   m.colorNode = mix(marked, wet.colour, outside);
   m.roughnessNode = mix(mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), wet.rough, outside);
@@ -367,7 +379,7 @@ export function makeCopperMaterial(crossfade = false): MeshStandardNodeMaterial 
   const tarnish = clamp(g.w.mul(TARNISH).add(sheet.mul(1 - TARNISH)), 0, 1);
   const green = smoothstep(GREEN_FROM, GREEN_FROM + GREEN_SOFT, g.z);
   const metal = mix(fin.rgb, vec3(...COPPER_BROWN), tarnish);
-  const wet = wetHull(positionLocal, mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail)), mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2)), SHIP_OBJECT.ship, SHIPS_DRAWN);
+  const wet = wetHull(positionLocal, mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail)), mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2)), WAKE_SLOT_OF.element(int(SHIP_OBJECT.ship)), WAKE_SLOTS);
   m.colorNode = wet.colour;
   m.metalnessNode = float(1).sub(green);
   m.roughnessNode = wet.rough;

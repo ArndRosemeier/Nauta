@@ -3,6 +3,7 @@
  * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`, `?glass=12`; two players:
  * `?room`, `?join=K7Q2ZP`, `?key=`, `?hub=`, `?seed=`, `?netcheck`). Pure: it takes the query string.
  */
+import { LEAST_SHIPS, MOST_SHIPS } from '../sim/scenario';
 import { SKILLS, type Offered, type Skill } from '../sim/rules/captain';
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
@@ -127,6 +128,8 @@ export interface Params {
    * seasoned); the seed, the wind and the hour are the address's own (`?seed=`, `?wind=`, `?hour=`). null: none.
    */
   readonly watch: { readonly british: Offered; readonly french: Offered } | null;
+  /** How many ships a battle watched has (`?watch&ships=4`, scenarios stage 5's trial before the dialog runs more than two): they take the two sides in turn; 2 without. */
+  readonly ships: number;
   /**
    * Powder smoke drawn at half resolution (`?smoke=half`, the trial of N5.5's next step): the scene into a
    * multisampled target of the shared post chain, its depth brought down to half resolution for the smoke; else the
@@ -168,6 +171,7 @@ export function readParams(query: string): Params {
     glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
     foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
     watch: q.has('watch') ? readWatch(q.get('watch') ?? '') : null,
+    ships: Math.round(num('ships', LEAST_SHIPS, LEAST_SHIPS, MOST_SHIPS)),
     halfSmoke: q.get('smoke') === 'half',
     scars: q.has('scars') ? Math.round(num('scars', 1, 0, SEED_MOST)) : null,
     casualties: q.has('casualties') ? Math.round(num('casualties', 1, 0, SEED_MOST)) : null,
