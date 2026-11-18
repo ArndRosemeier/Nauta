@@ -27,12 +27,14 @@ import { heightAt, routeNetwork } from '../../sim/crew/network';
 import type { Whereabouts } from '../../sim/crew/going';
 import { taskOf } from '../../sim/crew/crew';
 import { harmOf } from '../../sim/damage';
+import type { Harm } from '../../sim/rules/damage';
+import { STEPS_PER_SECOND } from '../../sim/units';
 import type { Spot } from '../../sim/ship/plan';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { belowDeck } from '../../audio/crewHearing';
-import { BUILDS, DRESSES, PACK, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
+import { BUILDS, DRESSES, PACK, SHIRT_GROUP, SHIRT_GARMENT, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
 import {
-  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, choosePool, clipPhase, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAt, type ManDrawn,
+  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, carryOf, choosePool, clipPhase, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAt, type ManDrawn,
 } from '../../app/crewDrawn';
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
@@ -41,7 +43,10 @@ import { VOICES, type Point3, type Speaker, type Voice } from '../../app/speech/
 import type { CrewKnobs } from '../../app/quality';
 import { pageSeconds } from '../../app/pageMatch';
 import { EYE } from '../../app/standpoints';
+import { stainOf, stained, takenBelow, TRAIL_EVERY, SHOWN } from '../../app/violence';
+import type { Violence } from '../../app/settings';
 import { NearPool, type PoolChar } from './nearPool';
+import { Blood } from './blood';
 import { geometryBytes } from '../bytes';
 
 /** Actors' crowd level: all the workbench draws (it only bakes the figures). */
@@ -75,6 +80,9 @@ const SPEAKING_RATE = 1;
 const DRESS_STICK = 5;
 /** Shot that strikes within this far of a man startles him, m. */
 const STRUCK_NEAR = 6;
+/** A man just hurt matters (the near pool takes him, so his face is a living one) this long, s, if he is within this far of the eye, m. */
+const HURT_MATTERS = 10;
+const HURT_REACH = 15;
 /** The clip a walking midshipman plays, and standing. */
 const WALK = 'walk';
 const STAND = 'idle';
@@ -101,6 +109,20 @@ interface Drawn {
   step: number;
   /** Seconds since shot struck near him. */
   struck: number;
+  /** How badly he is hurt as last seen, and the match's seconds when it first showed and when he began to lie (Infinity: not yet). */
+  harm: Harm | null;
+  hurtAt: number;
+  fellAt: number;
+  /** How far his shirt is stained now (violence.ts), and how much of him is taken below (0..1, mild). */
+  stain: number;
+  gone: number;
+  /** Where the last drop fell when he was carried (her space), for the trail. */
+  dripped: { x: number; z: number } | null;
+  /** A new hurt to lay blood for once he is placed (he has a place to bleed on), and whether he has been placed. */
+  fresh: Harm | null;
+  placed: boolean;
+  /** How much of him is faded out as drawn now (`gone` as last applied). */
+  faded: number;
 }
 
 /** How the trial draws the other crew (`?crew`, plan N4.0): on her own deck (`aboard`), or off her bow at `offset` (ship space, m). */
@@ -120,6 +142,8 @@ export interface CrewFrame {
   readonly captain: Spot | null;
   /** Page seconds. */
   readonly now: number;
+  /** What the violence setting shows (app/violence.ts). */
+  readonly violence: Violence;
 }
 
 /** What the HUD and the trial read off the crew. */
@@ -133,6 +157,8 @@ export interface CrewStats {
 }
 
 const UP = new Vector3(0, 1, 0);
+/** The harms from the lightest. */
+const HARM_ORDER: readonly Harm[] = ['wounded', 'badly', 'killed'];
 
 export class CrewView {
   /** Each ship's men ride in her group, which follows her pose; each goes in through `stage.add`. */
@@ -150,6 +176,8 @@ export class CrewView {
   private readonly byShip: Drawn[][];
   private readonly voices = new Map<Voice, number>();
   private readonly officerMen: number[];
+  /** The blood on each ship's decks (violence.ts). */
+  private readonly blood: Blood[];
   /** Men who matter now (speaking, addressed) until a page second. */
   private readonly matters = new Map<number, number>();
   /** When the pool last began dressing a man, page seconds. */
@@ -185,9 +213,10 @@ export class CrewView {
     }
     this.all = rosters.flatMap((roster, ship) => roster.map((m, man) => {
       const seed = manSeed(ship, man);
-      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity };
+      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, gone: 0, dripped: null, fresh: null, placed: false, faded: 0 };
     }));
     this.byShip = rosters.map((_, s) => this.all.filter((d) => d.ship === s));
+    this.blood = rosters.map((_, s) => { const b = new Blood(); b.attach(this.groups[s]!); return b; });
     for (const v of VOICES) this.voices.set(v, voiceMan(v, rosters[0]));
     this.officerMen = OFFICERS.map((o) => this.voices.get(o)!);
     this.poolInUse = pool.chars.length;
@@ -292,9 +321,12 @@ export class CrewView {
       const from = fr.state.from.ships[ship], to = fr.state.to.ships[ship];
       if (!from || !to) return;
       let nearest = Infinity;
+      const at = fr.state.to.tick / STEPS_PER_SECOND;
+      this.blood[ship]!.showLevel(fr.violence, at);
       for (const d of men) {
         if (ship === fr.mine && d.man === 0) continue; // the captain: the player's own body
         d.struck += dt;
+        this.noteHurt(d, to, at, fr.violence);
         const step = this.everyFrame ? 1 : d.step;
         if (dueThisFrame(this.frame, step, d.man) || this.pool.of(this.key(d)) || (ship === fr.mine && this.officerMen.includes(d.man))) {
           this.placeMan(d, from, to, fr);
@@ -303,6 +335,8 @@ export class CrewView {
         nearest = Math.min(nearest, d.distance);
         if (d.shown) s.drawn++;
       }
+      this.blood[ship]!.growPools(at);
+      this.trails(ship, to, at, fr.violence);
       const castsShadow = !this.noShadows && nearest <= k.shadowTo;
       for (const kind of this.figures.kinds.values()) if (kind.mesh.parent === g) kind.mesh.castShadow = castsShadow;
     });
@@ -310,6 +344,11 @@ export class CrewView {
     this.figures.update(dt);
     this.animatePool(dt, fr);
     s.ms = performance.now() - t0;
+  }
+
+  /** Her men now hurt, where they are drawn (her space): for the browser checks, which stand near one (tools/shot/men.mjs). */
+  hurtMen(ship: number): { man: number; harm: Harm; space: string; x: number; y: number; z: number; clip: string | null; shown: boolean; seen: boolean }[] {
+    return (this.byShip[ship] ?? []).flatMap((d) => (d.harm && d.placed ? [{ man: d.man, harm: d.harm, space: d.at.space, x: d.at.x, y: d.at.y, z: d.at.z, clip: d.clip, shown: d.shown, seen: d.seen }] : []));
   }
 
   /** The key of a man among both crews (the pool and the speakers know him by it). */
@@ -337,6 +376,39 @@ export class CrewView {
     return this.world.distanceTo(this.eye) / Math.max(1, fr.zoom) <= fr.knobs.crowdTo ? g : null;
   }
 
+  /**
+   * A man's hurt as the match has it now (at the match's `at` seconds): when it first shows or grows worse, blood is to be
+   * laid where he is placed, and the near pool takes him (his face is a living one); the killed and badly hurt lie from then.
+   */
+  private noteHurt(d: Drawn, ship: SimState['ships'][number], at: number, level: Violence): void {
+    const harm = harmOf(ship.damage, d.man);
+    if (harm !== d.harm) {
+      if (harm && (d.harm === null || HARM_ORDER.indexOf(harm) > HARM_ORDER.indexOf(d.harm))) {
+        d.fresh = harm;
+        d.hurtAt = at;
+        if (harm !== 'wounded') d.fellAt = at;
+      }
+      d.harm = harm;
+      if (harm === null) { d.hurtAt = Infinity; d.fellAt = Infinity; }
+    }
+    d.gone = takenBelow(level, d.harm, at - d.fellAt);
+  }
+
+  /** The men carried below at the unsparing level leave a drop every few metres, under their bearers' feet. */
+  private trails(ship: number, to: SimState['ships'][number], at: number, level: Violence): void {
+    if (!SHOWN[level].trail) return;
+    for (const d of this.byShip[ship]!) {
+      const task = d.harm === 'badly' ? carryOf(to.crew, d.man) : null;
+      if (!task) { d.dripped = null; continue; }
+      const bearer = this.byShip[ship]![task.hands[0]!]!;
+      if (!bearer.placed) continue;
+      const x = bearer.at.x, z = bearer.at.z;
+      if (d.dripped && Math.hypot(x - d.dripped.x, z - d.dripped.z) < TRAIL_EVERY) continue;
+      d.dripped = { x, z };
+      if (!routeNetwork().surfaces.has(bearer.at.space)) this.blood[ship]!.drip(x, bearer.at.y, z, at);
+    }
+  }
+
   /** A man placed from the match: his figure shown or hidden, moved, playing his clip, his hat on with distance. */
   private placeMan(d: Drawn, from: SimState['ships'][number], to: SimState['ships'][number], fr: CrewFrame): void {
     const at = manDrawn(from, to, fr.state.f, d.man, d.m, d.seed, d.at), mine = d.ship === fr.mine;
@@ -346,7 +418,13 @@ export class CrewView {
     d.distance = Math.hypot(at.x - eye.x, at.y + BODY_MIDDLE - eye.y, at.z - eye.z);
     // A man the match puts where the captain's eye is (it does not keep the captain clear) is not drawn: he is not seen inside out.
     const inEye = Math.hypot(at.x - eye.x, at.z - eye.z) < EYE_CLEAR && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT;
-    d.shown = this.crews > d.ship && !inEye && (view ? view.zoneGroupOf(at.space).visible : !belowDeck(at.space));
+    d.shown = this.crews > d.ship && !inEye && d.gone < 1 && (view ? view.zoneGroupOf(at.space).visible : !belowDeck(at.space));
+    d.placed = true;
+    if (d.fresh) {
+      // Where he fell, if it is a deck (not aloft): the blood the violence setting shows (blood.ts).
+      if (!routeNetwork().surfaces.has(at.space)) this.blood[d.ship]!.fell(at.x, at.y, at.z, d.fresh, d.seed, fr.state.to.tick / STEPS_PER_SECOND);
+      d.fresh = null;
+    }
     this.local.set(at.x, at.y + BODY_MIDDLE, at.z).applyMatrix4(this.groups[d.ship]!.matrixWorld);
     d.seen = d.shown && this.frustum.intersectsSphere(this.sphere.set(this.local, BODY_RADIUS));
     d.step = stepAt(fr.knobs, d.distance, d.seen);
@@ -362,6 +440,15 @@ export class CrewView {
     }
     const dressed = d.distance <= fr.knobs.dressTo + (d.dressed ? DRESS_STICK : 0);
     if (dressed !== d.dressed) { d.dressed = dressed; this.figures.setLook(c, { show: dressed ? d.figure.show : [] }); }
+    // The violence setting: his shirt stained by his hurt, and (mild) the killed carried below, out of sight by a fade.
+    const stain = d.figure.tints.length > SHIRT_GROUP ? stainOf(fr.violence, d.harm) : 0;
+    if (stain !== d.stain) { d.stain = stain; this.figures.setLook(c, { tints: this.tintsOf(d) }); }
+    if (d.gone !== d.faded) { d.faded = d.gone; this.figures.fade(c, 1 - d.gone); }
+  }
+
+  /** A man's tint colours with his shirt as stained as the setting shows it. */
+  private tintsOf(d: Drawn): string[] {
+    return d.figure.tints.map((t, i) => (i === SHIRT_GROUP && d.stain > 0 ? stained(t, d.stain) : t));
   }
 
   /** The six the captain addresses stand at their posts while the match has them there with nothing to do; the midshipman where the page walks him. */
@@ -387,8 +474,9 @@ export class CrewView {
 
   private showMan(d: Drawn): void {
     const f = d.figure;
-    d.crowd = this.figures.add(f.kind, { skin: skinToneColor(f.skinTone), hair: f.hairColour, tints: [...f.tints], show: d.dressed ? f.show : [] });
+    d.crowd = this.figures.add(f.kind, { skin: skinToneColor(f.skinTone), hair: f.hairColour, tints: this.tintsOf(d), show: d.dressed ? f.show : [] });
     d.clip = null;
+    d.faded = 0;
     const p = this.pool.of(this.key(d));
     if (p?.shown) this.figures.fade(d.crowd, 0);
   }
@@ -403,7 +491,12 @@ export class CrewView {
   /** The pool handed out: the men who matter and the nearest seen of her crew within its reach; the rest given back. */
   private handOut(fr: CrewFrame): void {
     const mine = this.byShip[fr.mine] ?? [], size = this.crews > 0 ? this.poolInUse : 0;
-    const candidates = mine.filter((d) => d.man !== 0 && d.crowd !== null).map((d) => ({ man: d.man, distance: d.distance, seen: d.seen, matters: (this.matters.get(d.man) ?? 0) > fr.now }));
+    const at = fr.state.to.tick / STEPS_PER_SECOND;
+    // A man just hurt matters too (plan "Faces": speaking, struck or addressed): his face is a living one, near enough to be seen.
+    const candidates = mine.filter((d) => d.man !== 0 && d.crowd !== null && d.gone === 0).map((d) => ({
+      man: d.man, distance: d.distance, seen: d.seen,
+      matters: (this.matters.get(d.man) ?? 0) > fr.now || (at - d.hurtAt < HURT_MATTERS && d.distance <= HURT_REACH),
+    }));
     this.held.clear();
     for (const p of this.pool.chars) if (p.man !== null) this.held.add(p.man - fr.mine * brigRoster().length);
     const chosen = new Set(choosePool(candidates, fr.knobs, this.held, size));
@@ -453,9 +546,11 @@ export class CrewView {
       const end = fr.state.to.fight.end, ended = !end ? null : end.lost[fr.mine] ? 'lost' : end.lost.some((l) => l !== null) ? 'won' : null;
       const present = facesNow({
         job: task && task.began !== null ? task.job : null, aloft: !!d.at.way || routeNetwork().surfaces.has(d.at.space), sinceStruck: d.struck,
-        fighting: ship.told.quarters, harm: harmOf(ship.damage, d.man), shouting: voice === 'boatswain' && (this.matters.get(d.man) ?? 0) > fr.now, ended,
+        fighting: ship.told.quarters, harm: d.harm, sinceHurt: fr.state.to.tick / STEPS_PER_SECOND - d.hurtAt, shouting: voice === 'boatswain' && (this.matters.get(d.man) ?? 0) > fr.now, ended,
       });
       p.ch.setFaceUnits(stepFace(p.face, present, dt, p.units));
+      // His shirt, stained as the crowd figure's is (a character dressed for another man is dressed afresh: `stain` starts again).
+      if (d.stain !== p.stain && d.figure.tints.length > SHIRT_GROUP) { p.stain = d.stain; p.ch.actor.setGarmentColor(SHIRT_GARMENT, this.tintsOf(d)[SHIRT_GROUP]!); }
       // Looking at the captain while addressed or speaking.
       const was = p.looking;
       p.looking = Math.max(0, p.looking - dt);
