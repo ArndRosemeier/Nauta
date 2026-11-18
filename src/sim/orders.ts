@@ -27,7 +27,7 @@ import type { MastName } from './rules/rig';
 import { CLOSE_HAULED, type CanvasName } from './rules/sailing';
 import { rigPlan } from './ship/rig';
 import { canvasFor, layAback, MASTS, setSail, steerTo, type Sailing, type SailingEvent } from './ship/sailing';
-import type { SailSetting } from './ship/sails';
+import { sailShare, type SailSetting } from './ship/sails';
 import { wrapBearing } from './units';
 import type { Wind } from './wind';
 
@@ -331,7 +331,8 @@ function canvasTarget(name: CanvasName, force: number, hove: boolean): SailSetti
  * up.
  */
 function sailActs(now: readonly SailSetting[], target: readonly SailSetting[]): NewAct[] {
-  const changed = target.map((_, i) => i).filter((i) => target[i]!.set !== now[i]!.set || target[i]!.reefs !== now[i]!.reefs);
+  // A sail part way (being set or taken in when a later order came) is changed too: set in full, or taken in.
+  const changed = target.map((_, i) => i).filter((i) => target[i]!.set !== now[i]!.set || target[i]!.reefs !== now[i]!.reefs || sailShare(now[i]!) !== sailShare(target[i]!));
   const order = [...changed.filter((i) => !target[i]!.set).reverse(), ...changed.filter((i) => target[i]!.set)];
   return order.map((i) => ({ kind: 'sail', sail: i, set: target[i]!.set, reefs: target[i]!.reefs }));
 }

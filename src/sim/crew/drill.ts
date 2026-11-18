@@ -9,14 +9,18 @@
  * A job is kept small, as it lives in the state that travels to the other player (crew.ts `Task`): its name, what it
  * is done on (a sail, a mast) and which job it waits for. Its places, parts, hands and work follow from the first two
  * alone (`jobWork`), found again where they are needed.
+ *
+ * A sail's jobs move how far it is set, one share from furled to sheeted home (rules/rig.ts `HANGING`, `jobSpan`): the
+ * crew's work on a sail is what sets it, a share at a time, and a sail left half set by a later order is taken on from
+ * where it stands.
  */
 import {
   GANGS, HELM_PARTS, JOBS, STATIONS_PARTS, WHEEL, type BySail, type Gang, type JobName, type Part,
 } from '../rules/crew';
-import type { LineKind, YardLevel } from '../rules/rig';
+import { HANGING, type LineKind, type YardLevel } from '../rules/rig';
 import type { Act } from '../orders';
 import { rigPlan, sparOf } from '../ship/rig';
-import type { Sail, SailSetting } from '../ship/sails';
+import { sailShare, type Sail, type SailSetting } from '../ship/sails';
 import type { RigLine } from '../ship/lines';
 import { MASTS } from '../ship/sailing';
 import type { OrderKind } from '../orders';
@@ -71,14 +75,43 @@ function yardPlaces(yard: string): string[] {
   return Array.from({ length: Math.max(sides[0]!.length, sides[1]!.length) }, (_, k) => sides.flatMap((side) => (side[k] ? [side[k].id] : []))).flat();
 }
 
-/** A job of a sail: its hands and work for the sail's yard, at the pins of its lines of the job's kinds (the loosers on its yard), by its gang aloft (loosing) or on deck. */
+/** The jobs done by men out on the yard; the rest are hauled from the deck. */
+const ON_THE_YARD: readonly JobName[] = ['loose', 'furl', 'reef'];
+
+/** A job of a sail: its hands and work for the sail's yard, at the pins of its lines of the job's kinds (or along its yard), by its gang aloft (on the yard) or on deck. */
 function sailWork(job: JobName, sail: Sail): JobWork {
-  const row = JOBS[job], level = yardOf(sail)?.level ?? null, gang = GANGS[gangOf(sail)];
-  let places = pins(ofKinds(sailLines(sail), row.lines));
-  if (job === 'loose') places = yardPlaces(yardOf(sail)!.id);
+  const row = JOBS[job], level = yardOf(sail)?.level ?? null, gang = GANGS[gangOf(sail)], aloft = ON_THE_YARD.includes(job);
+  let places = aloft ? yardPlaces(yardOf(sail)!.id) : pins(ofKinds(sailLines(sail), row.lines));
   // A sail with none of the job's lines (a headsail run down by its own weight) is worked at its halliard.
   if (places.length === 0) places = pins(ofKinds(sailLines(sail), ['halliard']));
-  return { need: bySail(row.hands, level), work: bySail(row.work, level), places, parts: job === 'loose' ? [gang.aloft!] : gang.deck };
+  return { need: bySail(row.hands, level), work: bySail(row.work, level), places, parts: aloft ? [gang.aloft!] : gang.deck };
+}
+
+/** How far a sail's job takes it: from and to, as shares from furled (0) to sheeted home (1); null for a job on no sail. */
+export function jobSpan(job: JobName): readonly [from: number, to: number] | null {
+  switch (job) {
+    case 'loose': return [0, HANGING];
+    case 'sheet': return [HANGING, 1];
+    case 'clew': return [1, HANGING];
+    case 'furl': return [HANGING, 0];
+    case 'reef': return [HANGING, HANGING];
+    case 'hoist': return [0, 1];
+    case 'douse': return [1, 0];
+    default: return null;
+  }
+}
+
+/** The share of a job's work still to do with its sail at `share` (all of it for a job on no sail, or that does not move the sail). */
+export function jobLeft(job: JobName, share: number): number {
+  const span = jobSpan(job);
+  if (!span || span[0] === span[1]) return 1;
+  return Math.min(1, Math.max(0, (span[1] - share) / (span[1] - span[0])));
+}
+
+/** How far a job's sail is set with `toDo` of its `work` still to do. */
+export function shareAt(job: JobName, toDo: number, work: number): number | null {
+  const span = jobSpan(job);
+  return span ? span[1] + (span[0] - span[1]) * (toDo / work) : null;
 }
 
 /** A job's work found from scratch (`jobWork` keeps it). */
@@ -112,19 +145,31 @@ export function jobWork(job: JobName, on: number): JobWork {
 }
 
 /**
- * One sail set (with its reefs) or taken in, from how it stands: a square sail is loosed aloft, then sheeted home; a
- * reef taken in or shaken out is clewed up, the men lay out, and it is sheeted home again; taken in, it is clewed up.
- * A fore-and-aft sail is hoisted, or doused, or doused and hoisted again for a reef.
+ * One sail set (with its reefs) or taken in, from how far it is set now: a square sail is loosed aloft and falls to hang
+ * in its gear, then sheeted home; a reef taken in or shaken out is clewed up, reefed by the men on the yard, and sheeted
+ * home again; taken in, it is clewed up and furled. A fore-and-aft sail is hoisted, or doused, or doused and hoisted
+ * again for a reef. A sail part way is taken on from where it stands: what it has already passed is not done again.
  */
 function sailDrill(sail: Sail, on: number, now: SailSetting, set: boolean, reefs: number): Job[] {
-  const reef = set && now.set && now.reefs !== reefs;
-  const jobs = (...names: JobName[]): Job[] => names.map((job, k) => ({ job, on, after: k === 0 ? null : k - 1 }));
+  const share = sailShare(now), reef = set && now.set && now.reefs !== reefs;
+  const names: JobName[] = [];
   if (sail.kind === 'square') {
-    if (!set) return jobs('clew');
-    return reef ? jobs('clew', 'loose', 'sheet') : jobs('loose', 'sheet');
+    if (!set) {
+      if (share > HANGING) names.push('clew');
+      if (share > 0) names.push('furl');
+    } else {
+      if (share < HANGING) names.push('loose');
+      else if (reef && share > HANGING) names.push('clew');
+      if (reef) names.push('reef');
+      if (reef || share < 1) names.push('sheet');
+    }
+  } else if (!set) {
+    if (share > 0) names.push('douse');
+  } else {
+    if (reef && share > 0) names.push('douse');
+    if (reef || share < 1) names.push('hoist');
   }
-  if (!set) return jobs('douse');
-  return reef ? jobs('douse', 'hoist') : jobs('hoist');
+  return names.map((job, k) => ({ job, on, after: k === 0 ? null : k - 1 }));
 }
 
 /** The jobs of one act, given the kind of order it is for and how her sails stand now. */

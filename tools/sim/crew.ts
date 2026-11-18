@@ -5,8 +5,8 @@
  *   time in the table (rules/crew.ts JOBS) and none is short-handed.
  * - Every order of the vocabulary given in a whole match (sea and wind) is carried out and reported done, in no less
  *   than a second and within a minute.
- * - Plain sail in a whole match: the courses and topgallants are set one by one, each no sooner than its men have
- *   loosed and sheeted it home; then, from half set, battle sail takes in again what was set.
+ * - Plain sail in a whole match: the courses and topgallants are set a share at a time, each sheeted home no sooner
+ *   than its men have loosed and sheeted it; then, from half set, battle sail takes in again what was set.
  * - Two brigs whose crews make plain sail at once (the busiest the state gets until she beats to quarters) stay under
  *   the network's 16 KB a state through the whole manoeuvre, and the busiest state, sent through bytes, steps on to
  *   the host's hash.
@@ -19,6 +19,8 @@
 import { JOBS, PASSED } from '../../src/sim/rules/crew.ts';
 import { canvasFor } from '../../src/sim/ship/sailing.ts';
 import { rigPlan } from '../../src/sim/ship/rig.ts';
+import { HANGING } from '../../src/sim/rules/rig.ts';
+import { sailShare } from '../../src/sim/ship/sails.ts';
 import { decodeState, encodeState, hashState, startMatch, type SimState } from '../../src/sim/state.ts';
 import { step } from '../../src/sim/step.ts';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../../src/sim/units.ts';
@@ -76,9 +78,13 @@ scenario('every order carried out in a whole match', () => {
 scenario('plain sail set sail by sail, and taken in again', () => {
   const sails = rigPlan().sails, before = start.ships[0]!.sailing.canvas;
   const setAt = new Map<string, number>();
+  let partWay = 0;
   const plain = run(start, PLAIN_SECONDS, [EACH.sail], (s, t) => s.ships[0]!.sailing.canvas.forEach((c, i) => {
-    if (c.set && !before[i]!.set && !setAt.has(sails[i]!.id)) setAt.set(sails[i]!.id, t);
+    const share = sailShare(c);
+    if (share > HANGING && share < 1) partWay++;
+    if (share === 1 && !before[i]!.set && !setAt.has(sails[i]!.id)) setAt.set(sails[i]!.id, t);
   }));
+  if (partWay === 0) throw new Error('no sail was ever seen part sheeted home');
   if (!plain.events.some(({ e }) => e.kind === 'done' && e.order === EACH.sail)) throw new Error('plain sail was not reported done');
   const ship = plain.state.ships[0]!;
   if (ship.told.canvas !== 'plain' || JSON.stringify(ship.sailing.canvas) !== JSON.stringify(canvasFor('plain', MODERATE))) throw new Error('her canvas is not plain sail');
@@ -91,7 +97,7 @@ scenario('plain sail set sail by sail, and taken in again', () => {
   // From half set, battle sail again: the sails already set come in.
   const half = run(start, Math.min(...setAt.values()) + 1, [EACH.sail]).state;
   if (!half.ships[0]!.sailing.canvas.some((c, i) => c.set && !before[i]!.set)) throw new Error('no sail was set by the half-way state');
-  const back = run(half, MOST_ORDER_SECONDS, [{ kind: 'sail', ship: 0, canvas: 'battle' }]).state.ships[0]!;
+  const back = run(half, PLAIN_SECONDS, [{ kind: 'sail', ship: 0, canvas: 'battle' }]).state.ships[0]!;
   if (JSON.stringify(back.sailing.canvas) !== JSON.stringify(before) || back.told.given.length) throw new Error('battle sail again did not take in what was set');
 });
 

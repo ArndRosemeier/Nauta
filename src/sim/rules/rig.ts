@@ -325,3 +325,12 @@ export const BUNTLINE_OUT = 0.25;
 /** A peak halliard takes the gaff this share of its length out from the jaws; the boom sheet the boom this far short of its end, m. */
 export const PEAK_HALLIARD_AT = 0.65;
 export const BOOM_SHEET_SHORT = 1.0;
+
+/**
+ * How far a sail is set, as one share the crew moves (design thread 2026-11-18): 0 furled, 1 sheeted home (crew/drill.ts
+ * moves it, sails.ts `sailShare`). A square sail passes `HANGING` on the way, hanging in its gear: let fall from its
+ * gaskets on the way up, clewed up on the way down; below it the men aloft are furling or loosing it on the yard, above
+ * it the hands on deck sheet it home or clew it up, and only above it does it draw (sails.ts `drawShare`). A
+ * fore-and-aft sail draws as it is hoisted. Roughly the drawn seconds of N3.10: let fall 5 s of 17 to sheeted home.
+ */
+export const HANGING = 0.3;

@@ -14,7 +14,7 @@ import { stepCrew } from './crew/crew';
 import { carryOut, giveOrder, heard, type AnswerCode, type Order } from './orders';
 import { followWind } from './sea/sea';
 import { stepMotion } from './ship/motion';
-import { stepSailing, type SailingEvent } from './ship/sailing';
+import { setShares, stepSailing, type SailingEvent } from './ship/sailing';
 import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 
@@ -105,7 +105,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
           const given = s.told.given.find((g) => g.id === e.of);
           if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });
         }
-        const carried = carryOut(s.told, s.sailing, crewed.done, wind);
+        const carried = carryOut(s.told, setShares(s.sailing, crewed.sails), crewed.done, wind);
         for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
         const sailed = stepSailing(carried.sailing, pose, windAt(state.wind, pose.x, pose.z, t));
         for (const kind of sailed.events) events.push({ kind, tick, ship: i });
