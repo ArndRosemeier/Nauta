@@ -8,6 +8,7 @@ import { handholdNear } from '../src/sim/ship/handholds.ts';
 import { pointVelocity, startMotion, toWorld, type ShipPose } from '../src/sim/ship/motion.ts';
 import { CaptainBody, type BodyPose, type BodyWorld } from '../src/app/body.ts';
 import { CALM_LEAST } from '../src/sim/rules/body.ts';
+import { OUTFITS } from '@actors/generator';
 import { BODY } from '../src/sim/rules/ships.ts';
 import { EYE_BELOW_TOP } from '../src/sim/rules/walking.ts';
 import { PACK_GARMENTS, captainLook } from '../src/app/crewLooks.ts';
@@ -189,10 +190,11 @@ test('his drawn body leans as far as the view\'s eye moves: the eye it carries i
   assert.ok(calm < full * 0.15, `calm ${calm.toFixed(3)} of ${full.toFixed(3)}`);
 });
 
-test('the captain wears an officer\'s dress from the crew\'s pack, the same on every machine', () => {
-  const look = captainLook();
-  assert.deepEqual(look, captainLook());
+test('the captain wears Actors\' post captain\'s uniform from the crew\'s pack, the same on every machine', () => {
+  const catalog = { outfits: OUTFITS };
+  const look = captainLook(catalog);
+  assert.deepEqual(look, captainLook(catalog));
   for (const g of look.outfit!) assert.ok(PACK_GARMENTS.includes(g), g);
-  assert.ok(look.outfit!.includes('longsleeve') && look.outfit!.includes('wool-pants'), 'coat and trousers');
+  assert.ok(look.outfit!.includes('navy-tailcoat') && look.outfit!.includes('navy-epaulettes'), 'coat and epaulettes');
   assert.equal(look.beard, 'none');
 });

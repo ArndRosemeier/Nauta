@@ -12,8 +12,12 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { CharacterCatalog, CharacterPatch } from '@actors/generator';
 
-/** Garments the crew wears. */
-export const PACK_GARMENTS = ['briefs', 'loose-tshirt', 'longsleeve', 'wool-pants', 'newsboy-cap', 'cloth-shoes'];
+/** Garments the crew wears, then the captain's (Actors' `navy-rn-captain` preset, see `captainLook`). */
+export const PACK_GARMENTS = [
+  'briefs', 'loose-tshirt', 'longsleeve', 'wool-pants', 'newsboy-cap', 'cloth-shoes',
+  'high-socks', 'buckled-shoes', 'navy-breeches', 'navy-waistcoat', 'navy-tailcoat', 'navy-lapels', 'navy-collar', 'navy-cuffs',
+  'navy-buttons-officer', 'navy-stock', 'navy-epaulettes',
+];
 /** Hairstyles: men's short ones, as most seamen wore them about 1805 (the pack's queue reads as a woman's ponytail from the deck). */
 export const PACK_HAIR = ['hair-short02', 'hair-short03', 'hair-short-messy', 'hair-short-grump', 'hair-swept-back', 'hair-short-curls'];
 /** Clips: standing by, hauling, working and walking (crew.ts gives each man his). */
@@ -84,10 +88,22 @@ export function lookOf(seed: number, rank: Rank, navy: Navy): CharacterPatch {
 
 /** The seed of the captain's own looks: the player's body, the same on every machine. */
 const CAPTAIN_SEED = 1805;
+/** Actors' outfit preset the captain wears (X2's navy wardrobe): a Royal Navy post captain about 1800. */
+export const CAPTAIN_DRESS = 'navy-rn-captain';
 /**
- * The captain as he sees himself (plan N2.7): an officer of her navy, in the wardrobe the crew wears. Actors' navy
- * captain preset (`navy-rn-captain`, X2) takes this place once the pack carries it.
+ * Pieces of it his own body leaves off: the hat. His head is drawn at a thousandth of its size, but the bicorne keeps
+ * its size round his eyes, so looking down he would see only its inside.
  */
-export function captainLook(): CharacterPatch {
-  return { ...lookOf(CAPTAIN_SEED, 'officer', 'british'), beard: 'none' };
+export const CAPTAIN_UNSEEN = ['navy-bicorne', 'navy-bicorne-lace', 'navy-cockade'];
+/**
+ * The captain as he sees himself (plan N2.7): his body from his seed, dressed as a post captain of her navy. Takes the
+ * preset from Actors' catalogue; every piece of it must be in PACK_GARMENTS.
+ */
+export function captainLook(catalog: Pick<CharacterCatalog, 'outfits'>): CharacterPatch {
+  const dress = catalog.outfits.find((o) => o.id === CAPTAIN_DRESS);
+  if (!dress) throw new Error(`no outfit ${CAPTAIN_DRESS} in the Actors catalogue`);
+  const missing = dress.garments.filter((g) => !PACK_GARMENTS.includes(g) && !CAPTAIN_UNSEEN.includes(g));
+  if (missing.length) throw new Error(`${CAPTAIN_DRESS} needs ${missing.join(', ')} in PACK_GARMENTS`);
+  const outfit = dress.garments.filter((g) => !CAPTAIN_UNSEEN.includes(g));
+  return { ...lookOf(CAPTAIN_SEED, 'officer', 'british'), beard: 'none', outfit, garmentColors: { ...dress.colors } };
 }

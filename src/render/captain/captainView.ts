@@ -3,7 +3,7 @@
  * arms, and your hand on the rail in a heavy sea; on a ladder your hands on its rungs. His head is not drawn: the
  * view is his eyes.
  *
- * One Actors character in the crew's wardrobe (app/crewLooks.ts `captainLook`), at full detail, posed each frame from
+ * One Actors character as a post captain (app/crewLooks.ts `captainLook`), at full detail, posed each frame from
  * his body (app/body.ts `BodyPose`) with @futuremagic/figure's `FigureRig`: leaned and turned as his body is, bent
  * forward when he stoops, his feet set on the soles his body plants and lifts, a hand closed on the hold he takes. On a
  * ladder the climb (`LadderClimb`, app/captain.ts) poses him, his hands and feet on its rungs. Then the whole figure is
@@ -121,7 +121,7 @@ export class CaptainView {
   /** Loads his figure (the pack the crew's is cut from), dressed, in the bind pose for the rig's measures, then standing. */
   static async load(renderer: WebGPURenderer, base: string, ship: Group): Promise<CaptainView> {
     const ch = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, clipLibraries: false });
-    await ch.set({ ...captainLook(), animation: null });
+    await ch.set({ ...captainLook(ch.catalog), animation: null });
     ch.actor.setLod(FULL);
     const view = new CaptainView(ch, ship);
     await view.play(STAND);
