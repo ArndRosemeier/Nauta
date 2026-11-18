@@ -8,7 +8,7 @@ import { breaches, disciplineBreaches, importsOf, readRules } from '../tools/gua
 // @ts-expect-error -- a plain script without types
 import { magicNumbers, ownerBreaches, seamProblems, seamRows } from '../tools/guards/discipline.mjs';
 // @ts-expect-error -- a plain script without types
-import { checkDuplication, duplicationFindings, readBaseline } from '../tools/guards/duplication.mjs';
+import { FINDERS, checkDuplication, duplicationFindings, readBaseline } from '../tools/guards/duplication.mjs';
 
 test('the source keeps the layer rules', () => {
   assert.deepEqual(breaches(readRules()), []);
@@ -31,9 +31,12 @@ test('a pure file that reaches the renderer or rolls unseeded dice is reported',
   assert.ok(found.some((l) => l.includes('src/render/view.ts') && l.includes('Math.random')));
 });
 
-test('the source holds no copy that is not accounted for', () => {
-  assert.deepEqual(checkDuplication(duplicationFindings(), readBaseline()), []);
-});
+// One test per finder: the source has grown past one test's time for both (docs/CHECKS.md).
+for (const finder of FINDERS) {
+  test(`the source holds no copy that is not accounted for (${finder})`, () => {
+    assert.deepEqual(checkDuplication(duplicationFindings(undefined, [finder]), readBaseline(), [finder]), []);
+  });
+}
 
 test('two functions with one body are found, and a clone cannot be excused', () => {
   const base = mkdtempSync(join(tmpdir(), 'nauta-dup-'));

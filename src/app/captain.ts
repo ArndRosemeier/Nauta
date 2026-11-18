@@ -12,7 +12,7 @@ import { EYE_BELOW_TOP, HEAD_CLEAR } from '../sim/rules/walking';
 import { floorsUnder, headroomAt, type ShipPlan, type Spot, type Way } from '../sim/ship/plan';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { WalkGraph } from '../sim/ship/walk';
-import { eyeOf, ladderOffered, spotOf, stepWalker, walkerAt, type DeckWalker, type LadderOffer } from '../sim/ship/deckWalk';
+import { eyeOf, ladderOffered, paceOf, spotOf, stepWalker, walkerAt, type DeckWalker, type LadderOffer } from '../sim/ship/deckWalk';
 import { shutDoors, stepDoors, type Doors } from '../sim/ship/doors';
 
 /** The climber's body for the figure: his height (the hips at the figure's usual share of it). */
@@ -126,7 +126,7 @@ export class Captain {
         walkTo(ex, ez, endY, ex - foot.x, ez - foot.z),
       ];
     // He starts facing the way he was walking.
-    const yaw = Math.hypot(w.vx, w.vz) > 0 ? Math.atan2(-w.vx, -w.vz) : faceYaw(foot);
+    const yaw = paceOf(w) > 0 ? Math.atan2(-w.vx, -w.vz) : faceYaw(foot);
     this.climb.play(steps, w.x, w.floor, w.z, yaw, CLIMBER);
     this.climbing = { offer, end };
   }

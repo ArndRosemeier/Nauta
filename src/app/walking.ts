@@ -34,9 +34,13 @@ export class Walking {
   /** His body as it was last drawn. */
   drawnBody: BodyPose | null = null;
 
-  /** Walking from the plan's station `from` (a deck station or one below; unknown or empty: the quarterdeck). */
+  /**
+   * Walking from the plan's station `from` (a deck station or one below; unknown or empty: the quarterdeck), or from a
+   * spot of her plan written `space:along:across` (`deck:2:3.9`, m: beside her starboard rail amidships).
+   */
   constructor(view: HTMLElement, from = START_STATION) {
-    const station = this.plan.stations.find((s) => s.id === from) ?? this.plan.stations.find((s) => s.id === START_STATION)!;
+    const [space, along, across] = from.split(':'), spot = space && Number.isFinite(Number(along)) && Number.isFinite(Number(across)) ? { space, along: Number(along), across: Number(across) } : null;
+    const station = spot ?? this.plan.stations.find((s) => s.id === from) ?? this.plan.stations.find((s) => s.id === START_STATION)!;
     const graph = rigWalk(this.plan);
     this.captain = new Captain(this.plan, graph, station);
     const c = this.captain;

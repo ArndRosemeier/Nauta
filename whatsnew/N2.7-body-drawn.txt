@@ -1,0 +1,2 @@
+Walking the decks (?walk), look down: you see your own legs in white trousers, your shoes on her planks and your hands in a blue officer's coat. Your feet step as your body does.
+In a gale beside the rail your hand closes on it, and on a ladder you see your hands on the rungs. Try ?walk=deck:-4:3.4&sea=gale and look toward the rail.

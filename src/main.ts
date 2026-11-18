@@ -34,6 +34,7 @@ import { CrewSound } from './audio/crewSound';
 import { SailSound } from './audio/sailSound';
 import { OPEN_AIR } from './audio/acoustics';
 import { CrewView } from './render/crew/crewView';
+import { CaptainView } from './render/captain/captainView';
 import { TWIN_OFFSET, musterCrews } from './app/crew';
 import { CrewTrialRun } from './app/crewTrialRun';
 import { formatBytes } from './probe/report';
@@ -125,6 +126,9 @@ async function start(): Promise<void> {
   const crew = ship && params.crew ? await CrewView.load(view.renderer, import.meta.env.BASE_URL, ship, men, params.crew === 'aboard' ? null : TWIN_OFFSET,
     (n) => { note.textContent = `mustering the crews: ${n} of ${men.length} (${((performance.now() - mustered) / MS_PER_SECOND).toFixed(0)} s)`; }) : null;
   const musterSeconds = (performance.now() - mustered) / MS_PER_SECOND;
+  // Walking, his own body (plan N2.7): an Actors figure from the crew's pack, his head not drawn.
+  if (walking && ship) note.textContent = 'dressing the captain';
+  const captain = walking && ship ? await CaptainView.load(view.renderer, import.meta.env.BASE_URL, ship.group) : null;
   view.camera.position.set(0, params.eye, 0);
   const startLook = params.look ?? START_LOOK;
   view.camera.rotation.set(startLook.pitch, startLook.yaw, 0);
@@ -169,6 +173,11 @@ async function start(): Promise<void> {
     }
     crew.afterWarm();
   }
+  if (captain) {
+    capTo(1);
+    note.textContent = 'building the captain\'s shaders';
+    await view.stage.prepare(captain.group);
+  }
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
   await view.stage.add(seaView.deep);
@@ -183,6 +192,7 @@ async function start(): Promise<void> {
     await view.stage.add(crew.aboard);
     await view.stage.add(crew.twin);
   }
+  if (captain) await view.stage.add(captain.group);
   capTo(capShare);
   const crewMemory = crew?.memory();
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
@@ -320,6 +330,7 @@ async function start(): Promise<void> {
       ship.update(sea, seaTime, dt, view.camera, where, input.look, view.sun, sky.lightDirection, sky.gain, view.radPerPixel(), seaView.origin);
       furnished?.update(ship.group, view.camera, sky.lightDirection);
       other?.show(match && match.other >= 0 ? match.pose(match.other) : null);
+      if (captain && walking?.drawnBody) captain.draw(dt, walking.drawnBody, walking.captain.walker, walking.captain.climber, view.camera);
       if (crew) {
         crew.crews = phase?.crews ?? 2;
         crew.override = phase?.override ?? {};

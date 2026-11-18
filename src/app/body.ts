@@ -23,7 +23,7 @@
  */
 import { directionToLocal, upInFrame, type Vec3 } from '@futuremagic/deck';
 import { pointVelocity, shipFrame, type ShipPose } from '../sim/ship/motion';
-import type { DeckWalker } from '../sim/ship/deckWalk';
+import { paceOf, type DeckWalker } from '../sim/ship/deckWalk';
 import type { Handhold } from '../sim/ship/handholds';
 import { BODY } from '../sim/rules/ships';
 import { EYE_BELOW_TOP } from '../sim/rules/walking';
@@ -31,7 +31,7 @@ import { GRAVITY } from '../sim/units';
 import {
   CADENCE, CADENCE_PER_PACE, CATCH_KEEP, HIP_RATE, HIP_SHARE, HOLD_LEAN_DAMPING, HOLD_LEAN_RATE, HOLD_LEAN_SHARE, HOLD_OFF,
   HOLD_ON, HOLD_PACE, JOLT_PUSH, LADDER_BLEND_RATE, LEAN_DAMPING, LEAN_RATE, LEAN_SHARE, LEG_SLACK, MOST_DIP, MOST_LEAN, MOTION_START,
-  STANCE_HALF, STANCE_WIDEN, STEP_LIFT, STEP_QUICKEST, STEP_SECONDS, STEP_TRIGGER, STOOP_FORWARD, SWING_SECONDS, SWING_SHARE,
+  STANCE_HALF, STANCE_WIDEN, STANDING_PACE, STEP_LIFT, STEP_QUICKEST, STEP_SECONDS, STEP_TRIGGER, STOOP_FORWARD, SWING_SECONDS, SWING_SHARE,
   TURN_RATE, WALK_LEAN, WEIGHT_HEIGHT,
 } from '../sim/rules/body';
 
@@ -65,10 +65,17 @@ export interface BodyPose {
   readonly yaw: number;
   /** His soles: the left and the right, each lifted while it steps. */
   readonly feet: Record<FootSide, [number, number, number]>;
-  /** The hand holding on and where, or null. */
-  readonly hold: { readonly side: FootSide; readonly at: Handhold } | null;
+  /** The hand holding on, where, and how far it has taken hold (0..1, easing on and off), or null. */
+  readonly hold: { readonly side: FootSide; readonly at: Handhold; readonly w: number } | null;
   /** How far he stoops under the beams, m. */
   readonly stoop: number;
+  /**
+   * His body as the view takes it (the calm view and the ladder fading it, his surroundings keeping it in): his lean
+   * off the felt vertical's square as a tilt (x, z), and how far his eye comes forward as he bends to stoop, m. His
+   * drawn body leans and bends this far, so his eye is where the view's is.
+   */
+  readonly lean: [number, number];
+  readonly bend: number;
 }
 
 interface Foot {
@@ -94,8 +101,6 @@ const LET_GO = 1e-3;
 /** A smooth start and end over 0..1 (3t² − 2t³): a foot's step speeds up and slows down. */
 const SMOOTH_A = 3;
 const smoothstep = (t: number) => t * t * (SMOOTH_A - 2 * t);
-/** A pace below this is standing (m/s). */
-const STANDING = 0.05;
 /** Smoothing of the deck's push before he feels it, 1/s: her pose is drawn between steps, so its rates come in small corners. */
 const PUSH_RATE = 10;
 
@@ -151,7 +156,7 @@ export class CaptainBody {
     // The felt vertical in her frame, as a tilt off her deck's square.
     const gx = GRAVITY * up.x - this.push[0], gy = Math.max(GRAVITY * up.y - this.push[1], GRAVITY / 2), gz = GRAVITY * up.z - this.push[2];
     const felt: [number, number] = clampTilt(gx / gy, gz / gy);
-    const pace = Math.hypot(w.vx, w.vz);
+    const pace = paceOf(w);
     this.ladderW += ((input.onLadder ? 1 : 0) - this.ladderW) * ease(LADDER_BLEND_RATE, dt);
     this.holdOn(felt, pace, dt, input.onLadder);
 
@@ -193,7 +198,7 @@ export class CaptainBody {
     const eyeTop = BODY.height - EYE_BELOW_TOP;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const ox = (this.tilt[0] * eyeTop + fx * stoop * STOOP_FORWARD) * body, oz = (this.tilt[1] * eyeTop + fz * stoop * STOOP_FORWARD) * body;
-    const room = this.roomFor(w, ox, oz, dt);
+    const room = this.roomFor(w, ox, oz, dt), shown = body * room;
     const eye: [number, number, number] = [input.eye[0] + ox * room, input.eye[1] - dip * body, input.eye[2] + oz * room];
 
     // The head: held as his body leans, the calm view holding it level (gravity's up).
@@ -207,8 +212,9 @@ export class CaptainBody {
       eye, up: [hu[0] / hn, hu[1] / hn, hu[2] / hn],
       hips: [hx, w.floor + this.hipY, hz], yaw: this.yaw,
       feet: { L: this.sole('L', w.floor), R: this.sole('R', w.floor) },
-      hold: this.holdW > 0 && this.grip ? this.grip : null,
+      hold: this.holdW > 0 && this.grip ? { ...this.grip, w: this.holdW } : null,
       stoop,
+      lean: [this.tilt[0] * shown, this.tilt[1] * shown], bend: stoop * STOOP_FORWARD * shown,
     };
   }
 
@@ -256,7 +262,7 @@ export class CaptainBody {
       return;
     }
     // Walking: his stride's cadence and reach (a foot lands as far ahead of where it should be as it is left behind).
-    const walking = pace > STANDING;
+    const walking = pace > STANDING_PACE;
     const cycle = 2 / (CADENCE + CADENCE_PER_PACE * pace), swingTime = walking ? SWING_SHARE * cycle : STEP_SECONDS;
     const reach = Math.max(STEP_TRIGGER, (pace * cycle * (1 - SWING_SHARE)) / 2);
     let stepping = false;

@@ -378,6 +378,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The captain aboard: walking, climbing her ladders as a seen figure, her doors | `src/app/captain.ts#Captain` |
 | Walking her decks on the page (`?walk`): thumbs to captain to standpoint and doors | `src/app/walking.ts#Walking` |
 | The captain's body on a moving deck: his lean against her roll, his feet stepping, his walk's bob, holding on, a blow's stagger, the eye and the head's hold it gives, the calm view's share | `src/app/body.ts#CaptainBody` |
+| The captain's own body drawn in first person: an Actors figure posed from his body (or the climb), his eyes at the view, his head not drawn | `src/render/captain/captainView.ts#CaptainView` |
+| How the captain looks (his dress, from the crew's wardrobe until the navy preset) | `src/app/crewLooks.ts#captainLook` |
+| Actors' catalogue cut to what the page's pack holds, for every character loaded | `src/app/crewLooks.ts#packCatalog` |
+| How fast a walker goes over her deck | `src/sim/ship/deckWalk.ts#paceOf` |
 | The body's tuning: lean and balance, legs and stance, cadence, holding on, the calm view's steps | `src/sim/rules/body.ts#LEAN_SHARE` |
 | What a hand can hold where he stands (her rail on deck, the beam overhead below) | `src/sim/ship/handholds.ts#handholdNear` |
 | How fast a point of her moves in the world from her heave, pitch and roll (what feet on her deck feel) | `src/sim/ship/motion.ts#pointVelocity` |

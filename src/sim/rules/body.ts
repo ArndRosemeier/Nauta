@@ -44,6 +44,8 @@ export const STANCE_WIDEN = 3;
 export const CADENCE = 1.0;
 export const CADENCE_PER_PACE = 0.65;
 export const SWING_SHARE = 0.45;
+/** A pace below this is standing, m/s. */
+export const STANDING_PACE = 0.05;
 /** Standing, a foot steps when it is this far from where it should be, m; a step lifts the foot this high, m. */
 export const STEP_TRIGGER = 0.08;
 export const STEP_LIFT = 0.07;

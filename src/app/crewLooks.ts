@@ -10,7 +10,7 @@
  * quoted ids.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
-import type { CharacterPatch } from '@actors/generator';
+import type { CharacterCatalog, CharacterPatch } from '@actors/generator';
 
 /** Garments the crew wears. */
 export const PACK_GARMENTS = ['briefs', 'loose-tshirt', 'longsleeve', 'wool-pants', 'newsboy-cap', 'cloth-shoes'];
@@ -21,6 +21,16 @@ export const PACK_CLIPS = [
   'idle', 'arms folded', 'talk', 'nod', 'lean on rail', 'call from rail', 'interact', 'pick up', 'crouch', 'repair (kneeling)',
   'walk', 'walk carrying',
 ];
+
+/** Where the build serves the cut pack (`npm run packs` fills public/packs), under the page's base. */
+export const PACK = 'packs/human/manifest.json';
+/** Actors' catalogue cut to what the pack holds (the PACK_ lists): every character the page loads takes it. */
+export const packCatalog = (c: CharacterCatalog): CharacterCatalog => ({
+  ...c,
+  garments: c.garments.filter((g) => PACK_GARMENTS.includes(g.id)),
+  hair: c.hair.filter((h) => PACK_HAIR.includes(h.id)),
+  animations: c.animations.filter((a) => PACK_CLIPS.includes(a.id)),
+});
 
 /** A man's rank, as far as his dress tells it. */
 export type Rank = 'officer' | 'marine' | 'seaman';
@@ -68,4 +78,14 @@ export function lookOf(seed: number, rank: Rank, navy: Navy): CharacterPatch {
     beard: seaman && r.chance(SHARE.beard) ? r.pick(BEARDS) : 'none',
     outfit, garmentColors: colors,
   };
+}
+
+/** The seed of the captain's own looks: the player's body, the same on every machine. */
+const CAPTAIN_SEED = 1805;
+/**
+ * The captain as he sees himself (plan N2.7): an officer of her navy, in the wardrobe the crew wears. Actors' navy
+ * captain preset (`navy-rn-captain`, X2) takes this place once the pack carries it.
+ */
+export function captainLook(): CharacterPatch {
+  return { ...lookOf(CAPTAIN_SEED, 'officer', 'british'), beard: 'none' };
 }

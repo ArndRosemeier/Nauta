@@ -190,6 +190,11 @@ export function ladderOffered(w: DeckWalker, intent: DeckIntent, plan: ShipPlan)
   return null;
 }
 
+/** How fast he walks over her deck now, m/s. */
+export function paceOf(w: DeckWalker): number {
+  return Math.hypot(w.vx, w.vz);
+}
+
 /** The captain's eye in ship space: over his feet by his height now, less his eye's drop below his crown. */
 export function eyeOf(w: DeckWalker, out: [number, number, number] = [0, 0, 0]): [number, number, number] {
   out[0] = w.x; out[1] = w.floor + w.height - EYE_BELOW_TOP; out[2] = w.z;
