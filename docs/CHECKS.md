@@ -32,6 +32,7 @@ A test never asserts bare milliseconds: a CI runner is slower than the tablet an
 Each is its own script, run in CI on pushes to `main` (the `Slow checks` job) and by hand, never inside `npm test`.
 
 - `npm run shot -- "<query>" out.png`: the built game in headless Chromium (see the script's header for its switches). CI takes a desktop view and a tablet view with a finger drag, and fails if the page reports an error or never gets ready.
+- `npm run check:replay` (N3.1): ten simulated minutes of a duel in the strongest wind, two brigs under a seeded script of orders, run in two processes side by side and once more with the state sent through bytes and back at five minutes; fails unless all three have the same hash at every simulated second. About 6 s (two runs of two ships for ten minutes are more than a test file's 5 s).
 
 ## Guards
 

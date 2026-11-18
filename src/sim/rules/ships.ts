@@ -12,6 +12,7 @@
  * **Heights** are metres above her base: the underside of the keel amidships. Positions along her are metres
  * forward of the mainmast. Ship space (src/sim/ship/section.ts) turns both into coordinates.
  */
+import { KNOT } from '../units';
 
 /**
  * The midship section (the dead flat, ⊗): her moulded half-breadth (to the outside of the frames, m) at heights above
@@ -556,3 +557,9 @@ export const HULL_DAMPING = { upward: 3, sideways: 0.4 } as const;
  * height a sloop of war carried laden, about 0.7 to 1.5 m.
  */
 export const ROLL_PERIOD = { least: 6, most: 10 } as const;
+
+/**
+ * The fastest she may be told to go until the sailing model (N3.3) works her speed out of the wind, m/s: 12 knots,
+ * a little over the 11 knots logged for the fastest of her class. A `course` order beyond it is refused.
+ */
+export const TOP_SPEED = 12 * KNOT;

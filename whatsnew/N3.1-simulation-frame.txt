@@ -1,0 +1,2 @@
+Behind the scenes: the whole match (wind, sea and ships) is now one record that moves on 30 times a second, the backbone for playing together.
+Two machines given the same orders now end up with exactly the same sea and ships, and can check it with a short fingerprint.

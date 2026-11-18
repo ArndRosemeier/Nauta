@@ -18,6 +18,7 @@
     "repeated": "node tools/repeated-code/find-repeated-code.mjs",
     "shot": "node tools/shot/shot.mjs",
     "guards": "node tools/guards/guards.mjs",
+    "check:replay": "tsx tools/sim/replay.ts",
     "plan:draw": "tsx tools/plan/draw.ts"
   },
   "dependencies": {
