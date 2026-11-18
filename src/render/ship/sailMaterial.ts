@@ -9,7 +9,7 @@
  * behind a sail it glows, the doubled cloth of its seams and bands darker against it and the rig's shadows on it (the
  * sun's light as it reaches the cloth, shadowed, through the back of the canvas).
  */
-import { DataTexture, DoubleSide, FloatType, MeshStandardNodeMaterial, PhysicalLightingModel, RGBAFormat, UnsignedByteType, Vector2 } from 'three/webgpu';
+import { DataTexture, DoubleSide, FloatType, LinearFilter, MeshStandardNodeMaterial, PhysicalLightingModel, RGBAFormat, UnsignedByteType, Vector2 } from 'three/webgpu';
 import {
   Fn, abs, attribute, clamp, cos, cross, faceDirection, float, floor, fract, fwidth, hash, int, ivec2, max, min, mix, normalView, normalize,
   round, select, sin, smoothstep, step, texture, textureLoad, transformNormalToView, uniform, varyingProperty, vec2, vec3, vec4,
@@ -20,6 +20,7 @@ import {
 } from './sailForm';
 import { ENSIGN_PATTERN, FLAGS, PENNANT_PATTERN, SAIL_ATLAS_SIZE } from './sailGrid';
 import { SHIPS_DRAWN, SHIP_OBJECT, crossfadeMask, nearest } from './shipMaterials';
+import { filtered } from '../dataTexture';
 
 /** Rows of the sails' state: her 11 sails, the ensign and the pennant, and room to spare. */
 export const MOST_SAIL_ROWS = 16;
@@ -34,11 +35,16 @@ export function setShipSails(rows: Float32Array, ship = 0): void {
   SAIL_TEXTURE.needsUpdate = true;
 }
 /**
- * The sails' hole map (sailGrid.ts `sailAtlas`): a texel per 5 cm of every sail's cloth. N6.5 writes shot holes and
- * scorches into it; now its green darkens the canvas as scorch does her timber.
+ * The sails' hole map (sailGrid.ts `sailAtlas`): a texel per 5 cm of every sail's cloth, a block per ship drawn (her
+ * own first), with the marks damageMarks.ts writes (hole, scorch, frayed rim, cut): the holed kind leaves the cut out.
  */
-export const SAIL_DAMAGE_TEXTURE = new DataTexture(new Uint8Array(SAIL_ATLAS_SIZE * SAIL_ATLAS_SIZE * RGBA), SAIL_ATLAS_SIZE, SAIL_ATLAS_SIZE, RGBAFormat, UnsignedByteType);
-SAIL_DAMAGE_TEXTURE.needsUpdate = true;
+export const SAIL_DAMAGE_TEXTURE = new DataTexture(new Uint8Array(SAIL_ATLAS_SIZE * SAIL_ATLAS_SIZE * SHIPS_DRAWN * RGBA), SAIL_ATLAS_SIZE, SAIL_ATLAS_SIZE * SHIPS_DRAWN, RGBAFormat, UnsignedByteType);
+filtered(SAIL_DAMAGE_TEXTURE, LinearFilter);
+/** Canvas frayed round a shot hole: greyed and darkened toward this (linear RGB), this much at most. */
+const FRAYED = [0.09, 0.08, 0.065];
+const FRAY_SHOWS = 0.7;
+/** A sail's hole map from this on is cut away. */
+const SAIL_CUT_FROM = 0.5;
 /**
  * Which ships drawn fly the French colours (1) and which the British (0), by the ship's index drawn (0 hers, 1 the
  * other's): a uniform, so the menu's choice of navy (docs/design/menu.md) changes the flags without a shader compiled.
@@ -219,7 +225,7 @@ class ClothMaterial extends MeshStandardNodeMaterial {
 }
 
 /** The sails and flags: shaped on the GPU from their rows, canvas and bunting drawn; `crossfade` makes the far ship's crossfading kind. */
-export function makeSailMaterial(crossfade = false): MeshStandardNodeMaterial {
+export function makeSailMaterial(crossfade = false, holed = crossfade): MeshStandardNodeMaterial {
   const m = new ClothMaterial({ side: DoubleSide });
   m.name = 'ship sails';
   const cl = attribute('cloth', 'vec3'), cv = attribute('canvas', 'vec4'), bd = attribute('band', 'vec4');
@@ -257,8 +263,9 @@ export function makeSailMaterial(crossfade = false): MeshStandardNodeMaterial {
   let canvas = vec3(...CANVAS).mul(shade).mul(weather).mul(float(1).sub(stitch.mul(STITCH_DARK)));
   canvas = mix(canvas, vec3(...HEMP), point);
   canvas = mix(canvas, vec3(...TARRED), bolt);
-  const scorch = texture(SAIL_DAMAGE_TEXTURE, bd.zw).g;
-  canvas = mix(canvas, vec3(...SCORCH), scorch);
+  // Her block of the hole map; the flags have none.
+  const marks = texture(SAIL_DAMAGE_TEXTURE, vec2(bd.z, bd.w.add(SHIP_OBJECT.ship).div(SHIPS_DRAWN))).mul(float(1).sub(isFlag));
+  canvas = mix(mix(canvas, vec3(...FRAYED), marks.b.mul(FRAY_SHOWS)), vec3(...SCORCH), marks.g);
   const doubled = max(max(overlap, band), tabling);
   const canvasThrough = float(CANVAS_THROUGH).mul(mix(float(1), float(DOUBLED), doubled)).mul(float(1).sub(max(bolt, point)));
   const isPennant = pattern.greaterThan(ENSIGN_PATTERN + 1 / 2);
@@ -270,6 +277,7 @@ export function makeSailMaterial(crossfade = false): MeshStandardNodeMaterial {
   m.throughNode = m.colorNode.mul(mix(canvasThrough, float(BUNTING_THROUGH), isFlag));
   m.roughnessNode = mix(float(ROUGH_CANVAS), float(ROUGH_BUNTING), isFlag);
   m.metalnessNode = float(0);
-  if (crossfade) m.maskNode = crossfadeMask();
+  const whole = marks.a.lessThan(SAIL_CUT_FROM);
+  if (crossfade || holed) m.maskNode = crossfade ? crossfadeMask().and(whole) : whole;
   return m;
 }

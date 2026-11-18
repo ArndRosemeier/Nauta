@@ -57,6 +57,8 @@ import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
 import { setFrenchFlags } from './render/ship/sailMaterial';
 import type { Navy } from './app/crewLooks';
+import { lightThrough } from './render/ship/shipMaterials';
+import { scarsOf } from './app/scars';
 import { GunfireView, fallInSea } from './render/gunfire';
 import { SmokeView, useSmokeDepth } from './render/smoke';
 import { HalfSmoke } from './render/halfSmoke';
@@ -323,6 +325,8 @@ async function start(): Promise<void> {
   if (ship) await view.stage.add(ship.group);
   // Her yards braced as the address asks (`?brace=30`), until the sailing model braces them (N3.3).
   if (ship) for (const id of ship.swingIds) ship.setBrace(id, params.brace);
+  // `?scars=3`: both ships drawn shot about by a stand-in for a fight's damage (plan N6.5), instead of the match's.
+  const scarred = params.scars !== null ? [scarsOf(params.scars, 0), scarsOf(params.scars, 1)] as const : null;
   if (other) await view.stage.add(other.group);
   if (spray) await view.stage.add(spray.mesh);
   if (fireDrawn) { await view.stage.add(fireDrawn.bits); await view.stage.add(fireDrawn.balls); }
@@ -611,6 +615,9 @@ async function start(): Promise<void> {
         where = walking.walk(dt, ship.drawn, input);
         walking.swingDoors((id, angle) => ship.setDoor(id, angle));
       }
+      // Her damage drawn as the match has it (plan N6.5): holes, bulwarks smashed out, her canvas holed.
+      ship.showDamage(scarred?.[0] ?? (match ? match.state.ships[match.ship]?.damage ?? null : null));
+      lightThrough(view.hemi);
       ship.update(sea, seaTime, dt, view.camera, where, glass ? glass.aim(input.look) : input.look, sky.gain, view.radPerPixel(), seaView.origin);
       furnished?.stowHammocks(myHammocks.after(!!match?.state.ships[match.ship]?.told.quarters, dt + jump));
       furnished?.update(ship.group, view.camera, sky.lightDirection);
@@ -627,6 +634,7 @@ async function start(): Promise<void> {
           other.sails.blow(windAt(wind, other.drawn.x, other.drawn.z, seaTime));
           for (const [id, angle] of sparAngles(match.state, match.other)) other.setBrace(id, angle);
           other.setRudder(rudderAngle(match.state, match.other));
+          other.showDamage(scarred?.[1] ?? match.state.ships[match.other]?.damage ?? null);
           if (jump > 0) other.sails.follow(jump);
           other.follow(sea, seaTime, dt, view.camera);
           herFittings?.stowHammocks(herHammocks.after(!!match.state.ships[match.other]?.told.quarters, dt + jump));

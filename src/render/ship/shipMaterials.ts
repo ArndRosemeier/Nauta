@@ -8,7 +8,7 @@
  * deck no sky comes in but through the hatch, so the sky's fill there falls off with the distance from it; and the
  * lantern's light is added to what it shines on, in the shader (a light of the scene's would be in every lit shader).
  */
-import { Color, DataTexture, DoubleSide, FloatType, FrontSide, Matrix4, MeshBasicNodeMaterial, MeshStandardNodeMaterial, NearestFilter, RGBAFormat, UnsignedByteType, Vector2, Vector4 } from 'three/webgpu';
+import { Color, DataTexture, DoubleSide, FloatType, FrontSide, LinearFilter, Matrix4, MeshBasicNodeMaterial, MeshStandardNodeMaterial, NearestFilter, RGBAFormat, UnsignedByteType, Vector2, Vector4 } from 'three/webgpu';
 import {
   Fn, Loop, abs, attribute, clamp, dot, float, floor, fract, fwidth, hash, int, ivec2, length, max, min, mix, modelViewMatrix, normalGeometry,
   normalLocal, normalize, positionGeometry, positionLocal, screenCoordinate, sin, smoothstep, step, texture, textureLoad, transformNormalToView,
@@ -19,6 +19,7 @@ import { GRAIN_SPAN, makeGrainTexture } from './grain';
 import { DAMAGE_MAP_SIZE, DAMAGE_REGIONS, DAMAGE_TEXEL } from './damageMap';
 import { MOST_FRAMES } from './swings';
 import { wetHull } from '../wakeMap';
+import { filtered } from '../dataTexture';
 
 /** How many lanterns and sky openings her shaders can hold. */
 export const MOST_LAMPS = 40;
@@ -48,6 +49,8 @@ export const SHIP_INPUTS = {
   skyPlace: uniformArray(Array.from({ length: MOST_SKIES }, () => new Vector4()), 'vec4'),
   /** ...and the height of the deck they are in (ship space) and how much they let through. */
   skyKind: uniformArray(Array.from({ length: MOST_SKIES }, () => new Vector4()), 'vec4'),
+  /** The daylight seen through a shot hole from inside her: colour times strength (`lightThrough`). */
+  daylight: uniform(new Color()),
 };
 
 /** Numbers per texel of the frames' texture. */
@@ -63,10 +66,7 @@ for (let ship = 0; ship < SHIPS_DRAWN; ship++) for (let f = 0; f < MOST_FRAMES; 
 
 /** A data texture read texel by texel: no filtering, and uploaded on first use. */
 export function nearest(t: DataTexture): DataTexture {
-  t.magFilter = NearestFilter;
-  t.minFilter = NearestFilter;
-  t.needsUpdate = true;
-  return t;
+  return filtered(t, NearestFilter);
 }
 
 /** Moving frame `frame` of ship `ship` (0 hers, 1 the other's) set to `m` (ship space to ship space), for her ropes' shaders. */
@@ -99,11 +99,23 @@ export const SHIP_OBJECT = {
 
 /** Bytes per texel of the damage map (before the map: the bundle reads it as undefined when it comes later, and the map is empty). */
 const RGBA = 4;
-/** The damage map (damageMap.ts): one texel per 4 cm of her hull and decks; N6.5 writes holes and scorches into it. */
-export const DAMAGE_TEXTURE = new DataTexture(new Uint8Array(DAMAGE_MAP_SIZE.width * DAMAGE_MAP_SIZE.height * RGBA), DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height, RGBAFormat, UnsignedByteType);
-DAMAGE_TEXTURE.needsUpdate = true;
+/**
+ * The damage map (damageMap.ts): one texel per 4 cm of her hull and decks, a block of rows per ship drawn (her own
+ * first), into which damageView.ts writes each ship's marks (damageMarks.ts: hole, scorch, rim, cut). Filtered, so a
+ * hole's edge is drawn between texels.
+ */
+export const DAMAGE_TEXTURE = new DataTexture(new Uint8Array(DAMAGE_MAP_SIZE.width * DAMAGE_MAP_SIZE.height * SHIPS_DRAWN * RGBA), DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height * SHIPS_DRAWN, RGBAFormat, UnsignedByteType);
+filtered(DAMAGE_TEXTURE, LinearFilter);
 /** Each region's least u and v (m) and its corner in the map (texels), by region number less one. */
 const REGIONS = uniformArray(DAMAGE_REGIONS.map((r) => new Vector4(r.u, r.v, r.x, r.y)), 'vec4');
+/** Each region's row read by place alone (her rails): 1, else 0. */
+const BY_PLACE = uniformArray(DAMAGE_REGIONS.map((r) => (r.byPlace ? 1 : 0)), 'float');
+/** How bright the daylight through a shot hole is against the sky's fill (the hemisphere light): the open sky beyond is the brightest thing in a dim room. */
+const DAYLIGHT_THROUGH = 2.5;
+/** The daylight seen through her shot holes from inside, from the sky's fill (`hemi`: the light rig's hemisphere light). Once a frame. */
+export function lightThrough(hemi: { readonly color: Color; readonly intensity: number }): void {
+  SHIP_INPUTS.daylight.value.copy(hemi.color).multiplyScalar(hemi.intensity * DAYLIGHT_THROUGH);
+}
 
 /** The grain, shared by all the ship's kinds (made once, on first use). */
 let grain = null;
@@ -197,21 +209,59 @@ export function crossfadeMask() {
   return step(f.x, d).mul(step(d, f.y.sub(TINY / 2))).greaterThan(1 / 2);
 }
 
-/** The damage drawn on a surface laid out in the damage map (shade.z its region): scorch darkens it. N6.5 adds holes. */
-function scorched(colour, gr, region) {
-  const k = REGIONS.element(int(max(region.sub(1), 0)));
-  const uv = vec2(k.z.add(gr.x.sub(k.x).div(DAMAGE_TEXEL)), k.w.add(gr.y.sub(k.y).div(DAMAGE_TEXEL))).div(vec2(DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height));
-  const scorch = texture(DAMAGE_TEXTURE, uv).g.mul(step(1 / 2, region));
-  return mix(colour, vec3(...CHAR), scorch);
+/**
+ * The marks on a surface laid out in the damage map (shade.z its region, its grain the region's metres; a rail's row
+ * by its place along her alone), from its ship's block of the map: hole, scorch, rim, cut (damageMarks.ts `MARK`).
+ */
+function damageAt(gr, region) {
+  const i = int(clamp(region.sub(1), 0, DAMAGE_REGIONS.length - 1)), k = REGIONS.element(i);
+  const laid = step(1 / 2, region).mul(step(region, DAMAGE_REGIONS.length + 1 / 2));
+  const v = mix(gr.y, k.y.add(DAMAGE_TEXEL / 2), BY_PLACE.element(i));
+  const row = k.w.add(v.sub(k.y).div(DAMAGE_TEXEL)).add(SHIP_OBJECT.ship.mul(DAMAGE_MAP_SIZE.height));
+  const uv = vec2(k.z.add(gr.x.sub(k.x).div(DAMAGE_TEXEL)), row).div(vec2(DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height * SHIPS_DRAWN));
+  return texture(DAMAGE_TEXTURE, uv).mul(laid);
 }
 /** Charred timber (linear RGB). */
 const CHAR = [0.008, 0.007, 0.006];
+/** A shot hole seen from where it is dark beyond (her inside, the sea): almost black (linear RGB). */
+const HOLE_INSIDE = [0.006, 0.005, 0.004];
+/** Oak freshly splintered: pale, under the weathered surface (linear RGB). */
+const SPLINTERED = [0.42, 0.3, 0.17];
+/** A hole's mark from this on is its opening, from this on light beyond (damageMarks.ts HOLE_DARK, HOLE_LIGHT); a cut from this. */
+const HOLE_FROM = 0.2;
+const LIGHT_FROM = 0.75;
+const CUT_FROM = 0.5;
+/** The splintered rim is broken into splinters this many to a metre, and this much of it shows at most. */
+const SPLINTERS_PER_M = 40;
+const RIM_SHOWS = 0.85;
+/** The edges of holes and cuts wander by this much of a mark (fine raggedness under the map's texel). */
+const EDGE_WANDER = 0.12;
+
+/** Her timber as the damage map has it: the rim splintered, scorch charred, a hole dark (its light is `holeLight`). */
+function damaged(colour, d, gr) {
+  const splinters = hash(floor(gr.xy.mul(SPLINTERS_PER_M)).dot(vec2(1, SPLINTERS_PER_M)));
+  const rim = d.b.mul(smoothstep(0, 1, splinters.add(d.b).sub(1 / 2))).mul(RIM_SHOWS);
+  const scorch = d.g;
+  const hole = step(HOLE_FROM, d.r.add(splinters.sub(1 / 2).mul(EDGE_WANDER)));
+  return mix(mix(mix(colour, vec3(...SPLINTERED), rim), vec3(...CHAR), scorch), vec3(...HOLE_INSIDE), hole);
+}
+/** The daylight through a hole from inside her (a lit room or the deck's underside): its colour, to add as light. */
+function holeLight(d, inside) {
+  return SHIP_INPUTS.daylight.mul(step(LIGHT_FROM, d.r)).mul(inside);
+}
+/** Where a surface is cut away (a bulwark shot through or smashed out): not drawn. */
+function uncut(d, gr) {
+  const wander = hash(floor(gr.xy.mul(SPLINTERS_PER_M)).dot(vec2(1, SPLINTERS_PER_M))).sub(1 / 2).mul(EDGE_WANDER);
+  return d.a.add(wander).lessThan(CUT_FROM);
+}
 
 /**
  * Her timber: grain, planks and their caulked seams, paint and its wear, grime, and the damage drawn on it. One kind
- * for every piece of wood; `crossfade` makes the kind of it a crossfade between levels of detail draws with.
+ * for every piece of wood; `crossfade` makes the kind of it a crossfade between levels of detail draws with, `holed`
+ * the kind that leaves out what the damage map cuts away (a ship with a bulwark shot through draws her outside with
+ * it). A crossfade cuts too: it leaves pixels out anyway.
  */
-export function makeWoodMaterial(crossfade = false): MeshStandardNodeMaterial {
+export function makeWoodMaterial(crossfade = false, holed = crossfade): MeshStandardNodeMaterial {
   // Both faces cast: her timbers touch (beam under deck, mast through partners), and back faces alone let the sun in at the joints.
   const m = new MeshStandardNodeMaterial({ side: FrontSide, shadowSide: DoubleSide });
   m.name = 'ship wood';
@@ -245,15 +295,16 @@ export function makeWoodMaterial(crossfade = false): MeshStandardNodeMaterial {
   const seam = max(seamA, seamB).mul(planked).mul(fade);
   const seamColour = mix(vec3(...PITCH), surface.mul(SEAM_UNDER_PAINT), cover);
   // Her outside wet where the sea has climbed it (wakeMap.ts `wetHull`); inside, dry.
-  const wet = wetHull(positionLocal, scorched(mix(surface, seamColour, seam), gr, sh.z), mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), SHIP_OBJECT.ship, SHIPS_DRAWN);
+  const dmg = damageAt(gr, sh.z), marked = damaged(mix(surface, seamColour, seam), dmg, gr);
+  const wet = wetHull(positionLocal, marked, mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), SHIP_OBJECT.ship, SHIPS_DRAWN);
   const outside = float(1).sub(step(0, SHIP_OBJECT.light.w));
-  m.colorNode = mix(scorched(mix(surface, seamColour, seam), gr, sh.z), wet.colour, outside);
+  m.colorNode = mix(marked, wet.colour, outside);
   m.roughnessNode = mix(mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), wet.rough, outside);
   m.metalnessNode = float(0);
   const light = belowDeck(ao);
   m.aoNode = light.sky;
-  m.emissiveNode = m.colorNode.mul(light.lamp);
-  if (crossfade) m.maskNode = crossfadeMask();
+  m.emissiveNode = m.colorNode.mul(light.lamp).add(holeLight(dmg, float(1).sub(outside)));
+  if (crossfade || holed) m.maskNode = crossfade ? crossfadeMask().and(uncut(dmg, gr)) : uncut(dmg, gr);
   return m;
 }
 

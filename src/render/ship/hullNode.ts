@@ -7,6 +7,7 @@
 import { DataTexture, DataUtils, HalfFloatType, LinearFilter, RGFormat } from 'three/webgpu';
 import { step, texture, vec2 } from 'three/tsl';
 import { PLANKING } from '../../sim/rules/ships';
+import { filtered } from '../dataTexture';
 import { HULL_AFT, HULL_FORE, HULL_HIGH, HULL_LOW, hullHalfBreadth, sheer } from '../../sim/ship/hull';
 import { shipY, shipZ } from '../../sim/ship/section';
 
@@ -35,10 +36,7 @@ function makeHullTexture(): DataTexture {
     }
   }
   const t = new DataTexture(data, ALONG, UP, RGFormat, HalfFloatType);
-  t.magFilter = LinearFilter;
-  t.minFilter = LinearFilter;
-  t.needsUpdate = true;
-  return t;
+  return filtered(t, LinearFilter);
 }
 const HULL_TEXTURE = makeHullTexture();
 

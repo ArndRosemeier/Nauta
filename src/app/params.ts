@@ -46,7 +46,7 @@ const SEED_MOST = 2 ** 32 - 1;
  */
 export const TOOL_SWITCHES = [
   'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'trial', 'men', 'bench', 'probe', 'netcheck', 'title', 'rig',
-  'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed',
+  'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed', 'scars',
 ] as const;
 
 /** Where `?look=` turns the eye: off the sun's (the moon's) bearing, clockwise, and up from level, both rad. */
@@ -125,6 +125,8 @@ export interface Params {
   readonly halfSmoke: boolean;
   /** The game itself (plan N7.2): the title, then the menu, every match chosen there; false when the address names a tool or a scene (`TOOL_SWITCHES`). */
   readonly menu: boolean;
+  /** Both ships drawn shot about by a stand-in for a fight's damage, seeded (`?scars=3`; app/scars.ts), to look at the damage drawn (plan N6.5); null: as the match has them. */
+  readonly scars: number | null;
 }
 
 export function readParams(query: string): Params {
@@ -152,6 +154,7 @@ export function readParams(query: string): Params {
     glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
     foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
     halfSmoke: q.get('smoke') === 'half',
+    scars: q.has('scars') ? Math.round(num('scars', 1, 0, SEED_MOST)) : null,
     menu: !TOOL_SWITCHES.some((name) => q.has(name)),
   };
 }

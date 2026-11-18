@@ -26,8 +26,11 @@ import { LOAD_WATERLINE } from '../../sim/rules/ships';
 import type { Look } from '../../app/look';
 import type { Standpoint } from '../../app/standpoints';
 import {
-  SHIP_COPPER, SHIP_COPPER_FADING, SHIP_GLOW, SHIP_IRON, SHIP_IRON_FADING, SHIP_ROPE, SHIP_SAILS, SHIP_SAILS_FADING, SHIP_WOOD, SHIP_WOOD_FADING,
+  SHIP_COPPER, SHIP_COPPER_FADING, SHIP_GLOW, SHIP_IRON, SHIP_IRON_FADING, SHIP_ROPE, SHIP_SAILS, SHIP_SAILS_FADING, SHIP_SAILS_HOLED, SHIP_WOOD, SHIP_WOOD_FADING,
+  SHIP_WOOD_HOLED,
 } from '../materials';
+import type { Damage } from '../../sim/damage';
+import { DamageView } from './damageView';
 import type { QualityKnobs } from '../../app/quality';
 import { SailsView } from './sailsView';
 import { SAIL_TIME, setShipSails } from './sailMaterial';
@@ -99,10 +102,10 @@ const SHARED_SHADOW_WITHIN = 80;
 const KINDS = { wood: SHIP_WOOD, iron: SHIP_IRON, copper: SHIP_COPPER, glow: SHIP_GLOW, ropes: SHIP_ROPE } as const;
 const FADING: ReadonlyMap<Kind, Kind> = new Map([[SHIP_WOOD, SHIP_WOOD_FADING], [SHIP_IRON, SHIP_IRON_FADING], [SHIP_COPPER, SHIP_COPPER_FADING]]);
 
-/** One mesh of hers: what it draws with plain and crossfading. */
+/** One mesh of hers: what it draws with plain (the holed kind once her damage cuts her: `showDamage`) and crossfading. */
 interface Part {
   readonly mesh: Mesh;
-  readonly plain: Material;
+  plain: Material;
   readonly fading: Material | null;
 }
 
@@ -161,6 +164,9 @@ export class ShipView {
   /** The sails' meshes near, fine and coarse (one shown, a quality knob), and far. */
   private readonly sailMeshes: { fine: Mesh; coarse: Mesh; far: Mesh };
   private swingsMoved = true;
+  /** Her damage drawn (plan N6.5): her marks in her blocks of the damage maps, and whether she is drawn holed yet. */
+  private readonly marks: DamageView;
+  private holed = { hull: false, sails: false };
   /** Her rudder's groups near and far, and where it lies (rad, + its after edge to starboard). */
   private readonly rudder = { groups: [] as Group[], angle: Number.NaN, matrix: new Matrix4() };
   /** Each zone's ranges in her shaders' light lists. */
@@ -187,6 +193,7 @@ export class ShipView {
    */
   constructor(build: ShipBuild, readonly index = 0) {
     this.drawn = this.motion.pose;
+    this.marks = new DamageView(index);
     this.group.name = index === 0 ? 'ship' : 'other ship';
     const own = index === 0;
     const ranges = own ? this.lights(build) : new Map<string, Vector4>();
@@ -394,6 +401,20 @@ export class ShipView {
     if (!w || w[key] === value) return;
     w[key] = value;
     this.swingsMoved = true;
+  }
+
+  /**
+   * Her damage as the match has it (plan N6.5; null: none): holes, panels stove in and bulwarks smashed out drawn on
+   * her timber, holes and splits in her canvas; once something of hers is cut through, her outside and her sails draw
+   * with the holed kinds (compiled at load, so nothing compiles now). Once a frame; nothing is done while it stands.
+   */
+  showDamage(d: Damage | null): void {
+    const shown = this.marks.marksFor(d);
+    const toKind = (parts: readonly Part[], from: Kind, to: Kind) => {
+      for (const p of parts) if (p.plain === from.make()) p.plain = to.make();
+    };
+    if (shown.hullCut && !this.holed.hull) { this.holed.hull = true; toKind(this.outside, SHIP_WOOD, SHIP_WOOD_HOLED); }
+    if (shown.sailsCut && !this.holed.sails) { this.holed.sails = true; toKind(this.outside, SHIP_SAILS, SHIP_SAILS_HOLED); }
   }
 
   /** The turning spars' ids. */

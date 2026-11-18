@@ -185,7 +185,7 @@ const lerp3 = (a: Place, b: Place, s: number): Place => [a[0] + (b[0] - a[0]) * 
 const zoneOf = (p: Place): Zone => zoneAt(p[0], p[1], p[2]);
 
 /** Her girth from her bottom up to a height at a place along her, m (as the plan's cells are laid out). */
-function girthTo(along: number, h: number): number {
+export function girthTo(along: number, h: number): number {
   const bottom = hullBottom(along), n = Math.max(1, Math.ceil((h - bottom) / GIRTH_STEP));
   let girth = 0, lastX = hullHalfBreadth(along, bottom), lastH = bottom;
   for (let i = 1; i <= n; i++) {
