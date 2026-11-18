@@ -574,6 +574,16 @@ export const STATIONS: readonly StationRow[] = [
   { id: 'magazine', name: 'the magazine', who: "the gunner's mate and the powder boys", orders: ['what is filled and passed up'], space: 'lightroom', along: -1.9, across: 0.6 },
   { id: 'pumps', name: 'the well and the pumps', who: 'the carpenter', orders: ['sound the well', 'man the pumps', 'plug and patch'], space: 'deck', along: 0, across: 1.5 },
   { id: 'surgeon', name: 'the cockpit', who: 'the surgeon', orders: [], space: 'cockpit', along: 5.28, across: -2.6 },
+  // Where the marines stand (design ruling 2026-11-18, rules/crew.ts ROSTER): sentries aft by the taffrail on her middle
+  // line, clear of the captain's side; one at the cabin door below; the rest in the waist or on the berth deck; at
+  // quarters on the forecastle and along the waist's rail, a place each side.
+  { id: 'sentries', name: 'the taffrail', who: 'the marine sentries', orders: [], space: 'deck', along: -12.0, across: 0 },
+  { id: 'cabin-door', name: "the captain's cabin door", who: 'a marine sentry', orders: [], space: 'passage', along: -5.4, across: 0 },
+  { id: 'marines-waist', name: 'the waist, between the hatches', who: 'the marines off duty', orders: [], space: 'deck', along: 6.0, across: 0 },
+  { id: 'marines-below', name: 'the berth deck', who: 'the marines off duty', orders: [], space: 'messdeck', along: 10.0, across: 1.5 },
+  { id: 'forecastle', name: 'the forecastle', who: 'the marines at quarters', orders: [], space: 'deck', along: 17.5, across: 1.5 },
+  { id: 'marines-s', name: 'the waist, starboard rail', who: 'the marines at quarters', orders: [], space: 'deck', along: 3.0, across: 2.5 },
+  { id: 'marines-p', name: 'the waist, larboard rail', who: 'the marines at quarters', orders: [], space: 'deck', along: 3.0, across: -2.5 },
 ];
 /**
  * Her lanterns below deck (plan N2.4): [space, m forward of the mainmast, m from the centreline], each hung from the

@@ -31,6 +31,11 @@ export interface RankRow {
   /** How much of a hand he is at the ropes: an able seaman is one, a landsman less, a boy less still. */
   readonly skill: number;
   readonly posts: readonly string[] | 'guns';
+  /**
+   * Where a man at no gun goes when she beats to quarters (the list taken in turn, as `posts`); `*` in a place stands
+   * for the side she fights (`s` or `p`; while neither or both sides bear, the men take the sides in turn). None: his post.
+   */
+  readonly quarters?: readonly string[];
 }
 
 /** A man's skill at the ropes, by what he is (hands: an able seaman is 1). */
@@ -71,12 +76,19 @@ export const ROSTER: readonly RankRow[] = [
   { rank: 'sailmaker', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
   { rank: 'armourer', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
   { rank: "carpenter's crew", count: 2, part: 'idlers', skill: IDLER, posts: ['station-pumps'] },
-  { rank: 'sergeant of marines', count: 1, part: 'marines', skill: MARINE, posts: ['pin-quarter-pins-s9'] },
-  { rank: 'corporal of marines', count: 1, part: 'marines', skill: MARINE, posts: ['pin-quarter-pins-p9'] },
+  // The marines (design ruling 2026-11-18: the quarterdeck is the captain's). Before quarters two sentries aft by the
+  // taffrail, one at the cabin door, the rest in the waist or below on the berth deck; at quarters the two stay aft,
+  // six go to the tops, six to the forecastle and five line the waist's engaged side.
+  { rank: 'sergeant of marines', count: 1, part: 'marines', skill: MARINE, posts: ['station-marines-waist'], quarters: ['station-marines-*'] },
+  { rank: 'corporal of marines', count: 1, part: 'marines', skill: MARINE, posts: ['station-sentries'], quarters: ['station-sentries'] },
   { rank: 'drummer', count: 1, part: 'officers', skill: MARINE, posts: ['station-quarterdeck'] },
   {
     rank: 'private of marines', count: 17, part: 'marines', skill: MARINE,
-    posts: ['pin-quarter-pins-s15', 'pin-quarter-pins-p15', 'pin-quarter-pins-s16', 'pin-quarter-pins-p16', 'pin-quarter-pins-s17', 'pin-quarter-pins-p17', 'pin-quarter-pins-s18', 'pin-quarter-pins-p18'],
+    posts: ['station-sentries', 'station-cabin-door', ...Array<string>(7).fill('station-marines-waist'), ...Array<string>(8).fill('station-marines-below')],
+    quarters: [
+      'station-sentries', ...Array<string>(4).fill('station-marines-*'),
+      'top-fore-s', 'top-fore-p', 'top-fore-s', 'top-main-s', 'top-main-p', 'top-main-s', ...Array<string>(6).fill('station-forecastle'),
+    ],
   },
   { rank: 'boy', count: 8, part: 'boys', skill: BOY, posts: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-after-ladder-head', 'ladder-magazine-ladder-head'] },
   { rank: 'captain of the foretop', count: 1, part: 'foretop', skill: PETTY, posts: ['top-fore-s'] },
