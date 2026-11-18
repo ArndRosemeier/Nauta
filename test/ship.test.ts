@@ -145,7 +145,8 @@ test('from the deck a room below is drawn only through an opening; from below, r
   const up = vis.seen(OUTSIDE, toClip(waist, 0, 1.4), shut)!;
   assert.deepEqual([...up], [OUTSIDE]);
   // In the cabin with its door shut, the passage beyond is not drawn; opened, it is.
-  const cabin = standpoint('cabin').eye, cz = eyeZone(cabin)!;
+  // Aft in the cabin, away from the companion over its fore end.
+  const cabin = [standpoint('cabin').eye[0], standpoint('cabin').eye[1], shipZ(-7.6)], cz = eyeZone(cabin)!;
   const ahead = toClip(cabin, 0, 0);
   const closed = vis.seen(cz, ahead, shut)!, opened = vis.seen(cz, ahead, open)!;
   assert.ok(!closed.has("passage") && opened.has("passage"), `shut ${[...closed]}, open ${[...opened]}`);
