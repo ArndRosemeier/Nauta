@@ -85,6 +85,8 @@ export const SHIP_COPPER = defineKind('ship copper', SOLID_ATTRIBUTES, () => mak
 export const SHIP_GLOW = defineKind('ship glow', SOLID_ATTRIBUTES, makeGlowMaterial, NO_SHADOW);
 /** Her timber, iron and copper as a crossfade between levels of detail draws them: dithered by each mesh's share (shipView.ts). */
 export const SHIP_WOOD_FADING = defineKind('ship wood fading', SOLID_ATTRIBUTES, () => makeWoodMaterial(true), SHADOWED);
+/** Her outside's timber once a bulwark of hers is shot through or smashed out: what the damage map cuts away is left out (plan N6.5). */
+export const SHIP_WOOD_HOLED = defineKind('ship wood holed', SOLID_ATTRIBUTES, () => makeWoodMaterial(false, true), SHADOWED);
 export const SHIP_IRON_FADING = defineKind('ship iron fading', SOLID_ATTRIBUTES, () => makeIronMaterial(true), SHADOWED);
 export const SHIP_COPPER_FADING = defineKind('ship copper fading', SOLID_ATTRIBUTES, () => makeCopperMaterial(true), RECEIVES);
 /** Rope, standing and running: widened to a pixel far off and faded, laid in strands up close. */
@@ -99,3 +101,5 @@ export const FITTED_GLOW = defineKind('fitted glow', SOLID_ATTRIBUTES, () => fit
  */
 export const SHIP_SAILS = defineKind('ship sails', SAIL_ATTRIBUTES, () => makeSailMaterial(), SHADOWED);
 export const SHIP_SAILS_FADING = defineKind('ship sails fading', SAIL_ATTRIBUTES, () => makeSailMaterial(true), SHADOWED);
+/** Her sails once one is shot through: the holes left out (plan N6.5). */
+export const SHIP_SAILS_HOLED = defineKind('ship sails holed', SAIL_ATTRIBUTES, () => makeSailMaterial(false, true), SHADOWED);

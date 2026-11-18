@@ -83,13 +83,13 @@ export function deckCells(alongs: readonly number[], xs: readonly number[], edge
 }
 
 /** A deck's underside, `thick` under its top, each cell drawn in the zone of the room under it (none: left out). */
-export function deckUnderside(ctx: DeckContext, alongs: readonly number[], xs: readonly number[], edge: (a: number) => number, y: (a: number, x: number) => number, cells: ReturnType<typeof deckCells>, level: Level): void {
+export function deckUnderside(ctx: DeckContext, alongs: readonly number[], xs: readonly number[], edge: (a: number) => number, y: (a: number, x: number) => number, cells: ReturnType<typeof deckCells>, level: Level, damage = 0): void {
   const { plan, zones, parts } = ctx;
   const under = deckGrid(alongs, xs, edge, y);
   sheet((i, j) => {
     const [a, x] = cells.centre(i, j), z = zoneUnder(plan, zones, level, a, x);
     return z ? parts.zone(z).wood : null;
-  }, under, DECK_BELOW, (i, j) => [shipZ(alongs[i]!), under[i]![j]!.x], cells.keep, true);
+  }, under, { ...DECK_BELOW, damage }, (i, j) => [shipZ(alongs[i]!), under[i]![j]!.x], cells.keep, true);
 }
 
 /** Cuts across a deck: every edge of the openings and spaces, and of the partners. */
@@ -112,7 +112,7 @@ export function buildWeatherDeck(ctx: DeckContext, deckAft: number, deckFore: nu
   const holes = [...openingsOn(plan, 'weather'), ...Object.values(MASTS).map((m) => partners(m.along))];
   const cells = deckCells(alongs, xs, deckEdge, weatherDeck, holes, rowStep), { top } = cells;
   sheet(parts.zone(OUTSIDE).wood, top, { ...DECK, damage: DAMAGE.weatherDeck }, (i, j) => [shipZ(alongs[i]!), top[i]![j]!.x], cells.keep, false, cells.ao);
-  deckUnderside(ctx, alongs, xs, deckEdge, (a, x) => weatherDeck(a, x) - PLANKING.deck, cells, 'berth');
+  deckUnderside(ctx, alongs, xs, deckEdge, (a, x) => weatherDeck(a, x) - PLANKING.deck, cells, 'berth', DAMAGE.weatherDeck);
 }
 
 /** The partners round each mast on the weather deck, with the tarred coat that keeps the water out (the masts are N3.6's). */

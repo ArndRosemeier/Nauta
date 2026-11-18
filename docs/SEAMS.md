@@ -190,6 +190,12 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her rooms: floors, ceiling, bulkheads, doors, ladders, lanterns | `src/render/ship/rooms.ts#buildRooms` |
 | Her damage map's layout (N6.5 writes into it) | `src/render/ship/damageMap.ts#DAMAGE_REGIONS` |
 | Where a point of a damaged surface lies in the damage map | `src/render/ship/damageMap.ts#damageTexel` |
+| The marks a ship's damage leaves on her damage map: holes inside and out, panels stove in, bulwarks and rails smashed out (N6.5) | `src/render/ship/damageMarks.ts#HullMarks` |
+| The holes and splits a ship's damage leaves in her sails' hole map (N6.5) | `src/render/ship/damageMarks.ts#SailMarks` |
+| One ship's damage written into her blocks of the damage maps, and whether she must draw holed | `src/render/ship/damageView.ts#DamageView` |
+| A ship's damage drawn as the match has it, her outside and sails holed once cut (N6.5) | `src/render/ship/shipView.ts#ShipView` |
+| The daylight seen through a shot hole from inside her | `src/render/ship/shipMaterials.ts#lightThrough` |
+| A stand-in for a fight's damage to look at (`?scars=3`) | `src/app/scars.ts#scarsOf` |
 | Her masts and rigging from the rig plan: spars, deadeyes, channels, every line, pins and coils (N3.6) | `src/render/ship/rig.ts#buildRigs` |
 | Her spars turned from the spar table: masts, tops, trestle and cross trees, caps, yards, bowsprit, jib-boom, boom, gaff | `src/render/ship/masts.ts#drawSpars` |
 | Every line of the rig plan drawn by its sag, with its blocks, ratlines, futtock staves, footropes and stirrups | `src/render/ship/rigging.ts#buildRigging` |
@@ -206,6 +212,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her sails as drawn this frame: set and furled seen happening, belly and shiver eased, the yards' hoists, the flags in the true wind, the frames of the lines to the sails | `src/render/ship/sailsView.ts#SailsView` |
 | How a ship's sails stand in a match's state, for the drawing | `src/app/sailsSeen.ts#sailsSeen` |
 | A data texture read texel by texel | `src/render/ship/shipMaterials.ts#nearest` |
+| A data texture's filtering (texel by texel or blended), ready to upload | `src/render/dataTexture.ts#filtered` |
 | The far ship's crossfade: where a mesh is not drawn | `src/render/ship/shipMaterials.ts#crossfadeMask` |
 | The timber's grain, pores and grime as one texture | `src/render/ship/grain.ts#makeGrainTexture` |
 | Her timber's shader: grain, planks, seams, paint, wear, grime | `src/render/ship/shipMaterials.ts#makeWoodMaterial` |

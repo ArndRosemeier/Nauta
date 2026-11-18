@@ -17,7 +17,7 @@ import { Solid } from './solid';
 import type { ZoneParts } from './parts';
 import { BERTH_DECK, BUFF, IRON, OAK } from './looks';
 import { place, type Fittings } from './fittings';
-import { DAMAGE } from './damageMap';
+import { DAMAGE, SIDE_REGIONS } from './damageMap';
 import { CORNER_AO, CORNER_REACH, EPSILON, ROW_STEP, SMALL_BEVEL, ceilingX, rowsAlong, steps } from './hullSide';
 import { LET_IN, MOST_HALF, bentBeam, buildCoamings, deckCells, deckUnderside, type DeckContext } from './decks';
 import { doorAthwart, openingsOn, rectCentre, zoneUnder } from './zones';
@@ -87,7 +87,7 @@ function buildFloor(ctx: DeckContext, s: Space): void {
   const edge = (a: number) => ceilingX(a, floor(a, 0)) + LET_IN;
   const cells = deckCells(alongs, xs, edge, floor, holes), { top } = cells;
   sheet(zoneOf(ctx, s).wood, top, { ...BERTH_DECK, damage: s.level === 'berth' && s.flat === null ? DAMAGE.berthDeck : 0 }, (i, j) => [shipZ(alongs[i]!), top[i]![j]!.x], cells.keep, false, cells.ao);
-  if (s.level === 'berth') deckUnderside(ctx, alongs, xs, edge, (a, x) => floor(a, x) - PLANKING.berthDeck, cells, 'hold');
+  if (s.level === 'berth') deckUnderside(ctx, alongs, xs, edge, (a, x) => floor(a, x) - PLANKING.berthDeck, cells, 'hold', DAMAGE.berthDeck);
 }
 
 /** The ceiling on her frames, where a space reaches her side: from its floor up to the deck above. */
@@ -107,7 +107,7 @@ function buildCeiling(ctx: DeckContext, s: Space): void {
       return Array.from({ length: n }, (_, j) => lo + ((hi - lo) * j) / (n - 1));
     });
     const grid = rows.map((r, i) => r.map((h) => new Vector3(side * ceilingX(alongs[i]!, h), shipY(h), shipZ(alongs[i]!))));
-    sheet(z.wood, grid, { ...OAK, plank: STRAKE }, (i, j) => [shipZ(alongs[i]!), rows[i]![j]!], (i) => grid[i]![0]!.x !== 0 || grid[i + 1]![0]!.x !== 0, side < 0,
+    sheet(z.wood, grid, { ...OAK, plank: STRAKE, damage: SIDE_REGIONS.ceiling(side) }, (i, j) => [shipZ(alongs[i]!), rows[i]![j]!], (i) => grid[i]![0]!.x !== 0 || grid[i + 1]![0]!.x !== 0, side < 0,
       (i, j) => CORNER_AO + (1 - CORNER_AO) * Math.min(1, (rows[i]![j]! - rows[i]![0]!) / CORNER_REACH));
   }
 }

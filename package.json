@@ -39,7 +39,8 @@
     "shot:ui": "node tools/shot/ui.mjs",
     "shot:speech": "node tools/shot/speech.mjs",
     "shot:fan": "node tools/shot/fan.mjs",
-    "shot:menu": "node tools/shot/menu.mjs"
+    "shot:menu": "node tools/shot/menu.mjs",
+    "shot:damage": "node tools/shot/damage.mjs"
   },
   "dependencies": {
     "@actors/core": "https://github.com/ArndRosemeier/Actors/releases/download/v0.37.0/actors-core-0.37.0.tgz",

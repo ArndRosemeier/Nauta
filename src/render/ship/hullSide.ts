@@ -22,7 +22,7 @@ import { box, roundedProfile, sheet, sweep } from './shapes';
 import type { ZoneParts } from './parts';
 import { BLACK, COPPER, OAK, OCHRE, RED, SIDE_PLANKS } from './looks';
 import type { Finish } from './solid';
-import { DAMAGE } from './damageMap';
+import { DAMAGE, SIDE_REGIONS } from './damageMap';
 
 /** The longest step between rows along her, m; near her ends, where her shape turns fast, a finer one. */
 export const ROW_STEP = 0.3;
@@ -236,7 +236,7 @@ export function buildBulwarks(out: ZoneParts, deckAft: number, deckFore: number,
       (i, j) => CORNER_AO + (1 - CORNER_AO) * Math.min(1, (hss[i]![j]! - sheer(alongs[i]!)) / CORNER_REACH));
     // The rail on top, black, rounded, following her sheer and her side.
     const rail = alongs.map((a) => ({ x: side * (outsideX(a, railFoot(a)) - BULWARK_THICK / 2 - BULWARK.railWidth / 2), y: shipY(railFoot(a)), z: shipZ(a) }));
-    sweep(out.wood, rail, roundedProfile(BULWARK.railWidth, BULWARK.railThick, BEVEL), side, BLACK);
+    sweep(out.wood, rail, roundedProfile(BULWARK.railWidth, BULWARK.railThick, BEVEL), side, { ...BLACK, damage: SIDE_REGIONS.rail(side) });
     // The waterway: a heavy timber along the deck's edge, against the bulwark, rounded on its inner edge.
     const way = alongs.map((a) => ({ x: side * (bulwarkInside(a, sheer(a)) - WATERWAY.width), y: shipY(sheer(a) - PLANKING.deck), z: shipZ(a) }));
     sweep(out.wood, way, roundedProfile(WATERWAY.width, WATERWAY.rise + PLANKING.deck, BEVEL * 2), side, OAK, CORNER_AO);
