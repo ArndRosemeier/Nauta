@@ -511,6 +511,15 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The repairs her crew finished, done to her: holes plugged, spars fished, lines spliced, steering mended, wreckage cut away (the one routine that mends) | `src/sim/damage.ts#mend` |
 | The holes in her planking the sea can come in at (not lodged, not plugged) | `src/sim/damage.ts#openHoles` |
 | The men out of the quarter bill (badly hurt or killed) | `src/sim/damage.ts#outOf` |
+| What of her rig stands now, from her damage | `src/sim/damage.ts#standingNow` |
+| The fight one step on (N6.4): a ship beaten, a ship lost, the end of the fight or of the light (the one owner of `fight`) | `src/sim/end.ts#stepFight` |
+| How a ship is lost now: blown up, sunk, burnt out, struck | `src/sim/end.ts#lostHow` |
+| Whether a ship is beaten (a computer captain strikes, a player's first lieutenant says so) | `src/sim/end.ts#beaten` |
+| Whether her fire is past saving | `src/sim/end.ts#burntOut` |
+| The winner of an ended fight, or none | `src/sim/end.ts#winner` |
+| A fight at its start, its time as the match setting says | `src/sim/end.ts#startFight` |
+| How a fight ends: beaten, burnt out, the match's time and the master's warning, striking asked twice (first proposals) | `src/sim/rules/end.ts#BEATEN` |
+| The pair of guns a gun is of (one crew a pair) | `src/sim/crew/roster.ts#pairOf` |
 | What the crew does for her life (N6.3): the repairs wanted now from her damage, her orders and where her men are, in the order they are manned | `src/sim/crew/repairs.ts#repairsDue` |
 | How many of a repair's men are at its spot (a fire party at its fire, the pump hands) | `src/sim/crew/crew.ts#atWork` |
 | The men the first lieutenant takes from the guns, in the quarter bill's order (waisters, then the last places of each gun) | `src/sim/crew/roster.ts#billOrder` |

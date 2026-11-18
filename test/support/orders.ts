@@ -51,5 +51,5 @@ export const EACH: Readonly<Record<OrderKind, Order>> = {
   shot: { kind: 'shot', ship: 0, shot: 'chain' }, aim: { kind: 'aim', ship: 0, at: 'rigging' },
   bear: { kind: 'bear', ship: 0 }, hold: { kind: 'hold', ship: 0 }, fire: { kind: 'fire', ship: 0 }, cease: { kind: 'cease', ship: 0 },
   pumps: { kind: 'pumps', ship: 0 }, fires: { kind: 'fires', ship: 0 }, wreckage: { kind: 'wreckage', ship: 0 },
-  plug: { kind: 'plug', ship: 0 }, pumping: { kind: 'pumping', ship: 0 },
+  plug: { kind: 'plug', ship: 0 }, pumping: { kind: 'pumping', ship: 0 }, strike: { kind: 'strike', ship: 0 },
 };

@@ -37,12 +37,15 @@ export function placeSpot(id: string): Spot {
   return bareSpot(p);
 }
 
+/** The pair a gun is of (her plan id less its side's letter): each pair of guns, larboard and starboard, has one crew. */
+export const pairOf = (id: string): string => id.slice(0, -1);
+
 /**
  * The gun places in the order the quarter bill fills them: pair by pair from aft (the chase guns' pair last), each
  * pair's places taken starboard and larboard in turn, so its crew stands half at each gun.
  */
 function gunPlaces(): { place: string; gun: string; pair: string }[] {
-  const plan = shipPlan(), pairOf = (id: string) => id.slice(0, -1);
+  const plan = shipPlan();
   const pairs = [...new Set(plan.guns.map((g) => pairOf(g.id)))];
   return pairs.flatMap((pair) => {
     const guns = plan.guns.filter((g) => pairOf(g.id) === pair).sort((a, b) => b.side - a.side);

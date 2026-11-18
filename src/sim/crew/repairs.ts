@@ -18,8 +18,8 @@
  *
  * A repair under way is kept before a new one of its kind is chosen, so men are not sent from one hole to the next.
  */
-import { openHoles, type Damage } from '../damage';
-import { lostWith, sparOfPart, standingOf } from '../damage/fall';
+import { openHoles, standingNow, type Damage } from '../damage';
+import { lostWith, sparOfPart } from '../damage/fall';
 import { magazineSpace, spaceAt } from '../damage/fire';
 import { sparParts } from '../damage/meet';
 import type { ShipOrders } from '../orders';
@@ -149,7 +149,7 @@ export function repairsDue(d: Damage, told: ShipOrders, crew: Crew, tick: number
 
   // Cut lines that would hold something again, the standing rigging that holds a spar first.
   if (d.cut.length > 0) {
-    const standing = standingOf(d.fallen, d.cut, d.rent), lines = rigPlan().lines;
+    const standing = standingNow(d), lines = rigPlan().lines;
     const holding = (l: number) => (lines[l]!.standing && lines[l]!.act === 'holds' ? 0 : 1);
     const worth = d.cut.filter((l) => !lostWith(standing, l)).sort((p, q) => holding(p) - holding(q) || p - q);
     for (const line of pick(crew, ['splice'], worth, 1)) out.push({ job: 'splice', on: line, at: spliceSpot(line) });
@@ -157,7 +157,7 @@ export function repairsDue(d: Damage, told: ShipOrders, crew: Crew, tick: number
 
   // Nothing leaking: the spar part nearest to breaking fished.
   if (leaking.length === 0 && d.wounds.length > 0) {
-    const down = standingOf(d.fallen, d.cut, d.rent).down, count = new Map<number, number>();
+    const down = standingNow(d).down, count = new Map<number, number>();
     for (const w of d.wounds) if (!down[sparOfPart(w)]) count.set(w, (count.get(w) ?? 0) + 1);
     const worst = [...count].sort((p, q) => q[1] - p[1] || p[0] - q[0]).map(([part]) => part);
     for (const part of pick(crew, ['fish'], worst, 1)) out.push({ job: 'fish', on: part, at: fishSpot(part) });

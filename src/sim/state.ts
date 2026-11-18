@@ -14,6 +14,7 @@ import { openShip, type Closures } from './crew/closures';
 import { startCrew, type Crew } from './crew/crew';
 import { startGuns, type Battery } from './guns/guns';
 import { startDamage, type Damage, type Flying } from './damage';
+import { startFight, type Fight } from './end';
 import { startMotion, type ShipMotion } from './ship/motion';
 import { startSailing, type Sailing } from './ship/sailing';
 import { START_CANVAS, type CanvasName } from './rules/sailing';
@@ -51,6 +52,8 @@ export interface SimState {
   readonly ships: readonly SimShip[];
   /** The shots on their way: which gun fired each and when, and what each ball has spent (damage.ts owns them). */
   readonly flying: readonly Flying[];
+  /** How the fight stands: when the light fails, who is beaten, and its end once over (end.ts owns it). */
+  readonly fight: Fight;
 }
 
 /**
@@ -72,6 +75,8 @@ export interface MatchSetup {
   readonly windForce: number;
   readonly windFrom: number;
   readonly ships: readonly ShipStart[];
+  /** How long the match may last before it is drawn, minutes (a match setting; rules/end.ts `MATCH_MINUTES` if not given). */
+  readonly minutes?: number;
 }
 
 /** The shared clock of a state, s: the time the next step starts at. */
@@ -99,6 +104,7 @@ export function startMatch(setup: MatchSetup): SimState {
       damage: startDamage(),
     })),
     flying: [],
+    fight: startFight(setup.ships.length, setup.minutes),
   };
 }
 
