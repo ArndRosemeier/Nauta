@@ -8,7 +8,7 @@
  */
 import type { AudioEngine } from '@futuremagic/audio/web';
 import { DuelSession, type DuelHub } from '../net/duel';
-import { MOST_PLAYERS, roomTerms, type RoomTerms } from '../net/wire';
+import { roomTerms, type RoomTerms } from '../net/wire';
 import type { Offered } from '../sim/rules/captain';
 import { limitOf, navyOfShip, playOf, youFirst, type Scenario } from '../sim/scenario';
 import { DAY_REAL_MINUTES } from '../sim/rules/day';
@@ -54,8 +54,6 @@ function scenarioColumns(presets: HTMLElement, map: HTMLElement, ships: HTMLElem
   return cols;
 }
 
-/** The skill of a ship's computer captain (a seasoned one for a ship no computer commands, which the dialog never starts). */
-const computerSkill = (s: Scenario['ships'][number]): Offered => (s.command.kind === 'computer' ? s.command.skill : 'seasoned');
 /** The skills of the British and the French captain in a battle watched (the duel has one of each navy), for the caption. */
 function watchedSkills(sc: Scenario): [Offered, Offered] {
   const skill = (navy: Navy): Offered => {
@@ -336,9 +334,9 @@ export class Menu {
   private sail(kind: 'alone' | 'walk' | 'watch', fresh = false): void {
     const t = this.terms, seed = (fresh ? null : t.seed) ?? newSeed(Date.now(), this.seeds++), hour = hourOf(t.hour, seed);
     const s = kind === 'alone'
-      ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), foe: computerSkill(youFirst(t.scenario).ships[1]!), minutes: matchMinutes(t) })
+      ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), scenario: youFirst(t.scenario), minutes: matchMinutes(t) })
       : kind === 'watch'
-        ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), watch: { first: computerSkill(t.scenario.ships[0]!), second: computerSkill(t.scenario.ships[1]!) }, minutes: matchMinutes(t) })
+        ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), scenario: t.scenario, minutes: matchMinutes(t) })
         : new DuelSession({ build: this.h.build, now: this.h.now, seed, alone: true, hour, terms: startTerms(t), minutes: QUIET_MINUTES });
     this.run(s, kind === 'walk' ? { kind } : { kind, terms: t, seed }, kind === 'watch' ? navyOfShip(t.scenario, 0) : undefined);
     // The sandbox has its own day: the sky runs at the sim's day clock's pace, so what the sky shows is the hour her crew keeps.
@@ -359,8 +357,8 @@ export class Menu {
   /** Hosts a room with the terms: its match runs from the moment it is open (both tapping Ready is still to come). */
   private async host(): Promise<void> {
     const t = this.terms, hour = hourOf(t.hour, newSeed(Date.now(), this.seeds++));
-    const shown: RoomTerms = { wind: t.wind, hour, meet: t.meet, minutes: t.minutes, navy: firstNavyOf(t.scenario) };
-    const s = new DuelSession({ hub: this.connect(), build: this.h.build, now: this.h.now, terms: startTerms(t), minutes: matchMinutes(t) });
+    const scenario = youFirst(t.scenario), shown: RoomTerms = { wind: t.wind, hour, meet: t.meet, minutes: t.minutes, navy: firstNavyOf(t.scenario), scenario };
+    const s = new DuelSession({ hub: this.connect(), build: this.h.build, now: this.h.now, terms: startTerms(t), scenario, minutes: matchMinutes(t) });
     await this.enterRoom(s, '', () => s.create(CAPTAIN, shown));
   }
 
@@ -461,7 +459,7 @@ export class Menu {
         if (this.sheet !== sheet) { off?.(); return; }
         const seated = s.shipCaptains.filter((c) => c !== null).length;
         const iAm = s.readyPlayers.includes(s.me), sheIs = s.readyPlayers.some((p) => p !== s.me);
-        captains.textContent = seated < MOST_PLAYERS ? `${seated}/${MOST_PLAYERS} ${say.captainsOf}` : sheIs ? say.herReady : say.otherAboard;
+        captains.textContent = seated < s.seats ? `${seated}/${s.seats} ${say.captainsOf}` : sheIs ? say.herReady : say.otherAboard;
         ready.disabled = iAm || s.role === 'refused' || !s.started;
         ready.textContent = iAm ? say.readyWaiting : say.ready;
         ready.classList.toggle('on', iAm);

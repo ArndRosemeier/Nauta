@@ -2,7 +2,7 @@
  * Two captains in a fake room (N3.7), for the duel's tests: the fake server, a shared fake clock, and a loop that
  * moves the clock a step at a time, pumps every machine and hands out the messages.
  */
-import { DuelSession } from '../../src/net/duel.ts';
+import { DuelSession, type DuelOptions } from '../../src/net/duel.ts';
 import { hashState } from '../../src/sim/state.ts';
 import { STEP_SECONDS } from '../../src/sim/units.ts';
 import { FakeServer } from './fakeHub.ts';
@@ -17,8 +17,8 @@ export class DuelRoom {
   readonly hashes: Map<number, string>[] = [];
 
   /** A machine joining the play, with its own connection. */
-  machine(name: string, build = BUILD): DuelSession {
-    const s = new DuelSession({ hub: this.server.connect(name), build, now: () => this.t });
+  machine(name: string, build = BUILD, options: Partial<DuelOptions> = {}): DuelSession {
+    const s = new DuelSession({ hub: this.server.connect(name), build, now: () => this.t, ...options });
     const seen = new Map<number, string>();
     s.on('events', () => { if (s.state.tick % (1 / STEP_SECONDS) === 0) seen.set(s.state.tick, hashState(s.state)); });
     this.sessions.push(s);

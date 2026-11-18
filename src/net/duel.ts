@@ -19,7 +19,9 @@
  *   Orders a captain gave that no host has stepped yet (numbered, `GivenOrder.seq`) are sent again to the new host,
  *   which steps each once (`acks`).
  *
- * Players are captains, one ship each: the room's first player has the first ship, the next the second.
+ * Players are captains, one ship each: the room's first player has the first ship a person commands, the next the next.
+ * Ships the scenario gives to a computer captain (`skills`) are commanded by the host: it steps his orders with the
+ * players', so they are in its log and every guest steps them the same (and a new host goes on with them).
  *
  * **Rounds** (menu.md, the waiting room and the end card): a room's match runs from the moment it is open (round 0).
  * Once every ship has her captain and each has said he is ready (`ready`), the host begins a fresh match from the
@@ -30,16 +32,17 @@
 import { deriveSeed, hashString } from '@futuremagic/core';
 import type { GameHub, RoomSummary } from '../../vendor/gamehub/gamehub';
 import { captainOrders, crewedBy } from '../sim/captain/captain';
+import { sidesOfShips, skillsOf, type Scenario } from '../sim/scenario';
 import type { Order } from '../sim/orders';
 import type { Skill } from '../sim/rules/captain';
 import { poseBetween, type ShipPose } from '../sim/ship/motion';
 import type { LoggedOrders } from '../sim/replay';
-import { aloneStart, duelStart, type StartTerms } from '../sim/start';
+import { aloneStart, duelStart, fleetStart, withSides, type StartTerms } from '../sim/start';
 import { hashState, startMatch, type MatchSetup, type SimState } from '../sim/state';
 import { step, type SimEvent } from '../sim/step';
 import { MINUTES_PER_HOUR, STEPS_PER_SECOND } from '../sim/units';
 import {
-  cleanOrder, GAME, makeSnapshot, MOST_ORDERS, MOST_PLAYERS, PROTOCOL, roomRefusal, roomTerms, snapshotState,
+  cleanOrder, GAME, makeSnapshot, MOST_ORDERS, MOST_PLAYERS, PROTOCOL, roomRefusal, roomScenario, roomTerms, snapshotState,
   type Ack, type Captains, type Delta, type GivenOrder, type Intent, type RoomMeta, type RoomTerms, type Snapshot,
 } from './wire';
 
@@ -68,10 +71,10 @@ const CLOCK_EASE = 0.05;
 export const SOLO_SEED = 1805;
 /** The ship a computer captain commands in a match played alone: the other one. */
 const FOE_SHIP = 1;
-/** The ship of the first computer captain in a match watched. */
-const FIRST_SHIP = 0;
 /** The player id a match played alone gives its one captain. */
 const SOLO_PLAYER = 0;
+/** The seats of a duel with no scenario: a captain for each of its two ships. */
+const MOST_DUEL_SEATS = 2;
 
 /** What this machine is in the match. */
 export type DuelRole = 'solo' | 'joining' | 'host' | 'guest' | 'refused';
@@ -85,6 +88,12 @@ export interface DuelOptions {
   readonly seed?: number;
   /** A match played alone from this setup instead of the duel's start from `seed` (tests, a chosen start). */
   readonly setup?: MatchSetup;
+  /**
+   * The scenario (sim/scenario.ts), its ships in the order the match numbers them (the one you command first): the ships
+   * and sides it places, a computer captain for each ship it gives one, a seat for each ship a person commands. A room's host
+   * shows it to the guests in the room's meta. It takes the place of `foe`, `watch`, `alone` and `setup`.
+   */
+  readonly scenario?: Scenario;
   /** The wind's force of a match played alone, over its start's (the page's `?wind=`); none: the start's own. */
   readonly windForce?: number;
   /** A match played alone starts from the state this makes of its start (the page's `?casualties=`: a stand-in to look at; never a room's). */
@@ -156,8 +165,12 @@ export class DuelSession {
   private readonly build: string;
   /** The computer captain of the other ship of a match played alone, or null. */
   private readonly foe: Skill | null;
-  /** The computer captain of the first ship, in a match watched (`watch`); null: the first ship is a player's. */
-  private readonly first: Skill | null;
+  /** Each ship's computer captain by her place in the match (null: a person's ship; none for a ship past the list). From the scenario, or `foe` and `watch`. */
+  private skills: readonly (Skill | null)[];
+  /** The scenario the match runs: the host's own, or a guest's from the room's meta; null: a duel. */
+  private scenario: Scenario | null;
+  /** The sides of the ships, from the scenario; none: each ship her own (a duel). */
+  private sides: readonly number[] | null;
   private foeState: FoeState;
   /** The length of a match this machine starts, minutes, or undefined for the rules' own. */
   private readonly minutes: number | undefined;
@@ -191,19 +204,21 @@ export class DuelSession {
     this.now = options.now;
     this.build = options.build;
     this.foe = options.watch?.second ?? options.foe ?? null;
-    this.first = options.watch?.first ?? null;
+    this.skills = options.scenario ? skillsOf(options.scenario) : options.watch ? [options.watch.first, options.watch.second] : this.foe ? [null, this.foe] : [];
+    this.sides = options.scenario ? sidesOfShips(options.scenario) : null;
+    this.scenario = options.scenario ?? null;
     this.foeState = options.foeWaits ? 'heave' : 'awake';
     this.minutes = options.minutes;
     this.terms = options.terms ?? {};
     if (!this.hub) {
       this.role = 'solo';
       const seed = options.seed ?? SOLO_SEED;
-      const planned = options.setup ?? this.timed(options.alone ? aloneStart(seed, this.terms) : duelStart(seed, this.terms));
+      const planned = options.setup ?? (options.alone ? this.timed(aloneStart(seed, this.terms)) : this.fresh(seed));
       const start = options.alone && options.hour !== undefined ? { ...planned, dayStart: options.hour * MINUTES_PER_HOUR } : planned;
-      const second = this.foe ? crewedBy(start, FOE_SHIP, this.foe) : start;
-      const crewed = this.first ? crewedBy(second, FIRST_SHIP, this.first) : second;
+      const crewed = this.crewed(start);
       const state = startMatch(options.windForce === undefined ? crewed : { ...crewed, windForce: options.windForce });
-      this.begin(options.start ? options.start(state) : state, this.first ? [null, null] : [SOLO_PLAYER, null]);
+      this.begin(options.start ? options.start(state) : state, state.ships.map(() => null));
+      this.seat(SOLO_PLAYER);
       return;
     }
     this.role = 'joining';
@@ -225,9 +240,14 @@ export class DuelSession {
     return this.captains.indexOf(this.me);
   }
 
-  /** Whether this is a match watched: no ship is mine, both are commanded by computer captains (`watch`). */
+  /** Whether this is a match watched: no ship is mine, every ship is commanded by a computer captain. */
   get watched(): boolean {
-    return this.first !== null;
+    return this.skills.length > 0 && this.skills.every((k) => k !== null);
+  }
+
+  /** How many ships a person commands: the seats of a room (a duel without a scenario has two). */
+  get seats(): number {
+    return this.scenario ? this.skills.filter((k) => k === null).length : MOST_DUEL_SEATS;
   }
 
   /** Whether the match is there to draw. */
@@ -272,7 +292,7 @@ export class DuelSession {
     const meta: RoomMeta = { game: GAME, protocol: PROTOCOL, build: this.build, ...(terms ? { terms } : {}) };
     // Connected first: the client drops what is sent before its socket is open.
     await this.need().ready;
-    return this.need().create({ name, public: true, maxPlayers: MOST_PLAYERS, meta });
+    return this.need().create({ name, public: true, maxPlayers: Math.min(MOST_PLAYERS, Math.max(1, this.seats)), meta });
   }
 
   /** Joins the room with this code (six letters, any case). */
@@ -399,8 +419,9 @@ export class DuelSession {
     if (this.state.tick < target) { this.baseTick = this.state.tick; this.baseTime = this.now(); }
   }
 
-  /** The computer captain's orders for this step: hove to and waiting first when he waits (`foeWaits`), then his own. */
-  private foeOrders(foe: Skill): Order[] {
+  /** The computer captain of ship `ship`'s orders for this step: hove to and waiting first when he waits (`foeWaits`, the second ship of a match played alone), then his own. */
+  private foeOrders(ship: number, foe: Skill): Order[] {
+    if (ship !== FOE_SHIP) return captainOrders(this.state, ship, foe);
     switch (this.foeState) {
       case 'heave': this.foeState = 'hove'; return [{ kind: 'heave', ship: FOE_SHIP }];
       case 'hove': return [];
@@ -420,9 +441,8 @@ export class DuelSession {
     this.queue = [];
     for (const t of taken) this.acks.set(t.player, Math.max(t.seq, this.acks.get(t.player) ?? 0));
     const orders = taken.map((t) => t.order);
-    // Played alone against a computer captain, his orders are stepped with the player's (sim/captain).
-    if (this.foe && this.role === 'solo') orders.push(...this.foeOrders(this.foe));
-    if (this.first && this.role === 'solo') orders.push(...captainOrders(this.state, FIRST_SHIP, this.first));
+    // The computer captains of the scenario's ships give their orders with the players' (sim/captain): in the host's log, so every machine steps them.
+    this.skills.forEach((skill, ship) => { if (skill !== null && ship < this.state.ships.length) orders.push(...this.foeOrders(ship, skill)); });
     if (orders.length) this.stepped.push({ tick, orders });
     this.advance(orders);
     if (!this.hub) { this.stepped = []; return; }
@@ -474,7 +494,7 @@ export class DuelSession {
   /** Counts `player` ready for the next round, and begins it once every ship's captain is. */
   private readyHost(player: number): void {
     if (!this.readyFor.includes(player)) this.readyFor = [...this.readyFor, player];
-    if (this.captains.every((c) => c !== null && this.readyFor.includes(c))) this.nextRound();
+    if (this.captains.every((c, ship) => this.skills[ship] != null || (c !== null && this.readyFor.includes(c)))) this.nextRound();
     else this.sendDelta();
     this.emit('change');
   }
@@ -487,7 +507,7 @@ export class DuelSession {
     this.stepped = [];
     this.round++;
     this.readyFor = [];
-    this.begin(startMatch(this.timed(duelStart(roundSeed(this.code, this.round), this.terms))), this.captains);
+    this.begin(startMatch(this.crewed(this.fresh(roundSeed(this.code, this.round)))), this.captains);
     this.sendSnapshot();
   }
 
@@ -496,13 +516,26 @@ export class DuelSession {
     return this.minutes === undefined ? setup : { ...setup, minutes: this.minutes };
   }
 
+  /** The start of a match from `seed`: the scenario's ships on their sides, or the duel's two; the length given. */
+  private fresh(seed: number): MatchSetup {
+    return this.timed(this.sides ? withSides(fleetStart(seed, this.sides, this.terms), this.sides) : duelStart(seed, this.terms));
+  }
+
+  /** `setup` with the gun crews of each computer captain's ship drilled as he keeps them. */
+  private crewed(setup: MatchSetup): MatchSetup {
+    return this.skills.reduce((made, skill, ship) => (skill !== null && ship < made.ships.length ? crewedBy(made, ship, skill) : made), setup);
+  }
+
   /** Hosting from here: run on through what the old host passed on, seat who is here, and go on stepping. */
   private host(): void {
     const hub = this.need();
     if (!this.known) {
       const latest = this.snapshots.at(-1);
       if (latest) this.adopt(latest);
-      else this.begin(startMatch(this.timed(duelStart(roundSeed(this.code, this.round), this.terms))), [hub.you, null]);
+      else {
+        const state = startMatch(this.crewed(this.fresh(roundSeed(this.code, this.round))));
+        this.begin(state, state.ships.map(() => null));
+      }
     }
     this.jumpIfFar(this.hostTick);
     this.catchUp(this.hostTick, Infinity);
@@ -515,6 +548,7 @@ export class DuelSession {
     this.baseTime = this.now();
     const here = new Set(hub.players.map((p) => p.id));
     this.captains = this.captains.map((c) => (c !== null && here.has(c) ? c : null));
+    if (hub.you !== null) this.seat(hub.you);
     for (const p of hub.players) this.seat(p.id);
     // My own orders no host has stepped yet go into the first step of mine.
     for (const g of this.unstepped) if (g.seq > (this.acks.get(this.me) ?? 0)) this.queue.push({ player: this.me, seq: g.seq, order: g.order as Order });
@@ -524,10 +558,10 @@ export class DuelSession {
     this.emit('change');
   }
 
-  /** Gives a player who has no ship the first ship without a captain. */
+  /** Gives a player who has no ship the first ship a person commands that has no captain. */
   private seat(player: number): void {
     if (this.captains.includes(player)) return;
-    const free = this.captains.indexOf(null);
+    const free = this.captains.findIndex((c, ship) => c === null && this.skills[ship] == null);
     if (free >= 0) this.captains[free] = player;
   }
 
@@ -656,6 +690,15 @@ export class DuelSession {
     if (hub && hub.host !== null && orders.length) hub.send({ kind: 'orders', orders }, hub.host);
   }
 
+  /** The scenario a room names in its meta, when this machine has none (a guest's): who commands which ship, and the sides. */
+  private learn(meta: unknown): void {
+    const sc = this.scenario ? null : roomScenario(meta);
+    if (!sc) return;
+    this.scenario = sc;
+    this.skills = skillsOf(sc);
+    this.sides = sidesOfShips(sc);
+  }
+
   // ---- the hub ----
 
   private listen(hub: DuelHub): void {
@@ -669,6 +712,7 @@ export class DuelSession {
         return;
       }
       this.role = hub.isHost ? 'joining' : 'guest';
+      this.learn(room.meta);
       // The room's history (its last snapshot and the deltas after it) comes right after this; a host decides once it has.
       if (hub.isHost) queueMicrotask(() => this.host());
       else this.emit('change');

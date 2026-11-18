@@ -130,6 +130,11 @@ export function fleetStart(seed: number, sides: readonly number[], terms: StartT
   return { seed, windForce: f.windForce, windFrom: f.windFrom, ships: placedBy(layFleet(f, sides), f.windFrom, terms.placed) };
 }
 
+/** `setup` with each ship on the side `sides` names (the scenario's; `fleetStart` only places them by it). */
+export function withSides(setup: MatchSetup, sides: readonly number[]): MatchSetup {
+  return { ...setup, ships: setup.ships.map((s, i) => (sides[i] === undefined ? s : { ...s, side: sides[i]! })) };
+}
+
 /** The wind the placement map pictures when the force is not yet drawn: the middle of the range chosen (as it comes: the duel's middle). */
 export function previewForce(choice: WindChoice): number {
   const range = choice === 'drawn' ? DUEL_FORCES : WIND_CHOICES[choice];

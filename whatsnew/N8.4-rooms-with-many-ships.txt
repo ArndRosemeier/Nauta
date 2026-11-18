@@ -1,0 +1,2 @@
+Under the hood, a room can now hold up to eight ships: the host runs the computer captains, and friends who join take the seats in order.
+The battle state is sent squeezed, so eight crews fit; the setup dialog still runs two ships until the rest of the work lands.
