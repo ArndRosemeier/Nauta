@@ -24,8 +24,12 @@ const POINTS = [['close-hauled', null], ['beam', 90], ['quarter', 135], ['runnin
 /** Off the wind before the tack, degrees: a little free of close-hauled. */
 const BEFORE_TACK = 75;
 const COMPASS = 360;
-/** Seconds the match runs on after an order before a picture: a canvas order takes the crew a while, a course settles; a sail being clewed up; furled. */
-const SETTLE = { canvas: 150, course: 75, clew: 6, furl: 200 };
+/**
+ * Seconds the match runs on after an order before a picture: a canvas order takes the crew a while, a course settles; a
+ * sail being clewed up (all off their sheets from 15 s, the next furled after 30 s); furled. The match
+ * moves only by these jumps (main.ts `__nautaSail.onward`), not by the page's clock, so they hold on any machine.
+ */
+const SETTLE = { canvas: 150, course: 75, clew: 18, furl: 200 };
 /** Through a tack the match runs on by this many seconds at a time until a sail is aback, at most this long. */
 const STAYS = { step: 2, most: 60 };
 

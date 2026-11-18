@@ -300,6 +300,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Sea shots taken on a page already loaded, a scene each | `tools/shot/sea.mjs#takeSeaShots` |
 | A finger dragged across the view (the touch look), for the browser checks | `tools/shot/browser.mjs#drag` |
 | Waiting for the page's next frames in a browser check (paced to the GPU by the stand-in swap chain) | `tools/shot/browser.mjs#frames` |
+| What a page asks of the GPU (pipelines built, queue submits and when each was done), for finding where a browser check's time goes | `tools/shot/gpuprobe.js` |
 | The sum of the slow checks against the CI job's 10 minutes | `tools/guards/budget.mjs#summary` |
 | The rig's measures: masts, yards, booms, the heights yards hang at, how far they brace (Steel's brig, estimated) | `src/sim/rules/rig.ts#MAST_SPARS` |
 | Her sails' cuts and reefs | `src/sim/rules/rig.ts#SAILS` |
