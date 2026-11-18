@@ -3,12 +3,13 @@
  * them back from whatever the device kept. Pure: the store (settingsStore.ts) keeps them on the device, the panel
  * (settingsPanel.ts) changes them, and each part of the page applies its own when it changes.
  *
- * Kept on the device, never sent: two captains in one room each have their own. Only the match length is a rule of
- * the match; the host's applies, from the next match on.
+ * Kept on the device, never sent: two captains in one room each have their own. The last match terms chosen in the
+ * menu (terms.ts) are kept with them; a room's are the host's.
  */
 import { MOTION_START, MOTION_STEPS } from '../sim/rules/body';
-import { MATCH_MINUTES } from '../sim/rules/end';
 import { QUALITY_LEVELS } from './quality';
+import { DEFAULT_TERMS, readTerms, type MatchTerms } from './terms';
+import { isRecord, oneOf } from './kept';
 
 /** The quality setting: `auto` measures frame time and chooses (quality.ts), or a level by its name. */
 export type QualitySetting = 'auto' | string;
@@ -49,8 +50,8 @@ export interface Settings {
   readonly thumb: ThumbSide;
   readonly keys: Readonly<Record<KeyAction, string>>;
   readonly violence: Violence;
-  /** How long a match may last before it is drawn at nightfall, minutes (rules/end.ts `MATCH_MINUTES` by default). */
-  readonly matchMinutes: number;
+  /** The match terms last chosen in the menu (terms.ts; plan N7.2): the next match starts from them. */
+  readonly match: MatchTerms;
   readonly language: Language;
   /** The Reports button on the view, opening the log of all the men have said (Arnd, 2026-11-18); its key opens it either way. */
   readonly reportsButton: boolean;
@@ -59,10 +60,6 @@ export interface Settings {
 /** The slowest and fastest a drag may turn the look, times the natural. */
 export const SPEED_LEAST = 0.25;
 export const SPEED_MOST = 3;
-/** The match lengths offered, minutes, and their step. */
-export const MATCH_LEAST = 15;
-export const MATCH_MOST = 90;
-export const MATCH_STEP = 5;
 
 export const DEFAULT_SETTINGS: Settings = {
   quality: 'auto',
@@ -81,13 +78,11 @@ export const DEFAULT_SETTINGS: Settings = {
     reports: 'KeyR',
   },
   violence: 'plain',
-  matchMinutes: MATCH_MINUTES,
+  match: DEFAULT_TERMS,
   language: 'en',
   reportsButton: true,
 };
 
-const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const oneOf = <T extends string>(v: unknown, of: readonly T[], or: T): T => (of.includes(v as T) ? (v as T) : or);
 const between = (v: unknown, least: number, most: number, or: number): number => (typeof v === 'number' && Number.isFinite(v) ? Math.min(most, Math.max(least, v)) : or);
 
 /** The quality settings there are: `auto`, then every level by name, best first. */
@@ -111,7 +106,7 @@ export function readSettings(kept: unknown): Settings {
     thumb: oneOf(k.thumb, THUMB_SIDES, d.thumb),
     keys: keptKeys(keys),
     violence: oneOf(k.violence, VIOLENCE_LEVELS, d.violence),
-    matchMinutes: Math.round(between(k.matchMinutes, MATCH_LEAST, MATCH_MOST, d.matchMinutes) / MATCH_STEP) * MATCH_STEP,
+    match: readTerms(k.match),
     language: oneOf(k.language, LANGUAGES, d.language),
     reportsButton: typeof k.reportsButton === 'boolean' ? k.reportsButton : d.reportsButton,
   };

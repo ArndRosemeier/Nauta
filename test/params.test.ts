@@ -8,11 +8,11 @@ import { DEGREE } from '../src/sim/units.ts';
 const BRACED = 30;
 
 test('no query: WebGPU, no HUD, a morning that moves', () => {
-  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, windAsked: false, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, panel: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, men: CREW_SIZE, glass: null, foe: null, halfSmoke: false });
+  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, windAsked: false, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, panel: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, men: CREW_SIZE, glass: null, foe: null, halfSmoke: false, menu: true });
 });
 
 test('the query sets the backend, the HUD, the hour, the day length, the eye and the wind', () => {
-  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, windAsked: true, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, panel: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, men: CREW_SIZE, glass: null, foe: null, halfSmoke: false });
+  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, windAsked: true, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, panel: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, men: CREW_SIZE, glass: null, foe: null, halfSmoke: false, menu: false });
 });
 
 test('nonsense falls back, and numbers are held to their range', () => {
@@ -102,4 +102,10 @@ test('?crew is the crew trial on her deck: her twin\'s crew off her bow, or both
   assert.equal(readParams('?crew&trial').trial, true);
   assert.deepEqual([readParams('?crew&men=60').men, readParams('?crew&men=999').men, readParams('?crew').men], [60, CREW_SIZE, CREW_SIZE]);
   assert.equal(readParams('?ship').crew, null);
+});
+
+test('the plain address is the game with its menu; every working address skips it, the settings of a visit do not', () => {
+  assert.equal(readParams('').menu, true);
+  for (const q of ['?hud', '?quality=low', '?motion=0.5', '?join=K7Q2ZP', '?notitle', '?smoke=half', '?key=ghk_x']) assert.equal(readParams(q).menu, true, q);
+  for (const q of ['?sail&foe=master', '?walk', '?ship=hold', '?hud&day=0', '?bench', '?probe', '?title', '?crew', '?room', '?sea=gale', '?eye=30']) assert.equal(readParams(q).menu, false, q);
 });

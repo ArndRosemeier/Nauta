@@ -272,3 +272,62 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .nt-steer .nt-link { margin: 0; align-self: flex-end; background: var(--lacquer-over); color: var(--ivory); }
 .nt-steer-mark { position: fixed; z-index: 14; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; box-sizing: border-box; border: 2px solid var(--brass); border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 1px #0008, inset 0 0 0 1px #0008; }
 .nt-steer-mark::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: var(--brass); }
+
+/* ---------- The menu (src/app/menu.ts, plan N7.2, docs/design/menu.md) ---------- */
+/* The main screen sits over the live view (her quarterdeck at sea): the name on its plate, four choices largest first,
+   the version and the language in the foot's corners. It holds the finger, so no tap behind it walks or opens a fan. */
+.nt-menu { position: fixed; inset: 0; z-index: 15; touch-action: none; color: var(--ivory); font: 17px/1.35 var(--word-font); -webkit-font-smoothing: antialiased; }
+.nt-menu[hidden] { display: none; }
+.menu-choices {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -38%); width: min(420px, calc(100% - 32px));
+  display: flex; flex-direction: column; gap: 12px;
+}
+.menu-choice {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 64px; padding: 10px 26px; box-sizing: border-box; text-align: left;
+  border: 1px solid var(--brass-dim); border-radius: 32px; background: var(--lacquer-over); color: var(--ivory); font: 400 20px/1.15 var(--title-font); letter-spacing: 0.12em; text-transform: uppercase;
+  box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-faint), 0 6px 18px #0008;
+}
+.menu-choice small { font: italic 15px/1.25 var(--word-font); letter-spacing: 0; text-transform: none; color: var(--ivory-soft); }
+.menu-choice.first { min-height: 80px; border-color: var(--brass-line); font-size: 26px; color: var(--brass); }
+.menu-choice:active { background: var(--brass-fill); color: var(--on-brass); }
+.menu-choice:active small { color: var(--on-brass); }
+.menu-foot {
+  position: absolute; left: max(14px, env(safe-area-inset-left)); right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+}
+.menu-foot .nt-link { margin: 0; background: var(--lacquer-over); color: var(--ivory); }
+.menu-language { background: var(--lacquer-over); }
+/* Over the menu nothing of the match's working tools shows. */
+body.in-menu #orders, body.in-menu #glass-button, body.in-menu #stick, body.in-menu .nt-bubbles, body.in-menu .nt-fan, body.in-menu .nt-thumb, body.in-menu .nt-steer-mark { display: none !important; }
+
+/* The menu's sheets: the match setup, joining, the waiting room, the captain's pause, the end card */
+.menu-sheet .nt-body { gap: 6px; }
+.menu-setup.nt-sheet { width: min(760px, 100%); }
+.menu-sheet-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.menu-sheet-foot .nt-link { margin: 0; align-self: center; }
+.menu-go { min-height: var(--target); padding: 0 28px; border-color: var(--brass-line); background: var(--brass-fill); color: var(--on-brass); font: 400 19px/1 var(--title-font); letter-spacing: 0.14em; text-transform: uppercase; }
+.menu-go:active { background: var(--brass); }
+.menu-pause .nt-button { margin: 4px 0; min-height: var(--target); }
+.menu-pause .nt-button.on { border-color: var(--signal); color: var(--signal); }
+.menu-seed { width: 11em; min-height: var(--target-small); padding: 0 16px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-deep); color: var(--ivory); font: 18px/1 var(--word-font); font-variant-numeric: lining-nums tabular-nums; -webkit-user-select: text; user-select: text; }
+.menu-seed::placeholder { color: var(--ivory-soft); font-style: italic; }
+.room-about { display: block; font-style: italic; font-size: 14px; color: var(--ivory-soft); }
+.menu-join .room-wide, .menu-room .room-wide { display: block; width: 100%; margin: 8px 0; text-align: left; padding: 8px 18px; }
+.room-problem { color: var(--signal); }
+.menu-ending { margin: 4px 0 2px; font: 400 24px/1.2 var(--title-font); letter-spacing: 0.06em; color: var(--brass); }
+.menu-numbers { width: 100%; margin: 10px 0; border-collapse: collapse; font-variant-numeric: lining-nums tabular-nums; }
+.menu-numbers th { font: 400 13px/1 var(--title-font); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ivory-soft); text-align: right; padding: 6px 4px; }
+.menu-numbers td { padding: 8px 4px; border-top: 1px solid var(--brass-faint); }
+.menu-numbers td.nt-value { text-align: right; color: var(--ivory); }
+/* A choice whose game is still to come (menu.md, "What is not here yet"): in its place, dimmed, its line saying so. */
+.coming, .nt-row.coming .nt-choice { opacity: 0.5; }
+.nt-button.coming { cursor: default; }
+/* The title, once the game is ready behind it: the tag asks for the tap that begins (title.ts `awaitBegin`). */
+#loading .title-hint.begin { font-style: normal; font-family: var(--title-font); letter-spacing: 0.16em; text-transform: uppercase; color: var(--brass); }
+@media (max-height: 560px) {
+  .nt-menu .title-plate { top: max(10px, env(safe-area-inset-top)); padding: 8px 26px 10px; }
+  .nt-menu .title-plate .nt-rose { display: none; }
+  .menu-choices { top: auto; bottom: 70px; transform: translateX(-50%); gap: 8px; }
+  .menu-choice { min-height: 52px; padding: 6px 22px; }
+  .menu-choice.first { min-height: 60px; }
+}

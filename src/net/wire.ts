@@ -66,6 +66,30 @@ export interface RoomMeta {
   readonly game: string;
   readonly protocol: number;
   readonly build: string;
+  /** What the host chose for the match (menu.md): shown in the list of rooms and in the waiting room. */
+  readonly terms?: RoomTerms;
+}
+
+/**
+ * The host's choices for a room's match, as the page names them (docs/design/menu.md, "Match setup"): the wind, the
+ * hour the sky starts at (the guest's page draws the same sky), how the ships meet, the length in minutes (0: no
+ * limit) and the host's navy (the guest takes the other). Only the host's machine starts the match from them; the
+ * guest takes its state from the host.
+ */
+export interface RoomTerms {
+  readonly wind: string;
+  readonly hour: number;
+  readonly meet: string;
+  readonly minutes: number;
+  readonly navy: string;
+}
+
+/** The host's choices in a room's meta, or null when it has none (an older build, another game). */
+export function roomTerms(meta: unknown): RoomTerms | null {
+  const t = (meta as Partial<RoomMeta> | null)?.terms as Partial<RoomTerms> | undefined;
+  if (!t || typeof t !== 'object') return null;
+  const ok = typeof t.wind === 'string' && typeof t.meet === 'string' && typeof t.navy === 'string' && Number.isFinite(t.hour) && Number.isFinite(t.minutes);
+  return ok ? (t as RoomTerms) : null;
 }
 
 /** Why a machine of this protocol and build may not join a room, or ''. */

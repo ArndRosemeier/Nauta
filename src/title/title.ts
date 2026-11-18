@@ -57,6 +57,8 @@ export class Title {
   private down: { x: number; y: number; id: number } | null = null;
   private tapped = false;
   private gone = false;
+  /** Once the game is ready behind it with the menu to come (plan N7.2): what the next tap does. */
+  private begin: (() => void) | null = null;
   /** The hint's words in the player's language (the settings). */
   private readonly said: Readonly<Record<WordKey, string>>;
 
@@ -93,6 +95,7 @@ export class Title {
 
   private onPress(e: PointerEvent): void {
     if (this.gone) return;
+    if (this.begin) { const begin = this.begin; this.begin = null; begin(); return; }
     this.down = { x: e.clientX, y: e.clientY, id: e.pointerId };
     if (!this.tapped) this.firstTap();
     const w = this.root.clientWidth, h = this.root.clientHeight;
@@ -118,9 +121,9 @@ export class Title {
   private firstTap(): void {
     this.tapped = true;
     const hint = this.root.querySelector<HTMLElement>('.title-hint');
-    if (!hint) return;
+    if (!hint || this.begin) return;
     hint.textContent = this.said.titleThen;
-    setTimeout(() => hint.classList.add('gone'), HINT_MS);
+    setTimeout(() => { if (!this.begin) hint.classList.add('gone'); }, HINT_MS);
   }
 
   /** A tap on the brig: she fires, the other brig answers, and both are heard as far off as they are. */
@@ -132,13 +135,25 @@ export class Title {
     e.play('shot/splash', { delay: plan.answer + EXCHANGE.flight + SPLASH_SOUND, gain: SPLASH_GAIN, bus: 'ui', late: plan.answer });
   }
 
-  /** Fades the title into what is drawn behind it, then stops drawing it; the theme fades under the deck's sound. */
-  leave(atOnce: boolean): void {
+  /** The game is ready behind the title and the menu comes next (plan N7.2): the hint asks for a tap, and the next tap anywhere calls `begin`. */
+  awaitBegin(begin: () => void): void {
+    this.begin = begin;
+    const note = this.root.querySelector<HTMLElement>('.title-note');
+    if (note) note.textContent = '';
+    const hint = this.root.querySelector<HTMLElement>('.title-hint');
+    if (!hint) return;
+    hint.textContent = this.said.titleBegin;
+    hint.classList.remove('gone');
+    hint.classList.add('begin');
+  }
+
+  /** Fades the title into what is drawn behind it, then stops drawing it; the theme fades under the deck's sound, or plays on under the menu (`keepTheme`). */
+  leave(atOnce: boolean, keepTheme = false): void {
     if (this.gone) return;
     this.gone = true;
     this.root.style.pointerEvents = 'none';
     this.root.style.opacity = '0';
-    this.engine.music(null, atOnce ? 1 : THEME_FADE);
+    if (!keepTheme) this.engine.music(null, atOnce ? 1 : THEME_FADE);
     setTimeout(() => { this.drawer.stop(); this.root.remove(); }, atOnce ? 0 : HAND_OVER_MS);
   }
 }
@@ -188,7 +203,21 @@ export function showTitle(engine: AudioEngine, onDrawn: (at: number) => void = (
  * The game has drawn its first frame (or failed: `atOnce`): the title fades into it. Without a title (the probe, the
  * network check) the loading screen just goes.
  */
-export function handOver(atOnce = false): void {
-  if (shown) shown.leave(atOnce);
+export function handOver(atOnce = false, keepTheme = false): void {
+  if (shown) shown.leave(atOnce, keepTheme);
   else document.getElementById('loading')?.remove();
+}
+
+/**
+ * The game is ready and the menu comes next (plan N7.2, menu.md: "one tap begins"): the title asks for a tap and
+ * `begin` runs on it; without a title, at once.
+ */
+export function beginOnTap(begin: () => void): void {
+  if (shown && document.getElementById('loading')) shown.awaitBegin(begin);
+  else begin();
+}
+
+/** The title theme played again (back at the menu) or faded out (a match begins). */
+export function titleTheme(engine: AudioEngine, on: boolean): void {
+  engine.music(on ? THEME : null, THEME_FADE);
 }

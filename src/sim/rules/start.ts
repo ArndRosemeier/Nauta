@@ -11,3 +11,15 @@ export const START_APART = 1500;
  * she loses a little.
  */
 export const START_WAY = 4;
+
+/**
+ * The winds a match may be set to (docs/design/menu.md, "Match setup"): the force drawn from the match's seed within
+ * each, Beaufort. "As it comes" is the duel's own draw (rules/wind.ts `DUEL_FORCES`).
+ */
+export const WIND_CHOICES = { light: { least: 2, most: 3 }, fresh: { least: 4, most: 4 }, strong: { least: 5, most: 6 } } as const;
+/**
+ * How far the wind is turned from square across the line between the ships when one of them holds the weather
+ * position at the start (menu.md, "How you meet"), degrees: she has the wind 20° abaft her beam, the other ship 70°
+ * off her bow, close-hauled and still able to close (a brig lies about 67° off the wind, rules/sailing.ts).
+ */
+export const WEATHER_TURN_DEGREES = 20;
