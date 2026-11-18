@@ -7,7 +7,9 @@
  * into a ring, and the vertex stage flies it (linear drag toward the wind, gravity), so a drop costs nothing after.
  */
 import { Rng } from '@futuremagic/core';
-import { BufferGeometry, Float32BufferAttribute, InstancedBufferAttribute, Mesh, MeshBasicNodeMaterial, NormalBlending, Vector3, type Material } from 'three/webgpu';
+import {
+  BufferGeometry, CustomBlending, Float32BufferAttribute, InstancedBufferAttribute, Mesh, MeshBasicNodeMaterial, NormalBlending, OneFactor, OneMinusSrcAlphaFactor, Vector3, type Material,
+} from 'three/webgpu';
 import {
   Fn, attribute, cameraProjectionMatrix, exp, float, length, max, modelViewMatrix, positionGeometry, saturate, smoothstep, uniform, varyingProperty, vec3, vec4,
 } from 'three/tsl';
@@ -106,6 +108,61 @@ export function shiftStarts(a: InstancedBufferAttribute, dx: number, dz: number)
   a.needsUpdate = true;
 }
 
+/** What a ring of flown quads reads each frame: the clock (s) and the wind's velocity (m/s, x and z). */
+export interface FlownInputs {
+  readonly now: { value: number };
+  readonly wind: { value: Vector3 };
+}
+
+/**
+ * A ring of flown quads kept up once a frame: the clock and the wind into its inputs; when the sea's origin has moved
+ * from `at`, its `starts` moved by the step and `at` set to it; each of `meshes` placed at it. Answers the step (m, x
+ * and z; zero when none).
+ */
+export function keepFlown(inputs: FlownInputs, t: number, wind: Wind, at: Vector3, origin: Vector3, starts: readonly InstancedBufferAttribute[], meshes: readonly Mesh[]): [number, number] {
+  const dx = origin.x - at.x, dz = origin.z - at.z;
+  if (dx !== 0 || dz !== 0) for (const a of starts) shiftStarts(a, dx, dz);
+  at.copy(origin);
+  for (const m of meshes) m.position.copy(at);
+  inputs.now.value = t;
+  inputs.wind.value.set(wind.x * wind.speed, 0, wind.z * wind.speed);
+  return [dx, dz];
+}
+
+/** A ring's mesh: `count` instances of the quad, never culled (they fly in the shader), drawn in `order` among the see-through. */
+export function flownMesh(g: BufferGeometry, material: Material, name: string, count: number, order: number): Mesh {
+  const m = new Mesh(g, material);
+  m.name = name;
+  m.count = count;
+  m.frustumCulled = false;
+  m.renderOrder = order;
+  return m;
+}
+
+/**
+ * The material of flown quads: see-through, writing no depth, no fog, its stages from `vertex` (the clip position)
+ * and `colour` (TSL, each built once). `premultiplied`: its colour comes premultiplied by its alpha, so fire adds
+ * (alpha 0) and smoke covers in one draw (blended One, OneMinusSrcAlpha, three's own premultiplying left off: it would
+ * black out the fire); else blended as usual.
+ */
+export function flownMaterial(name: string, premultiplied: boolean, vertex: () => unknown, colour: () => unknown): MeshBasicNodeMaterial {
+  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: NormalBlending, fog: false });
+  m.name = name;
+  if (premultiplied) {
+    m.blending = CustomBlending;
+    m.blendSrc = OneFactor;
+    m.blendDst = OneMinusSrcAlphaFactor;
+    m.premultipliedAlpha = false;
+  }
+  m.vertexNode = Fn(vertex)();
+  m.colorNode = Fn(colour)();
+  return m;
+}
+
+/** Seconds since a start whose time is its `w` (TSL), and the quad's corner (±1) handed to the fragment stage through `corner`. */
+export const ageOf = (now, start) => now.sub(start.w);
+export const passCorner = (corner): void => { corner.assign(positionGeometry.xy); };
+
 /** What the drops' shader reads each frame. */
 export const SPRAY_INPUTS = {
   /** The clock (s), the wind's velocity (m/s, x and z), all from the spray's origin's frame. */
@@ -116,25 +173,21 @@ export const SPRAY_INPUTS = {
 /** The drops' material: quads facing the eye, flown in the vertex stage, soft round puffs lit by the day. */
 export function makeSprayMaterial(): MeshBasicNodeMaterial {
   const I = SPRAY_INPUTS;
-  const m = new MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: NormalBlending, fog: false });
-  m.name = 'spray';
   const vCorner = varyingProperty('vec2', 'vSprayCorner'), vAlpha = varyingProperty('float', 'vSprayAlpha');
-  m.vertexNode = Fn(() => {
+  return flownMaterial('spray', false, () => {
     const drop = attribute(DROP_ATTRIBUTE, 'vec4'), fling = attribute(FLING_ATTRIBUTE, 'vec4');
-    const age = I.now.sub(drop.w), alive = smoothstep(0, float(LIFE * FADE_OUT), float(LIFE).sub(age)).mul(age.greaterThanEqual(0).select(float(1), float(0)));
+    const age = ageOf(I.now, drop), alive = smoothstep(0, float(LIFE * FADE_OUT), float(LIFE).sub(age)).mul(age.greaterThanEqual(0).select(float(1), float(0)));
     // dv/dt = DRAG·(wind − v) + g: v drifts to u = wind + g/DRAG; x = x0 + u·t + (v0 − u)·(1 − e^(−DRAG·t))/DRAG.
     const t = max(age, 0), u = vec3(I.wind.x, float(-GRAVITY / DRAG), I.wind.z);
     const centre = flown(drop.xyz, fling.xyz, u, float(DRAG), t);
     const size = fling.w.mul(t.mul(GROWTH - 1).add(1));
-    vCorner.assign(positionGeometry.xy);
+    passCorner(vCorner);
     vAlpha.assign(alive);
     return facingEye(centre, size.mul(alive));
-  })();
-  m.colorNode = Fn(() => {
+  }, () => {
     const r = length(vCorner), puff = saturate(float(1).sub(r)).pow(2).mul(DENSITY).mul(vAlpha);
     return vec4(daylight().mul(ALBEDO), puff);
-  })();
-  return m;
+  });
 }
 
 /** Her bow as the spray needs it: her stem at the waterline (world), her heading's direction (x, z), her velocity over the water and speed through it. */
@@ -174,11 +227,7 @@ export class SprayView {
     this.flings = new InstancedBufferAttribute(new Float32Array(MOST_DROPS * DROP_STRIDE), DROP_STRIDE);
     g.setAttribute(DROP_ATTRIBUTE, this.drops);
     g.setAttribute(FLING_ATTRIBUTE, this.flings);
-    this.mesh = new Mesh(g, material);
-    this.mesh.name = 'spray';
-    this.mesh.count = MOST_DROPS;
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = SPRAY_ORDER;
+    this.mesh = flownMesh(g, material, 'spray', MOST_DROPS, SPRAY_ORDER);
   }
 
   /**
@@ -187,10 +236,7 @@ export class SprayView {
    * wind blowing, the clock `t`, `dt` since the last frame, and `origin`, the sea's.
    */
   show(from: readonly SprayFrom[], wind: Wind, t: number, dt: number, origin: Vector3): void {
-    if (!origin.equals(this.origin)) this.move(origin);
-    this.mesh.position.copy(this.origin);
-    SPRAY_INPUTS.now.value = t;
-    SPRAY_INPUTS.wind.value.set(wind.x * wind.speed, 0, wind.z * wind.speed);
+    keepFlown(SPRAY_INPUTS, t, wind, this.origin, origin, [this.drops], [this.mesh]);
     let written = false;
     from.forEach(({ slams, bow }, ship) => {
       for (const s of slams) {
@@ -247,11 +293,5 @@ export class SprayView {
     f[k + Y] = rate * FLING_UP * r.range(1 / 2, 1) + r.gaussian(0, FLING_SPREAD);
     f[k + Z] = vz + (rate * FLING_OUT * outZ) / out + r.gaussian(0, FLING_SPREAD);
     f[k + W] = r.range(SIZE[0], SIZE[1]);
-  }
-
-  /** The spray's frame follows the sea's origin: every drop moved by the step. */
-  private move(origin: Vector3): void {
-    shiftStarts(this.drops, origin.x - this.origin.x, origin.z - this.origin.z);
-    this.origin.copy(origin);
   }
 }

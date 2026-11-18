@@ -228,6 +228,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A quad facing the eye: its geometry, and its corner in clip space (spray, gunfire) | `src/render/spray.ts#facingEye` |
 | The one quad geometry many instances facing the eye draw | `src/render/spray.ts#eyeQuad` |
 | A ring of starts moved by the floating origin's step | `src/render/spray.ts#shiftStarts` |
+| A ring of flown quads kept up each frame: the clock and wind into its inputs, its starts following the sea's origin, its meshes placed | `src/render/spray.ts#keepFlown` |
+| The mesh of a ring of flown quads (never culled, drawn in its order among the see-through) | `src/render/spray.ts#flownMesh` |
+| The material of flown quads: see-through, no depth written, blended as usual or premultiplied (fire adds, smoke covers) | `src/render/spray.ts#flownMaterial` |
+| A flown quad's age from its start's time, and its corner handed to the fragment stage (TSL) | `src/render/spray.ts#ageOf` |
 | The spray's shader | `src/render/spray.ts#makeSprayMaterial` |
 | The ship-and-water check's pictures (sailed by a match: rail, bowsprit, astern, 50 m off, above, berth deck) | `tools/shot/ship.mjs#shipShots` |
 | The sun's shadow map round her | `src/render/ship/shipView.ts#shadowingSun` |
@@ -283,6 +287,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The carronade cut into her slide and the gun on her carriage | `src/render/ship/gunPlaces.ts#splitCarronade` |
 | The ring on a carronade's cascabel her breeching is rove through | `src/render/ship/gunPlaces.ts#cascabelRing` |
 | Gunfire drawn: muzzle flashes and first puffs, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
+| Powder smoke: poured from the ports as guns fire, drifting with the wind, swelling and thinning, lit by the day and the flashes (N5.5) | `src/render/smoke.ts#SmokeView` |
+| How many puffs of smoke a gun pours at a quality level, and how dense each is, so the smoke hides as much at every level | `src/render/smoke.ts#puffsPoured` |
 | Balls falling in the sea: a column of spray and white water in the nearest ship's wake map | `src/render/gunfire.ts#fallInSea` |
 | Shot fallen in the sea as white water on her wake map | `src/render/wakeMap.ts#WakeMap` |
 | Something that moves on her outside (her guns and lids), drawn near and far | `src/render/ship/shipView.ts#ShipView` |

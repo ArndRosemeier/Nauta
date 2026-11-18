@@ -3,7 +3,7 @@
  * how a gun stands from her drill (run in, running out, leaping back), her lid wanted up; her moving frames (trained
  * about her pivot, run in along her axis, the lid swung on its hinge); the carronade cut into slide and gun; and what
  * is seen of a shot from its event and the shots in flight (the flash, the ball along its path, its splashes, a ball
- * stopped in a ship drawn no further).
+ * stopped in a ship drawn no further); and how much powder smoke a gun pours at each quality level.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,6 +21,7 @@ import {
   CARRONADE, LID_OPEN, carronadeRest, cascabelRing, gunMove, lidEdge, lidHinge, lidMove, lidSize, splitCarronade,
 } from '../src/render/ship/gunPlaces.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
+import { puffsPoured } from '../src/render/smoke.ts';
 import { SEED } from './support/orders.ts';
 
 const PACK = decodePack(new Uint8Array(readFileSync('public/ship/fittings.fmpk')));
@@ -108,4 +109,15 @@ test('a shot is seen as its flash at the muzzle, its ball along its path, a spla
   jumped.take([shotFired(tick)]);
   const past = jumped.sightsAt(t0 + 2 + STALE);
   assert.equal(past.flashes.length + past.splashes.length + past.balls.length, 0);
+});
+
+test('a lower quality pours fewer puffs of smoke, each denser, so the smoke seen through hides as much', () => {
+  const seenThrough = (p: { puffs: number; density: number }) => (1 - p.density) ** p.puffs;
+  const full = puffsPoured(1);
+  for (const plenty of [1, 0.6, 0.4, 0.05]) {
+    const p = puffsPoured(plenty);
+    assert.ok(p.puffs >= 1 && p.puffs <= full.puffs && p.density <= 1);
+    assert.ok(Math.abs(seenThrough(p) - seenThrough(full)) < 1e-9, `plenty ${plenty}`);
+  }
+  assert.ok(puffsPoured(0.4).puffs < full.puffs);
 });
