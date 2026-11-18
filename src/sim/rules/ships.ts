@@ -366,9 +366,18 @@ export interface DoorRow {
 /** Where a cabin's door stands across her: in the passage's side, or the main hatchway's. */
 const CABIN_DOOR = PASSAGE;
 const STORE_DOOR = MIDSHIPS;
+/**
+ * Doors in athwart bulkheads beside a ladder's foot, m from the centreline (N2.3): the captain's cabin door stands to
+ * starboard of the companion ladder, which comes down in his cabin; the magazine's door to starboard of the magazine
+ * ladder's foot in the light room passage; the spirit room's door to port of the hold ladder's foot. On the
+ * centreline the ladders stood in their doorways.
+ */
+const BESIDE_COMPANION = 0.7;
+const BESIDE_MAGAZINE_LADDER = 0.6;
+const BESIDE_HOLD_LADDER = -0.7;
 export const DOORS: readonly DoorRow[] = [
   { id: 'bread-door', between: ['breadroom', 'cabin'], along: -8.23, across: 0 },
-  { id: 'cabin-door', between: ['cabin', 'passage'], along: -5.85, across: 0 },
+  { id: 'cabin-door', between: ['cabin', 'passage'], along: -5.85, across: BESIDE_COMPANION },
   { id: 'master-door', between: ['master', 'passage'], along: -4.84, across: -CABIN_DOOR },
   { id: 'surgeon-door', between: ['surgeon', 'passage'], along: -2.2, across: -CABIN_DOOR },
   { id: 'purser-door', between: ['purser', 'passage'], along: -0.33, across: -CABIN_DOOR },
@@ -384,8 +393,8 @@ export const DOORS: readonly DoorRow[] = [
   { id: 'sailroom-door', between: ['sailroom', 'galley'], along: 11.83, across: -STORE_DOOR },
   { id: 'dry-store-door', between: ['dry-store', 'galley'], along: 13.19, across: -STORE_DOOR },
   { id: 'boatswain-store-door', between: ['boatswain-store', 'galley'], along: 12.51, across: STORE_DOOR },
-  { id: 'magazine-door', between: ['lightroom', 'magazine'], along: -3.51, across: 0 },
-  { id: 'spirit-door', between: ['spirit', 'hold'], along: 1.52, across: 0 },
+  { id: 'magazine-door', between: ['lightroom', 'magazine'], along: -3.51, across: BESIDE_MAGAZINE_LADDER },
+  { id: 'spirit-door', between: ['spirit', 'hold'], along: 1.52, across: BESIDE_HOLD_LADDER },
   { id: 'fore-hold-door', between: ['hold', 'fore-hold'], along: 11.46, across: 0 },
 ];
 

@@ -192,3 +192,11 @@ test('every surface aloft is reachable from the deck: tops, crosstrees, every ya
   for (const p of rig.places) assert.ok(fromQuarterdeck.has(nodeAt(graph, p)), p.id);
   assert.ok(rig.places.filter((p) => p.kind === 'yard').length > 50);
 });
+
+test('the bowsprit\'s inboard part is walked round, not over: no standing on it, the deck either side of it and its step at the stem reached', () => {
+  const bowsprit = sparOf(rig, 'bowsprit');
+  const on = (along: number, across: number) => nodeAt(graph, { space: 'deck', along, across });
+  assert.ok(on(bowsprit.heel.along + 1, 0) < 0, 'not on its top');
+  for (const side of [-1, 1]) assert.ok(fromQuarterdeck.has(on(bowsprit.heel.along + 1, side * 1.2)), `beside it, ${side > 0 ? 'starboard' : 'larboard'}`);
+  assert.ok(fromQuarterdeck.has(graph.aloft.get('bowsprit')!), 'onto it at the stem');
+});

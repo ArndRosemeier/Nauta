@@ -51,3 +51,9 @@ export const WIND_PRESETS: readonly WindPreset[] = [
   // 8 gale
   { gustStrength: [0.15, 0.3], gustRadius: [100, 300], gustLife: [50, 150], gustSpacing: 480, veer: 10 * DEGREE, freshen: 0.1 },
 ];
+
+/**
+ * The winds a duel is fought in, Beaufort forces (design thread, 2026-11-17): below force 2 the ships do not move,
+ * above force 6 the guns cannot be worked. The checks that must hold in any duel run in the strongest.
+ */
+export const DUEL_FORCES = { least: 2, most: 6 } as const;

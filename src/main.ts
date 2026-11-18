@@ -6,6 +6,7 @@ import { watchLook } from './app/lookInput';
 import { standpoint, type Standpoint } from './app/standpoints';
 import { showStandpoints } from './app/standpointBar';
 import { showVersion } from './app/whatsNew';
+import { Walking } from './app/walking';
 import { QualityChooser, type QualityKnobs } from './app/quality';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
@@ -62,7 +63,9 @@ async function start(): Promise<void> {
   const params = readParams(location.search);
   const canvas = el<HTMLCanvasElement>('view'), hud = el('hud'), loading = el('loading');
   // `?ship`: the whole brig, built in a worker behind the loading screen (plan N2.4); the sun casts shadows then.
-  const ship = params.ship !== null ? new ShipView(await loadShip(import.meta.env.BASE_URL)) : null;
+  // `?walk`: the captain walks her decks with two thumbs (plan N2.3), on the whole brig.
+  const walking = params.walk !== null ? new Walking(canvas, params.walk || undefined) : null;
+  const ship = params.ship !== null || walking ? new ShipView(await loadShip(import.meta.env.BASE_URL)) : null;
   let where: Standpoint = standpoint(params.ship ?? '');
   const view = await createView(canvas, params.forceWebGL, ship !== null);
   view.camera.position.set(0, params.eye, 0);
@@ -90,7 +93,7 @@ async function start(): Promise<void> {
   if (ship) await view.stage.add(ship.group);
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
-  const input = watchLook(canvas, ship ? where.look : startLook, view.radPerPixel);
+  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : ship ? where.look : startLook, view.radPerPixel, walking ? (e) => walking.input.owns(e) : undefined);
   /** The scene the address asks for: the hour and the day's pace, the wind and its sea, the eye, the look. */
   const setScene = (p: Params) => {
     sky.hour = p.hour; sky.dayMinutes = p.dayMinutes;
@@ -117,7 +120,7 @@ async function start(): Promise<void> {
     setScene(p);
     sceneFrames = SCENE_FRAMES; sceneDrawn = done;
   });
-  if (ship) showStandpoints(where, (s) => { where = s; input.look = s.look; });
+  if (ship && !walking) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
   // The quality level: from the top, stepping down in the first seconds while frames are late (plan N1.8).
@@ -150,6 +153,10 @@ async function start(): Promise<void> {
     meanWind(wind, seaTime, blowing);
     sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
     if (ship) {
+      if (walking) {
+        where = walking.walk(dt, ship.drawn, input);
+        walking.swingDoors((id, angle) => ship.setDoor(id, angle));
+      }
       ship.update(sea, seaTime, dt, view.camera, where, input.look, view.sun, sky.lightDirection, sky.gain, view.radPerPixel(), seaView.origin);
       sky.below = ship.below;
       seaView.sheltered = ship.below > 0;

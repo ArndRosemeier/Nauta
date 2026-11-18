@@ -71,6 +71,8 @@ jobs:
         run: node tools/guards/budget.mjs 120 180 -- npm run check:replay
       - name: The brig sails, tacks and heels within her limits in every wind, through the sea and the gusts
         run: node tools/guards/budget.mjs 120 180 -- npm run check:sailing
+      - name: The captain walks every space, door and ladder of the brig in the strongest duel sea (N2.3)
+        run: node tools/guards/budget.mjs 120 180 -- npm run walk:check
       - name: The standard sea shots (times of day, seas, eye heights) within their 3 minutes
         run: node tools/guards/budget.mjs 120 180 -- npm run shot:sea -- shots/sea
       - uses: actions/upload-artifact@v4

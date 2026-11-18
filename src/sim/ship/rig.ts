@@ -7,9 +7,9 @@
 import { BODY } from '../rules/ships';
 import { buildAloft, buildClimbs, walkAloft, type AloftSurface, type AloftWay, type MastClimb } from './aloft';
 import { buildRunning, buildStanding, buildStays, type RigLine } from './lines';
-import { deepFreeze, shipPlan, type CrewPlace, type ShipPlan, type Station } from './plan';
+import { deepFreeze, shipPlan, type CrewPlace, type Obstacle, type ShipPlan, type Station } from './plan';
 import { buildSails, type Sail } from './sails';
-import { buildDeadeyes, buildSpars, mastGeometry, type Deadeye, type MastGeometry, type Spar } from './spars';
+import { atMark, buildDeadeyes, buildSpars, mastGeometry, type Deadeye, type MastGeometry, type Spar } from './spars';
 import { walkGraph, type Body, type WalkGraph } from './walk';
 import type { MastName } from '../rules/rig';
 
@@ -45,10 +45,21 @@ export function rigPlan(plan: ShipPlan = shipPlan()): RigPlan {
   return built;
 }
 
-/** The one walk graph with the rig joined to it: decks, cabins and hold (N2.1), and every surface aloft. */
+/**
+ * What of the rig stands on her decks in a body's way, from its own spar data (never typed again into the plan's
+ * fittings): the bowsprit's inboard part, from its heel to the stem, as wide as the spar. Its top is far above a
+ * step, so it is walked round, and got onto only by its way at the stem (ship.md, "Every space navigable").
+ */
+export function rigObstacles(rig: RigPlan): Obstacle[] {
+  const bowsprit = sparOf(rig, 'bowsprit'), stem = atMark(bowsprit, 'stem'), half = bowsprit.diameter / 2;
+  return [{ id: 'bowsprit-inboard', level: 'weather', aft: Math.min(bowsprit.heel.along, stem.along), fore: Math.max(bowsprit.heel.along, stem.along), port: bowsprit.heel.across - half, starboard: bowsprit.heel.across + half }];
+}
+
+/** The one walk graph with the rig joined to it: decks, cabins and hold (N2.1) round what of the rig stands on them, and every surface aloft. */
 export function rigWalk(plan: ShipPlan = shipPlan(), body: Body = BODY): WalkGraph {
   const rig = rigPlan(plan);
-  return walkAloft(walkGraph(plan, body), { climbs: rig.climbs, surfaces: rig.surfaces, ways: rig.ways, stations: rig.stations, places: rig.places });
+  const decks = walkGraph({ ...plan, obstacles: [...plan.obstacles, ...rigObstacles(rig)] }, body);
+  return walkAloft(decks, { climbs: rig.climbs, surfaces: rig.surfaces, ways: rig.ways, stations: rig.stations, places: rig.places });
 }
 
 /** A spar of the rig by id. */
