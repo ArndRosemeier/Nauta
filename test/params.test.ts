@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readParams } from '../src/app/params.ts';
 
 test('no query: WebGPU, no HUD, a morning that moves', () => {
-  assert.deepEqual(readParams(''), { forceWebGL: false, hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, slice: null, quality: null, eye: 4.5, wind: 4, look: null });
+  assert.deepEqual(readParams(''), { forceWebGL: false, hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, slice: null, quality: null, eye: 4.5, wind: 4, look: null, toLight: null, bench: 0 });
 });
 
 test('the query sets the backend, the HUD, the hour, the day length, the eye and the wind', () => {
-  assert.deepEqual(readParams('?gl&hud&hour=17.5&day=0&eye=30&wind=7'), { forceWebGL: true, hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, slice: null, quality: null, eye: 30, wind: 7, look: null });
+  assert.deepEqual(readParams('?gl&hud&hour=17.5&day=0&eye=30&wind=7'), { forceWebGL: true, hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, slice: null, quality: null, eye: 30, wind: 7, look: null, toLight: null, bench: 0 });
 });
 
 test('nonsense falls back, and numbers are held to their range', () => {
@@ -43,4 +43,26 @@ test('?slice stands on the slice of her waist, at the standpoint named', () => {
 test('?quality names a level, or leaves the choice to measuring', () => {
   assert.equal(readParams('?quality=low').quality, 'low');
   assert.equal(readParams('').quality, null);
+});
+
+test('?sea names a sea by the wind that raises it, and ?wind wins over it', () => {
+  assert.equal(readParams('?sea=calm').wind, 0);
+  assert.equal(readParams('?sea=breeze').wind, 4);
+  assert.equal(readParams('?sea=gale').wind, 8);
+  assert.equal(readParams('?sea=gale&wind=2').wind, 2);
+  assert.equal(readParams('?sea=storm').wind, 4);
+});
+
+test('?look turns the eye off the light and tilts it, in degrees', () => {
+  const look = readParams('?look=90,-6').toLight!;
+  assert.ok(Math.abs(look.off - Math.PI / 2) < 1e-12 && Math.abs(look.up + (6 * Math.PI) / 180) < 1e-12);
+  assert.deepEqual(readParams('?look').toLight, { off: 0, up: 0 });
+  assert.deepEqual(readParams('?look=x,').toLight, { off: 0, up: 0 });
+});
+
+test('?bench flies for 60 s, or the seconds named within its range', () => {
+  assert.equal(readParams('?bench').bench, 60);
+  assert.equal(readParams('?bench=30').bench, 30);
+  assert.equal(readParams('?bench=1').bench, 5);
+  assert.equal(readParams('').bench, 0);
 });

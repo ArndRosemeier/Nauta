@@ -1,6 +1,7 @@
 /** The page: the view, the sky, the sea and the look, started behind the loading screen. */
 import { GraphicsUnavailable } from '@futuremagic/stage';
-import { readParams } from './app/params';
+import { readParams, type Params } from './app/params';
+import { BenchRun } from './app/benchRun';
 import { watchLook } from './app/lookInput';
 import { standpoint, type Standpoint } from './app/standpoints';
 import { showStandpoints } from './app/standpointBar';
@@ -38,11 +39,21 @@ const SUN_DISTANCE = 60;
 const THOUSAND = 1000;
 /** Bytes in a megabyte, for the HUD. */
 const MEGABYTE = 1 << 20;
+/** Frames drawn after `__nautaScene` before it resolves: one, as everything it sets is in place before that frame. */
+const SCENE_FRAMES = 1;
+/** The moment of the sea a scene set for a shot shows, s after it started: foam that lingers has had time to form. */
+const SHOT_SEA_TIME = 60;
 
 declare global {
   interface Window {
     /** Set once the first frame with everything in it is drawn (the headless checks wait for it). */
     __nautaReady?: boolean;
+    /**
+     * Sets the scene from a query (`hour=6.3&day=0&sea=gale&eye=10&look=0,-6`: hour and day, wind or sea, eye, look) with
+     * the clocks stopped and the sea started afresh, and resolves once it is drawn: `npm run shot:sea` takes its
+     * shots on one page with it (tools/shot/sea.mjs).
+     */
+    __nautaScene?: (query: string) => Promise<void>;
   }
 }
 
@@ -63,8 +74,12 @@ async function start(): Promise<void> {
   sky.update(0, null);
   // The wind and the sea of the match, on the clock `seaTime` (s); one shared clock comes with the simulation (N3.1).
   // The sea keeps the wind it is given, so it gets a copy of the mean wind, never the one `meanWind` writes into.
-  const wind = makeWind(MATCH_SEED, params.wind, WIND_FROM), blowing = meanWind(wind, 0);
+  let wind = makeWind(MATCH_SEED, params.wind, WIND_FROM), blowing = meanWind(wind, 0);
   let seaTime = 0, sea = startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
+  /** The clocks stand still (a scene set for a shot); held: the scene is drawn and nothing is drawn until the next. */
+  let still = false, held = false;
+  /** Waiting for the scene set by `__nautaScene` to be drawn: frames still to draw, and what to call then. */
+  let sceneFrames = 0, sceneDrawn: (() => void) | null = null;
   const seaView = new SeaView(sky);
   seaView.show(sea, wind, blowing.speed, seaTime, 0, view.camera, sky);
   // The sea's mesh is drawn as many tiles at once, a shader of its own: the warm-up builds it with the kinds.
@@ -77,6 +92,32 @@ async function start(): Promise<void> {
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
   const input = watchLook(canvas, ship ? where.look : startLook, view.radPerPixel);
+  /** The scene the address asks for: the hour and the day's pace, the wind and its sea, the eye, the look. */
+  const setScene = (p: Params) => {
+    sky.hour = p.hour; sky.dayMinutes = p.dayMinutes;
+    if (p.wind !== wind.windForce) {
+      wind = makeWind(MATCH_SEED, p.wind, WIND_FROM); blowing = meanWind(wind, seaTime);
+      sea = startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
+    }
+    view.camera.position.y = p.eye;
+    // The sky at once (the eye adapts at once with no time passed), so the look can find the sun.
+    sky.update(0, view.camera);
+    if (p.toLight) {
+      const toward = sky.lightDirection;
+      input.look = { yaw: Math.atan2(-toward.x, -toward.z) - p.toLight.off, pitch: p.toLight.up };
+    } else if (p.look) input.look = { ...p.look };
+  };
+  if (params.toLight) setScene(params);
+  window.__nautaScene = (query) => new Promise((done) => {
+    const p = readParams(query);
+    still = true; held = false; last = performance.now();
+    // The sea started as on the page's load and looked at a little later, the same moment for every shot.
+    wind = makeWind(MATCH_SEED, p.wind, WIND_FROM); blowing = meanWind(wind, 0);
+    sea = startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, 0);
+    seaTime = SHOT_SEA_TIME;
+    setScene(p);
+    sceneFrames = SCENE_FRAMES; sceneDrawn = done;
+  });
   if (ship) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
@@ -88,12 +129,24 @@ async function start(): Promise<void> {
   // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want.
   const sound = new SeaSound(import.meta.env.BASE_URL, MATCH_SEED);
   const ear = new Vector3(), facing = new Vector3(), crown = new Vector3();
+  // `?bench`: the fixed flight, measured once the quality level is chosen (plan N1.9).
+  const bench = params.bench > 0 ? new BenchRun(el('bench'), params.bench, {
+    settled: () => quality.chosen,
+    memory: () => ({ gpu: view.renderer.info.memory.total, js: performance.memory?.usedJSHeapSize ?? null }),
+    about: () => { const px = view.drawnSize(); return `${view.backend} · quality ${quality.knobs.name}, ${px.x}×${px.y} px · ${sky.clock} · force ${wind.windForce}`; },
+    shaders: () => view.stage.hudLine(),
+  }) : null;
+  // The bench's sky stands still, so runs at one hour compare.
+  if (bench) sky.dayMinutes = 0;
 
   let last = performance.now(), frames = 0, shown = last, ms = 0;
   view.renderer.setAnimationLoop(() => {
-    const now = performance.now(), dt = Math.min(MAX_FRAME_SECONDS, (now - last) / MS_PER_SECOND);
+    // A still scene already on screen is not drawn again: the shot is taken without frames drawn beside it.
+    if (held) return;
+    const now = performance.now(), dt = still ? 0 : Math.min(MAX_FRAME_SECONDS, (now - last) / MS_PER_SECOND);
     if (window.__nautaReady && quality.frame(now - last)) apply(quality.knobs);
     last = now;
+    const flight = bench?.fly(now);
     seaTime += dt;
     meanWind(wind, seaTime, blowing);
     sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
@@ -102,7 +155,9 @@ async function start(): Promise<void> {
       sky.below = ship.below;
       seaView.sheltered = ship.below > 0;
     } else {
-      view.camera.rotation.set(input.look.pitch, input.look.yaw, 0);
+      const look = flight?.look ?? input.look;
+      if (flight) view.camera.position.set(flight.x, flight.y, flight.z);
+      view.camera.rotation.set(look.pitch, look.yaw, 0);
       view.sun.position.copy(view.sun.target.position).addScaledVector(sky.lightDirection, SUN_DISTANCE);
     }
     sky.update(dt, view.camera);
@@ -113,11 +168,13 @@ async function start(): Promise<void> {
     sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], ship?.below ?? 0);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
+    bench?.worked(performance.now() - now);
     frames++;
+    if (sceneDrawn && --sceneFrames <= 0) { sceneDrawn(); sceneDrawn = null; held = true; }
     if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${params.wind} · eye ${params.eye} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris, ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris, ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;

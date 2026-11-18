@@ -19,7 +19,8 @@
     "shot": "node tools/shot/shot.mjs",
     "guards": "node tools/guards/guards.mjs",
     "check:replay": "tsx tools/sim/replay.ts",
-    "plan:draw": "tsx tools/plan/draw.ts"
+    "plan:draw": "tsx tools/plan/draw.ts",
+    "shot:sea": "node tools/shot/sea.mjs"
   },
   "dependencies": {
     "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",

@@ -177,3 +177,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Running a match on through a log of orders (a guest, a replay, the tests) | `src/sim/replay.ts#replay` |
 | The knot in m/s | `src/sim/units.ts#KNOT` |
 | The fastest a ship may be told to go until the sailing model works speed out | `src/sim/rules/ships.ts#TOP_SPEED` |
+| The bench's flight: where the eye is at a moment of it | `src/app/bench.ts#benchPose` |
+| A percentile of sorted measurements | `src/app/bench.ts#percentile` |
+| Frame times summed up as the budget reads them (percentiles, worst, on time, hitches) | `src/app/bench.ts#frameStats` |
+| The bench on the page: flying, measuring, the result on screen | `src/app/benchRun.ts#BenchRun` |
+| The built game in a headless browser (for screenshots) | `tools/shot/browser.mjs#openGame` |
+| The standard sea shots (times of day × seas × eye heights), each scene set on one page by main.ts's `window.__nautaScene` | `tools/shot/sea.mjs#seaShots` |
