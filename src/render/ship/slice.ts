@@ -22,7 +22,7 @@ import { place, type Fittings } from './fittings';
 import { buildRig, type RigParts } from './rig';
 
 /** The slice's ends, m forward of the mainmast: abaft the aftmost main shroud, and forward of the main hatch. */
-export const SLICE_AFT = -4.3;
+export const SLICE_AFT = -4.65;
 export const SLICE_FORE = 2.6;
 /** The longest step between rows of her side and deck along her length, m. */
 const ROW_STEP = 0.3;

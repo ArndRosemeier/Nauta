@@ -79,12 +79,45 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The sea drawn: tiles chosen for the camera each frame, waves and light handed to the shader | `src/render/seaView.ts#SeaView` |
 | A game kind's own attribute on the Stage's stand-in mesh | `src/render/materials.ts#standInAttribute` |
 | The brig's measures (Cruizer class, from the Admiralty draught): her midship section, decks, ports, rig sizes | `src/sim/rules/ships.ts#MIDSHIP_SECTION` |
+| Her table of offsets: profile, stem, stern, transom, body plan stations | `src/sim/rules/ships.ts#BODY_STATIONS` |
+| Her gun ports and the gun in each | `src/sim/rules/ships.ts#PORTS` |
+| Her spaces, openings, ladders, doors, fittings, rails and stations (the plan's rules) | `src/sim/rules/ships.ts#SPACES` |
+| The body every space is sized for, and the sizes of ways (doors, hatches, ladders) | `src/sim/rules/ships.ts#BODY` |
+| What she carries fitted for sea, and timber densities | `src/sim/rules/ships.ts#LOADS` |
 | Her moulded half-breadth at a height | `src/sim/ship/section.ts#halfBreadth` |
 | Her section's outline by girth, planked or ceiled | `src/sim/ship/section.ts#sectionOutline` |
 | Ship space: heights above her base, metres forward of the mainmast | `src/sim/ship/section.ts#shipY` |
 | The weather deck's height across her (its camber) | `src/sim/ship/section.ts#deckY` |
 | The plane of the water under her footprint | `src/sim/ship/standIn.ts#waterPlane` |
 | Her stand-in motion: easing toward the water (until N2.2) | `src/sim/ship/standIn.ts#followWater` |
+| A smooth curve through readings that never overshoots (monotone cubic) | `src/sim/curve.ts#monotoneCurve` |
+| A straight-line curve through readings | `src/sim/curve.ts#linearCurve` |
+| Her moulded half-breadth anywhere on her hull (the fair surface through the table of offsets) | `src/sim/ship/hull.ts#hullHalfBreadth` |
+| Her hull's ends at a height (stem, sternpost, counter) | `src/sim/ship/hull.ts#hullEnds` |
+| The lowest height of her hull at a place along her | `src/sim/ship/hull.ts#hullBottom` |
+| Her keel's underside along her | `src/sim/ship/hull.ts#keelBottom` |
+| The sheer: the weather deck at her side along her | `src/sim/ship/hull.ts#sheer` |
+| The top of her side along her | `src/sim/ship/hull.ts#sideTop` |
+| The weather deck's height anywhere (sheer and camber) | `src/sim/ship/hull.ts#weatherDeck` |
+| The underside of the weather deck's planking | `src/sim/ship/hull.ts#weatherDeckUnderside` |
+| The draught's sloping load waterline | `src/sim/ship/hull.ts#designWaterline` |
+| Her displaced volume below a waterline | `src/sim/ship/hull.ts#displacedVolume` |
+| Simpson's rule: points and weights | `src/sim/ship/hull.ts#simpsonPoints` |
+| Her hull as one closed surface | `src/sim/ship/hull.ts#hullMesh` |
+| The brig's plan, built once: spaces, openings, ways, bulkheads, guns, pins, crew places, stations, mast steps, damage cells | `src/sim/ship/plan.ts#shipPlan` |
+| The berth deck's height along her | `src/sim/ship/plan.ts#berthDeck` |
+| A space's floor at a place | `src/sim/ship/plan.ts#floorAt` |
+| The underside of what is over a space (headroom) | `src/sim/ship/plan.ts#overheadAt` |
+| The inside of her side at a place and height | `src/sim/ship/plan.ts#insideBreadth` |
+| Every floor under a place, lowest first (what the walker stands on) | `src/sim/ship/plan.ts#floorsUnder` |
+| Her girth on one side at a place along her | `src/sim/ship/plan.ts#sectionGirth` |
+| The one walk graph for a body: where it can stand, and the ways that fit it | `src/sim/ship/walk.ts#walkGraph` |
+| The node of the walk graph a spot stands on | `src/sim/ship/walk.ts#nodeAt` |
+| What a body can reach from a node | `src/sim/ship/walk.ts#reachable` |
+| Her timber's weight from the plan | `src/sim/ship/weight.ts#structure` |
+| Her whole weight fitted for sea and its centre | `src/sim/ship/weight.ts#shipWeight` |
+| Tonnes of sea water a volume displaces | `src/sim/ship/weight.ts#displacementTonnes` |
+| The plan's drawings (lines, decks, walk graph) | `tools/plan/draw.ts#lines` |
 | Where one stands on the slice, and the look from there | `src/app/standpoints.ts#STANDPOINTS` |
 | The standpoints' buttons | `src/app/standpointBar.ts#showStandpoints` |
 | Vertices gathered and handed to the GPU as one geometry | `src/render/ship/gathered.ts#Gathered` |

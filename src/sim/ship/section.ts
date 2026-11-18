@@ -6,6 +6,7 @@
  * -z forward (her bow points where an unturned look looks, compass north at heading 0, units.ts).
  */
 import { DECK_AT_SIDE, DECK_CAMBER, KEEL_HALF_SIDING, LOAD_WATERLINE, MIDSHIP_SECTION } from '../rules/ships';
+import { monotoneCurve } from '../curve';
 
 /** A point of a section: across (half-breadth, m, from the centreline), up (ship-space y, m), and the girth to it from the keel (m). */
 export interface SectionPoint {
@@ -19,37 +20,14 @@ export const shipY = (aboveBase: number): number => aboveBase - LOAD_WATERLINE;
 /** A position forward of the mainmast as ship-space z. */
 export const shipZ = (forward: number): number => -forward;
 
-/** Monotone cubic slopes (Fritsch and Carlson) of the section's half-breadth over height, so the curve never overshoots its readings. */
-function slopes(h: readonly number[], b: readonly number[]): number[] {
-  const n = h.length, d: number[] = [], m: number[] = new Array(n).fill(0);
-  for (let i = 0; i < n - 1; i++) d.push((b[i + 1]! - b[i]!) / (h[i + 1]! - h[i]!));
-  m[0] = d[0]!;
-  m[n - 1] = d[n - 2]!;
-  for (let i = 1; i < n - 1; i++) {
-    const a = d[i - 1]!, c = d[i]!;
-    // Where the curve turns (a reading higher or lower than both its neighbours), it stands flat there.
-    m[i] = a * c <= 0 ? 0 : (2 * a * c) / (a + c);
-  }
-  return m;
-}
-
 /** Samples of the outline before it is walked by girth. */
 const FINE = 400;
 const HEIGHTS = MIDSHIP_SECTION.map((p) => p[0]);
-const BREADTHS = MIDSHIP_SECTION.map((p) => p[1]);
-const SLOPES = slopes(HEIGHTS, BREADTHS);
+const MIDSHIP = monotoneCurve(HEIGHTS, MIDSHIP_SECTION.map((p) => p[1]));
 
 /** The moulded half-breadth of the midship section at a height above the base, m (held at its ends outside the readings). */
 export function halfBreadth(aboveBase: number): number {
-  const n = HEIGHTS.length;
-  if (aboveBase <= HEIGHTS[0]!) return BREADTHS[0]!;
-  if (aboveBase >= HEIGHTS[n - 1]!) return BREADTHS[n - 1]!;
-  let i = 0;
-  while (aboveBase > HEIGHTS[i + 1]!) i++;
-  const h0 = HEIGHTS[i]!, step = HEIGHTS[i + 1]! - h0, t = (aboveBase - h0) / step, u = 1 - t;
-  // Cubic Hermite between two readings: the second reading's weight t²(3 - 2t), the slopes' t(1-t)² and -t²(1-t).
-  const w1 = t * t * (1 + 2 * u);
-  return (1 - w1) * BREADTHS[i]! + w1 * BREADTHS[i + 1]! + step * t * u * (u * SLOPES[i]! - t * SLOPES[i + 1]!);
+  return MIDSHIP(aboveBase);
 }
 
 /**
