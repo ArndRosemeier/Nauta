@@ -58,3 +58,7 @@ The plain address opens the title and then the main screen. A link with a room's
 ## What is not here yet, and shows as such
 
 Until the packages under it are built, a choice that cannot work yet is shown in its place, dimmed, with one line saying what is still coming, never hidden: Arnd is iterating on the final shape. "Your first command" (N7.4) appears when it exists.
+
+## Built (first pass, 2026-11-18)
+
+Everything above is on the plain address, with these still shown dimmed with their line: both captains tapping "Ready" (the room's match runs from the moment the room opens), "Again" with two captains, the navies' two coats. Sailing out of the fight is not a rule yet, so "she broke off the action" never ends a match. The sea behind the main screen is always the same quiet morning (her alone in a light wind, hove to by her crew as the menu opens). One tap on the title begins once the game is ready; before that, taps play with the title as they did. The theme plays on under the menu and fades when a match begins.

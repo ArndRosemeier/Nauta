@@ -669,3 +669,15 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The officers drawn (six full characters with living faces; N4.3's near pool takes over): where each is on the view, looking at the captain | `src/render/crew/officersView.ts#OfficersView` |
 | The report log: every line the men said this match, shown or not | `src/app/speech/reportLog.ts#ReportLog` |
 | The reports sheet and its tag and key | `src/app/reportsPanel.ts#ReportsPanel` |
+| The menu: the main screen, the match setup, joining, the waiting room, the captain's pause, the end card; which match the page runs (N7.2) | `src/app/menu.ts#Menu` |
+| The match terms the menu sets: choices, defaults, reading kept ones back | `src/app/terms.ts#readTerms` |
+| The hour a match's sky starts at, named or drawn from the seed | `src/app/terms.ts#hourOf` |
+| A new match's seed when none is typed | `src/app/terms.ts#newSeed` |
+| What the end card tells: how it ended for me, how long, each ship's numbers | `src/app/tally.ts#endCard` |
+| Counting guns fired and balls that struck from a match's events | `src/app/tally.ts#Tally` |
+| One ship alone at sea (walking her, the sea behind the menu) | `src/sim/start.ts#aloneStart` |
+| A room's host's choices in its meta (shown in the list, the guest's sky) | `src/net/wire.ts#roomTerms` |
+| Whether the address is the game with its menu or a working tool | `src/app/params.ts#TOOL_SWITCHES` |
+| A kept value read back: a plain object, one of a few | `src/app/kept.ts#oneOf` |
+| The rooms waiting, as buttons from GameHub's lobby; a room's link to share | `src/app/roomPanel.ts#waitingRooms` |
+| The title asking for the tap that begins once the game is ready; its theme on and off | `src/title/title.ts#beginOnTap` |

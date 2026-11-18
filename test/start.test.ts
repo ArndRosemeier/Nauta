@@ -6,11 +6,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { angleDiff } from '@futuremagic/core';
-import { duelStart } from '../src/sim/start.ts';
+import { aloneStart, duelStart } from '../src/sim/start.ts';
 import { startMatch } from '../src/sim/state.ts';
 import { meanWind } from '../src/sim/wind.ts';
 import { DUEL_FORCES } from '../src/sim/rules/wind.ts';
-import { START_APART } from '../src/sim/rules/start.ts';
+import { START_APART, WEATHER_TURN_DEGREES, WIND_CHOICES } from '../src/sim/rules/start.ts';
 import { bearingDir, DEGREE } from '../src/sim/units.ts';
 
 const SEEDS = 200;
@@ -53,4 +53,31 @@ test('the match made from it has that wind and both ships where the ruling puts 
     assert.equal(s.motion.pose.x, setup.ships[i]!.x);
     assert.equal(s.told.canvas, 'battle');
   });
+});
+
+test('a chosen wind is drawn within its range, and holding the weather position turns the wind toward the ship that holds it', () => {
+  for (let seed = 0; seed < SEEDS; seed++) {
+    const even = duelStart(seed);
+    for (const [name, range] of Object.entries(WIND_CHOICES)) {
+      const f = duelStart(seed, { wind: name as keyof typeof WIND_CHOICES }).windForce;
+      assert.ok(f >= range.least && f <= range.most, `seed ${seed}: ${name} gave force ${f}`);
+    }
+    assert.deepEqual(duelStart(seed, { wind: 'drawn', meet: 'even' }), even, 'the default terms are the duel as it was');
+    for (const [meet, holder] of [['weather', 0], ['lee', 1]] as const) {
+      const s = duelStart(seed, { meet }), up = s.ships[holder]!, down = s.ships[1 - holder]!;
+      // The ships stand where they stood; the wind now blows from the holder's side of the line toward the other.
+      assert.deepEqual(s.ships, even.ships);
+      const [wx, wz] = bearingDir(s.windFrom);
+      assert.ok(wx * (up.x - down.x) + wz * (up.z - down.z) > 0, `seed ${seed}: ${meet}: the holder is to windward`);
+      assert.ok(Math.abs(Math.abs(angleDiff(even.windFrom, s.windFrom)) - WEATHER_TURN_DEGREES * DEGREE) < 1e-9);
+    }
+  }
+});
+
+test('one ship alone: the first ship of the same duel, at the middle, with the chosen wind', () => {
+  const alone = aloneStart(9, { wind: 'strong' }), duel = duelStart(9, { wind: 'strong' });
+  assert.equal(alone.ships.length, 1);
+  assert.equal(alone.windForce, duel.windForce);
+  assert.equal(alone.ships[0]!.heading, duel.ships[0]!.heading);
+  assert.equal(startMatch(alone).ships.length, 1);
 });

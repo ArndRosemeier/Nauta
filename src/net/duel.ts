@@ -28,13 +28,13 @@ import type { Order } from '../sim/orders';
 import type { Skill } from '../sim/rules/captain';
 import { poseBetween, type ShipPose } from '../sim/ship/motion';
 import type { LoggedOrders } from '../sim/replay';
-import { duelStart } from '../sim/start';
+import { aloneStart, duelStart, type StartTerms } from '../sim/start';
 import { hashState, startMatch, type MatchSetup, type SimState } from '../sim/state';
 import { step, type SimEvent } from '../sim/step';
 import { STEPS_PER_SECOND } from '../sim/units';
 import {
-  cleanOrder, GAME, makeSnapshot, MOST_ORDERS, MOST_PLAYERS, PROTOCOL, roomRefusal, snapshotState,
-  type Ack, type Captains, type Delta, type GivenOrder, type Intent, type RoomMeta, type Snapshot,
+  cleanOrder, GAME, makeSnapshot, MOST_ORDERS, MOST_PLAYERS, PROTOCOL, roomRefusal, roomTerms, snapshotState,
+  type Ack, type Captains, type Delta, type GivenOrder, type Intent, type RoomMeta, type RoomTerms, type Snapshot,
 } from './wire';
 
 /** The hub as the duel uses it: GameHub's client (vendor/gamehub) or the fake one in the tests. */
@@ -83,8 +83,12 @@ export interface DuelOptions {
   readonly now: () => number;
   /** A match played alone: the other ship commanded by a computer captain at this skill (plan N7.1); none: she sails on as she started. */
   readonly foe?: Skill;
-  /** How long a match this machine starts may last before it is drawn, minutes (the player's setting, plan N7.3); none: the rules' own. */
+  /** How long a match this machine starts may last before it is drawn, minutes (the match setup, menu.md); none: the rules' own. */
   readonly minutes?: number;
+  /** The wind and how the ships meet in a match this machine starts (alone, or as a room's host; menu.md); none: the duel's own. */
+  readonly terms?: StartTerms;
+  /** A match played alone with her alone at sea, no enemy (menu.md, "Walk the ship"). */
+  readonly alone?: boolean;
 }
 
 /** What the page draws: her pose between two steps, `f` of the way from `from` to `to`, at the match's time `time` (s). */
@@ -119,6 +123,8 @@ export class DuelSession {
   private readonly foe: Skill | null;
   /** The length of a match this machine starts, minutes, or undefined for the rules' own. */
   private readonly minutes: number | undefined;
+  /** The wind and the meeting of a match this machine starts. */
+  private readonly terms: StartTerms;
   private readonly listeners: { [K in keyof Events]: Set<Events[K]> } = { events: new Set(), change: new Set() };
   private known: SimState | null = null;
   private previous: SimState | null = null;
@@ -146,9 +152,11 @@ export class DuelSession {
     this.build = options.build;
     this.foe = options.foe ?? null;
     this.minutes = options.minutes;
+    this.terms = options.terms ?? {};
     if (!this.hub) {
       this.role = 'solo';
-      const start = options.setup ?? this.timed(duelStart(options.seed ?? SOLO_SEED));
+      const seed = options.seed ?? SOLO_SEED;
+      const start = options.setup ?? this.timed(options.alone ? aloneStart(seed, this.terms) : duelStart(seed, this.terms));
       this.begin(startMatch(options.windForce === undefined ? start : { ...start, windForce: options.windForce }), [SOLO_PLAYER, null]);
       return;
     }
@@ -198,9 +206,14 @@ export class DuelSession {
     return () => { this.listeners[kind].delete(fn); };
   }
 
-  /** Makes a room and hosts its match; its code is `code` once it resolves. */
-  async create(name: string): Promise<RoomSummary> {
-    const meta: RoomMeta = { game: GAME, protocol: PROTOCOL, build: this.build };
+  /** The host's choices for this room's match (menu.md), or null alone or before a room. */
+  get roomTerms(): RoomTerms | null {
+    return roomTerms(this.hub?.room?.meta);
+  }
+
+  /** Makes a room and hosts its match, showing `terms` (the host's choices) to who looks; its code is `code` once it resolves. */
+  async create(name: string, terms?: RoomTerms): Promise<RoomSummary> {
+    const meta: RoomMeta = { game: GAME, protocol: PROTOCOL, build: this.build, ...(terms ? { terms } : {}) };
     // Connected first: the client drops what is sent before its socket is open.
     await this.need().ready;
     return this.need().create({ name, public: true, maxPlayers: MOST_PLAYERS, meta });
@@ -371,7 +384,7 @@ export class DuelSession {
     if (!this.known) {
       const latest = this.snapshots.at(-1);
       if (latest) this.adopt(latest);
-      else this.begin(startMatch(this.timed(duelStart(roomSeed(this.code)))), [hub.you, null]);
+      else this.begin(startMatch(this.timed(duelStart(roomSeed(this.code), this.terms))), [hub.you, null]);
     }
     this.jumpIfFar(this.hostTick);
     this.catchUp(this.hostTick, Infinity);

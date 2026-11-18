@@ -18,3 +18,8 @@ export const GAMEHUB_KEY = 'ghk_nauta_qbuwVLqomloa-mz5TFvvznJ19XvuVWvC';
 export function openHub(params: Params, name: string): DuelHub {
   return connect({ url: params.hub ?? GAMEHUB_URL, app: GAME, appKey: params.key ?? GAMEHUB_KEY, name });
 }
+
+/** What went wrong with the hub, in words for the panel ("gamehub: " left off). */
+export function hubProblem(err: unknown): string {
+  return err instanceof Error ? err.message.replace(/^gamehub: /, '') : String(err);
+}

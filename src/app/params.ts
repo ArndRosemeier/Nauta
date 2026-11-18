@@ -39,6 +39,15 @@ const BENCH_LONGEST = 600;
 const FOE_SKILL: Skill = 'seasoned';
 /** The largest seed the address may name: a whole 32-bit number. */
 const SEED_MOST = 2 ** 32 - 1;
+/**
+ * The working addresses (docs/design/menu.md, "Addresses"): any of these names a scene or a tool, which opens as it
+ * always has and skips the menu. Without them the page is the game: the title, then the menu. (`?hud`, `?quality=`,
+ * `?motion=`, `?smoke=`, `?key=`, `?hub=`, `?notitle` and a room's `?join=` keep the menu.)
+ */
+export const TOOL_SWITCHES = [
+  'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'trial', 'men', 'bench', 'probe', 'netcheck', 'title', 'rig',
+  'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed',
+] as const;
 
 /** Where `?look=` turns the eye: off the sun's (the moon's) bearing, clockwise, and up from level, both rad. */
 export interface LookAtLight {
@@ -114,6 +123,8 @@ export interface Params {
    * smoke is drawn at full resolution in the main pass, straight to the canvas.
    */
   readonly halfSmoke: boolean;
+  /** The game itself (plan N7.2): the title, then the menu, every match chosen there; false when the address names a tool or a scene (`TOOL_SWITCHES`). */
+  readonly menu: boolean;
 }
 
 export function readParams(query: string): Params {
@@ -141,6 +152,7 @@ export function readParams(query: string): Params {
     glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
     foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
     halfSmoke: q.get('smoke') === 'half',
+    menu: !TOOL_SWITCHES.some((name) => q.has(name)),
   };
 }
 

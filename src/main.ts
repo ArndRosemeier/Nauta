@@ -11,6 +11,7 @@ import { showStandpoints } from './app/standpointBar';
 import { Walking } from './app/walking';
 import { QUALITY_LEVELS, QualityChooser, type QualityKnobs } from './app/quality';
 import { SettingsStore } from './app/settingsStore';
+import { matchMinutes } from './app/terms';
 import { SettingsMenu } from './app/settingsPanel';
 import { words } from './app/words';
 import { walkKeys } from './app/thumbs';
@@ -31,6 +32,7 @@ import { characterSpeaker } from './render/speech/characterSpeaker';
 import { sailsSeen } from './app/sailsSeen';
 import { PageMatch, pageSeconds, rudderAngle, sparAngles } from './app/pageMatch';
 import { RoomPanel } from './app/roomPanel';
+import { Menu } from './app/menu';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
@@ -162,10 +164,11 @@ async function start(): Promise<void> {
   const canvas = el<HTMLCanvasElement>('view'), hud = el('hud'), loading = el('loading');
   // `?ship`: the whole brig, built in a worker behind the loading screen (plan N2.4); the sun casts shadows then.
   // `?walk`: the captain walks her decks with two thumbs (plan N2.3), on the whole brig.
-  const walking = params.walk !== null ? new Walking(canvas, params.walk || undefined) : null;
+  // The plain address (plan N7.2): the game itself, the captain walking her decks in every match the menu starts.
+  const walking = params.walk !== null || params.menu ? new Walking(canvas, params.walk || undefined) : null;
   // `?sail`: the brig under way in a match, where the ship view lays her, commanded from the order panel (plan N3.5);
   // alone at first, or with a second captain in a room (`?room` opens one, `?join=K7Q2ZP` joins one; plan N3.7).
-  const sailing = params.sail || params.room || params.join !== null;
+  const sailing = params.sail || params.room || params.join !== null || params.menu;
   const build = params.ship !== null || walking || sailing ? await loadShip(import.meta.env.BASE_URL) : null;
   const ship = build ? new ShipView(build) : null;
   /**
@@ -174,9 +177,11 @@ async function start(): Promise<void> {
    * in the same state at each picture on a fast machine and a slow one.
    */
   let ahead = 0, pinned: number | null = null;
-  /** The match's clock, s: the page's, or where the browser checks have run it to. The bubbles keep it too. */
-  const matchClock = (): number => (pinned ?? pageSeconds()) + ahead;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, settings.now.matchMinutes) : null;
+  /** The captain's pause in a match played alone (plan N7.2): the page's clock when it began, and the seconds paused before. */
+  let pausedAt: number | null = null, paused = 0;
+  /** The match's clock, s: the page's less the pauses, or where the browser checks have run it to. The bubbles keep it too. */
+  const matchClock = (): number => (pinned ?? pausedAt ?? pageSeconds()) - paused + ahead;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match)) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   const other = build && match ? new ShipView(build, 1) : null;
@@ -429,8 +434,8 @@ async function start(): Promise<void> {
     other: () => (other?.group.visible ? { drawn: other.trianglesDrawn, near: other.nearDrawn, apart: Math.round(other.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null),
     firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
   };
-  if (match) {
-    const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.useSession(s), () => words(settings.now.language), () => settings.now.matchMinutes);
+  if (match && !params.menu) {
+    const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.useSession(s), () => words(settings.now.language), () => matchMinutes(settings.now.match));
     match.onChange(() => rooms.refresh());
     settings.watch((s, before) => { if (before && before.language !== s.language) rooms.refresh(); });
   }
@@ -446,10 +451,21 @@ async function start(): Promise<void> {
     const changed = before ? before.quality !== s.quality : s.quality !== 'auto' && !settings.setByAddress('quality');
     if (changed && quality.choose(s.quality)) apply(quality.knobs);
   });
-  new SettingsMenu(settings, { qualityNow: () => `${quality.knobs.name} · ${quality.reason}` });
+  const settingsMenu = new SettingsMenu(settings, { qualityNow: () => `${quality.knobs.name} · ${quality.reason}` });
   document.addEventListener('visibilitychange', () => quality.interrupt());
   // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want (the title's tap opens it).
   const sound = new SeaSound(pageEngine(), MATCH_SEED);
+  // The plain address: the menu over the live view (plan N7.2, docs/design/menu.md); it chooses every match the page runs.
+  let skyMinutes = sky.dayMinutes;
+  const menu = params.menu && match ? new Menu({
+    params, build: VERSION, settings, settingsMenu, match, now: matchClock, engine: sound.engine,
+    sky: (hour, dayMinutes) => { sky.hour = hour; sky.dayMinutes = skyMinutes = dayMinutes; },
+    pause: (on) => {
+      if (on && pausedAt === null) pausedAt = pageSeconds();
+      else if (!on && pausedAt !== null) { paused += pageSeconds() - pausedAt; pausedAt = null; }
+      sky.dayMinutes = on ? 0 : skyMinutes;
+    },
+  }) : null;
   // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
   // Each part of the sound at the player's level (plan N7.3): the whole is the engine's master volume.
   const shipPart = new Channel(sound.engine), crewPart = new Channel(sound.engine), battlePart = new Channel(sound.engine);
@@ -645,8 +661,8 @@ async function start(): Promise<void> {
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
-      // The title fades into the deck (plan N7.7).
-      handOver();
+      // The title fades into the deck (plan N7.7), or with the menu to come asks for a tap first (N7.2).
+      if (menu) menu.ready(); else handOver();
     }
   });
 }

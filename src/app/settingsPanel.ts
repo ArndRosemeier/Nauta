@@ -8,7 +8,7 @@ import { MOTION_STEPS } from '../sim/rules/body';
 import { make } from './dom';
 import { rose, openSheet, type Sheet } from './sheet';
 import {
-  DEFAULT_SETTINGS, KEY_ACTIONS, LANGUAGES, MATCH_LEAST, MATCH_MOST, MATCH_STEP, QUALITY_CHOICES, SPEED_LEAST, SPEED_MOST,
+  DEFAULT_SETTINGS, KEY_ACTIONS, LANGUAGES, QUALITY_CHOICES, SPEED_LEAST, SPEED_MOST,
   THUMB_SIDES, VIOLENCE_LEVELS, withKey, type KeyAction, type Settings, type SoundPart,
 } from './settings';
 import type { SettingsStore } from './settingsStore';
@@ -66,12 +66,14 @@ export class SettingsMenu {
   private ticker = 0;
   /** The action waiting for its new key, and how to stop waiting. */
   private capture: (() => void) | null = null;
+  /** What the rose does instead of opening the settings (in a match chosen from the menu: the captain's pause, plan N7.2); null: the settings. */
+  rose: (() => void) | null = null;
 
   constructor(private readonly store: SettingsStore, private readonly hooks: SettingsHooks) {
     this.button.id = 'settings';
     this.button.type = 'button';
     this.button.append(rose());
-    this.button.addEventListener('click', () => this.open());
+    this.button.addEventListener('click', () => (this.rose ? this.rose() : this.open()));
     document.body.append(this.button);
     store.watch((now, before) => {
       const say = words(now.language);
@@ -155,7 +157,6 @@ export class SettingsMenu {
     } else if (p === 'fight') {
       el.append(
         choiceRow(say.violence, say.violenceHelp, VIOLENCE_WORDS.map((w) => say[w]), VIOLENCE_LEVELS.indexOf(s.violence), (i) => set({ violence: VIOLENCE_LEVELS[i]! })),
-        slideRow(say.matchLength, say.matchLengthHelp, s.matchMinutes, MATCH_LEAST, MATCH_MOST, MATCH_STEP, (v) => `${v} ${say.minutes}`, (v) => set({ matchMinutes: v })),
       );
     } else {
       el.append(choiceRow(say.pageLanguage, null, LANGUAGE_WORDS.map((w) => say[w]), LANGUAGES.indexOf(s.language), (i) => set({ language: LANGUAGES[i]! })));
@@ -192,8 +193,8 @@ function section(name: string): HTMLElement {
   return make('div', 'nt-section', name);
 }
 
-/** One setting's row: its name and a line of help, and its control. */
-function row(name: string, help: string | null, control: HTMLElement): HTMLElement {
+/** One setting's row: its name and a line of help, and its control (the menu's match setup uses it too). */
+export function row(name: string, help: string | null, control: HTMLElement): HTMLElement {
   const r = make('div', 'nt-row'), label = make('div', 'nt-label', name);
   if (help) label.append(make('small', '', help));
   r.append(label, control);
@@ -201,7 +202,7 @@ function row(name: string, help: string | null, control: HTMLElement): HTMLEleme
 }
 
 /** A choice of a few, one line of words with the chosen one marked. */
-function choiceRow(name: string, help: string | null, options: readonly string[], chosen: number, picked: (i: number) => void): HTMLElement {
+export function choiceRow(name: string, help: string | null, options: readonly string[], chosen: number, picked: (i: number) => void): HTMLElement {
   const box = make('div', 'nt-choice');
   box.setAttribute('role', 'radiogroup');
   box.setAttribute('aria-label', name);
