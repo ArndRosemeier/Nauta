@@ -36,7 +36,7 @@ import { shipY, shipZ } from '../../sim/ship/section';
 import { belowDeck } from '../../audio/crewHearing';
 import { BUILDS, DRESSES, HAT_ITEMS, PACK, SHIRT_GROUP, SHIRT_GARMENT, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
 import {
-  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, duckTo, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, turnBetween, type ManDrawn,
+  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, SURFACE_WALKS, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, duckTo, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, turnBetween, type ManDrawn,
 } from '../../app/crewDrawn';
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
@@ -266,7 +266,7 @@ export class CrewView {
     const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, levels: [CROWD_LEVEL] });
     const kinds = crowdKinds(workbench.catalog, rosters);
     note(`baking ${kinds.length} kinds of men`);
-    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, ...GUN_CLIP_NAMES, LYING, SLEEPING, WALK, 'jog', 'idle'])];
+    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, ...GUN_CLIP_NAMES, ...Object.values(SURFACE_WALKS), LYING, SLEEPING, WALK, 'jog', 'idle'])];
     const figures = await buildCrowdFigures(workbench, { material: createNodeCrowdFigureMaterial, builds: { ...BUILDS }, kinds, clips, once: ONCE_CLIPS, fps: BAKE_FPS });
     note('the officers come on deck');
     const pool = await NearPool.load(renderer, `${base}${PACK}`, workbench, knobs.pool, knobs.poolFull, fullLook(workbench.catalog, figureOf(0, 1, rosters[0]![1]!)));

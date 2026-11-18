@@ -172,7 +172,11 @@ export function buildAloft(plan: ShipPlan, geometry: Readonly<Record<MastName, M
         const rope = add({ id: `${yard.id}-footrope-${s}`, name: `${yard.name}'s footrope, ${side > 0 ? 'starboard' : 'larboard'}`, kind: 'footrope', spar: yard.id, points: ends, area: distance(ends[0]!, ends[1]!) * FOOTING, yard: f });
         const level = yard.yard!.level;
         const [from, ladder] = level === 'course' ? [deckSpot, c.shroud] : level === 'topsail' ? [onTop, c.topmast] : [onCross, c.topgallant];
-        ways.push({ id: `${yard.id}-${s}`, kind: 'footrope', from, to: spotOn(rope, ends[0]!), ladders: [ladder], at: shipY(ends[0]!.height), rung: RATLINE_PITCH, slope: 0 });
+        // The way ends on the rope where the ladder meets it (the climb goes straight up the shrouds, then the man sidles in or out from there), not at the rope's inner end.
+        const out = side * Math.min(f.reach, Math.max(f.inner ?? FOOTROPE_INNER, Math.abs(ladder.x)));
+        yardPoint(f, out, 0, footropeY(f, out), scratch);
+        const meets = fromShip(scratch.x, scratch.y, scratch.z);
+        ways.push({ id: `${yard.id}-${s}`, kind: 'footrope', from, to: spotOn(rope, meets), ladders: [ladder], at: shipY(meets.height), rung: RATLINE_PITCH, slope: 0 });
         const n = Math.floor(distance(ends[0]!, ends[1]!) / CLIMB.yardPlace);
         for (let k = 0; k <= n; k++) places.push({ id: `yard-${yard.id}-${s}${k + 1}`, kind: 'yard', of: yard.id, ...spotOn(rope, between(ends[0]!, ends[1]!, n ? k / n : 0)) });
       }

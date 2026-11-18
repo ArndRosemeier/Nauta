@@ -43,6 +43,12 @@ export const JOB_CLIPS: Readonly<Record<JobName, string>> = {
 /** On his way: walking, or smartly at a run. */
 export const WALKING = 'walk';
 export const RUNNING = 'jog';
+/**
+ * How a man moves along a surface aloft that is not a footrope (those he sidles, `ClimbRig.sidle`): bent over and careful
+ * across a top's boards, crouched along the crosstrees' two timbers, arms out along the bowsprit (CMU motion capture
+ * 77_28 careful walk, 136_09 walk crouched, 89_06 balance beam; crewLooks.ts PACK_MOCAP).
+ */
+export const SURFACE_WALKS: Readonly<Record<string, string>> = { top: 'cmu 77_28', crosstrees: 'cmu 136_09', bowsprit: 'cmu 89_06' };
 /** Killed, or badly hurt and lying where he fell (the badly hurt are carried below by others, `carriedAt`). */
 export const LYING = 'death';
 /** Asleep in his hammock: the mocap of a man lying down (CMU 111_12), its last frame held (crewLooks.ts PACK_MOCAP). */
@@ -386,6 +392,8 @@ function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, s
   if (at.moving) {
     if (task?.job === 'carry' || bearsPowder(hand)) return JOB_CLIPS.carry;
     // A man runs on a deck, never on a ladder, the shrouds or aloft (his footing there is a climb, or a careful walk).
+    const footing = SURFACE_WALKS[routeNetwork().surfaces.get(at.space)?.kind ?? at.way ?? ''];
+    if (footing) return footing;
     return hand.going?.haste === 'smart' && at.way === null && !routeNetwork().surfaces.has(at.space) ? RUNNING : WALKING;
   }
   if (task) return task.began === null ? standToClip(m, seed) : JOB_CLIPS[task.job];
