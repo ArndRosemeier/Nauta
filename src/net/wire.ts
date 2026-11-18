@@ -17,7 +17,7 @@ import { decodeState, encodeState, hashState, type SimState } from '../sim/state
 /** The game's id on GameHub (registered there by Arnd: `npm run apps -- add nauta`). */
 export const GAME = 'nauta';
 /** The version of this protocol; a machine never joins a room of another. Raise it when a message changes shape. */
-export const PROTOCOL = 3;
+export const PROTOCOL = 4;
 /** The most players in a room: a captain a ship (Arnd, 2026-11-17: every player is a captain of his own ship), up to the most ships a match holds. */
 export const MOST_PLAYERS = MOST_SHIPS;
 /** The most orders one message may carry; the rest are dropped (a captain gives a few a minute). */
@@ -161,6 +161,6 @@ function field(value: unknown): unknown {
 export function cleanOrder(raw: unknown, ship: number): Order {
   const o = (raw !== null && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const out: Record<string, unknown> = { kind: typeof o.kind === 'string' ? o.kind.slice(0, MOST_WORD) : '', ship };
-  for (const key of ['heading', 'canvas', 'mast'] as const) if (key in o) out[key] = field(o[key]);
+  for (const key of ['heading', 'canvas', 'mast', 'shot', 'at'] as const) if (key in o) out[key] = field(o[key]);
   return JSON.parse(JSON.stringify(out)) as Order;
 }

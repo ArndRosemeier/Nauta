@@ -73,6 +73,7 @@ function ayeLine(order: Order): Line {
     case 'sail': return `aye.sail.${order.canvas}`;
     case 'shot': return `aye.shot.${order.shot}`;
     case 'aim': return `aye.aim.${order.at}`;
+    case 'target': return order.at === null ? 'aye.target.nearest' : 'aye.target';
     default: return `aye.${order.kind}` as Line;
   }
 }

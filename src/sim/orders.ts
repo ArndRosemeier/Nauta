@@ -31,6 +31,7 @@ import { CLOSE_HAULED, type CanvasName } from './rules/sailing';
 import { rigPlan } from './ship/rig';
 import { canvasFor, layAback, MASTS, sailAback, setSail, steerTo, type Sailing, type SailingEvent } from './ship/sailing';
 import { sailShare, type SailSetting } from './ship/sails';
+import { MOST_SHIPS } from './scenario';
 import { STEPS_PER_SECOND, wrapBearing } from './units';
 import type { Wind } from './wind';
 
@@ -81,8 +82,14 @@ export interface AimOrder {
   readonly ship: number;
   readonly at: AimName;
 }
+/** Which enemy ship the guns (and the master's "follow") go for: a ship by her place in `SimState.ships`, or null for the nearest (foes.ts `enemiesOf`). */
+export interface TargetOrder {
+  readonly kind: 'target';
+  readonly ship: number;
+  readonly at: number | null;
+}
 /** The gunnery orders (N5.3a): the first lieutenant's quarters and the gunner's rows; they take no hands of the sailing drill. */
-export type GunneryOrder = GunsOrder | ShotOrder | AimOrder;
+export type GunneryOrder = GunsOrder | ShotOrder | AimOrder | TargetOrder;
 export type GunneryKind = GunneryOrder['kind'];
 
 /**
@@ -117,7 +124,7 @@ export type Order = SailingOrder | GunneryOrder | LifeOrder | KeepOrder | SoundO
 export type OrderKind = Order['kind'];
 
 /** The kinds of the gunnery orders. */
-const GUNNERY_KINDS: readonly OrderKind[] = ['quarters', 'stand', 'shot', 'aim', 'bear', 'hold', 'fire', 'cease'];
+const GUNNERY_KINDS: readonly OrderKind[] = ['quarters', 'stand', 'shot', 'aim', 'target', 'bear', 'hold', 'fire', 'cease'];
 /** Whether an order is one of the gunnery orders. */
 export const isGunnery = (order: Order): order is GunneryOrder => GUNNERY_KINDS.includes(order.kind);
 /** The kinds of the orders for her life. */
@@ -133,7 +140,7 @@ export interface OrderWord {
   readonly kind: OrderKind;
   readonly to: OrderTaker;
   readonly what: string;
-  readonly takes: 'heading' | 'canvas' | 'mast' | 'shot' | 'aim' | null;
+  readonly takes: 'heading' | 'canvas' | 'mast' | 'shot' | 'aim' | 'ship' | null;
 }
 
 /** The sailing vocabulary, as data: what the panel (N3.5) and the order fan (N4.4) offer. */
@@ -155,6 +162,7 @@ export const VOCABULARY: readonly OrderWord[] = [
   { kind: 'stand', to: 'first lieutenant', what: 'stand down: the guns run in, loaded as they are', takes: null },
   { kind: 'shot', to: 'gunner', what: 'the shot of the next loading: round, chain or grape; guns already loaded fire what they hold', takes: 'shot' },
   { kind: 'aim', to: 'gunner', what: 'where the gun captains lay their guns on her: hull, rigging or deck', takes: 'aim' },
+  { kind: 'target', to: 'gunner', what: 'which enemy ship the guns lay on (those that bear on her; the others on the nearest) and the master steers for: one ship of the enemy, or the nearest', takes: 'ship' },
   { kind: 'bear', to: 'gunner', what: 'fire as they bear: each gun fires when the roll brings her laying onto the enemy, and keeps firing', takes: null },
   { kind: 'hold', to: 'gunner', what: "hold for my word: the loaded side waits for the captain's word", takes: null },
   { kind: 'fire', to: 'gunner', what: "the captain's word: the held side fires now, rippling down her side", takes: null },
@@ -202,6 +210,8 @@ const PHRASES: readonly { readonly words: string; readonly order: Partial<Order>
   { words: 'aim at the hull', order: { kind: 'aim', at: 'hull' } },
   { words: 'aim at the rigging', order: { kind: 'aim', at: 'rigging' } },
   { words: 'aim at the deck', order: { kind: 'aim', at: 'deck' } },
+  { words: 'lay on the nearest', order: { kind: 'target', at: null } },
+  ...Array.from({ length: MOST_SHIPS }, (_, i) => ({ words: `lay on ship ${i + 1}`, order: { kind: 'target' as const, at: i } })),
   { words: 'fire as they bear', order: { kind: 'bear' } },
   { words: 'hold for my word', order: { kind: 'hold' } },
   { words: 'fire', order: { kind: 'fire' } },
@@ -339,6 +349,8 @@ export interface ShipOrders {
   /** The shot of the next loading, where the gun captains lay on her, and how her guns fire. */
   readonly shot: ShotKind;
   readonly aim: AimName;
+  /** The enemy ship the gunner and the master are told to go for (her place in the match), or null: the nearest. It is a wish: while she is no standing enemy the nearest is gone for. */
+  readonly target: number | null;
   readonly firing: FireMode;
   /** The captain's word given, her held side firing down its length until every gun that could has fired (guns/gunnery.ts says when, `wordSpent`). */
   readonly word: boolean;
@@ -367,7 +379,7 @@ const START_AIM: AimName = 'hull';
 export function startOrders(heading: number, canvas: CanvasName): ShipOrders {
   return {
     helm: { heading: wrapBearing(heading), by: 0 }, keep: null, canvas, hove: false, backed: MASTS.map(() => false), acts: [], given: [], serial: 0,
-    quarters: false, shot: START_SHOT, aim: START_AIM, firing: 'cease', word: false, pumps: null, fires: null, wreckage: null, carpenter: null, strike: null, struck: false,
+    quarters: false, shot: START_SHOT, aim: START_AIM, target: null, firing: 'cease', word: false, pumps: null, fires: null, wreckage: null, carpenter: null, strike: null, struck: false,
   };
 }
 
@@ -521,6 +533,7 @@ export function malformed(order: Order): string {
     case 'sail': return Object.hasOwn(SHORTER, order.canvas) && (order.canvas as CanvasName) !== 'bare' ? '' : `there is no "${order.canvas} sail" (battle, plain, all)`;
     case 'back': return MASTS.includes(order.mast) ? '' : `there is no mast "${order.mast}" (${MASTS.join(', ')})`;
     case 'shot': return Object.hasOwn(SHOT, order.shot) ? '' : `there is no "${order.shot} shot" (round, chain, grape)`;
+    case 'target': return order.at === null || (Number.isInteger(order.at) && order.at >= 0 && order.at < MOST_SHIPS) ? '' : 'there is no such ship';
     case 'aim': return Object.hasOwn(AIM_HEIGHT, order.at) ? '' : `there is no aiming at her "${order.at}" (hull, rigging, deck)`;
     case 'up': case 'away': case 'by': case 'tack': case 'wear': case 'heave': case 'shorten': case 'fill': return '';
     case 'quarters': case 'stand': case 'bear': case 'hold': case 'fire': case 'cease': return '';
@@ -638,11 +651,12 @@ const FIRING_SO: Readonly<Record<FireMode, string>> = { cease: 'the guns are not
  * refused. They take none of the sailing drill's hands.
  */
 function gunnery(told: ShipOrders, order: GunneryOrder): OrderAnswer {
-  const take = (changes: Partial<Pick<ShipOrders, 'quarters' | 'shot' | 'aim' | 'firing' | 'word'>>): OrderAnswer => ({ refused: false, told: { ...told, ...changes }, ...NOTHING_SAID });
+  const take = (changes: Partial<Pick<ShipOrders, 'quarters' | 'shot' | 'aim' | 'target' | 'firing' | 'word'>>): OrderAnswer => ({ refused: false, told: { ...told, ...changes }, ...NOTHING_SAID });
   switch (order.kind) {
     case 'quarters': return told.quarters ? refuse(told, 'at quarters already', 'she is at quarters already') : take({ quarters: true });
     case 'stand': return told.quarters ? take({ quarters: false, firing: 'cease', word: false }) : refuse(told, 'not at quarters', NOT_AT_QUARTERS);
     case 'shot': return told.shot === order.shot ? refuse(told, 'loading it already', `the guns load ${order.shot} shot already`) : take({ shot: order.shot });
+    case 'target': return told.target === order.at ? refuse(told, 'laid there already', order.at === null ? 'the guns go for the nearest already' : 'the guns are laid on her already') : take({ target: order.at });
     case 'aim': return told.aim === order.at ? refuse(told, 'laid there already', `the guns are laid on her ${order.at} already`) : take({ aim: order.at });
     case 'fire':
       if (!told.quarters) return refuse(told, 'not at quarters', NOT_AT_QUARTERS);

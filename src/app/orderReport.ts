@@ -49,7 +49,8 @@ export function orderButtons(): OrderButton[] {
       : w.takes === 'mast' ? MASTS.map((mast: MastName) => ({ kind: 'back', ship: 0, mast }))
         : w.takes === 'shot' ? (Object.keys(SHOT) as ShotKind[]).map((shot) => ({ kind: 'shot', ship: 0, shot }))
           : w.takes === 'aim' ? (Object.keys(AIM_HEIGHT) as AimName[]).map((at) => ({ kind: 'aim', ship: 0, at }))
-            : w.takes === 'heading' ? [] : [{ kind: w.kind, ship: 0 } as Order];
+            : w.takes === 'ship' ? [{ kind: 'target', ship: 0, at: null }]
+              : w.takes === 'heading' ? [] : [{ kind: w.kind, ship: 0 } as Order];
     return orders.map((order) => ({ order, label: orderWords(order), to: w.to }));
   });
 }
@@ -217,6 +218,7 @@ export function isStanding(order: Order, told: ShipOrders): boolean {
     case 'stand': return !told.quarters;
     case 'shot': return told.shot === order.shot;
     case 'aim': return told.aim === order.at;
+    case 'target': return told.target === order.at;
     case 'bear': case 'hold': case 'cease': return told.quarters && told.firing === order.kind;
     case 'fire': return told.word;
     case 'pumps': case 'fires': case 'wreckage': return told[order.kind] !== null;
