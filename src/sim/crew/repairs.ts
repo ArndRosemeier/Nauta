@@ -140,10 +140,13 @@ export function repairsDue(d: Damage, told: ShipOrders, crew: Crew, tick: number
   // The first lieutenant's parties.
   if (pumpsManned && (d.flooded[0] + d.flooded[1] > PUMPING.least || leaking.length > 0)) out.push({ job: 'pump', on: 0, at: placeSpot(PUMP_POST) });
   if (passed(told.fires, 'first lieutenant', tick) && d.fires.length > 0) {
-    // Nearest the magazine fore and aft (the spaces round it burn toward it).
+    // One fire party: at the fire it fights until that is out, then the fire nearest the magazine fore and aft (the
+    // spaces round it burn toward it). A fire it cannot beat down holds it there while the fires it spreads to grow,
+    // the magazine's too (N7.5a: a fire that takes hold burns her, or blows her up).
     const spaces = shipPlan().spaces, magazine = rectCentre(spaces[magazineSpace()]!).along;
     const far = (space: number) => Math.abs(rectCentre(spaces[space]!).along - magazine);
-    for (const f of [...d.fires].sort((p, q) => far(p.space) - far(q.space) || p.space - q.space)) out.push({ job: 'fight', on: f.space, at: fireSpot(f.space) });
+    const burning = d.fires.map((f) => f.space).sort((p, q) => far(p) - far(q) || p - q);
+    for (const space of pick(crew, ['fight'], burning, 1)) out.push({ job: 'fight', on: space, at: fireSpot(space) });
   }
   if (passed(told.wreckage, 'first lieutenant', tick)) for (const code of pick(crew, ['cut'], d.alongside, 1)) out.push({ job: 'cut', on: code, at: cutSpot(code) });
 

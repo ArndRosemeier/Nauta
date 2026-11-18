@@ -11,8 +11,9 @@
  *   at the part of her the aim names, rules/guns.ts `AIM_HEIGHT`); the others stand square and level.
  * - **Fire as they bear:** a ready gun laid as her captain wants fires when the roll brings her bore onto his
  *   elevation (`bears`), with his timing error; then she reloads and fires again. **Held for the captain's word**, the
- *   ready guns that bear on her fire at his word, at his moment (no timing error), rippling down her side; the word is
- *   spent when every one of them has fired. **Cease firing:** the guns load and stand ready.
+ *   ready guns that bear on her and are laid fire at his word, at his moment (no timing error), rippling down her side;
+ *   the word is spent when every one of them has fired. Each gun captain lays against her trim and her steady heel
+ *   (motion.ts), so her roll passing her steady heel brings every bore through the elevation wanted at once. **Cease firing:** the guns load and stand ready.
  * - At most `RIPPLE` guns of a ship fire in a step, in battery order: a broadside ripples over a few steps.
  *
  * - **The gun crews at quarters** (orders.md): one crew serves a pair of guns. The side that bears on the enemy
@@ -21,7 +22,7 @@
  *   bear, or she made ready before either did and they stand at their posts in the quarter bill) is split: each gun is
  *   worked by the whole crew at `SPLIT_SHARE` of its pace (`pairHands`).
  *
- * Not built yet: shifting a long six to her chase port; her steady heel in the laying (laid as if she lay upright).
+ * Not built yet: shifting a long six to her chase port.
  */
 import { AIM_HEIGHT, GUNS, LAID_WITHIN, RIPPLE, SHOT, SPLIT_SHARE, type ShotKind } from '../rules/guns';
 import { LOAD_WATERLINE } from '../rules/ships';
@@ -51,6 +52,12 @@ export interface GunneryDeck {
   readonly out?: ReadonlySet<number>;
   readonly sailing: Sailing;
   readonly pose: ShipPose;
+  /** Her steady heel, rad (motion.ts): her gun captains lay against it (0: as if she lay upright). */
+  readonly heel?: number;
+  /** How well her gun crews are drilled, their pace (1 if not given; state.ts `SimShip.drill`). */
+  readonly drill?: number;
+  /** The powder smoke about her (guns/smoke.ts; clear if not given). */
+  readonly smoke?: number;
   /** The enemy's pose, or null when there is none to fire at. */
   readonly enemy: ShipPose | null;
   readonly sea: SeaState | null;
@@ -135,12 +142,13 @@ export function stepGunnery(d: GunneryDeck): Gunnery {
     if (!told.quarters) return SECURED;
     const g = gunAt(d.guns, i), want: GunWant = { load: told.shot, runOut: true, train: 0, elevation: 0 };
     if (!target || g.dismounted || !offSide(d.pose, place.side, muzzleAt(place), target)) return want;
-    const lay = layOn({ seed: d.seed, ship: d.ship, gun: i, tick: d.tick, place, pose: d.pose, shot: g.loadedWith ?? told.shot, heel: 0 }, target);
+    const lay = layOn({ seed: d.seed, ship: d.ship, gun: i, tick: d.tick, place, pose: d.pose, shot: g.loadedWith ?? told.shot, heel: d.heel ?? 0 }, target);
     if (Math.abs(lay.train) > GUNS[place.gun].train) return want;
     lays[i] = lay;
     return { ...want, train: lay.train, elevation: lay.laid };
   });
-  let guns = stepGuns(d.guns, men, wants, shares);
+  // Each gun at her share of her pair's crew, as well drilled as they are.
+  let guns = stepGuns(d.guns, men, wants, shares.map((x) => x * (d.drill ?? 1)));
   const fired: GunFired[] = [];
   const word = told.firing === 'hold' && told.word;
   let left = 0;
@@ -149,15 +157,14 @@ export function stepGunnery(d: GunneryDeck): Gunnery {
       const lay = lays[i], g = gunAt(guns, i), place = places[i]!;
       if (!lay || g.drill !== 'ready' || cannotFire(g, men[i]!)) continue;
       const laid = laidAt(g);
-      if (!word) {
-        const near = Math.abs(laid.elevation - lay.laid) <= LAID_WITHIN && Math.abs(laid.train - lay.train) <= LAID_WITHIN;
-        if (!near || !bears(place, laid.train, laid.elevation, d.pose, lay.elevation)) continue;
-      }
+      // A gun not yet laid holds her fire, at the word too (N7.5a); as they bear, each fires as the roll brings her on.
+      const near = Math.abs(laid.elevation - lay.laid) <= LAID_WITHIN && Math.abs(laid.train - lay.train) <= LAID_WITHIN;
+      if (!near || (!word && !bears(place, laid.train, laid.elevation, d.pose, lay.elevation))) continue;
       if (fired.length === RIPPLE) { left++; continue; }
       const shot = fireGun(guns, i, men[i]!);
       if (!shot.firing) continue;
       guns = shot.guns;
-      const fire = { seed: d.seed, ship: d.ship, gun: i, tick: d.tick, place, firing: shot.firing, pose: d.pose, men: men[i]!, sea: d.sea, t: d.t };
+      const fire = { seed: d.seed, ship: d.ship, gun: i, tick: d.tick, place, firing: shot.firing, pose: d.pose, men: men[i]!, sea: d.sea, t: d.t, smoke: d.smoke ?? 0 };
       fired.push({ kind: 'fired', tick: d.tick, ship: d.ship, gun: i, fired: fireShot({ ...fire, going: { ahead: d.sailing.ahead, leeway: d.sailing.leeway }, asTheyBear: !word }) });
     }
   }

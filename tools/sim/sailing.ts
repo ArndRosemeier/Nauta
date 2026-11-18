@@ -13,6 +13,9 @@
  * filling to get under way again, and the order panel's eight compass points from a start under way, each reached
  * or answered with full and by.
  *
+ * Then the duel's start (N7.5a): in each force a duel is fought in, the two ships close as fast as the table that sets
+ * how far apart they start says (rules/start.ts `START_CLOSING`), within a quarter.
+ *
  * Last her roll on the sea (N2.2, N3.3, moved here from npm test for its time, docs/CHECKS.md): ten minutes of floating
  * in the strongest preset never blow up; under all the sail the crew will carry in it she heels below the limit; and in
  * a force 5 beam sea her sails steady her roll against bare poles.
@@ -22,7 +25,9 @@
 import {
   CLOSE_HAULED, HEEL_LIMIT, SPEED_CANVAS, SPEED_TABLE, SPEED_TOLERANCE, SPEED_WIND_FORCE, type CanvasName,
 } from '../../src/sim/rules/sailing.ts';
-import { WIND_PRESETS } from '../../src/sim/rules/wind.ts';
+import { DUEL_FORCES, WIND_PRESETS } from '../../src/sim/rules/wind.ts';
+import { START_CLOSING, START_MINUTES } from '../../src/sim/rules/start.ts';
+import { duelStart, startApart } from '../../src/sim/start.ts';
 import { startMatch, type SimState } from '../../src/sim/state.ts';
 import type { Order } from '../../src/sim/orders.ts';
 import { NO_WAY } from '../../src/sim/rules/orders.ts';
@@ -34,7 +39,7 @@ import { simTime } from '../../src/sim/state.ts';
 import { STEER_POINTS, steerPoint } from '../../src/app/orderReport.ts';
 import { angleDiff } from '@futuremagic/core';
 import { step, type SimEvent } from '../../src/sim/step.ts';
-import { DEGREE, KNOT, STEP_SECONDS, STEPS_PER_SECOND } from '../../src/sim/units.ts';
+import { apartOnWater, DEGREE, KNOT, SECONDS_PER_MINUTE, STEP_SECONDS, STEPS_PER_SECOND } from '../../src/sim/units.ts';
 import { beaufortSpeed } from '../../src/sim/rules/beaufort.ts';
 import { startSea } from '../../src/sim/sea/sea.ts';
 import { lyingStill, startMotion, stepMotion, type ShipMotion } from '../../src/sim/ship/motion.ts';
@@ -259,6 +264,24 @@ function beamSea(): string {
   if (!(battle.mean > 1 * DEGREE)) problems.push(`beam sea: under battle sail she is not heeled to leeward (${why})`);
   return why;
 }
+/** How far the closing at a duel's start (rules/start.ts `START_CLOSING`) may stray from what the ships sail, as a share. */
+const CLOSING_SLACK = 0.25;
+/** Each force a duel is fought in: both ships at the duel's start sailed three minutes with no orders, their closing against the table that sets the start (N7.5a). */
+function startClosing(): string {
+  const out: string[] = [];
+  for (let force = DUEL_FORCES.least; force <= DUEL_FORCES.most; force++) {
+    // The seed's picture in this wind, drawn twice as far apart so they do not meet within the minutes measured.
+    const start = duelStart(SEED), [p, q] = start.ships, wide = (2 * startApart(force)) / apartOnWater(p!, q!);
+    let s = startMatch({ ...start, windForce: force, ships: start.ships.map((x) => ({ ...x, x: x.x * wide, z: x.z * wide })) });
+    const apart = apartOnWater(s.ships[0]!.motion.pose, s.ships[1]!.motion.pose);
+    for (let i = 0; i < START_MINUTES * SECONDS_PER_MINUTE * STEPS_PER_SECOND; i++) s = step(s, []).state;
+    const [a, b] = s.ships.map((x) => x.motion.pose), closing = (apart - apartOnWater(a!, b!)) / (START_MINUTES * SECONDS_PER_MINUTE);
+    if (Math.abs(closing - START_CLOSING[force]!) > CLOSING_SLACK * START_CLOSING[force]!) problems.push(`the start in force ${force}: they closed ${closing.toFixed(2)} m/s, the table says ${START_CLOSING[force]}`);
+    out.push(`force ${force} ${closing.toFixed(1)} m/s (${apart.toFixed(0)} m)`);
+  }
+  return out.join(', ');
+}
+console.log(`the start, closing over ${START_MINUTES} min: ${startClosing()}`);
 console.log(galeFloating());
 console.log(`all sail in the gale: ${galeHeel()}`);
 console.log(`force ${BEAM_FORCE} beam sea: ${beamSea()}`);

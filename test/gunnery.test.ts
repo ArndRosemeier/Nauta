@@ -21,6 +21,8 @@ import { EACH, MODERATE, SEED } from './support/orders.ts';
 
 /** How far off her starboard beam the enemy lies, m: well inside the carronades' reach. */
 const RANGE = 150;
+/** Long enough for the gun captains to lay every gun on her, s (a gun not yet laid holds her fire at the word). */
+const LAYING = 4;
 /** A full crew at each gun, for making the battery ready. */
 const FULL = 5;
 /** Long enough for a full crew to load and run out every gun, s (a reload is 35 s, its recoil 1.5 s of it). */
@@ -121,7 +123,7 @@ test('a ship not at quarters never fires; at quarters the guns on her side are l
 });
 
 test('held guns fire at the tick the word is given, rippling down her side until every one has fired', () => {
-  const held = run(LOADED, 1, [EACH.quarters, EACH.hold]).state;
+  const held = run(LOADED, LAYING, [EACH.quarters, EACH.hold]).state;
   assert.deepEqual(firedIn(run(held, 1).events), [], 'held: none fires before the word');
   const word = step(held, [EACH.fire]);
   const first = firedIn(word.events);

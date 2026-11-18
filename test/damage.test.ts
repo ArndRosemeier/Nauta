@@ -3,7 +3,7 @@
  * its path; the design's ranges for piercing hold; every effect is reachable (a hole, a lodged ball, splinters, a gun
  * dismounted, a man struck, a spar wounded, a line cut, a sail holed); splinters strike only men ahead of the hole;
  * chain cuts more than round shot; a ball through her wheel shoots her steering away and one fired close may set her
- * afire (N6.2); the step puts fired shots in flight and traces them. That no state under `owners`
+ * afire (N6.2); the step puts fired shots in flight and traces them; a ball in by her stern rakes her (N7.5a). That no state under `owners`
  * is written elsewhere is the guards' test (test/guards.test.ts).
  *
  * Shots here fly straight at a set speed through a ship lying still (built for the purpose, as CHECKS.md asks): what a
@@ -230,3 +230,19 @@ test('the step puts a gun\'s shot in flight and traces it through the other ship
 });
 /** Steps the integration test runs at most (a ball crosses the 3 km between the ships' places well inside it). */
 const STEPS = 120;
+
+/** From well astern of her to well ahead, m along. */
+const AHEAD = 30;
+test('a ball in by her stern rakes her: it travels the length of her battery, dismounting more guns than one across her, and its splinters strike more', () => {
+  const g = battery().find((p) => p.side > 0 && p.gun === 'carronade')!, h = (g.sill + g.top) / 2 - 0.2;
+  const line = (g.footprint.port + g.footprint.starboard) / 2;
+  let raked = { guns: 0, men: 0 }, square = { guns: 0, men: 0 };
+  // Square into her side at a gun (`intoGun`), and from astern along the line of her starboard guns at their height.
+  const count = (r: Run, was: { guns: number; men: number }) => ({ guns: was.guns + r.events.filter((e) => e.what === 'gun').length, men: was.men + r.events.filter((e) => e.what === 'man').length });
+  for (const seed of [1, 2, 3, 4]) {
+    raked = count(fire(straight('round', [-AHEAD, line, h], [AHEAD, line, h], AT_100), CARRONADE, seed), raked);
+    square = count(fire(intoGun().shot, CARRONADE, seed), square);
+  }
+  // A ball fired into her side at one gun: through the port it dismounts that gun and stops.
+  assert.ok(raked.guns > square.guns && raked.men > 2 * square.men, `raking: ${raked.guns} guns, ${raked.men} men; into her side: ${square.guns} guns, ${square.men} men`);
+});

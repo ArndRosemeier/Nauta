@@ -10,7 +10,7 @@ import { encode } from '../src/sim/codec.ts';
 import { battery } from '../src/sim/guns/guns.ts';
 import { bears, boreElevation, elevationFor, fireShot, fly, layOn, muzzleAt, type Fire, type Flight } from '../src/sim/guns/shot.ts';
 import { MUZZLE_SPEED, POINT_BLANK, RANGE_TABLE, RANGE_TOLERANCE, SHOT } from '../src/sim/rules/guns.ts';
-import { startMotion, toWorld, type ShipPose } from '../src/sim/ship/motion.ts';
+import { restTrim, startMotion, toWorld, type ShipPose } from '../src/sim/ship/motion.ts';
 import { DEGREE } from '../src/sim/units.ts';
 
 /** The muzzle's height over the water in the range table, m. */
@@ -19,6 +19,8 @@ const STARBOARD = battery().findIndex((g) => g.side > 0 && g.gun === 'carronade'
 const LARBOARD = battery().findIndex((g) => g.side < 0 && g.gun === 'carronade');
 /** She lies level, heading north, still. */
 const LEVEL: ShipPose = { ...startMotion(0, 0, 0).pose, pitch: 0, roll: 0, heave: 0 };
+/** Laid within this of what is wanted, rad (a hundredth of a degree: the laying's one step of correction for her trim). */
+const LAID_CLOSE = 0.01 * DEGREE;
 
 /** A first graze's distance from where the ball left, m. */
 const graze = (f: Flight, from: readonly number[]): number => Math.hypot(f.touches[0]![0] - from[0]!, f.touches[0]![2] - from[2]!);
@@ -110,9 +112,12 @@ test('the laying table puts the shot through the point laid for, and the gun cap
   assert.ok(Math.abs(abeam.train) < 1e-9 && abeam.elevation > 0);
   const forward = layOn({ seed: 1, ship: 0, gun: STARBOARD, tick: 0, place, pose: LEVEL, shot: 'round', heel: 0 }, [from[0] + 200, 1, from[2] - 50]);
   assert.ok(forward.train > 10 * DEGREE);
+  // Laid against her trim at rest: as she lies on average, trained forward of square too, the bore stands at the elevation wanted.
+  const steady: ShipPose = { ...LEVEL, pitch: restTrim() };
+  for (const lay of [abeam, forward]) assert.ok(Math.abs(boreElevation(place, lay.train, lay.laid, steady).now - lay.elevation) < LAID_CLOSE);
   // Heeled to starboard, she is laid higher on deck to reach the same elevation.
   const heeled = layOn({ seed: 1, ship: 0, gun: STARBOARD, tick: 0, place, pose: LEVEL, shot: 'round', heel: 2 * DEGREE }, [from[0] + 200, 1, from[2]]);
-  assert.ok(Math.abs(heeled.laid - abeam.laid - 2 * DEGREE) < 1e-9);
+  assert.ok(Math.abs(heeled.laid - abeam.laid - 2 * DEGREE) < LAID_CLOSE);
 });
 
 test('a gun bears when her roll brings her bore through the elevation laid for', () => {

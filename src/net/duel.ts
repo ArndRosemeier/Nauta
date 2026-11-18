@@ -29,7 +29,7 @@
  */
 import { deriveSeed, hashString } from '@futuremagic/core';
 import type { GameHub, RoomSummary } from '../../vendor/gamehub/gamehub';
-import { captainOrders } from '../sim/captain/captain';
+import { captainOrders, crewedBy } from '../sim/captain/captain';
 import type { Order } from '../sim/orders';
 import type { Skill } from '../sim/rules/captain';
 import { poseBetween, type ShipPose } from '../sim/ship/motion';
@@ -185,7 +185,8 @@ export class DuelSession {
       this.role = 'solo';
       const seed = options.seed ?? SOLO_SEED;
       const start = options.setup ?? this.timed(options.alone ? aloneStart(seed, this.terms) : duelStart(seed, this.terms));
-      this.begin(startMatch(options.windForce === undefined ? start : { ...start, windForce: options.windForce }), [SOLO_PLAYER, null]);
+      const crewed = this.foe ? crewedBy(start, FOE_SHIP, this.foe) : start;
+      this.begin(startMatch(options.windForce === undefined ? crewed : { ...crewed, windForce: options.windForce }), [SOLO_PLAYER, null]);
       return;
     }
     this.role = 'joining';

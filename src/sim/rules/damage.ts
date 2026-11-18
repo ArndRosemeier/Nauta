@@ -71,8 +71,8 @@ export const PIERCE: Readonly<Record<ShotKind, Readonly<Record<GunKind, Pierce>>
     long6: { slow: [163, 0.17], fast: [253, 0.24], most: 0.26, splinters: 0.2 },
   },
   grape: {
-    carronade: { slow: [177, 0.04], fast: [191, 0.17], most: 0.2, splinters: 0.1 },
-    long6: { slow: [270, 0.04], fast: [330, 0.17], most: 0.2, splinters: 0.05 },
+    carronade: { slow: [177, 0.04], fast: [191, 0.17], most: 0.2, splinters: 0.3 },
+    long6: { slow: [270, 0.04], fast: [330, 0.17], most: 0.2, splinters: 0.15 },
   },
 };
 
@@ -103,10 +103,17 @@ export const MAN_AS_OAK = 0.03;
  * at the hole, falling straight to none at the reach, times the shot's `splinters` (PIERCE). A ball that lodges throws
  * LODGED_SPLINTERS of that off the inside.
  */
-export const SPLINTER_REACH = 3;
-export const SPLINTER_CONE = 40 * DEGREE;
-export const SPLINTER_STRIKE = 0.7;
+export const SPLINTER_REACH = 4;
+export const SPLINTER_CONE = 50 * DEGREE;
+export const SPLINTER_STRIKE = 1;
 export const LODGED_SPLINTERS = 0.5;
+/**
+ * Raking (N7.5a, "raking pays"): a ball whose path through her lies within `within` (rad) of her length, in by her bow
+ * or stern, travels the length of her deck and counts for several fired into her side: it meets her timber square on
+ * (her stern and bow, built across it, not her side glancing), and a gun it meets is dismounted without stopping it (it
+ * spends `1 / times` of a gun's iron), so it goes on through the gun crews down her side.
+ */
+export const RAKING = { within: 30 * DEGREE, times: 2 } as const;
 
 // ---- Men ----
 
@@ -115,12 +122,16 @@ export type Harm = 'wounded' | 'badly' | 'killed';
 export const HARMS: readonly Harm[] = ['wounded', 'badly', 'killed'];
 /** What strikes a man: a ball itself (by its kind), or splinters. */
 export type HurtBy = ShotKind | 'splinter' | 'fall';
-/** How a man struck is hurt, by what struck him (a man aloft on a spar that falls is thrown down: `fall`): the shares wounded, badly wounded and killed (they add up to one, tested). */
+/**
+ * How a man struck is hurt, by what struck him (a man aloft on a spar that falls is thrown down: `fall`): the shares
+ * wounded, badly wounded and killed (they add up to one, tested). Splinters and grape put about half the men they strike
+ * or more out of the fight (N7.5a, "splinters and grape hurt"), so a well-served broadside thins a gun deck.
+ */
 export const HURT: Readonly<Record<HurtBy, readonly [wounded: number, badly: number, killed: number]>> = {
   round: [0, 0.3, 0.7],
   chain: [0, 0.4, 0.6],
   grape: [0.3, 0.4, 0.3],
-  splinter: [0.6, 0.3, 0.1],
+  splinter: [0.4, 0.35, 0.25],
   fall: [0.2, 0.4, 0.4],
 };
 
@@ -129,19 +140,39 @@ export const HURT: Readonly<Record<HurtBy, readonly [wounded: number, badly: num
 /**
  * A shot hole lets the sea in as a round opening RAGGED times the ball's diameter across (the timber splintered round
  * it), passing DISCHARGE of the ideal flow (a sharp-edged opening): flow = DISCHARGE × area × √(2 g × depth), the depth
- * from the sea outside down to the hole, less the water inside standing over it. A lodged ball plugs its own hole. Held
- * to the design's statement (tested): five holes at her waterline, unplugged, with the pumps manned, sink her in about
- * eight minutes (`FOUNDER_MINUTES`); plugged and pumped she holds.
+ * from the sea outside down to the hole, less the water inside standing over it. A lodged ball plugs its own hole; a
+ * hole the carpenter has plugged still weeps WEEP of what it let in, so the water gains slowly even with a good
+ * carpenter (N7.5a).
  */
 export const RAGGED = 1.7;
 export const DISCHARGE = 0.6;
-export const FOUNDER_MINUTES = 8;
+export const WEEP = 0.25;
+/**
+ * Every hole in her planking, above the water too, lets in at least SEEP of what the same hole at her waterline would
+ * (`AT_WATERLINE`): the sea she ships through it as she rolls and the seams the blow opened round it. So the water in her
+ * adds up with the fire she takes, not with where one or two balls happen to strike (design thread, 2026-11-18, "less
+ * luck in flooding").
+ */
+export const SEEP = 0.2;
+/**
+ * The sea washes in at a hole up to WASH m above it, as if the hole lay that much deeper: her roll, her own wave and the
+ * slop along her side (N7.5a: holes "between wind and water" let the sea in; turning the wounded side away lifts them
+ * clear).
+ */
+export const WASH = 1;
+/**
+ * A hole "at her waterline" in the design's sense (between wind and water): her roll and the waves put it about this far
+ * under on the average, m. The pumps are measured against a 32-pound shot hole lying so.
+ */
+export const AT_WATERLINE = 0.3;
 /**
  * Her chain pumps (ship.md; rules/fittings.ts `PUMPS`): `count` side by side by the mainmast, each fully manned by
- * `hands` men clearing `rate` t of water a second (a ton and a half a minute), fewer men in proportion. They draw from
- * the well and leave `least` t in the bilge. The men posted at the pumps by the quarter bill (crew.ts) work them.
+ * `hands` men holding `holds` open 32-pound shot holes at her waterline (`AT_WATERLINE`), fewer men in proportion
+ * (N7.5a, "flooding is a contest": the carpenter's crew, four at the pumps while he and his mate plug, hold one and a
+ * half; "Hands to the pumps", eight men at both, about three). They draw from the well and leave `least` t in the bilge. The
+ * men posted at the pumps by the quarter bill (crew.ts) work them. Faster than chain pumps were, for the contest's sake.
  */
-export const PUMPING = { count: 2, hands: 4, rate: 1.5 / 60, least: 1 } as const;
+export const PUMPING = { count: 2, hands: 4, holds: 1.5, least: 1 } as const;
 /** The post of the men who work the pumps (rules/crew.ts quarter bill). */
 export const PUMP_POST = 'station-pumps';
 /**
@@ -196,19 +227,20 @@ export const SPLIT = 0.6;
  * ball starts it. Unfought it doubles every `doubling` s up to the whole space; at `spread` it catches the spaces the
  * plan's ways join it to (doors, ladders, openings) at `start`; each man fighting it puts out `put` of the space a
  * second. Powder catches when the magazine's own fire reaches `catch`: from `start` that takes log₂(catch / start)
- * doublings, about 3 min (tested). Out below `out`.
+ * doublings, about 3 min (tested). Out below `out`. A contest (N7.5a): a fresh fire outgrows the `FIGHT_AT_HAND` men
+ * beating at it, so a fire party must come within a minute or two or it takes hold.
  */
-export const FIRE = { start: 0.05, doubling: 78, spread: 0.5, catch: 0.25, put: 0.0012, out: 0.005 } as const;
+export const FIRE = { start: 0.05, doubling: 50, spread: 0.5, catch: 0.65, put: 0.0003, out: 0.005 } as const;
 /** The space the powder is kept in (the plan's). */
 export const MAGAZINE = 'magazine';
 /** Until a fire party comes (N6.3), the men in a burning space and the spaces joined to it beat at it, at most this many. */
-export const FIGHT_AT_HAND = 4;
+export const FIGHT_AT_HAND = 2;
 /**
  * The chance a ball that holes her timber, lodges in it or dismounts a gun sets her afire: `wad` when it was fired from
  * within WAD_RANGE (m, the burning wads and the flash reach her), else `ball` (a lantern, the galley fire, powder
  * by the guns).
  */
-export const FIRE_CHANCE = { wad: 0.05, ball: 0.003 } as const;
+export const FIRE_CHANCE = { wad: 0.05, ball: 0.03 } as const;
 export const WAD_RANGE = 40;
 
 // ---- Steering (N6.2) ----

@@ -146,7 +146,8 @@ export const JOBS: Readonly<Record<DrillJob, JobRow>> = {
 /**
  * Who works what (the quarter bill's parts of ship), by gang: each mast's square sails and braces, the headsails, the
  * after sails (boom sail and staysails). `aloft` goes out on the yards; `deck` hauls, in the order they are sent.
- * "Ready about" takes the hands of every gang on deck. The helm is the quartermasters'.
+ * "Ready about" takes the hands of every gang on deck. The helm is the quartermasters'; with them all down or busy the
+ * nearest afterguard man takes the wheel (a shot through the wheel once left her with no one to put the helm over).
  */
 export type Gang = 'fore' | 'main' | 'head' | 'after';
 export const GANGS: Readonly<Record<Gang, { readonly aloft: Part | null; readonly deck: readonly Part[] }>> = {
@@ -156,7 +157,7 @@ export const GANGS: Readonly<Record<Gang, { readonly aloft: Part | null; readonl
   after: { aloft: null, deck: ['afterguard', 'marines'] },
 };
 export const STATIONS_PARTS: readonly Part[] = ['afterguard', 'forecastle', 'waist', 'marines'];
-export const HELM_PARTS: readonly Part[] = ['helm'];
+export const HELM_PARTS: readonly Part[] = ['helm', 'afterguard'];
 /** The crew place a helm job is done at. */
 export const WHEEL = 'station-wheel';
 
@@ -224,7 +225,7 @@ export const CARPENTERS: readonly string[] = ['carpenter', "carpenter's mate", '
 export const STANDING_WORK = 3600;
 
 export const REPAIRS: Readonly<Record<RepairName, RepairRow>> = {
-  plug: { what: 'a shot hole plugged', men: 2, work: 45, who: { ranks: CARPENTERS } },
+  plug: { what: 'a shot hole plugged', men: 2, work: 60, who: { ranks: CARPENTERS } },
   fish: { what: 'a wounded spar fished', men: 2, work: 90, who: { ranks: ['carpenter', "carpenter's mate"] } },
   splice: { what: 'a cut line knotted and spliced', men: 3, work: 60, who: { ranks: ['boatswain', "boatswain's mate"] } },
   tackle: { what: 'the relieving tackles rigged', men: 4, work: 90, who: { ranks: ['quartermaster'] } },

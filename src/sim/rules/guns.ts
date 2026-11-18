@@ -128,6 +128,14 @@ export const SHOT: Readonly<Record<ShotKind, ShotRow>> = {
 };
 
 /**
+ * Powder smoke about a ship (N7.5a, "the weather position must pay"; guns/smoke.ts): each gun fired by either ship lays
+ * `gun` of thick smoke on the ship to leeward (in full dead to leeward, less as the wind draws abeam); it clears as the
+ * wind carries it `clears` m off (half a minute in a light breeze, a few seconds in a strong one); while it hangs her gun
+ * captains lay and time their guns `spoils` times as badly again at the thickest. First proposals of N7.5a.
+ */
+export const SMOKE = { gun: 0.06, clears: 60, spoils: 2 } as const;
+
+/**
  * Scatter (seeded; tuned so that against a brig broadside on in a force 4 sea, fired as they bear, about three round
  * shot in four strike her hull at 100 m, half at 200 m and one in five at 400 m: design decisions for N5; checked by
  * `npm run check:gunnery`):
@@ -183,12 +191,13 @@ export const RANGE_TOLERANCE = 0.05;
 /** Where the gun captains lay their guns on her (orders.md: the gunner's "Aim: Hull, Rigging, Deck"). */
 export type AimName = 'hull' | 'rigging' | 'deck';
 /**
- * The point each aim lays on, m above the calm water at her middle, on her side toward the guns: the hull half her
- * freeboard up (where N5.2's check aims, so the range shares hold for it); the rigging about her lower yards (her lower
- * masts' hounds); the deck a man's chest above her rail. First proposals, judged at G5 when damage (N6.1) can say what
- * each strikes.
+ * The point each aim lays on, m above the calm water at her middle, on her side toward the guns: the hull at her
+ * waterline, "between wind and water" as gunners laid it (N7.5a: with her roll and the waves a fair share strike where
+ * the sea comes in; the design's shares of balls that strike her, N5, are of balls laid on her side's middle, 1.25 m
+ * up, and `check:gunnery` measures them so); the rigging about her lower yards (her lower masts' hounds); the deck a
+ * man's chest above her rail. First proposals, judged at G5.
  */
-export const AIM_HEIGHT: Readonly<Record<AimName, number>> = { hull: 1.25, rigging: 13, deck: 4 };
+export const AIM_HEIGHT: Readonly<Record<AimName, number>> = { hull: 0, rigging: 13, deck: 4 };
 /**
  * The most guns of one ship that fire in a step: a broadside ripples down her side over a few steps, as a real one
  * did, and so a whole side of grape (about 6.5 ms of flights, N5.2) is spread over steps of 2 ms.

@@ -7,9 +7,11 @@
  * Beaten: a computer captain strikes, a player's first lieutenant says "We must strike, sir", when any one holds: at
  * least `out` of her men killed or badly hurt; she cannot sail (no sail can draw) and fewer than `crews` gun crews on
  * both sides together can fire (a pair's crew at a mounted gun of the pair, at least `FEWEST_AT_GUN` of them there);
- * the water in her over `water` of what founders her and still gaining.
+ * the water in her over `water` of what founders her and still gaining; or (N7.5a, "a helpless ship is beaten") she
+ * cannot sail and faces a ship that can and still has at least `guns` of her guns mounted (the other lies off her bow
+ * or stern and rakes her).
  */
-export const BEATEN = { out: 1 / 2, crews: 4, water: 2 / 3 } as const;
+export const BEATEN = { out: 0.3, crews: 4, water: 0.95, guns: 1 / 2 } as const;
 
 /**
  * Burnt out, lost like a ship sunk: fire holds `spaces` or more spaces below her weather deck at over `size` each, or

@@ -5,7 +5,7 @@
  * record (who lost, how, when; both lost in one step is a draw). With neither lost when the match's time runs out, it is
  * drawn: they part at nightfall, the master warning five minutes before.
  *
- * Beaten (`beaten`) is what makes a computer captain strike (N7.1) and his first lieutenant say "We must strike, sir"
+ * Beaten (`beaten`, with N7.5a's helpless ship) is what makes a computer captain strike (N7.1) and his first lieutenant say "We must strike, sir"
  * to a player, who is never made to: it is told as an event the step it comes true.
  *
  * The simulation goes on after the end (the ship is seen going down, N6.7); step.ts refuses every order then.
@@ -13,7 +13,7 @@
 import { outOf, standingNow, type Damage } from './damage';
 import { founderTonnes } from './damage/flood';
 import { pairOf } from './crew/roster';
-import { battery, gunAt, handsAtGuns } from './guns/guns';
+import { battery, gunAt, gunCount, handsAtGuns } from './guns/guns';
 import { COMPLEMENT } from './rules/crew';
 import { BEATEN, BURNT, LIGHT_WARNING_MINUTES, MATCH_MINUTES } from './rules/end';
 import { FEWEST_AT_GUN } from './rules/guns';
@@ -36,6 +36,8 @@ export interface Fight {
   readonly nightfall: number;
   /** Each ship beaten now (her first lieutenant has said so). */
   readonly beaten: readonly boolean[];
+  /** The tick each ship became beaten, while she is (null: not beaten): a better computer captain fights on a little past it (N7.5a). */
+  readonly beatenAt: readonly (number | null)[];
   /** The end, once the fight is over; null while it goes on. */
   readonly end: FightEnd | null;
 }
@@ -53,7 +55,7 @@ const ticksOf = (minutes: number): number => Math.round(minutes * SECONDS_PER_MI
 
 /** A fight at its start for `ships` ships, its time `minutes` long. */
 export function startFight(ships: number, minutes: number = MATCH_MINUTES): Fight {
-  return { nightfall: ticksOf(minutes), beaten: Array.from({ length: ships }, () => false), end: null };
+  return { nightfall: ticksOf(minutes), beaten: Array.from({ length: ships }, () => false), beatenAt: Array.from({ length: ships }, () => null), end: null };
 }
 
 /** The water in her, t. */
@@ -94,17 +96,27 @@ function crewsAble(ship: SimShip): number {
   return [...pairs.values()].filter((p) => p.mounted && p.men >= FEWEST_AT_GUN).length;
 }
 
+/** Whether a ship can sail: some sail of hers can still draw. */
+const canSail = (ship: SimShip): boolean => standingNow(ship.damage).draws.some((x) => x > 0);
+
+/** Whether an enemy can still punish a ship that cannot sail: she can sail and has at least `BEATEN.guns` of her guns mounted. */
+function canRake(enemy: SimShip): boolean {
+  let mounted = 0;
+  for (let i = 0; i < gunCount(enemy.guns); i++) if (!gunAt(enemy.guns, i).dismounted) mounted++;
+  return mounted >= BEATEN.guns * gunCount(enemy.guns) && canSail(enemy);
+}
+
 /**
- * Whether a ship is beaten (design decisions for N6): half her men killed or badly hurt; she cannot sail and fewer than
- * four gun crews can fire; or her water over two thirds of what founders her and still gaining (`was`: her damage a step
- * before).
+ * Whether a ship is beaten (design decisions for N6, N7.5a): `BEATEN.out` of her men killed or badly hurt; she cannot sail and
+ * fewer than four gun crews can fire, or she cannot sail facing an enemy that can and has half her guns (`enemies`: the
+ * other ships); or her water over two thirds of what founders her and still gaining (`was`: her damage a step before).
  */
-export function beaten(ship: SimShip, was: Damage): boolean {
+export function beaten(ship: SimShip, was: Damage, enemies: readonly SimShip[] = []): boolean {
   const d = ship.damage;
   if (outOf(d).size >= BEATEN.out * COMPLEMENT) return true;
   if (waterIn(d) > BEATEN.water * founderTonnes() && waterIn(d) > waterIn(was)) return true;
-  const sails = standingNow(d).draws.every((x) => x === 0);
-  return sails && crewsAble(ship) < BEATEN.crews;
+  if (canSail(ship)) return false;
+  return enemies.some(canRake) || crewsAble(ship) < BEATEN.crews;
 }
 
 /**
@@ -115,7 +127,7 @@ export function beaten(ship: SimShip, was: Damage): boolean {
 export function stepFight(f: Fight, before: readonly SimShip[], after: readonly SimShip[], tick: number): { fight: Fight; events: FightEvent[] } {
   if (f.end) return { fight: f, events: [] };
   const events: FightEvent[] = [];
-  const now = after.map((s, i) => beaten(s, before[i]!.damage));
+  const now = after.map((s, i) => beaten(s, before[i]!.damage, after.filter((_, j) => j !== i)));
   now.forEach((b, i) => { if (b && !f.beaten[i]) events.push({ kind: 'beaten', tick, ship: i }); });
   const lost = after.map(lostHow);
   let end: FightEnd | null = null;
@@ -123,7 +135,8 @@ export function stepFight(f: Fight, before: readonly SimShip[], after: readonly 
   else if (tick + 1 === f.nightfall - ticksOf(LIGHT_WARNING_MINUTES)) events.push({ kind: 'light', tick });
   if (end) events.push({ kind: 'end', tick, lost });
   const changed = end !== null || now.some((b, i) => b !== f.beaten[i]);
-  return { fight: changed ? { ...f, beaten: now, end } : f, events };
+  const beatenAt = now.map((b, i) => (b ? (f.beaten[i] ? f.beatenAt[i] ?? tick : tick) : null));
+  return { fight: changed ? { ...f, beaten: now, beatenAt, end } : f, events };
 }
 
 /** The winner of an ended fight (the one ship not lost), or null: drawn, or not over. */

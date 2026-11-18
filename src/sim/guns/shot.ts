@@ -21,12 +21,12 @@ import { clamp, deriveSeed, Rng } from '@futuremagic/core';
 import { monotoneCurve } from '../curve';
 import {
   CHAIN_WANDER, DISPERSION, FLIGHT_LONGEST, FLIGHT_STEP, JUDGE_SECONDS, JUDGING, MUZZLE_SPEED, PATH_STEP, RICOCHET_ANGLE, RICOCHET_SPEED,
-  SHOT, SKIP_KEEP, SKIP_LIFT, SKIPS_MOST, SPEED_OF_SOUND, SPEED_SPREAD, SPHERE_DRAG, TIMING, type ShotKind,
+  SHOT, SKIP_KEEP, SKIP_LIFT, SKIPS_MOST, SMOKE, SPEED_OF_SOUND, SPEED_SPREAD, SPHERE_DRAG, TIMING, type ShotKind,
 } from '../rules/guns';
 import { AIR } from '../rules/sailing';
 import { highestWater, seaAt, seaSample, type SeaState } from '../sea/sea';
 import { hullHalfBreadth } from '../ship/hull';
-import { pointVelocity, poseRotation, toWorld, type ShipPose } from '../ship/motion';
+import { pointVelocity, poseRotation, restTrim, toWorld, type ShipPose } from '../ship/motion';
 import type { GunPlace } from '../ship/plan';
 import { shipY, shipZ } from '../ship/section';
 import { bearingDir, DEGREE, GRAVITY, MS_PER_SECOND, STEP_SECONDS, STEPS_PER_SECOND } from '../units';
@@ -89,6 +89,8 @@ export interface Fire {
   /** The sea the balls fall into (null: a calm, flat sea), and the time of firing, s. */
   readonly sea: SeaState | null;
   readonly t: number;
+  /** The powder smoke about her, 0 clear to 1 thick (guns/smoke.ts; clear if not given): it spoils the gun captain's aim. */
+  readonly smoke?: number;
 }
 
 const DRAG = monotoneCurve(SPHERE_DRAG.mach, SPHERE_DRAG.drag);
@@ -220,12 +222,13 @@ export const shotRng = (seed: number, ship: number, gun: number, tick: number): 
 export function fireShot(f: Fire): Shot {
   const rng = shotRng(f.seed, f.ship, f.gun, f.tick), row = SHOT[f.firing.shot], kind = f.place.gun;
   const pace = drillPace(f.men, f.place.crew.length);
-  const late = f.asTheyBear ? rng.gaussian(0, TIMING / Math.max(pace, PACE_FLOOR)) : 0;
+  const veiled = 1 + SMOKE.spoils * (f.smoke ?? 0);
+  const late = f.asTheyBear ? rng.gaussian(0, (TIMING * veiled) / Math.max(pace, PACE_FLOOR)) : 0;
   const pose = poseAfter(f.pose, late), at = muzzleAt(f.place);
   const from = toWorld(pose, at[0], at[1], at[2]);
   const bore = worldDir(pose, boreIn(f.place, f.firing.trained, f.firing.elevated));
   const carried = shipVelocity(pose, f.going, at);
-  const wander = DISPERSION * (f.firing.shot === 'chain' ? CHAIN_WANDER : 1);
+  const wander = DISPERSION * veiled * (f.firing.shot === 'chain' ? CHAIN_WANDER : 1);
   const aim = scatterDir(bore, rng.gaussian(0, wander), rng.gaussian(0, wander));
   const speed = MUZZLE_SPEED[kind] * row.speed * (1 + rng.gaussian(0, SPEED_SPREAD));
   const balls: Flight[] = [];
@@ -323,7 +326,7 @@ export interface Lay {
   readonly train: number;
   /** The world elevation he wants the bore at when he fires, rad. */
   readonly elevation: number;
-  /** The elevation above her deck he lays her at to reach it as she lies on average (her steady heel `heel`, rad, taken out). */
+  /** The elevation above her deck he lays her at to reach it as she lies on average (her trim at rest and her steady heel `heel`, rad, taken out). */
   readonly laid: number;
 }
 
@@ -339,8 +342,9 @@ export function trainTo(place: GunPlace, pose: ShipPose, target: Vec): { train: 
 /**
  * How a gun captain lays his gun on a world point from where she lies: the training that points her at it (as her
  * heading lies), and the elevation for its range as he judges it (seeded misjudgement of the range, `JUDGING`, judged
- * afresh every `JUDGE_SECONDS`), laid
- * against her steady heel so the roll brings her bore through it. Not kept within her arcs: the gun (guns.ts) is.
+ * afresh every `JUDGE_SECONDS`), laid against her trim at rest and her steady heel so the roll brings her bore through
+ * it (N7.5a: laid as if she lay level, a gun trained forward of square stood a degree high in a calm and never bore). Not
+ * kept within her arcs: the gun (guns.ts) is.
  */
 export function layOn(f: Pick<Fire, 'seed' | 'ship' | 'gun' | 'tick' | 'place' | 'pose'> & { readonly shot: ShotKind; readonly heel: number }, target: Vec): Lay {
   const { train, range, from } = trainTo(f.place, f.pose, target);
@@ -348,5 +352,7 @@ export function layOn(f: Pick<Fire, 'seed' | 'ship' | 'gun' | 'tick' | 'place' |
   const spell = Math.floor(f.tick / (JUDGE_SECONDS * STEPS_PER_SECOND));
   const judged = range * (1 + new Rng(deriveSeed(f.seed, 'judge', f.ship, f.gun, spell)).gaussian(0, JUDGING));
   const elevation = elevationFor(f.shot, f.place.gun, judged, target[1] - from[1]);
-  return { train, elevation, laid: elevation + f.place.side * f.heel };
+  // Laid against her as she lies on average, trimmed by the stern and at her steady heel, so her roll brings the bore through it.
+  const steady: ShipPose = { ...f.pose, pitch: restTrim(), roll: f.heel, pitchRate: 0, rollRate: 0 };
+  return { train, elevation, laid: 2 * elevation - boreElevation(f.place, train, elevation, steady).now };
 }

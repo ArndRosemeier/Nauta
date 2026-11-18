@@ -38,37 +38,54 @@ export interface SkillRow {
   readonly chain: boolean;
   /** He holds the side for his word and gives it as her roll passes level (design N5: "the roll is the skill"); otherwise they fire as they bear. */
   readonly word: boolean;
+  /** Laying his broadside on her and still closing, he turns toward her only as far as his guns still bear, loaded or not (N7.5a); else as steeply as `MOST_CLOSING` while they reload. */
+  readonly keepBearing: boolean;
   /** He sets plain sail to close beyond this range, m (0: never), and goes back to battle sail inside it. */
   readonly plainBeyond: number;
   /** He sends the hands to the pumps once this much water is in her, t. */
   readonly pumpsAt: number;
-  /** He sends a fire party once a fire holds this share of its space (0: at once). */
+  /** He sends a fire party once a fire holds this share of its space (0: at once), each fire noticed a little sooner or later (`FIRE_NOTICE`). */
   readonly fireAt: number;
   /** He has the carpenter's crew plug first once this many holes let the sea in (0: never). */
   readonly plugAt: number;
+  /** Beaten by the rule, he fights on this many seconds before he asks to strike, while it may still serve him (N7.5a: green at once; never once she is going down). */
+  readonly strikeAfter: number;
+  /**
+   * How well his gun crews are drilled: their pace at the guns (1: a player's crew, always). Only a little either way
+   * (design thread, 2026-11-18): flavour when playing alone; his decisions are what must win or lose the fight.
+   */
+  readonly drill: number;
 }
 
 /**
  * The levels. A green captain looks round every 8 s, misjudges a range by a quarter, steers straight at her, fights
- * at 250 m, opens fire at 800 m and sees to the water late. A seasoned one looks every 4 s, works a little for the wind
- * and her stern, fights at 150 m and closes to grape. A master looks every 2 s, judges within 5 %, works hard for the
- * weather position and the rake, fights at 100 m with grape inside 90 m, cripples a ship to windward with chain, fires
- * his broadsides on the roll and sees to every leak and fire at once.
+ * at 180 m, opens fire at 800 m and sees to the water late. A seasoned one looks every 4 s, works a little for the wind
+ * and her stern, fights at 110 m and closes to grape. A master looks every 2 s, judges within 5 %, works hard for the
+ * weather position and the rake, fights at 90 m with grape inside 60 m, cripples a ship to windward with chain, fires
+ * his broadsides on the roll and sees to every leak and fire at once. Beaten, the green one strikes at once, the seasoned
+ * one fights on ten seconds and the master twenty, in case it turns (not when she is going down under him).
  */
 export const SKILL: Readonly<Record<Skill, SkillRow>> = {
   green: {
-    look: 8, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 250, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
-    grape: 0, chain: false, word: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.1, plugAt: 0,
+    look: 8, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
+    grape: 0, chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.14, plugAt: 0, strikeAfter: 0, drill: 0.95,
   },
   seasoned: {
-    look: 4, judgeRange: 0.12, judgeBearing: 2 * DEGREE, range: 150, gauge: 150, rake: 0.5, lead: 0.5, quarters: 1500, open: 500,
-    grape: 70, chain: false, word: false, plainBeyond: 1200, pumpsAt: 10, fireAt: 0, plugAt: 0,
+    look: 4, judgeRange: 0.12, judgeBearing: 2 * DEGREE, range: 110, gauge: 150, rake: 0.5, lead: 0.5, quarters: 1500, open: 500,
+    grape: 50, chain: false, word: false, keepBearing: true, plainBeyond: 1200, pumpsAt: 10, fireAt: 0, plugAt: 0, strikeAfter: 10, drill: 1,
   },
   master: {
-    look: 2, judgeRange: 0.05, judgeBearing: 1 * DEGREE, range: 100, gauge: 250, rake: 1, lead: 1, quarters: Infinity, open: 400,
-    grape: 90, chain: true, word: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2,
+    look: 2, judgeRange: 0.05, judgeBearing: 1 * DEGREE, range: 90, gauge: 250, rake: 1, lead: 1, quarters: Infinity, open: 400,
+    grape: 60, chain: true, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, strikeAfter: 20, drill: 1.05,
   },
 };
+
+/**
+ * A fire is noticed sooner or later than his `fireAt` by up to this share of it, seeded for each fire (N7.5a): eight
+ * men beat down a fire up to about a fifth of its space, so now and then a green captain hears of one too late and she
+ * burns.
+ */
+export const FIRE_NOTICE = 0.5;
 
 // ---- Tactics every level shares ----
 
@@ -88,6 +105,11 @@ export const TURN_AT = 6 * DEGREE;
 export const OFF_CLOSE = 3 * DEGREE;
 /** He goes about onto the other tack only when it heads him this much nearer what he wants than this tack does, rad. */
 export const TACK_GAIN = 25 * DEGREE;
+/**
+ * Wanting a course before the wind, the other tack is only a small turn through the wind astern: he wears onto it for
+ * this much gain, rad (N7.5a: with `TACK_GAIN` he stayed on a dead run, his broadside not bearing, while she pounded him).
+ */
+export const WEAR_GAIN = 6 * DEGREE;
 /** He tacks only with this much way on her; slower, she would miss stays (N3.3), so he wears. */
 export const TACK_WAY = 2 * KNOT;
 /** Fewer than this many seconds to close is no reason to reckon ahead; more than `LEAD_MOST` is guesswork. */
@@ -105,18 +127,21 @@ export const LAYING_SPARE = 8 * DEGREE;
 /** Choosing the side to fight, a side whose guns stand ready counts this much nearer, rad; the side he fights already as much again. */
 export const READY_SIDE = 30 * DEGREE;
 export const SAME_SIDE = 20 * DEGREE;
+/**
+ * Choosing the side to fight with the water past his mark (`pumpsAt`), each hole the sea washes in at in a side counts
+ * this much against it, rad, at most `WOUNDED_MOST` (N7.5a, "flooding is a contest": turned away, the holes lift clear).
+ */
+export const WOUNDED_SIDE = 30 * DEGREE;
+export const WOUNDED_MOST = 180 * DEGREE;
 /** She lies in his rake when he is within this of her bow or stern line, rad: her broadside cannot bear on him there. */
 export const RAKE_WITHIN = 55 * DEGREE;
 /** A raking side counts this much nearer when he chooses which side to fight, rad, by his `rake`. */
 export const RAKE_SIDE = 60 * DEGREE;
 /** Fired on his word: he gives it once this share of the side's mounted guns that bear stand ready, */
-export const WORD_READY = 0.6;
-/** as her roll passes within this of level, rad, or her roll stands still within `WORD_STILL_ROLL` (a steady heel). */
-export const WORD_ROLL = 1 * DEGREE;
+export const WORD_READY = 0.4;
+/** as her roll passes her steady heel (N7.5a), or, her roll slower than `WORD_STILL_RATE` rad/s, lying within `WORD_STILL` rad of it. */
 export const WORD_STILL_RATE = 0.5 * DEGREE;
-export const WORD_STILL_ROLL = 4 * DEGREE;
-/** Heeled steadily beyond this, rad, a master lets them fire as they bear: her roll never brings the side level. */
-export const WORD_HEEL_MOST = 6 * DEGREE;
+export const WORD_STILL = 0.2 * DEGREE;
 /** Loading chain at her rigging: inside this range, m (chain reaches about 250 m, design N5), and beyond his grape. */
 export const CHAIN_INSIDE = 250;
 /** She holds the weather position when she is this far to windward of him, m. */

@@ -36,6 +36,10 @@ export interface SimShip {
   readonly guns: Battery;
   /** Her holes, lines cut, spars wounded, sails holed and men hurt (damage.ts owns it). */
   readonly damage: Damage;
+  /** How well her gun crews are drilled: their pace at the guns, set at the start (`ShipStart.drill`) and never changed. */
+  readonly drill: number;
+  /** The powder smoke about her as her gun captains see it, 0 clear to 1 thick (guns/smoke.ts owns it). */
+  readonly smoke: number;
 }
 
 /** The whole match. Changed only by `step` (and made by `startMatch`); rules.json `owners` names each field's owner. */
@@ -66,6 +70,8 @@ export interface ShipStart {
   readonly heading: number;
   readonly speed?: number;
   readonly canvas?: CanvasName;
+  /** How well her gun crews are drilled, their pace at the guns (1 if not given: a player's crew; a computer captain's by his skill, captain.ts `crewedBy`). */
+  readonly drill?: number;
 }
 
 /** What a match starts from. How the ships are placed (distance, who has the wind) is the caller's: an open design question. */
@@ -102,6 +108,8 @@ export function startMatch(setup: MatchSetup): SimState {
       closures: openShip(),
       guns: startGuns(),
       damage: startDamage(),
+      drill: s.drill ?? 1,
+      smoke: 0,
     })),
     flying: [],
     fight: startFight(setup.ships.length, setup.minutes),

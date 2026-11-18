@@ -86,10 +86,11 @@ test('the guns: quarters and opening fire by his ranges, grape close in, round s
   // Abeam to starboard at 300 m a master opens fire, holding for his word; a green captain fires as they bear.
   assert.deepEqual(kinds(firstLook(pair([300, 0]))).filter((k) => ['quarters', 'hold', 'bear'].includes(k)), ['quarters', 'hold']);
   assert.ok(kinds(firstLook(pair([300, 0]), 'green')).includes('bear'));
-  // At 60 m a master loads grape at her deck; a green captain keeps round shot at her hull.
-  const close = firstLook(pair([60, 0]));
+  // Inside his grape range a master loads grape at her deck; a green captain keeps round shot at her hull.
+  const near = SKILL.master.grape * (1 - 1 / 5);
+  const close = firstLook(pair([near, 0]));
   assert.ok(close.some((o) => o.kind === 'shot' && o.shot === 'grape') && close.some((o) => o.kind === 'aim' && o.at === 'deck'));
-  assert.ok(!firstLook(pair([60, 0]), 'green').some((o) => o.kind === 'shot'));
+  assert.ok(!firstLook(pair([near, 0]), 'green').some((o) => o.kind === 'shot'));
   // Out of his range he does not open fire (the guns stand loaded for when it counts).
   assert.ok(!kinds(firstLook(pair([900, 0]))).some((k) => k === 'bear' || k === 'hold'));
 });
@@ -136,13 +137,18 @@ test('the helm: never closer than close-hauled; closing to windward of her; a br
   }
 });
 
-test('beaten, he strikes: he asks, and gives it again when asked back; the fight ends with her struck', () => {
+test('beaten, he strikes (a master after fighting on a little): he asks, and gives it again when asked back; the fight ends with her struck', () => {
   const killed = HARMS.indexOf('killed');
   const hurt = Array.from({ length: Math.ceil(COMPLEMENT / 2) }, (_, m) => (m + 1) * HARMS.length + killed);
   const was = pair([300, 0], 0, { hurt });
   assert.equal(beaten(was.ships[0]!, was.ships[0]!.damage), true, 'half her men out: beaten');
   // His first lieutenant has said so (end.ts sets `fight.beaten` as the step ends).
-  let s: SimState = { ...was, fight: { ...was.fight, beaten: [true, false] } };
+  const fightsOn = Math.round(SKILL.master.strikeAfter * STEPS_PER_SECOND);
+  const just: SimState = { ...was, tick: 0, fight: { ...was.fight, beaten: [true, false], beatenAt: [0, null] } };
+  // Just beaten, a green captain asks at once; a master fights on a little (N7.5a).
+  assert.ok(captainOrders(just, 0, 'green').some((o) => o.kind === 'strike'), 'green: at once');
+  assert.ok(!captainOrders({ ...just, tick: fightsOn - Math.round(SKILL.master.look * STEPS_PER_SECOND) }, 0, 'master').some((o) => o.kind === 'strike'), 'a master fights on');
+  let s: SimState = { ...was, fight: { ...was.fight, beaten: [true, false], beatenAt: [-fightsOn, null] } };
   const struck: number[] = [];
   for (let k = 0; k < 3 * STEPS_PER_SECOND * SKILL.master.look && !s.ships[0]!.told.struck; k++) {
     s = { ...s, tick: k };
@@ -159,12 +165,14 @@ test('played alone with a foe (?foe=master), the other ship is commanded by the 
   assert.equal(readParams('?sail&foe=master').foe, 'master');
   assert.equal(readParams('?sail&foe').foe, 'seasoned');
   assert.equal(readParams('?sail').foe, null);
-  // One step: at the match's first step he looks round and gives his orders (a master beats to quarters at any range).
+  // The second ship's captain looks round half a look after the match's first step and gives his orders (a master beats to quarters at any range).
+  const firstLook = Math.round(SKILL.master.look * STEPS_PER_SECOND / 2);
   let t = 0;
   const alone = new DuelSession({ build: 'test', now: () => t, seed: 3 }), fought = new DuelSession({ build: 'test', now: () => t, seed: 3, foe: 'master' });
-  const his = captainOrders(fought.state, 1, 'master');
-  assert.ok(his.length > 0, 'he has orders at his first look');
-  t = 1 / STEPS_PER_SECOND;
+  while (fought.state.tick < firstLook) { t += 1 / STEPS_PER_SECOND; for (const s of [alone, fought]) s.pump(); }
+  assert.equal(fought.state.ships[1]!.told.serial, 0, 'not before his first look');
+  assert.ok(captainOrders(fought.state, 1, 'master').length > 0, 'he has orders at his first look');
+  t += 1 / STEPS_PER_SECOND;
   for (const s of [alone, fought]) s.pump();
   assert.equal(alone.state.ships[1]!.told.serial, 0, 'alone, nobody orders her');
   assert.equal(fought.state.ships[1]!.told.quarters, true, 'with a foe, his orders were stepped: quarters');

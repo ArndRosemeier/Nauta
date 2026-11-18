@@ -3,7 +3,7 @@
  * order that gets it. Closing from afar he steers for where she will be, to windward of her by his skill (the weather
  * position) and astern of her (her stern, to rake her); inside his fighting range he lays a broadside on her, closing
  * on a slant while he is beyond his range and opening while inside it, and turning away whatever else when the ships
- * would touch.
+ * would touch. With the water gaining on him he would rather fight the side the sea is not washing in at (N7.5a).
  *
  * The heading he wants becomes the order a captain gives: a course on the tack she is on (never closer than
  * close-hauled, `OFF_CLOSE` off it), full and by when he wants to go closer to the wind than she will lie, a tack onto
@@ -15,7 +15,7 @@ import { angleDiff } from '@futuremagic/core';
 import { goingAbout, isGunnery, isKeep, isLife, tackOf, type Keep, type Order, type SailingOrder } from '../orders';
 import {
   BACK_ABAFT, BACK_MOST, BEARS_WITHIN, CLOSEST, LAYING_SPARE, WORD_READY, CLOSING_PER_RANGE, FILL_ABAFT, HYSTERESIS, OFF_BEARING, STATION_RANGES, ENGAGE_BEYOND, LEAD_MOST, MOST_CLOSING, OFF_CLOSE, RAKE_WITHIN, READY_SIDE, SAME_SIDE, SKILL, TACK_GAIN, TACK_WAY,
-  TURN_AT, type Skill,
+  TURN_AT, WEAR_GAIN, WOUNDED_MOST, WOUNDED_SIDE, type Skill,
 } from '../rules/captain';
 import { HOVE_TO_MAST, MASTER_LOOK } from '../rules/orders';
 import { CLOSE_HAULED } from '../rules/sailing';
@@ -77,12 +77,12 @@ function closing(sight: Sight, skill: Skill): number {
 /**
  * Laying a broadside on her at `range`, m: the heading that puts her on side `k`, turned toward her by how far she is
  * beyond the range (away inside it); while that side stands ready it turns toward her no more than its guns still
- * bear (fire, then close). One who works for her stern (`rake`) holds on while he lies in her rake.
+ * bear (fire, then close), or always (`keepBearing`). One who works for her stern (`rake`) holds on while he lies in her rake.
  */
-function broadside(sight: Sight, range: number, rake: boolean, k: 0 | 1): number {
+function broadside(sight: Sight, range: number, rake: boolean, keepBearing: boolean, k: 0 | 1): number {
   const sign = sideSign(k), side = sight.sides[k];
   const hold = rake && inHerRake(sight) && sight.range > CLOSEST;
-  const most = side.mounted > 0 && side.ready >= WORD_READY * side.mounted ? BEARS_WITHIN - LAYING_SPARE : MOST_CLOSING;
+  const most = keepBearing || (side.mounted > 0 && side.ready >= WORD_READY * side.mounted) ? BEARS_WITHIN - LAYING_SPARE : MOST_CLOSING;
   const closingBy = hold ? 0 : Math.min(most, closingFor(sight.range, range));
   return wrapBearing(sight.bearing - sign * (BEAM - closingBy));
 }
@@ -96,10 +96,12 @@ export function wantedHeading(sight: Sight, skill: Skill): Wanted {
   if (sight.range > row.range + ENGAGE_BEYOND) return { heading: closing(sight, skill), side: null };
   let best: Wanted = { heading: own.heading, side: now }, bestScore = Infinity;
   for (const k of [0, 1] as const) {
-    const heading = broadside(sight, row.range, row.rake > 0, k);
+    const heading = broadside(sight, row.range, row.rake > 0, row.keepBearing, k);
     const can = sailableOn(tackOf(heading, sight.windFrom, 1), heading, sight.windFrom);
     const report = sight.sides[k];
-    const score = Math.abs(angleDiff(own.heading, can)) + OFF_BEARING * Math.abs(angleDiff(can, heading)) - (report.mounted > 0 ? (report.ready / report.mounted) * READY_SIDE : -READY_SIDE) - (k === now ? SAME_SIDE : 0);
+    // The water gaining on him (past his mark), a side with the sea washing in at it counts against itself: turned away, its holes lift clear.
+    const wounded = sight.water >= row.pumpsAt ? Math.min(WOUNDED_MOST, report.leaks * WOUNDED_SIDE) : 0;
+    const score = Math.abs(angleDiff(own.heading, can)) + OFF_BEARING * Math.abs(angleDiff(can, heading)) - (report.mounted > 0 ? (report.ready / report.mounted) * READY_SIDE : -READY_SIDE) - (k === now ? SAME_SIDE : 0) + wounded;
     if (score < bestScore) { bestScore = score; best = { heading, side: k }; }
   }
   // Too close: whichever side he fights, his head is turned away from her.
@@ -116,7 +118,8 @@ export function helmOrder(sight: Sight, want: number): Order | null {
   if (goingAbout(told)) return null;
   const tack = tackOf(s.heading, from, s.sides[0]!);
   const same = sailableOn(tack, want, from), other = sailableOn(-tack, want, from);
-  if (Math.abs(angleDiff(other, want)) + TACK_GAIN < Math.abs(angleDiff(same, want))) {
+  const gain = Math.abs(angleDiff(want, from)) < BEAM ? TACK_GAIN : WEAR_GAIN;
+  if (Math.abs(angleDiff(other, want)) + gain < Math.abs(angleDiff(same, want))) {
     // To windward on the other board: go about with way enough, else wear round to it.
     if (Math.abs(angleDiff(want, from)) < BEAM && s.ahead >= TACK_WAY) return { kind: 'tack', ship };
     return farFrom(told.helm, other, -tack, from) ? { kind: 'steer', ship, heading: other } : null;

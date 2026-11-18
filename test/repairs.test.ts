@@ -16,7 +16,7 @@ import { billOrder, brigRoster, placeSpot } from '../src/sim/crew/roster.ts';
 import { handsAtGuns } from '../src/sim/guns/guns.ts';
 import { parseOrder, type Order } from '../src/sim/orders.ts';
 import { CARRY_PARTIES, PLUG_PARTIES, REPAIRS, SURGEON } from '../src/sim/rules/crew.ts';
-import { HARMS } from '../src/sim/rules/damage.ts';
+import { FIRE, HARMS } from '../src/sim/rules/damage.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
@@ -111,7 +111,7 @@ test('the first lieutenant\'s parties take men from the guns by the quarter bill
   const messdeck = shipPlan().spaces.findIndex((sp) => sp.id === 'messdeck');
   const part = sparParts().findIndex((p) => p.spar === 'fore-mast');
   const orders: Order[] = ['hands to the pumps', 'fire party', 'clear the wreckage'].map((w) => parseOrder(w, 0) as Order);
-  const start = lying({ holes: holesUnder(1 / 2, PLUG_PARTIES.all), flooded: [10, 10], fires: [{ space: messdeck, size: 0.2 }], alongside: [part * 2 + 1] });
+  const start = lying({ holes: holesUnder(1 / 2, PLUG_PARTIES.all), flooded: [10, 10], fires: [{ space: messdeck, size: FIRE.start }], alongside: [part * 2 + 1] });
   // Before the orders come down to the men, the carpenter and his mate plug alone.
   let s = run(start, 1, orders);
   assert.equal(repairTasks(s.ships[0]!.crew, 'plug').length, PLUG_PARTIES.unasked);

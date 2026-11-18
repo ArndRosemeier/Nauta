@@ -522,7 +522,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Shot in flight: a gun's firing made into her shot (aim from her lay and the ship's pose at that instant, seeded scatter, the ship's motion added), every ball flown to its end | `src/sim/guns/shot.ts#fireShot` |
 | One ball's flight under gravity and drag, skipping off the water, to where it is spent | `src/sim/guns/shot.ts#fly` |
 | The elevation that puts a gun's shot through a point (the laying table) | `src/sim/guns/shot.ts#elevationFor` |
-| How a gun captain lays his gun on a point (training, the elevation he wants, laid against her heel; his misjudged range) | `src/sim/guns/shot.ts#layOn` |
+| How a gun captain lays his gun on a point (training, the elevation he wants, laid against her trim at rest and her steady heel; his misjudged range) | `src/sim/guns/shot.ts#layOn` |
+| Her steady heel (her roll averaged, what her gun captains lay against) and her trim at rest | `src/sim/ship/motion.ts#stepMotion`, `src/sim/ship/motion.ts#restTrim` |
+| Powder smoke about a ship: how far she lies to leeward of the other, and the smoke the wind lays on her and clears | `src/sim/guns/smoke.ts#leeOf`, `src/sim/guns/smoke.ts#smokeAfter` |
+| A computer captain's gun crews drilled by his skill, in the match's start | `src/sim/captain/captain.ts#crewedBy` |
 | The training a gun needs to bear on a point, and its range | `src/sim/guns/shot.ts#trainTo` |
 | Whether a gun bears: her roll brings her bore through the elevation laid for | `src/sim/guns/shot.ts#bears` |
 | A gun's bore's elevation above the horizon now, and its rate | `src/sim/guns/shot.ts#boreElevation` |
@@ -549,8 +552,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What a straight piece of a ball's path meets in a ship, in order: timber crossed (cell, thickness, how square), guns, men, spars, lines, sails as set | `src/sim/damage/meet.ts#meetings` |
 | The parts of her spars between the places each can break (what a wound is kept against) | `src/sim/damage/meet.ts#sparParts` |
 | The closest approach of two straight pieces | `src/sim/damage/meet.ts#closest` |
-| What a hit does and what follows: timber thickness, each shot's punch by speed, chain's bite, splinters, how men are hurt, stove in and smashed, the violence levels; water, pumps, falling spars, the wreck's drag, holed sails, fire, steering (first proposals) | `src/sim/rules/damage.ts#PIERCE` |
-| What damage leads to (N6.2), each step for each ship: the sea in at her holes against the pumps, spars falling with the men on them, fire growing, spreading, fought and reaching her powder; what is left of her sails, her steering, the wreck's drag and the water's weight for her sailing and floating (the one routine that takes what follows a hit) | `src/sim/damage.ts#stepAftermath` |
+| What a hit does and what follows: timber thickness, each shot's punch by speed, chain's bite, splinters, raking, how men are hurt, stove in and smashed, the violence levels; water, plugged holes weeping, pumps, falling spars, the wreck's drag, holed sails, fire, steering (first proposals) | `src/sim/rules/damage.ts#PIERCE` |
+| What damage leads to (N6.2), each step for each ship: the sea in at her holes (plugged ones weeping) against the pumps, spars falling with the men on them, fire growing, spreading, fought and reaching her powder; what is left of her sails, her steering, the wreck's drag and the water's weight for her sailing and floating (the one routine that takes what follows a hit) | `src/sim/damage.ts#stepAftermath` |
 | A hole as her damage keeps it | `src/sim/damage.ts#holeCode` |
 | The repairs her crew finished, done to her: holes plugged, spars fished, lines spliced, steering mended, wreckage cut away (the one routine that mends) | `src/sim/damage.ts#mend` |
 | The holes in her planking the sea can come in at (not lodged, not plugged) | `src/sim/damage.ts#openHoles` |
@@ -572,6 +575,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The repairs' men, work and who does them; plugging parties, carrying parties, the surgeon's place (first proposals) | `src/sim/rules/crew.ts#REPAIRS` |
 | The sea's flow in at a shot hole by its depth | `src/sim/damage/flood.ts#inflow` |
 | What the pumps clear, by the men at them | `src/sim/damage/flood.ts#pumped` |
+| What one pump fully manned clears (the holes at her waterline it holds) | `src/sim/damage/flood.ts#pumpRate` |
 | The water in her running across her as she heels, with what comes in and what is pumped | `src/sim/damage/flood.ts#flowed` |
 | How water of a weight lies in her (its level, its middle, its surface's breadth) | `src/sim/damage/flood.ts#lyingOf` |
 | The water in her as what she carries (weight and middle in ship space) | `src/sim/damage/flood.ts#loadOf` |
@@ -590,7 +594,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What a ship carries beyond her own weight (the water in her), for floating | `src/sim/ship/motion.ts#Burden` |
 | The match the page sails (`?sail`, `?room`, `?join=`): the session running now behind one face, its events to the order panel, the poses to draw | `src/app/pageMatch.ts#PageMatch` |
 | Where a duel starts: 1,500 m apart, the wind on the beam of the line between them, the seed turning the picture and picking the force | `src/sim/start.ts#duelStart` |
-| How a duel starts (distance apart, way on at the start) | `src/sim/rules/start.ts#START_APART` |
+| How a duel starts (as far apart as three minutes of closing in that wind, way on at the start) | `src/sim/rules/start.ts#START_CLOSING` |
 | The match as the page runs it: stepped by the clock alone, or as host or guest through GameHub; hashes checked, the host's state winning; the host leaving passes hosting on | `src/net/duel.ts#DuelSession` |
 | A room's match seed from its code | `src/net/duel.ts#roomSeed` |
 | What the machines send each other (snapshot, delta, a captain's orders), the protocol's version | `src/net/wire.ts#PROTOCOL` |

@@ -12,13 +12,15 @@ import { angleDiff, deriveSeed, Rng } from '@futuremagic/core';
 import { openHoles, standingNow } from '../damage';
 import { waterIn } from '../end';
 import { battery, gunAt } from '../guns/guns';
-import { SKILL, BEARS_WITHIN, type Skill } from '../rules/captain';
+import { SKILL, BEARS_WITHIN, FIRE_NOTICE, type Skill } from '../rules/captain';
+import { WASH } from '../rules/damage';
 import { GUNS } from '../rules/guns';
+import { LOAD_WATERLINE } from '../rules/ships';
 import { rigPlan } from '../ship/rig';
 import { MASTS } from '../ship/sailing';
 import type { SimShip, SimState } from '../state';
 import { simTime } from '../state';
-import { apartOnWater, bearingDir, bearingTo, wrapBearing } from '../units';
+import { apartOnWater, bearingDir, bearingTo, STEPS_PER_SECOND, wrapBearing } from '../units';
 import { meanWind, type Wind } from '../wind';
 
 /** The enemy as he sees her across the water. */
@@ -40,6 +42,8 @@ export interface SideReport {
   readonly ready: number;
   readonly readyBearing: number;
   readonly bears: boolean;
+  /** The carpenter's report: the open holes in that side the sea washes in at (within `WASH` of her waterline). */
+  readonly leaks: number;
 }
 
 /** What he knows at a look. */
@@ -63,13 +67,19 @@ export interface Sight {
   readonly windward: number;
   /** His sides, larboard then starboard (-1, +1 at [0], [1]). */
   readonly sides: readonly [SideReport, SideReport];
-  /** The water in her, t; the holes the sea comes in at; the largest fire's share of its space; what lies alongside. */
+  /**
+   * The water in her, t; the holes the sea comes in at; the largest fire's share of its space of those he has noticed
+   * (0: none): a fire is noticed at his `fireAt`, each fire sooner or later than that by a seeded share up to
+   * `FIRE_NOTICE` (N7.5a: so a green captain now and then hears of one too late); what lies alongside.
+   */
   readonly water: number;
   readonly leaks: number;
   readonly fire: number;
   readonly wreckage: number;
   /** His first lieutenant says she is beaten ("We must strike, sir", N6.4). */
   readonly beaten: boolean;
+  /** How long she has been beaten, s (0 while she is not). */
+  readonly beatenFor: number;
 }
 
 /** A quarter turn, rad: square to her side. */
@@ -94,7 +104,9 @@ export function sideReports(own: SimShip, off: number, trueOff: number): [SideRe
     if (Math.abs(angleDiff(p.side * QUARTER, trueOff)) <= GUNS[p.gun].train) c.readyBearing++;
   });
   const bears = (sign: number) => Math.abs(angleDiff(sign * QUARTER, off)) <= BEARS_WITHIN;
-  return [{ ...counts[0]!, bears: bears(-1) }, { ...counts[1]!, bears: bears(1) }];
+  const leaks = [0, 0];
+  for (const h of openHoles(own.damage)) if (h.at[2] - LOAD_WATERLINE < WASH) leaks[h.at[1] > 0 ? 1 : 0]!++;
+  return [{ ...counts[0]!, bears: bears(-1), leaks: leaks[0]! }, { ...counts[1]!, bears: bears(1), leaks: leaks[1]! }];
 }
 
 /** The lower masts' places in the rig plan's spars (fore, main). */
@@ -104,6 +116,11 @@ function mastsStanding(ship: SimShip): number {
   lowerMasts ??= MASTS.map((m) => rigPlan().spars.findIndex((s) => s.id === `${m}${MAST_SUFFIX}`));
   const down = standingNow(ship.damage).down;
   return lowerMasts.filter((m) => !down[m]).length;
+}
+
+/** The share of a space a fire there holds when he notices it: his `fireAt`, sooner or later by a seeded share up to `FIRE_NOTICE` (the same for the same fire on every machine). */
+function noticedAt(seed: number, ship: number, space: number, fireAt: number): number {
+  return fireAt * (1 + FIRE_NOTICE * (2 * new Rng(deriveSeed(seed, 'fire seen', ship, space)).float() - 1));
 }
 
 /** What the captain of `ship` (with the eye of `skill`) knows at the start of the step of `state`. The duel's enemy is the other ship. */
@@ -123,7 +140,8 @@ export function sightOf(state: SimState, ship: number, skill: Skill): Sight {
     windward: (me.x - her.x) * wx + (me.z - her.z) * wz,
     sides: sideReports(own, off, trueOff),
     water: waterIn(d), leaks: openHoles(d).length,
-    fire: d.fires.reduce((m, f) => Math.max(m, f.size), 0), wreckage: d.alongside.length,
+    fire: d.fires.reduce((m, f) => (f.size >= noticedAt(state.matchSeed, ship, f.space, row.fireAt) ? Math.max(m, f.size) : m), 0), wreckage: d.alongside.length,
     beaten: state.fight.beaten[ship] ?? false,
+    beatenFor: (state.tick - (state.fight.beatenAt[ship] ?? state.tick)) / STEPS_PER_SECOND,
   };
 }
