@@ -13,6 +13,8 @@ import { makeTestBodies } from './render/testBodies';
 import { loadFittings } from './render/ship/fittings';
 import { buildSlice } from './render/ship/slice';
 import { ShipView } from './render/ship/shipView';
+import { SeaSound } from './audio/seaSound';
+import { Vector3 } from 'three/webgpu';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
 import { makeWind, meanWind } from './sim/wind';
 import { followWind, startSea } from './sim/sea/sea';
@@ -83,6 +85,9 @@ async function start(): Promise<void> {
   const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());
+  // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want.
+  const sound = new SeaSound(import.meta.env.BASE_URL, MATCH_SEED);
+  const ear = new Vector3(), facing = new Vector3(), crown = new Vector3();
 
   let last = performance.now(), frames = 0, shown = last, ms = 0;
   view.renderer.setAnimationLoop(() => {
@@ -102,13 +107,17 @@ async function start(): Promise<void> {
     }
     sky.update(dt, view.camera);
     seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky);
+    view.camera.getWorldPosition(ear);
+    view.camera.getWorldDirection(facing);
+    crown.copy(view.camera.up).applyQuaternion(view.camera.quaternion);
+    sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], ship?.below ?? 0);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
     frames++;
     if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${params.wind} · eye ${params.eye} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris, ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${params.wind} · eye ${params.eye} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris, ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;

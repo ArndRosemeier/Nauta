@@ -40,3 +40,17 @@ export function beaufortSpeed(force: number): number {
   if (!row) throw new RangeError(`no force ${force} on the Beaufort scale (0 to ${BEAUFORT.length - 1})`);
   return (row.lo + row.hi) / 2;
 }
+
+/**
+ * The force a mean wind speed stands at, as a fraction between whole forces: `beaufortSpeed`'s inverse, straight between
+ * the forces' middle speeds, so `beaufortForce(beaufortSpeed(f)) === f`. Below force 0's middle it is 0, above the last
+ * force's middle the last force.
+ */
+export function beaufortForce(speed: number): number {
+  if (speed <= beaufortSpeed(0)) return 0;
+  for (let f = 0; f + 1 < BEAUFORT.length; f++) {
+    const lo = beaufortSpeed(f), hi = beaufortSpeed(f + 1);
+    if (speed <= hi) return f + (speed - lo) / (hi - lo);
+  }
+  return BEAUFORT.length - 1;
+}
