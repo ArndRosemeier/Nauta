@@ -17,15 +17,16 @@
  * - **The hull** resists going ahead, sideways (her leeway) and turning; **the rudder** turns her by the square of her
  *   speed through the water, so without way she does not answer her helm (and with sternway it acts the other way).
  * - **The helmsman** steers the heading he is told, the short way or the way he is told to turn (through the wind is
- *   a tack, away from it a wear). In a tack that stops short of the wind she misses stays: he bears away onto the old
- *   tack.
+ *   a tack, away from it a wear), but never closer to the wind than her set sails stand full (`closestOff`): he steers
+ *   by the sails, so full and by is as close as she lies with every sail drawing. In a tack that stops short of the
+ *   wind she misses stays: he bears away onto the old tack.
  *
  * Out of a step come her new state, how she moves on the water and the sails' heeling moment (`Way`, for motion.ts,
  * which owns her pose), and what happened (tacked, wore, missed stays).
  */
 import { angleDiff, clamp } from '@futuremagic/core';
 import {
-  ADDED_MASS, AIR, BOOM_SHEET_LEAST, BRACE_RATE, CANVAS, CARRIED_UP_TO, FORE_AFT_POLAR, GYBE, HAUL, HEADSAIL_SHEET,
+  ADDED_MASS, AIR, BOOM_SHEET_LEAST, BRACE_RATE, CANVAS, CARRIED_UP_TO, CLOSE_HAULED, FORE_AFT_POLAR, FULL_ANGLE, GYBE, HAUL, HEADSAIL_SHEET,
   HELM_RATE, HELMSMAN, HULL_AHEAD, HULL_SIDEWAYS, HULL_TURNING, LET_FLY_ANGLE, LET_FLY_SHARE, MISSED_STAYS, REEF_AT,
   RUDDER, SAIL_ROLL_SLOPE, SHIVER_ANGLE, SQUARE_POLAR, START_CANVAS, TRIM_TRIES, TURN_GYRATION, TURN_SKID, WINDAGE, type CanvasName, type Polar,
 } from '../rules/sailing';
@@ -101,6 +102,8 @@ interface SailBody {
   /** A yard's brace limit, rad (square sails, from square), or how far a sheet lets the sail swing off her centre line, least and most. */
   readonly least: number;
   readonly limit: number;
+  /** The nearest the apparent wind may come to her bow for it to stand full, braced up or sheeted flat, rad. */
+  readonly full: number;
 }
 
 /** The hull and rig, worked out once. */
@@ -161,6 +164,7 @@ function buildSailingBody(): Body {
     return {
       sail, square, head: sail.kind === 'head', mast: sail.mast === 'main' ? MAIN : FORE,
       along: c.along - along, height: c.height, tryCos, trySin, least, limit: most,
+      full: (square ? Math.PI / 2 - most : least) + FULL_ANGLE,
     };
   });
   return {
@@ -369,6 +373,39 @@ function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: 
   force.heel = heel;
 }
 
+/** How many Newton steps `arcSine` takes: enough for the sines `closestOff` meets (below a half), to the last bit. */
+const ARC_STEPS = 5;
+
+/** The angle whose sine is `q` (|q| ≤ 1, kept to below a quarter turn), rad, from `sincos` alone, so the same bits on every engine. */
+function arcSine(q: number): number {
+  let a = q;
+  for (let i = 0; i < ARC_STEPS; i++) {
+    sincos(a, sc);
+    if (sc[1] <= 0) break;
+    a = clamp(a - (sc[0] - q) / sc[1], -Math.PI / 2, Math.PI / 2);
+  }
+  return a;
+}
+
+/**
+ * The nearest she lies to the true wind `wind` with every set sail full, rad off her bow (full and by): with her way
+ * and leeway as they are and the wind on her `side` (+1 starboard), the true wind's angle at which the apparent wind
+ * comes as near her bow as the set sail that needs it furthest aft allows (`FULL_ANGLE` past its yard braced up or its
+ * sheet flat). Never closer than `CLOSE_HAULED`; with no sail set, close-hauled.
+ */
+export function closestOff(s: Sailing, wind: Wind, side: number = s.sides[FORE]!): number {
+  const b = sailingBody();
+  let need = 0;
+  for (let i = 0; i < b.sails.length; i++) if (drawingArea(b.sails[i]!.sail, s.canvas[i]!) > 0) need = Math.max(need, b.sails[i]!.full);
+  if (need === 0 || wind.speed === 0) return CLOSE_HAULED;
+  // The apparent wind β off her bow from the true wind θ off it: tan β = (W sin θ + side·leeway) / (W cos θ + ahead),
+  // so sin(θ - β) = (ahead sin β - side·leeway cos β) / W.
+  sincos(need, sc);
+  const q = (s.ahead * sc[0] - side * s.leeway * sc[1]) / wind.speed;
+  if (q >= 1) return Math.PI;
+  return Math.min(Math.PI, Math.max(CLOSE_HAULED, need + arcSine(q)));
+}
+
 /** The signed heading still to go, rad, the way the helmsman turns: the short way, or all the way round the way he was told. */
 function headingToGo(heading: number, steer: Steer): number {
   const short = angleDiff(heading, steer.heading);
@@ -402,12 +439,16 @@ export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind): SailingStep
 
   // The helmsman: which way she must still turn, and the side the wind will be on at the heading he steers for. Her
   // sails go over to that side only; while the fore yards are still on the other and her turn takes her through the
-  // wind's eye, she is in stays (a tack).
+  // wind's eye, she is in stays (a tack). Sailing on a tack with her yards drawing, he steers by the sails: no nearer
+  // the wind than they stand full (`closestOff`), whatever he was told.
   let steer = s.steer;
   if (steer.turn !== 0 && Math.abs(angleDiff(s.heading, steer.heading)) < HELMSMAN.settled) steer = { ...steer, turn: 0 };
-  const toGo = headingToGo(s.heading, steer), turning = Math.sign(toGo);
-  const windSide = ay < 0 ? 1 : -1, eye = angleDiff(s.heading, wind.from);
-  const bound = Math.sign(angleDiff(steer.heading, wind.from)) || s.sides[FORE]!;
+  const windSide = ay < 0 ? 1 : -1, eye = angleDiff(s.heading, wind.from), side = s.sides[FORE]!;
+  const bound = Math.sign(angleDiff(steer.heading, wind.from)) || side;
+  const onTack = bound === side && windSide === side && s.sides[MAIN] === side && !s.backed.some(Boolean);
+  const off = onTack ? closestOff(s, wind, side) : 0;
+  const aim = onTack && side * angleDiff(steer.heading, wind.from) < off ? { ...steer, heading: wrapBearing(wind.from - side * off) } : steer;
+  const toGo = headingToGo(s.heading, aim), turning = Math.sign(toGo);
   const inStays = bound !== s.sides[FORE] && Math.sign(eye) === turning && Math.abs(toGo) > Math.abs(eye);
   const letFly = inStays && Math.abs(ay) < air * b.letFly;
 
@@ -421,7 +462,8 @@ export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind): SailingStep
   const heading = wrapBearing(s.heading + turnRate * dt);
 
   // The helm: hard over at most, put over at the helmsman's pace, the other way with sternway.
-  const wanted = clamp(HELMSMAN.heading * toGo - HELMSMAN.turning * s.turnRate, -RUDDER.most, RUDDER.most) * (s.ahead < 0 ? -1 : 1);
+  const gain = aim === steer ? HELMSMAN.heading : HELMSMAN.bySails;
+  const wanted = clamp(gain * toGo - HELMSMAN.turning * s.turnRate, -RUDDER.most, RUDDER.most) * (s.ahead < 0 ? -1 : 1);
   const helm = s.helm + clamp(wanted - s.helm, -HELM_RATE * dt, HELM_RATE * dt);
 
   // Missed stays: in a tack, she has lost her way or begun to fall back. The helmsman bears away on the old tack and
@@ -471,6 +513,9 @@ export function sailsStanding(s: Sailing, wind: Wind): SailStanding[] {
   const b = sailingBody(), { ax, ay } = apparent(s.heading, s.ahead, s.leeway, wind), shiver = sinOf(SHIVER_ANGLE);
   return b.sails.map((sb, i) => {
     const area = drawingArea(sb.sail, s.canvas[i]!);
+    // Aback (a square sail) or backed (a fore-and-aft one): the wind on the face it should fill from behind (a square
+    // sail's normal here points forward, a fore-and-aft one's to starboard). Running a little by the lee, a boom sail
+    // swung out still fills from aft.
     let angle: number, aback: boolean;
     if (sb.square) {
       angle = -s.braces[sb.mast]! * sb.limit;
@@ -481,8 +526,7 @@ export function sailsStanding(s: Sailing, wind: Wind): SailStanding[] {
       sheetOf(sb, b.foreAft, s, ax, ay);
       angle = sheet.lee * (sb.least + ((sb.limit - sb.least) * sheet.k) / (TRIM_TRIES - 1));
       sailPush(b.foreAft, sheet.lee * sb.trySin[sheet.k]!, sb.tryCos[sheet.k]!, ax, ay);
-      // Backed: the wind comes from the side it lies on.
-      aback = (ay < 0 ? 1 : -1) === sheet.lee;
+      aback = sheet.lee * push.onFace < 0;
     }
     return {
       id: sb.sail.id, area, angle,

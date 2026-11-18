@@ -330,6 +330,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Which sails a canvas sets in a wind, reefed for it | `src/sim/ship/sailing.ts#canvasFor` |
 | Laying a mast's yards aback, or filling them | `src/sim/ship/sailing.ts#layAback` |
 | How each sail stands this moment (area, brace or sheet, pressure, aback, shivering), for drawing and sound | `src/sim/ship/sailing.ts#sailsStanding` |
+| Full and by: the nearest the wind she lies with every set sail full, from her way and leeway (the helmsman's limit, and where the master says she will not lie a course) | `src/sim/ship/sailing.ts#closestOff` |
 | The sailing model's tuning: sail polars, hull and rudder, helmsman, bracing, canvas settings and reefs, heel limit, the speed table | `src/sim/rules/sailing.ts#SPEED_TABLE` |
 | The sailing orders as data: each order, who takes it, what it does | `src/sim/orders.ts#VOCABULARY` |
 | An order from its words (typed or spoken), and why words are none | `src/sim/orders.ts#parseOrder` |

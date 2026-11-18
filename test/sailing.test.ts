@@ -8,14 +8,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { angleDiff } from '@futuremagic/core';
 import {
-  CANVAS, CLOSE_HAULED, HELMSMAN, SPEED_CANVAS, SPEED_TABLE, SPEED_TOLERANCE, SPEED_WIND_FORCE,
+  CANVAS, CLOSE_HAULED, FULL_AND_BY_TOLERANCE, HELMSMAN, SPEED_CANVAS, SPEED_FULL_AND_BY, SPEED_TABLE, SPEED_TOLERANCE,
+  SPEED_WIND_FORCE,
 } from '../src/sim/rules/sailing.ts';
 import { WIND_PRESETS } from '../src/sim/rules/wind.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { canvasFor, layAback, sailsStanding, startSailing, steerTo, stepSailing, type Sailing } from '../src/sim/ship/sailing.ts';
 import { startMotion } from '../src/sim/ship/motion.ts';
 import { DEGREE, KNOT } from '../src/sim/units.ts';
-import { firstEvent, sail, speedAt, steadyWind } from './support/sail.ts';
+import { firstEvent, sail, SETTLE_SECONDS, speedAt, steadyWind } from './support/sail.ts';
 import { pace } from './support/pace.ts';
 
 /** The wind blows from the north in these tests: a heading is then the wind's angle off her bow, to larboard. */
@@ -30,19 +31,35 @@ for (const [part, rows] of [[1, SPEED_TABLE.slice(0, half)], [2, SPEED_TABLE.sli
     for (const [angle, table] of rows) {
       const v = knots(speedAt(angle, SPEED_WIND_FORCE, SPEED_CANVAS, FROM));
       speeds.set(angle, v);
-      if (table === 0) assert.ok(v < SPEED_TOLERANCE, `${angle}° off the wind she makes no way: ${v.toFixed(2)} kn`);
-      else assert.ok(Math.abs(v - table) <= SPEED_TOLERANCE, `${angle}°: ${v.toFixed(2)} kn, the table ${table} kn`);
+      assert.ok(Math.abs(v - table) <= SPEED_TOLERANCE, `${angle}°: ${v.toFixed(2)} kn, the table ${table} kn`);
     }
   });
 }
 
-test('she is fastest with the wind abaft the beam, and makes no way within about 60° of it', () => {
+test('full and by: told to steer 45° off the wind, she lies where every set sail stands full, at the table\'s angle and speed', () => {
+  const wind = steadyWind(SPEED_WIND_FORCE, FROM);
+  const s = sail(steerTo(startSailing({ heading: 45 * DEGREE, canvas: SPEED_CANVAS, speed: 2 }, wind, SPEED_WIND_FORCE), 45 * DEGREE, 0), wind, SETTLE_SECONDS);
+  const [angle, table] = SPEED_FULL_AND_BY, off = Math.abs(angleDiff(s.heading, FROM)) / DEGREE;
+  assert.ok(Math.abs(off - angle) <= FULL_AND_BY_TOLERANCE, `she lies ${off.toFixed(1)}° off the wind, the table ${angle}°`);
+  assert.ok(Math.abs(knots(s.ahead) - table) <= SPEED_TOLERANCE, `${knots(s.ahead).toFixed(2)} kn, the table ${table} kn`);
+  const lifting = sailsStanding(s, wind).filter((x) => x.area > 0 && (x.aback || x.shivering)).map((x) => x.id);
+  assert.deepEqual(lifting, [], 'every set sail draws');
+  // Under battle sail (no courses) she lies closer, close-hauled.
+  const battle = sail(steerTo(startSailing({ heading: 45 * DEGREE, canvas: 'battle', speed: 2 }, wind, SPEED_WIND_FORCE), 45 * DEGREE, 0), wind, SETTLE_SECONDS);
+  assert.ok(Math.abs(angleDiff(battle.heading, FROM)) < Math.abs(angleDiff(s.heading, FROM)), 'closer under battle sail');
+  assert.ok(Math.abs(angleDiff(battle.heading, FROM)) >= CLOSE_HAULED - 1 * DEGREE, 'never closer than close-hauled');
+});
+
+test('she is fastest with the wind abaft the beam, and slower full and by than on the beam', () => {
   assert.equal(speeds.size, SPEED_TABLE.length, 'the table was sailed first');
   const [fastest] = [...speeds].sort((a, b) => b[1] - a[1])[0]!;
   assert.ok(fastest > 90 && fastest < 180, `fastest at ${fastest}°`);
-  assert.ok(speeds.get(90)! > speeds.get(CLOSE_HAULED / DEGREE)!, 'faster on the beam than close-hauled');
-  assert.ok(knots(speedAt(45, SPEED_WIND_FORCE, SPEED_CANVAS, FROM)) < 0, 'pointed 45° off the wind her sails are aback and she goes astern');
+  assert.ok(speeds.get(90)! > SPEED_FULL_AND_BY[1], 'faster on the beam than full and by');
 });
+
+/** A shift that takes her aback, rad, and how long she has to fill her sails again, s. */
+const SHIFT = 45 * DEGREE;
+const SHIFT_SECONDS = 90;
 
 /** Settled on a heading in a steady wind. */
 function settled(heading: number, force: number, canvas: 'battle' | 'plain', seconds = 120): Sailing {
@@ -95,13 +112,16 @@ test('wearing: she turns away from the wind, gybes her boom sail across and come
   assert.ok(end.ahead > 2 * KNOT, `under way on the new tack at ${knots(end.ahead).toFixed(1)} kn`);
 });
 
-test('taken aback: steered into the wind\'s eye her sails go aback and she gathers sternway; laid aback she loses her way', () => {
+test('taken aback: caught by a shift her sails go aback, and the helmsman bears away until they fill; laid aback she loses her way', () => {
   const wind = steadyWind(SPEED_WIND_FORCE, FROM);
   const reach = settled(90 * DEGREE, SPEED_WIND_FORCE, 'battle');
-  // Into the eye, the short way, the yards left as they are.
-  const eye = sail(steerTo(reach, FROM + 5 * DEGREE, 0), wind, 90);
-  assert.ok(eye.ahead < 0, `sternway ${knots(eye.ahead).toFixed(1)} kn`);
-  assert.ok(sailsStanding(eye, wind).some((s) => s.area > 0 && s.aback), 'her sails are aback');
+  // Close-hauled, the wind heads her by four points at once: aback, until he has borne away and her sails fill again.
+  const close = settled(CLOSE_HAULED, SPEED_WIND_FORCE, 'battle');
+  const headed = steadyWind(SPEED_WIND_FORCE, FROM - windSide(close) * SHIFT);
+  assert.ok(sailsStanding(close, headed).some((s) => s.area > 0 && s.aback), 'her sails are aback in the shift');
+  const filled = sail(close, headed, SHIFT_SECONDS);
+  assert.deepEqual(sailsStanding(filled, headed).filter((s) => s.area > 0 && (s.aback || s.shivering)).map((s) => s.id), [], 'every sail draws again');
+  assert.ok(filled.ahead > 2 * KNOT, `under way again at ${knots(filled.ahead).toFixed(1)} kn`);
   // The main laid aback (heaving to) slows her steadily; both masts laid aback (the headsails backed with them) slow her
   // faster, and in three minutes she has all but stopped (her boom sail still drawing, she forereaches a little).
   const hove = sail(layAback(reach, 'main', true), wind, 90);

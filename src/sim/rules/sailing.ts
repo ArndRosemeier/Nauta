@@ -44,6 +44,13 @@ export const FORE_AFT_POLAR: Polar = {
 export const SAIL_ROLL_SLOPE = 3;
 /** Below this angle of attack a sail shivers (its luff lifts and the cloth ripples): for the drawing and the sound, rad. */
 export const SHIVER_ANGLE = 6 * DEGREE;
+/**
+ * Full and by (design decisions for N3): the helmsman never lets her come closer to the wind than every set sail
+ * meeting it at this angle of attack with its yard braced up or its sheet hauled flat, rad: shivering's angle and a
+ * margin for the gusts and her swing, so her sails stand full while she sails, steered by the sails, not by a fixed
+ * angle.
+ */
+export const FULL_ANGLE = SHIVER_ANGLE + 2 * DEGREE;
 
 /**
  * How far a fore-and-aft sail's sheet lets it swing off her centre line to leeward, rad: least (sheeted flat) and
@@ -129,9 +136,10 @@ export const HELM_RATE = 9 * DEGREE;
 /**
  * The helmsman: helm in rad for each rad of heading still to go, and for each rad/s she is turning (he meets her
  * swing so she does not overshoot); within `settled` of an ordered heading a turn ordered one way is done and he
- * holds it the short way.
+ * holds it the short way. Steering by the sails (full and by), he answers the weather leeches lifting sharper,
+ * `bySails` rad of helm for each rad she must bear away, so a lull does not leave her sails shivering.
  */
-export const HELMSMAN = { heading: 1.6, turning: 9, settled: 8 * DEGREE } as const;
+export const HELMSMAN = { heading: 1.6, bySails: 5, turning: 9, settled: 8 * DEGREE } as const;
 
 /**
  * Missing stays: she is in a tack (her turn takes her through the wind's eye) and has lost her way (her speed ahead
@@ -141,7 +149,7 @@ export const HELMSMAN = { heading: 1.6, turning: 9, settled: 8 * DEGREE } as con
  */
 export const MISSED_STAYS = { way: 0, rate: 0.2 * DEGREE, bearAway: 80 * DEGREE } as const;
 
-/** Close-hauled: as near the wind as she sails, rad (six points: square-riggers lay about 6 points off the wind). */
+/** Close-hauled: the nearest the wind she is ever steered, rad (six points: square-riggers lay about 6 points off the wind); her set sails may hold her further off (`FULL_ANGLE`). */
 export const CLOSE_HAULED = 67.5 * DEGREE;
 
 /**
@@ -183,16 +191,22 @@ export const HEEL_LIMIT = 15 * DEGREE;
 
 /**
  * The speeds she is tuned to, knots, under plain sail in a fresh breeze (force 5): by the true wind's angle off her
- * bow, degrees. Within about 60° of the wind she makes no way (55°: her sails aback, she falls astern); close-hauled,
- * six points off, about 5 knots; fastest with the wind abaft the beam on the quarter, about 11.5 knots, where the
- * apparent wind is strongest and every sail draws; running before it about 10. A first proposal for the design thread
- * ("how much pace", implementation plan N3): a brig sloop logged 10 to 11 knots at her best, so this is a little
- * quicker than she was, for pace.
+ * bow, degrees. Fastest with the wind abaft the beam on the quarter, about 11.5 knots, where the apparent wind is
+ * strongest and every sail draws; running before it about 10. A first proposal for the design thread ("how much
+ * pace", implementation plan N3): a brig sloop logged 10 to 11 knots at her best, so this is a little quicker than
+ * she was, for pace.
  */
 export const SPEED_WIND_FORCE = 5;
 export const SPEED_CANVAS: CanvasName = 'plain';
 export const SPEED_TABLE: readonly (readonly [angle: number, knots: number])[] = [
-  [55, 0], [60, 2.5], [67.5, 5], [90, 10.2], [110, 11.5], [135, 11], [160, 10.2], [180, 10],
+  [90, 10.8], [110, 11.5], [135, 11], [160, 10.2], [180, 10],
 ];
-/** How far her speed may lie from the table, knots (a tuned game number, not a measurement); at no way, the most she may make. */
+/** How far her speed may lie from the table, knots (a tuned game number, not a measurement). */
 export const SPEED_TOLERANCE = 1;
+/**
+ * Full and by in the table's wind and canvas: the angle off the true wind, degrees, at which her set sails all stand
+ * full (the courses, braced up, hold her furthest off), and her speed there, knots; and how far the angle may lie from
+ * it, degrees. Under battle sail, without the courses, she lies close-hauled (`CLOSE_HAULED`) at about 5.5 knots.
+ */
+export const SPEED_FULL_AND_BY: readonly [angle: number, knots: number] = [76, 8.4];
+export const FULL_AND_BY_TOLERANCE = 3;
