@@ -3,8 +3,8 @@
  * build` first). The plain address at the tablet's 1180 × 820: the title asking for the tap once the game is ready,
  * the main screen over her quarterdeck, the match setup, the deck after "Beat to quarters", the captain's pause, the
  * end card after she strikes, joining and the waiting room (without a GameHub key they show the server's refusal),
- * the main screen in German, upright, and the first match's welcome and first lesson (N7.4). Fails if the page throws. A few minutes in the cloud (each frame costs
- * seconds on the software GPU).
+ * the main screen in German, upright, and the first match's welcome and first lesson (N7.4). Fails if the page
+ * throws. About 8 minutes in the cloud (each frame costs seconds on the software GPU; run `npm run packs` first).
  */
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -12,9 +12,9 @@ import { TIMEOUT, frames, openBrowser, snap } from './browser.mjs';
 
 /** The quiet moment on deck before the end card, ms (src/app/menu.ts END_QUIET_MS), and a little more. */
 const END_WAIT_MS = 9500;
-/** Into the first match: the welcome's bubble up, ms; then on to the first lesson (src/app/lessons.ts WELCOME_SECONDS). */
-const FIRST_WELCOME_MS = 3000;
-const FIRST_LOOK_MS = 11000;
+/** Into the first match: the welcome's bubbles up, s; then on to the first lesson (src/app/lessons.ts WELCOME_SECONDS). */
+const FIRST_WELCOME_SECONDS = 3;
+const FIRST_LOOK_SECONDS = 11;
 
 const out = process.argv[2] ?? 'shots/menu';
 mkdirSync(out, { recursive: true });
@@ -71,9 +71,10 @@ await shot('main-upright');
 await page.setViewportSize({ width: 1180, height: 820 });
 await tap('.menu-choice:nth-child(1)');
 await page.waitForSelector('.nt-lesson-skip:not([hidden])', { timeout: TIMEOUT });
-await page.waitForTimeout(FIRST_WELCOME_MS);
+// The match's clock is the check's since the strike above (`onward` pins it): the first match is run on by its jumps.
+await page.evaluate((s) => window.__nautaSail.onward(s), FIRST_WELCOME_SECONDS);
 await shot('first-welcome');
-await page.waitForTimeout(FIRST_LOOK_MS);
+await page.evaluate((s) => window.__nautaSail.onward(s), FIRST_LOOK_SECONDS);
 await shot('first-look');
 console.log(`${out}: done in ${took()}${failed ? ', the page failed' : ''}`);
 await served.close();
