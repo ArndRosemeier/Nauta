@@ -14,8 +14,8 @@ import type { Closures } from '../sim/crew/closures';
 import type { Spot } from '../sim/ship/plan';
 import { make } from './dom';
 import { makeButton } from './button';
-import { FAN_MOST, KEY_ORDERS, RANK_WORDS, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem, type FanSlot, type ManOnScreen } from './fanOrders';
-import { inVoice, postOf, type Officer, type Taker } from './officers';
+import { FAN_MOST, KEY_ORDERS, RANK_WORDS, waitingForWord, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem, type FanSlot, type ManOnScreen } from './fanOrders';
+import { inVoice, postOf, takerOf, type Officer, type Taker } from './officers';
 import type { Midshipman, Message } from './midshipman';
 import type { OrderSession } from './orderReport';
 import { KEY_ACTIONS, type KeyAction, type Settings } from './settings';
@@ -94,7 +94,11 @@ interface Open {
 
 export class OrderFan {
   private readonly root = make('div', 'nt-fan');
+  /** By the right thumb: the large "Fire!" while the guns wait for the captain's word, and "Steer there" while he points. */
+  private readonly thumb = make('div', 'nt-thumb');
+  private readonly fire = make('button', 'nt-fire');
   private readonly steer = make('div', 'nt-steer');
+  private fireShown = false;
   private readonly mark = make('div', 'nt-steer-mark');
   private open: Open | null = null;
   private slots: FanSlot[] = [];
@@ -115,7 +119,12 @@ export class OrderFan {
   private readonly heard = new Set<(s: Sent) => void>();
 
   constructor(private readonly view: HTMLElement, private readonly page: FanPage) {
-    document.body.append(this.root, this.steer, this.mark);
+    this.thumb.append(this.fire, this.steer);
+    document.body.append(this.root, this.thumb, this.mark);
+    this.fire.type = 'button';
+    this.fire.style.display = 'none';
+    // The word: no walk, no fan, no midshipman; given the moment the thumb comes down (orders.md).
+    this.fire.addEventListener('pointerdown', (e) => { e.preventDefault(); this.word(); });
     this.root.style.display = 'none';
     this.showSteer(false);
     // Before the look's own listener (capture): a finger on a man opens his fan instead of turning the look.
@@ -145,6 +154,12 @@ export class OrderFan {
   /** Once a frame: the midshipman goes on (and gives what he carries when he arrives), the fan's orders judged anew. */
   onFrame(now: number, dt: number): void {
     this.pointFor = Math.max(0, this.pointFor - dt);
+    const waiting = waitingForWord(this.page.session.state, this.page.session.ship);
+    if (waiting !== this.fireShown) {
+      this.fireShown = waiting;
+      this.fire.textContent = this.page.wording().fire;
+      this.fire.style.display = waiting ? 'block' : 'none';
+    }
     this.hailFor = Math.max(0, this.hailFor - dt);
     const p = this.page, delivered = p.midshipman.step(dt, p.captain(), p.heel(), p.closures());
     if (delivered) this.delivered(delivered);
@@ -290,6 +305,13 @@ export class OrderFan {
     if ('order' in m) this.page.session.give(m.order);
   }
 
+  /** The captain's word: the held broadside fires now, rippling down her side. */
+  private word(): void {
+    const s = this.page.session;
+    s.give({ kind: 'fire', ship: s.ship });
+    for (const fn of this.heard) fn({ kind: 'sent', voice: 'gunner', ship: s.ship, order: { kind: 'fire', ship: s.ship }, ask: null, via: 'hail', runner: false });
+  }
+
   // ---------- Steer there ----------
 
   private startPointing(runner: boolean): void {
@@ -349,7 +371,13 @@ export class OrderFan {
       this.steerNow(runner, 'key');
       return;
     }
-    const to = keyTaker(what);
+    if (what === 'fire') {
+      // F: while her guns wait for his word, the word; otherwise fire as they bear.
+      if (waitingForWord(this.page.session.state, this.page.session.ship)) this.word();
+      else this.speak('gunner', { order: { kind: 'bear', ship: this.page.session.ship } }, 'key', !this.inVoice('gunner'));
+      return;
+    }
+    const to = takerOf(what);
     this.speak(to, { order: what }, 'key', !this.inVoice(to));
   }
 
@@ -407,9 +435,4 @@ export class OrderFan {
     this.tags = [];
     this.hub = null;
   }
-}
-
-/** The man a key's order goes to (fanOrders.ts KEY_ORDERS are all the master's or the first lieutenant's). */
-function keyTaker(order: Order): Taker {
-  return order.kind === 'sail' || order.kind === 'shorten' ? 'first lieutenant' : 'master';
 }

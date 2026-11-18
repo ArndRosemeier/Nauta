@@ -654,6 +654,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Who takes an order, and answers it (the speech bubbles ask here too) | `src/app/officers.ts#takerOf` |
 | What the order fan offers each man now: at most six, one more ring, dim and ringed as the match stands | `src/app/fanOrders.ts#fanItems` |
 | What each order key gives | `src/app/fanOrders.ts#KEY_ORDERS` |
+| Whether her guns wait for the captain's word (the Fire! button shows) | `src/app/fanOrders.ts#waitingForWord` |
 | Which drawn man a finger points at on the view | `src/app/fanOrders.ts#manAt` |
 | The order fan on the page: tap or press a man, the midshipman, the keys, steer there; the captain's arm | `src/app/orderFan.ts#OrderFan` |
 | The midshipman: keeps by the captain on her decks, runs with a message and gives it when he arrives | `src/app/midshipman.ts#Midshipman` |

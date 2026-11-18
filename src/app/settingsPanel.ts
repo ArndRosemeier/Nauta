@@ -44,7 +44,8 @@ const LANGUAGE_WORDS: readonly WordKey[] = ['english', 'german'];
 const KEY_WORDS: Readonly<Record<KeyAction, WordKey>> = {
   forward: 'keyForward', back: 'keyBack', left: 'keyLeft', right: 'keyRight', glass: 'keyGlass',
   steer: 'keySteer', up: 'fanUp', away: 'fanAway', tack: 'fanTack', wear: 'fanWear', heave: 'fanHeave',
-  battle: 'fanBattle', plain: 'fanPlain', all: 'fanAll', shorten: 'fanShorten', fan: 'keyFan', midshipman: 'keyMidshipman',
+  battle: 'fanBattle', plain: 'fanPlain', all: 'fanAll', shorten: 'fanShorten',
+  quarters: 'fanQuarters', round: 'fanRound', chain: 'fanChain', grape: 'fanGrape', fire: 'keyFire', cease: 'fanCease', fan: 'keyFan', midshipman: 'keyMidshipman',
 };
 /** The first order key: the keys page starts a section "Orders" there. */
 const FIRST_ORDER_KEY: KeyAction = 'steer';
