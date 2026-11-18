@@ -20,7 +20,7 @@ import HumanWorker from '@actors/human/worker?worker';
 import { FigureRig, type LadderClimb, type LimbGoal, type LimbGoals } from '@futuremagic/figure';
 import type { BodyPose, FootSide } from '../../app/body';
 import { paceOf, type DeckWalker } from '../../sim/ship/deckWalk';
-import { PACK, captainLook, packCatalog } from '../../app/crewLooks';
+import { PACK, captainLook, packCatalog, type Navy } from '../../app/crewLooks';
 import { FULL } from '../../app/crewLevels';
 import { BODY } from '../../sim/rules/ships';
 import { EYE_BELOW_TOP } from '../../sim/rules/walking';
@@ -115,7 +115,19 @@ export class CaptainView {
     this.footRest = { L: inv.clone().multiply(this.feet.L.getWorldQuaternion(new Quaternion())), R: inv.clone().multiply(this.feet.R.getWorldQuaternion(new Quaternion())) };
     const goal = (): LimbGoal => ({ p: new Vector3(), w: 0 });
     this.goals = { L: goal(), R: goal(), footL: goal(), footR: goal(), curl: { L: GRIP_CURL, R: GRIP_CURL }, curlW: 0 };
-    ch.object.traverse((o) => { if ((o as Mesh).isMesh) { o.castShadow = false; o.frustumCulled = false; } });
+    this.ownMeshes();
+  }
+
+  /** His figure casts no shadow (his body would shade the view) and is always drawn (it is round the camera). */
+  private ownMeshes(): void {
+    this.ch.object.traverse((o) => { if ((o as Mesh).isMesh) { o.castShadow = false; o.frustumCulled = false; } });
+  }
+
+  /** His coat changed to a post captain's of `navy` (the match setup's choice, menu.md). */
+  async changeCoat(navy: Navy): Promise<void> {
+    const look = captainLook(this.ch.catalog, navy);
+    await this.ch.set({ outfit: look.outfit, garmentColors: look.garmentColors });
+    this.ownMeshes();
   }
 
   /** Loads his figure (the pack the crew's is cut from), dressed, in the bind pose for the rig's measures, then standing. */

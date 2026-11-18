@@ -11,6 +11,7 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { CharacterCatalog, CharacterPatch } from '@actors/generator';
+import { otherNavy, type Navy } from './terms';
 
 /**
  * Garments the crew wears, then the captain's (Actors' `navy-rn-captain` preset, see `captainLook`), then the rest of
@@ -22,6 +23,7 @@ export const PACK_GARMENTS = [
   'navy-buttons-officer', 'navy-stock', 'navy-epaulettes',
   'navy-bicorne', 'navy-cockade', 'navy-buttons-single', 'navy-round-hat', 'navy-shirt', 'navy-jacket', 'navy-buttons-jacket',
   'navy-slops', 'navy-neckerchief', 'socks',
+  'navy-cockade-tricolour', 'navy-epaulette', 'navy-slops-striped', 'navy-knit-cap',
 ];
 /** Hairstyles: men's short ones, as most seamen wore them about 1805 (the pack's queue reads as a woman's ponytail from the deck). */
 export const PACK_HAIR = ['hair-short02', 'hair-short03', 'hair-short-messy', 'hair-short-grump', 'hair-swept-back', 'hair-short-curls'];
@@ -43,10 +45,20 @@ export const packCatalog = (c: CharacterCatalog): CharacterCatalog => ({
 
 /** A man's rank, as far as his dress tells it. */
 export type Rank = 'officer' | 'marine' | 'seaman';
-/** The two navies of a duel: the player's and the enemy's. */
-export type Navy = 'british' | 'french';
-/** A ship's navy in the duel: the first ship British, the other French. */
-export const navyOf = (ship: number): Navy => (ship === 0 ? 'british' : 'french');
+/** The two navies of a duel (the match terms' `Navy`, app/terms.ts). */
+export type { Navy };
+/**
+ * A ship's navy in the duel: the first ship's is `first` (the room's host's or the player's alone, as the match setup
+ * chose; British unless chosen), the other ship's the other navy.
+ */
+export const navyOf = (ship: number, first: Navy = 'british'): Navy => (ship === 0 ? first : otherNavy(first));
+
+/** The kinds of dress the men drawn wear, and Actors' outfit preset of each in each navy (X2's navy wardrobe). */
+export type Dress = 'captain' | 'lieutenant' | 'midshipman' | 'boatswain' | 'seaman';
+export const DRESS: Readonly<Record<Navy, Readonly<Record<Dress, string>>>> = {
+  british: { captain: 'navy-rn-captain', lieutenant: 'navy-rn-lieutenant', midshipman: 'navy-rn-midshipman', boatswain: 'navy-rn-boatswain', seaman: 'navy-rn-seaman' },
+  french: { captain: 'navy-fr-captain', lieutenant: 'navy-fr-officer', midshipman: 'navy-fr-aspirant', boatswain: 'navy-fr-boatswain', seaman: 'navy-fr-seaman' },
+};
 
 /** Colours of the dress (sRGB hex) by navy: the coat or shirt of each rank, the trousers, and the seamen's slops. */
 const COLOURS: Readonly<Record<Navy, { officer: string; marine: string; whites: string; slops: readonly string[]; shirts: readonly string[] }>> = {
@@ -93,30 +105,28 @@ export function lookOf(seed: number, rank: Rank, navy: Navy): CharacterPatch {
 
 /** The seed of the captain's own looks: the player's body, the same on every machine. */
 const CAPTAIN_SEED = 1805;
-/** Actors' outfit preset the captain wears (X2's navy wardrobe): a Royal Navy post captain about 1800. */
-export const CAPTAIN_DRESS = 'navy-rn-captain';
 /**
  * Pieces of it his own body leaves off: the hat. His head is drawn at a thousandth of its size, but the bicorne keeps
  * its size round his eyes, so looking down he would see only its inside.
  */
-export const CAPTAIN_UNSEEN = ['navy-bicorne', 'navy-bicorne-lace', 'navy-cockade'];
+export const CAPTAIN_UNSEEN = ['navy-bicorne', 'navy-bicorne-lace', 'navy-cockade', 'navy-cockade-tricolour'];
 /**
  * The captain as he sees himself (plan N2.7): his body from his seed, dressed as a post captain of her navy. Takes the
  * preset from Actors' catalogue; every piece of it must be in PACK_GARMENTS.
  */
-export function captainLook(catalog: Pick<CharacterCatalog, 'outfits'>): CharacterPatch {
-  return { ...navyLook(catalog, CAPTAIN_DRESS, CAPTAIN_SEED, 'officer', CAPTAIN_UNSEEN), beard: 'none' };
+export function captainLook(catalog: Pick<CharacterCatalog, 'outfits'>, navy: Navy = 'british'): CharacterPatch {
+  return { ...navyLook(catalog, DRESS[navy].captain, CAPTAIN_SEED, 'officer', CAPTAIN_UNSEEN, navy), beard: 'none' };
 }
 
 /**
- * A man from his seed and rank (`lookOf`, a British crew), dressed in an outfit preset of Actors' navy wardrobe
+ * A man from his seed and rank (`lookOf`) of `navy`, dressed in an outfit preset of Actors' navy wardrobe
  * (`navy-rn-lieutenant`), less the pieces `unseen`. Every other piece of it must be in PACK_GARMENTS.
  */
-export function navyLook(catalog: Pick<CharacterCatalog, 'outfits'>, preset: string, seed: number, rank: Rank, unseen: readonly string[] = []): CharacterPatch {
+export function navyLook(catalog: Pick<CharacterCatalog, 'outfits'>, preset: string, seed: number, rank: Rank, unseen: readonly string[] = [], navy: Navy = 'british'): CharacterPatch {
   const dress = catalog.outfits.find((o) => o.id === preset);
   if (!dress) throw new Error(`no outfit ${preset} in the Actors catalogue`);
   const missing = dress.garments.filter((g) => !PACK_GARMENTS.includes(g) && !unseen.includes(g));
   if (missing.length) throw new Error(`${preset} needs ${missing.join(', ')} in PACK_GARMENTS`);
   const outfit = dress.garments.filter((g) => !unseen.includes(g));
-  return { ...lookOf(seed, rank, 'british'), outfit, garmentColors: { ...dress.colors } };
+  return { ...lookOf(seed, rank, navy), outfit, garmentColors: { ...dress.colors } };
 }

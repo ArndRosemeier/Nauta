@@ -436,7 +436,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Walking her decks on the page (`?walk`): thumbs to captain to standpoint and doors | `src/app/walking.ts#Walking` |
 | The captain's body on a moving deck: his lean against her roll, his feet stepping, his walk's bob, holding on, a blow's stagger, the eye and the head's hold it gives, the calm view's share | `src/app/body.ts#CaptainBody` |
 | The captain's own body drawn in first person: an Actors figure posed from his body (or the climb), his eyes at the view, his head not drawn | `src/render/captain/captainView.ts#CaptainView` |
-| How the captain looks (his dress, from the crew's wardrobe until the navy preset) | `src/app/crewLooks.ts#captainLook` |
+| How the captain looks (his navy's post captain's dress) | `src/app/crewLooks.ts#captainLook` |
 | Actors' catalogue cut to what the page's pack holds, for every character loaded | `src/app/crewLooks.ts#packCatalog` |
 | How fast a walker goes over her deck | `src/sim/ship/deckWalk.ts#paceOf` |
 | The body's tuning: lean and balance, legs and stance, cadence, holding on, the calm view's steps | `src/sim/rules/body.ts#LEAN_SHARE` |
@@ -661,7 +661,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The match's events and notices to the bubbles, on the page | `src/app/speaking.ts#Speech` |
 | An Actors man as a speaker: his head for the bubble, his mouth with the words, his look to the captain | `src/render/speech/characterSpeaker.ts#characterSpeaker` |
 | Faceless stand-ins at the stations for the men not yet drawn | `src/render/speech/standIns.ts#standIns` |
-| A ship's navy in the duel | `src/app/crewLooks.ts#navyOf` |
+| A ship's navy in the duel (the first ship's as the match setup chose, the other the other) | `src/app/crewLooks.ts#navyOf` |
+| Each navy's dress for the men drawn (Actors' `navy-rn-*` and `navy-fr-*` presets) | `src/app/crewLooks.ts#DRESS` |
+| Which ships drawn fly the French colours (the flags' uniform) | `src/render/ship/sailMaterial.ts#setFrenchFlags` |
 | The men the captain gives orders to: who they are, where each stands, whom an order goes to, whether his voice reaches them (N4.4) | `src/app/officers.ts#OFFICERS` |
 | How far apart two spots are on one floor (another space: Infinity) | `src/app/officers.ts#floorApart` |
 | Where the midshipman gives a message to each man | `src/app/officers.ts#deliverAt` |

@@ -32,6 +32,7 @@ import {
 import { openWhatsNew, unseenVersion, versionLabel } from './whatsNew';
 import { words, type WordKey } from './words';
 import { LANGUAGES } from './settings';
+import { oneOf } from './kept';
 
 /** How a captain is named to the other player. */
 const CAPTAIN = 'Captain';
@@ -140,15 +141,18 @@ export class Menu {
 
   // ---- what runs behind ----
 
-  /** Runs `s` from now on: the session before closed if it was a room's, the end card's count started afresh. */
-  private run(s: DuelSession, playing: Playing): void {
+  /**
+   * Runs `s` from now on: the session before closed if it was a room's, the end card's count started afresh. `firstNavy`:
+   * the first ship's navy (mine alone or hosting; the host's when I joined).
+   */
+  private run(s: DuelSession, playing: Playing, firstNavy: Navy = this.terms.navy): void {
     const before = this.h.match.session;
     if (before !== s && before.role !== 'solo') before.close();
     clearTimeout(this.endTimer);
     this.h.pause(false);
     this.tally.reset();
     this.playing = playing;
-    this.h.match.useSession(s);
+    this.h.match.useSession(s, firstNavy);
     this.h.firstCommand(playing.kind === 'first' ? s : null);
   }
 
@@ -242,7 +246,6 @@ export class Menu {
         pick('matchLength', 'matchLengthHelp', LENGTHS, (m) => lengthWords(m, say), t.minutes, (minutes) => this.setTerms({ minutes })),
         row(say.seed, say.seedHelp, seed),
       );
-      navy.classList.add('coming');
       const go = menuButton('nt-button menu-go', kind === 'alone' ? say.beatToQuarters : say.openTheRoom, () => { this.setTerms({ seed: readSeed(seed.value) }); if (kind === 'alone') this.sail('alone'); else void this.host(); });
       const back = menuButton('nt-link', say.back, () => this.main());
       const foot = make('div', 'menu-sheet-foot');
@@ -312,9 +315,9 @@ export class Menu {
       await how();
       if (s.role === 'refused') throw new Error(s.problem);
       if (this.pendingRoom !== s) { s.close(); return; }
-      this.run(s, { kind: 'duel', session: s });
-      this.watchRounds(s);
       const terms = s.roomTerms;
+      this.run(s, { kind: 'duel', session: s }, terms ? oneOf(terms.navy, NAVIES, this.terms.navy) : this.terms.navy);
+      this.watchRounds(s);
       if (terms) this.h.sky(terms.hour, MATCH_DAY_MINUTES);
       this.waitingRoom(s, null, code);
     } catch (err) {

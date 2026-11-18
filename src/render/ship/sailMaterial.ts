@@ -9,7 +9,7 @@
  * behind a sail it glows, the doubled cloth of its seams and bands darker against it and the rig's shadows on it (the
  * sun's light as it reaches the cloth, shadowed, through the back of the canvas).
  */
-import { DataTexture, DoubleSide, FloatType, MeshStandardNodeMaterial, PhysicalLightingModel, RGBAFormat, UnsignedByteType } from 'three/webgpu';
+import { DataTexture, DoubleSide, FloatType, MeshStandardNodeMaterial, PhysicalLightingModel, RGBAFormat, UnsignedByteType, Vector2 } from 'three/webgpu';
 import {
   Fn, abs, attribute, clamp, cos, cross, faceDirection, float, floor, fract, fwidth, hash, int, ivec2, max, min, mix, normalView, normalize,
   round, select, sin, smoothstep, step, texture, textureLoad, transformNormalToView, uniform, varyingProperty, vec2, vec3, vec4,
@@ -39,6 +39,15 @@ export function setShipSails(rows: Float32Array, ship = 0): void {
  */
 export const SAIL_DAMAGE_TEXTURE = new DataTexture(new Uint8Array(SAIL_ATLAS_SIZE * SAIL_ATLAS_SIZE * RGBA), SAIL_ATLAS_SIZE, SAIL_ATLAS_SIZE, RGBAFormat, UnsignedByteType);
 SAIL_DAMAGE_TEXTURE.needsUpdate = true;
+/**
+ * Which ships drawn fly the French colours (1) and which the British (0), by the ship's index drawn (0 hers, 1 the
+ * other's): a uniform, so the menu's choice of navy (docs/design/menu.md) changes the flags without a shader compiled.
+ */
+const FRENCH_FLAGS = uniform(new Vector2(0, 1));
+/** The colours each ship drawn flies: hers and the other's (true: French). */
+export function setFrenchFlags(mine: boolean, hers: boolean): void {
+  FRENCH_FLAGS.value.set(mine ? 1 : 0, hers ? 1 : 0);
+}
 /** Seconds, for the sails' shiver, breathing and the flags' waves (sailsView.ts keeps it with the CPU's copy). */
 export const SAIL_TIME = uniform(0);
 
@@ -139,9 +148,16 @@ const CLOTH_SEED = 7.31;
 const SCORCH = [0.02, 0.016, 0.012];
 
 // --- The flags (linear RGB): the red ensign of 1805 with the Union of 1801 in its canton; the pennant, St George's cross at its hoist and a red fly.
+// French: the tricolour of 1794 (blue at the hoist, white, red, in equal bands), and the pennant blue, white and red from its hoist.
 const RED = [0.5, 0.018, 0.022];
 const WHITE = [0.78, 0.77, 0.72];
 const BLUE = [0.006, 0.02, 0.11];
+const FRENCH_BLUE = [0.01, 0.035, 0.2];
+const FRENCH_RED = [0.55, 0.03, 0.03];
+/** The tricolour's three bands. */
+const BANDS = 3;
+/** The French pennant's blue and white, each this long from its hoist, m (the rest red). */
+const FRENCH_PENNANT_BAND = 0.9;
 /** The Union's crosses as shares of the canton's hoist (it is 30 high): the white saltire, the red saltire, the white cross, the red cross (half widths). */
 const UNION_HOIST = 30;
 const SALTIRE_WHITE = 3 / UNION_HOIST;
@@ -173,6 +189,11 @@ function ensignColour(s, t) {
 function pennantColour(s, t) {
   const cross = max(step(abs(t.sub(PENNANT.hoist / 2)), PENNANT.hoist * PENNANT_CROSS_WIDTH), step(abs(s.sub(PENNANT_CROSS / 2)), PENNANT.hoist * PENNANT_CROSS_WIDTH));
   return mix(vec3(...RED), mix(vec3(...WHITE), vec3(...RED), cross), step(s, PENNANT_CROSS));
+}
+
+/** The tricolour's colour at s m along a fly whose first two bands are each `band` m long. */
+function tricolour(s, band) {
+  return mix(vec3(...FRENCH_BLUE), mix(vec3(...WHITE), vec3(...FRENCH_RED), step(band * 2, s)), step(band, s));
 }
 
 /** The lighting of a cloth: as any matte surface, and the sun's light through it from behind (shadowed as it reaches it). */
@@ -240,7 +261,11 @@ export function makeSailMaterial(crossfade = false): MeshStandardNodeMaterial {
   canvas = mix(canvas, vec3(...SCORCH), scorch);
   const doubled = max(max(overlap, band), tabling);
   const canvasThrough = float(CANVAS_THROUGH).mul(mix(float(1), float(DOUBLED), doubled)).mul(float(1).sub(max(bolt, point)));
-  const flag = select(pattern.greaterThan(ENSIGN_PATTERN + 1 / 2), pennantColour(s, drop), ensignColour(s, drop));
+  const isPennant = pattern.greaterThan(ENSIGN_PATTERN + 1 / 2);
+  const british = select(isPennant, pennantColour(s, drop), ensignColour(s, drop));
+  const french = select(isPennant, tricolour(s, FRENCH_PENNANT_BAND), tricolour(s, ENSIGN.fly / BANDS));
+  const flies = select(int(SHIP_OBJECT.ship).equal(0), FRENCH_FLAGS.x, FRENCH_FLAGS.y);
+  const flag = mix(british, french, flies);
   m.colorNode = mix(canvas, flag, isFlag);
   m.throughNode = m.colorNode.mul(mix(canvasThrough, float(BUNTING_THROUGH), isFlag));
   m.roughnessNode = mix(float(ROUGH_CANVAS), float(ROUGH_BUNTING), isFlag);

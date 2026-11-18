@@ -14,6 +14,7 @@ import type { SimEvent } from '../sim/step';
 import { MS_PER_SECOND } from '../sim/units';
 import type { Skill } from '../sim/rules/captain';
 import { DuelSession, type Drawn } from '../net/duel';
+import { navyOf, type Navy } from './crewLooks';
 import type { OrderSession } from './orderReport';
 import { sailsSeen } from './sailsSeen';
 
@@ -25,6 +26,8 @@ const PUMP_MS = 100;
 
 export class PageMatch implements OrderSession {
   private current: DuelSession;
+  /** The first ship's navy in the session running now (the room's host's, or the player's alone); the other ship's is the other. */
+  private first: Navy = 'british';
   private drawnNow: Drawn;
   private readonly heard = new Set<(events: readonly SimEvent[]) => void>();
   private readonly changed = new Set<() => void>();
@@ -51,6 +54,15 @@ export class PageMatch implements OrderSession {
     return Math.max(0, this.current.mine);
   }
 
+  /** My ship's navy, and hers: the coats and flags drawn, the words her men use. */
+  get navy(): Navy {
+    return navyOf(this.ship, this.first);
+  }
+
+  get herNavy(): Navy {
+    return navyOf(1 - this.ship, this.first);
+  }
+
   /** The other ship, or -1 when the match has only mine. */
   get other(): number {
     return this.state.ships.length > 1 ? 1 - this.ship : -1;
@@ -75,12 +87,14 @@ export class PageMatch implements OrderSession {
 
   /**
    * Runs `s` from now on, as soon as its match has begun and it has a ship for me: a guest starts from the room's state
-   * of before he came, and the host seats him a moment later, so the view never shows the host's ship as his.
+   * of before he came, and the host seats him a moment later, so the view never shows the host's ship as his. `first`:
+   * the first ship's navy in it (the match setup's, menu.md).
    */
-  useSession(s: DuelSession): void {
+  useSession(s: DuelSession, first: Navy = 'british'): void {
     const ready = () => s.started && s.mine >= 0;
     const swap = () => {
       if (!ready() || this.current === s) return;
+      this.first = first;
       this.current = this.attach(s);
       this.drawnNow = s.drawn();
       for (const fn of this.changed) fn();
