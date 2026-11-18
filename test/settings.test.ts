@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_SETTINGS, languageOf, readSettings, withKey } from '../src/app/settings.ts';
 import { DEFAULT_TERMS } from '../src/app/terms.ts';
+import { PRESETS } from '../src/sim/scenario.ts';
 import { QualityChooser } from '../src/app/quality.ts';
 import { DEFAULT_WALK_KEYS, keyPush, walkKeys } from '../src/app/thumbs.ts';
 import { words } from '../src/app/words.ts';
@@ -13,13 +14,13 @@ test('settings read back from nothing, junk or an older build are the defaults',
 });
 
 test('settings out of bounds are brought inside them, match terms not offered to their defaults', () => {
-  const s = readSettings({ sound: { all: 2, crew: -1, sea: 0.3 }, fingerSpeed: 99, match: { minutes: 43, foe: 'master', wind: 'gale' }, quality: 'low', motion: 0.5 });
+  const s = readSettings({ sound: { all: 2, crew: -1, sea: 0.3 }, fingerSpeed: 99, match: { minutes: 43, scenario: PRESETS.watch, wind: 'gale' }, quality: 'low', motion: 0.5 });
   assert.equal(s.sound.all, 1);
   assert.equal(s.sound.crew, 0);
   assert.equal(s.sound.sea, 0.3);
   assert.equal(s.fingerSpeed, 3);
   assert.equal(s.match.minutes, DEFAULT_TERMS.minutes);
-  assert.equal(s.match.foe, 'master');
+  assert.deepEqual(s.match.scenario, PRESETS.watch);
   assert.equal(s.match.wind, DEFAULT_TERMS.wind);
   assert.equal(s.quality, 'low');
   assert.equal(s.motion, 0.5);

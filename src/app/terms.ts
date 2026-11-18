@@ -1,19 +1,18 @@
 /**
- * The match's terms as the menu sets them (implementation plan N7.2, docs/design/menu.md "Match setup"): the navy, the
- * other captain's skill when alone, the wind, the hour, how the ships meet, the length and the seed, each with a
+ * The match's terms as the menu sets them (implementation plan N7.2, docs/design/menu.md "Match setup"; docs/design/scenarios.md):
+ * the scenario (ships, sides, navies, captains), the wind, the hour, how the ships meet, the length and the seed, each with a
  * default so one tap starts a match; what each means for the match and for the sky. Pure: the menu (menu/setup.ts)
  * shows and changes them, `TermsStore` keeps the last ones chosen on the device.
  */
 import { deriveSeed, hash32, Rng } from '@futuremagic/core';
-import { SKILLS, type Offered } from '../sim/rules/captain';
+import { SKILLS } from '../sim/rules/captain';
+import { DEFAULT_SCENARIO, isPlaced, NAVIES, placesOf, readScenario, youFirst, type Navy, type Scenario } from '../sim/scenario';
 import { MATCH_MINUTES } from '../sim/rules/end';
 import { MEETINGS, WIND_CHOICE_NAMES, type Meeting, type StartTerms, type WindChoice } from '../sim/start';
 import { HOURS_PER_DAY, MINUTES_PER_HOUR } from '../sim/units';
-import { isRecord, oneOf } from './kept';
+import { isRecord, oneOf } from '../sim/kept';
 
-/** The navies (nauta-plan.md, "Which navies?": British against French around 1800, the same hull in two coats). */
-export const NAVIES = ['british', 'french'] as const;
-export type Navy = (typeof NAVIES)[number];
+export { NAVIES, type Navy };
 /** The hours a match may start at: as the seed draws it, or named. */
 export const HOURS = ['drawn', 'dawn', 'day', 'dusk', 'moon'] as const;
 export type HourChoice = (typeof HOURS)[number];
@@ -37,12 +36,8 @@ export const MATCH_DAY_MINUTES = (HOURS_PER_DAY * MINUTES_PER_HOUR) / SKY_PACE;
 const SEED_MOST = 2 ** 32 - 1;
 
 export interface MatchTerms {
-  readonly navy: Navy;
-  /** The other captain's skill, a match played alone. */
-  readonly foe: Offered;
-  /** The two computer captains' skills in a battle watched (plan N7.8): the British ship's and the French ship's. */
-  readonly skillBritish: Offered;
-  readonly skillFrench: Offered;
+  /** The ships, their sides, navies and captains (sim/scenario.ts; the dialog's ship list). */
+  readonly scenario: Scenario;
   readonly wind: WindChoice;
   readonly hour: HourChoice;
   readonly meet: Meeting;
@@ -52,17 +47,21 @@ export interface MatchTerms {
   readonly seed: number | null;
 }
 
-export const DEFAULT_TERMS: MatchTerms = { navy: 'british', foe: 'seasoned', skillBritish: 'seasoned', skillFrench: 'seasoned', wind: 'drawn', hour: 'drawn', meet: 'even', minutes: MATCH_MINUTES, seed: null };
+export const DEFAULT_TERMS: MatchTerms = { scenario: DEFAULT_SCENARIO, wind: 'drawn', hour: 'drawn', meet: 'even', minutes: MATCH_MINUTES, seed: null };
 
+
+/** Terms kept before the scenario existed had one navy and the other captain's skill: you in that navy against a captain of that skill. */
+function fromLegacy(k: Record<string, unknown>): Scenario {
+  if (k.navy === undefined && k.foe === undefined) return DEFAULT_SCENARIO;
+  const navy = oneOf(k.navy, NAVIES, 'british'), foe = oneOf(k.foe, SKILLS, 'seasoned');
+  return readScenario({ sideNavies: [navy, otherNavy(navy)], ships: [{ side: 0, command: { kind: 'you' } }, { side: 1, command: { kind: 'computer', skill: foe } }] });
+}
 
 /** Terms from whatever was kept: each field missing or wrong takes its default. */
 export function readTerms(kept: unknown): MatchTerms {
   const k = isRecord(kept) ? kept : {}, d = DEFAULT_TERMS;
   return {
-    navy: oneOf(k.navy, NAVIES, d.navy),
-    foe: oneOf(k.foe, SKILLS, d.foe),
-    skillBritish: oneOf(k.skillBritish, SKILLS, d.skillBritish),
-    skillFrench: oneOf(k.skillFrench, SKILLS, d.skillFrench),
+    scenario: k.scenario === undefined ? fromLegacy(k) : readScenario(k.scenario),
     wind: oneOf(k.wind, WIND_CHOICE_NAMES, d.wind),
     hour: oneOf(k.hour, HOURS, d.hour),
     meet: oneOf(k.meet, MEETINGS, d.meet),
@@ -81,7 +80,10 @@ export function readSeed(v: unknown): number | null {
 export const newSeed = (ms: number, n: number): number => deriveSeed(hash32(Math.floor(ms)), 'match', n) >>> 0;
 
 /** What the simulation's start takes of the terms. */
-export const startTerms = (t: MatchTerms): StartTerms => ({ wind: t.wind, meet: t.meet });
+export const startTerms = (t: MatchTerms): StartTerms => {
+  const sc = youFirst(t.scenario);
+  return { wind: t.wind, meet: t.meet, ...(isPlaced(sc) ? { placed: placesOf(sc) } : {}) };
+};
 
 /** The match's length for the simulation, minutes (no limit: a day). */
 export const matchMinutes = (t: MatchTerms): number => (t.minutes === NO_LIMIT ? LONGEST_MINUTES : t.minutes);

@@ -1,7 +1,7 @@
 /**
  * The menu (docs/design/menu.md, plan N7.2), by hand, not in CI: `npm run shot:menu [-- <out dir>]` (run `npm run
  * build` first). The plain address at the tablet's 1180 × 820: the title asking for the tap once the game is ready,
- * the main screen over her quarterdeck, the match setup, the controls card the first match opens (once on a device),
+ * the main screen over her quarterdeck, the scenario setup (and its fleet action), the controls card the first match opens (once on a device),
  * the deck after "Beat to quarters", the captain's pause, the
  * end card after she strikes, joining and the waiting room (without a GameHub key they show the server's refusal),
  * the main screen in German, upright, and the first match's welcome and first lesson (N7.4). Fails if the page
@@ -41,6 +41,12 @@ await page.waitForFunction(() => !document.getElementById('loading'), null, { ti
 await shot('main');
 await tap('.menu-choice.first');
 await shot('setup');
+// The scenario's other starts (docs/design/scenarios.md): a fleet action, six ships on two sides, and the foot of the dialog.
+await tap('.scn-presets button:nth-child(4)');
+await shot('setup-fleet');
+await page.evaluate(() => document.querySelector('.menu-setup .nt-body')?.scrollTo(0, 99999));
+await shot('setup-fleet-foot');
+await tap('.scn-presets button:nth-child(1)');
 await tap('.menu-go');
 await page.waitForSelector('.controls-card', { timeout: TIMEOUT });
 await shot('controls');
@@ -56,11 +62,12 @@ await page.waitForTimeout(END_WAIT_MS);
 await page.waitForSelector('.menu-end', { timeout: TIMEOUT });
 await shot('end');
 await page.click('.menu-end .menu-sheet-foot .nt-button:not(.menu-go)');
-await tap('.menu-choice:nth-child(4)');
+await tap('.menu-choice:nth-child(3)');
 await page.waitForTimeout(2000);
 await shot('join');
 await page.keyboard.press('Escape');
-await tap('.menu-choice:nth-child(3)');
+await tap('.menu-choice.first');
+await tap('.scn-presets button:nth-child(2)');
 await tap('.menu-go');
 await page.waitForSelector('.menu-room', { timeout: TIMEOUT });
 await page.waitForTimeout(3000);

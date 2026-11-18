@@ -45,7 +45,8 @@
     "check:offline": "node --import tsx tools/offline/check.mjs",
     "check:transfer": "node --import tsx tools/offline/transfer.mjs",
     "shot:men": "node tools/shot/men.mjs",
-    "shot:watch": "node tools/shot/watch.mjs"
+    "shot:watch": "node tools/shot/watch.mjs",
+    "shot:scenario": "node tools/shot/scenario.mjs"
   },
   "dependencies": {
     "@actors/core": "https://github.com/ArndRosemeier/Actors/releases/download/v0.37.4/actors-core-0.37.4.tgz",

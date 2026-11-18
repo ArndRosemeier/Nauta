@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_TERMS, HOUR_AT, hourOf, matchMinutes, newSeed, NO_LIMIT, readSeed, readTerms } from '../src/app/terms.ts';
+import { navyOfShip, PRESETS } from '../src/sim/scenario.ts';
 import { endCard, Tally } from '../src/app/tally.ts';
 import { duelStart } from '../src/sim/start.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
@@ -12,9 +13,15 @@ import type { SimEvent } from '../src/sim/step.ts';
 
 test('terms read back from nothing or junk are the defaults; a seed only as a whole 32-bit number', () => {
   assert.deepEqual(readTerms(null), DEFAULT_TERMS);
-  assert.deepEqual(readTerms({ navy: 'dutch', foe: 'admiral', skillBritish: 'raw', skillFrench: 5, wind: 'gale', hour: 'noon', meet: 'ahead', minutes: 33, seed: -4 }), DEFAULT_TERMS);
-  assert.deepEqual(readTerms({ navy: 'french', foe: 'master', skillBritish: 'green', skillFrench: 'master', wind: 'strong', hour: 'dusk', meet: 'lee', minutes: NO_LIMIT, seed: 77 }),
-    { navy: 'french', foe: 'master', skillBritish: 'green', skillFrench: 'master', wind: 'strong', hour: 'dusk', meet: 'lee', minutes: NO_LIMIT, seed: 77 });
+  assert.deepEqual(readTerms({ scenario: 7, wind: 'gale', hour: 'noon', meet: 'ahead', minutes: 33, seed: -4 }), DEFAULT_TERMS);
+  const kept = { scenario: PRESETS.watch, wind: 'strong', hour: 'dusk', meet: 'lee', minutes: NO_LIMIT, seed: 77 };
+  assert.deepEqual(readTerms(JSON.parse(JSON.stringify(kept))), kept);
+  // Terms kept before the scenario existed: you in the navy chosen against a captain of the skill chosen.
+  const old = readTerms({ navy: 'french', foe: 'master', wind: 'light' }).scenario;
+  assert.equal(navyOfShip(old, 0), 'french');
+  assert.equal(navyOfShip(old, 1), 'british');
+  assert.deepEqual(old.ships.map((s) => s.command), [{ kind: 'you' }, { kind: 'computer', skill: 'master' }]);
+  assert.deepEqual(readTerms({ navy: 'dutch', foe: 'admiral' }).scenario, DEFAULT_TERMS.scenario);
   assert.equal(readSeed(' 1234 '), 1234);
   for (const v of ['', 'abc', '1.5', '-1', String(2 ** 32), null]) assert.equal(readSeed(v), null, String(v));
 });
