@@ -140,7 +140,7 @@ async function start(): Promise<void> {
    * in the same state at each picture on a fast machine and a slow one.
    */
   let ahead = 0, pinned: number | null = null;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => (pinned ?? pageSeconds()) + ahead, params.windAsked ? params.wind : null) : null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => (pinned ?? pageSeconds()) + ahead, params.windAsked ? params.wind : null, params.foe) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   const other = build && match ? new ShipView(build, 1) : null;

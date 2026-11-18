@@ -23,7 +23,9 @@
  */
 import { hashString } from '@futuremagic/core';
 import type { GameHub, RoomSummary } from '../../vendor/gamehub/gamehub';
+import { captainOrders } from '../sim/captain/captain';
 import type { Order } from '../sim/orders';
+import type { Skill } from '../sim/rules/captain';
 import { poseBetween, type ShipPose } from '../sim/ship/motion';
 import type { LoggedOrders } from '../sim/replay';
 import { duelStart } from '../sim/start';
@@ -58,6 +60,8 @@ export const MOST_STEPS = 2 * STEPS_PER_SECOND;
 const CLOCK_EASE = 0.05;
 /** The seed of a match played alone when the page names none. */
 export const SOLO_SEED = 1805;
+/** The ship a computer captain commands in a match played alone: the other one. */
+const FOE_SHIP = 1;
 /** The player id a match played alone gives its one captain. */
 const SOLO_PLAYER = 0;
 
@@ -77,6 +81,8 @@ export interface DuelOptions {
   readonly windForce?: number;
   /** The clock, s (the page's `performance.now() / 1000`; tests give a fake one). */
   readonly now: () => number;
+  /** A match played alone: the other ship commanded by a computer captain at this skill (plan N7.1); none: she sails on as she started. */
+  readonly foe?: Skill;
 }
 
 /** What the page draws: her pose between two steps, `f` of the way from `from` to `to`, at the match's time `time` (s). */
@@ -107,6 +113,8 @@ export class DuelSession {
   private readonly hub: DuelHub | null;
   private readonly now: () => number;
   private readonly build: string;
+  /** The computer captain of the other ship of a match played alone, or null. */
+  private readonly foe: Skill | null;
   private readonly listeners: { [K in keyof Events]: Set<Events[K]> } = { events: new Set(), change: new Set() };
   private known: SimState | null = null;
   private previous: SimState | null = null;
@@ -132,6 +140,7 @@ export class DuelSession {
     this.hub = options.hub ?? null;
     this.now = options.now;
     this.build = options.build;
+    this.foe = options.foe ?? null;
     if (!this.hub) {
       this.role = 'solo';
       const start = options.setup ?? duelStart(options.seed ?? SOLO_SEED);
@@ -299,6 +308,8 @@ export class DuelSession {
     this.queue = [];
     for (const t of taken) this.acks.set(t.player, Math.max(t.seq, this.acks.get(t.player) ?? 0));
     const orders = taken.map((t) => t.order);
+    // Played alone against a computer captain, his orders are stepped with the player's (sim/captain).
+    if (this.foe && this.role === 'solo') orders.push(...captainOrders(this.state, FOE_SHIP, this.foe));
     if (orders.length) this.stepped.push({ tick, orders });
     this.advance(orders);
     if (!this.hub) { this.stepped = []; return; }

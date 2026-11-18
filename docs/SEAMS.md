@@ -580,3 +580,13 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A ship shoved: blows change her way, leeway and turning, by what moves with her | `src/sim/ship/sailing.ts#shoved` |
 | What moves with her when she is shoved: mass, added masses ahead and sideways, turning inertia | `src/sim/ship/sailing.ts#shovedMasses` |
 | A ship moved bodily across the water | `src/sim/ship/motion.ts#shifted` |
+| Her tack on a heading in a wind (+1 the wind on her starboard side) | `src/sim/orders.ts#tackOf` |
+| Whether she is going about (a tack or wear ordered and not yet done) | `src/sim/orders.ts#goingAbout` |
+| The orders a computer captain gives in a step (from the state alone; none between his looks) | `src/sim/captain/captain.ts#captainOrders` |
+| What a computer captain knows when he looks round: his ship as reported, the enemy as seen, his judged range and bearing | `src/sim/captain/sight.ts#sightOf` |
+| Where a computer captain wants her head: closing for the weather position and her stern, a broadside at his range, away before the ships touch | `src/sim/captain/helm.ts#wantedHeading` |
+| The master's order that brings her head toward a wanted heading (a course, full and by, a tack, or wearing round) | `src/sim/captain/helm.ts#helmOrder` |
+| The heading nearest a wanted one she can steer on a tack | `src/sim/captain/helm.ts#sailableOn` |
+| Keeping station alongside her: the main topsail aback when she drops astern, filled when she is abreast | `src/sim/captain/helm.ts#stationOrder` |
+| The computer captain's three levels of skill and the tactics they share | `src/sim/rules/captain.ts#SKILL` |
+| A match played alone against a computer captain (`?foe=`) | `src/net/duel.ts#DuelOptions` |

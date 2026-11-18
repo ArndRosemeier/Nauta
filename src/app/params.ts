@@ -3,6 +3,7 @@
  * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`, `?glass=12`; two players:
  * `?room`, `?join=K7Q2ZP`, `?key=`, `?hub=`, `?seed=`, `?netcheck`). Pure: it takes the query string.
  */
+import { SKILLS, type Skill } from '../sim/rules/captain';
 import { CREW_SIZE } from './crew';
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
@@ -34,6 +35,8 @@ export const BENCH_SECONDS = 60;
 /** The shortest and longest flight `?bench=` may ask for, s. */
 const BENCH_SHORTEST = 5;
 const BENCH_LONGEST = 600;
+/** The computer captain's skill when `?foe` names none. */
+const FOE_SKILL: Skill = 'seasoned';
 /** The largest seed the address may name: a whole 32-bit number. */
 const SEED_MOST = 2 ** 32 - 1;
 
@@ -101,6 +104,8 @@ export interface Params {
   readonly trial: boolean;
   /** The spyglass raised from the start, drawn out to this magnification (`?glass=12`; `?glass` alone: as it starts); null: lowered. */
   readonly glass: number | null;
+  /** The other ship of a match sailed alone commanded by a computer captain at this skill (`?foe=master`; `?foe` alone: seasoned, plan N7.1); null: she sails on as she started. */
+  readonly foe: Skill | null;
 }
 
 export function readParams(query: string): Params {
@@ -126,6 +131,7 @@ export function readParams(query: string): Params {
     seed: q.has('seed') ? Math.round(num('seed', 0, 0, SEED_MOST)) : null, netcheck: q.has('netcheck'),
     crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'), men: Math.round(num('men', CREW_SIZE, 1, CREW_SIZE)),
     glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
+    foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
   };
 }
 

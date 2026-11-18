@@ -12,6 +12,7 @@ import { rigPlan } from '../sim/ship/rig';
 import type { SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
 import { MS_PER_SECOND } from '../sim/units';
+import type { Skill } from '../sim/rules/captain';
 import { DuelSession, type Drawn } from '../net/duel';
 import type { OrderSession } from './orderReport';
 import { sailsSeen } from './sailsSeen';
@@ -28,11 +29,11 @@ export class PageMatch implements OrderSession {
   private readonly heard = new Set<(events: readonly SimEvent[]) => void>();
   private readonly changed = new Set<() => void>();
 
-  /** `windForce`: the address's wind (`?wind=`), over the start's own; null: the start's. */
-  constructor(build: string, seed: number | null, now = pageSeconds, windForce: number | null = null) {
+  /** `windForce`: the address's wind (`?wind=`), over the start's own; null: the start's. `foe`: the other ship's computer captain (`?foe=`), or null. */
+  constructor(build: string, seed: number | null, now = pageSeconds, windForce: number | null = null, foe: Skill | null = null) {
     // The guns' laying tables built now, while the page loads, so no step of the match pays for them.
     warmGunnery();
-    this.current = this.attach(new DuelSession({ build, now, seed: seed ?? undefined, windForce: windForce ?? undefined }));
+    this.current = this.attach(new DuelSession({ build, now, seed: seed ?? undefined, windForce: windForce ?? undefined, foe: foe ?? undefined }));
     this.drawnNow = this.current.drawn();
     setInterval(() => this.current.pump(), PUMP_MS);
   }
