@@ -170,6 +170,16 @@ export function forEachShownSet(sea: SeaState, t: number, visit: (waves: WaveSet
   for (let i = 0; i < weights.length; i++) if (weights[i]! > 0) visit(sea.seaLayers[i]!.waves, weights[i]!);
 }
 
+/**
+ * The highest the water can stand anywhere at time `t`, m above the calm level: every shown wave's amplitude and lift
+ * at their crests together. Above it nothing meets the sea (a ball in flight need not sample it there).
+ */
+export function highestWater(sea: SeaState, t: number): number {
+  let most = 0;
+  forEachShownSet(sea, t, (w, f) => { most += f * w.amp.reduce((a, b) => a + b, 0) + f * f * w.lift; });
+  return most;
+}
+
 /** The calm point and time `sumAt` sums at, for `addHere` (kept here so a sample allocates nothing). */
 const here = { x: 0, z: 0, t: 0 };
 const addHere = (waves: WaveSet, factor: number): void => addWaves(sums, waves, factor, here.x, here.z, here.t);

@@ -395,3 +395,16 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A gun read out of a ship's packed battery | `src/sim/guns/guns.ts#gunAt` |
 | A gun's training and elevation in radians | `src/sim/guns/guns.ts#laidAt` |
 | A gun knocked off her carriage or slide (damage asks for it) | `src/sim/guns/guns.ts#dismountGun` |
+| Shot in flight: a gun's firing made into her shot (aim from her lay and the ship's pose at that instant, seeded scatter, the ship's motion added), every ball flown to its end | `src/sim/guns/shot.ts#fireShot` |
+| One ball's flight under gravity and drag, skipping off the water, to where it is spent | `src/sim/guns/shot.ts#fly` |
+| The elevation that puts a gun's shot through a point (the laying table) | `src/sim/guns/shot.ts#elevationFor` |
+| How a gun captain lays his gun on a point (training, the elevation he wants, laid against her heel; his misjudged range) | `src/sim/guns/shot.ts#layOn` |
+| Whether a gun bears: her roll brings her bore through the elevation laid for | `src/sim/guns/shot.ts#bears` |
+| A gun's bore's elevation above the horizon now, and its rate | `src/sim/guns/shot.ts#boreElevation` |
+| Where a gun's muzzle stands in ship space | `src/sim/guns/shot.ts#muzzleAt` |
+| A gun's bore in ship space as she is laid | `src/sim/guns/shot.ts#boreIn` |
+| A direction of ship space in the world at her pose | `src/sim/guns/shot.ts#worldDir` |
+| Her pose a moment on along her rates | `src/sim/guns/shot.ts#poseAfter` |
+| The seeded randomness of a gun's shot | `src/sim/guns/shot.ts#shotRng` |
+| The shot's rules: muzzle speeds, each shot's balls, mass, size, speed, drag, spread and span; scatter; skipping; the range table (first proposals) | `src/sim/rules/guns.ts#SHOT` |
+| The highest the water can stand anywhere at a moment (above it nothing meets the sea) | `src/sim/sea/sea.ts#highestWater` |

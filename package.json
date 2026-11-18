@@ -20,6 +20,7 @@
     "guards": "node tools/guards/guards.mjs",
     "check:replay": "tsx tools/sim/replay.ts",
     "check:sailing": "tsx tools/sim/sailing.ts",
+    "check:gunnery": "tsx tools/sim/gunnery.ts",
     "plan:draw": "tsx tools/plan/draw.ts",
     "shot:sea": "node tools/shot/sea.mjs",
     "walk:check": "tsx tools/walk/everywhere.ts"
