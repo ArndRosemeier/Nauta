@@ -10,7 +10,8 @@
  *
  * Pure: no three.js here, so the plan's tests can check the layout.
  */
-import { HULL_AFT, HULL_FORE, HULL_HIGH } from '../../sim/ship/hull';
+import { HULL_AFT, HULL_FORE, HULL_HIGH, sheer, sideTop } from '../../sim/ship/hull';
+import { BULWARK } from '../../sim/rules/ships';
 import { sectionGirth } from '../../sim/ship/plan';
 import { HOLE_GRID } from '../../sim/rules/damage';
 
@@ -32,15 +33,15 @@ export const SIDE_REGIONS = {
 
 /** How far across her a deck reaches either side, m (wider than her beam). */
 const DECK_REACH = 5;
-/** The bulwark's inside is mapped up to this height above the deck, m. */
-const BULWARK_REACH = 1.6;
+/** Places along her her bulwarks and girth are sampled at, to find the highest and the longest. */
+const GIRTH_SAMPLES = 64;
+const alongAt = (i: number): number => HULL_AFT + ((HULL_FORE - HULL_AFT) * i) / GIRTH_SAMPLES;
+/** The bulwark's inside is mapped up to its highest over the deck at her side, m: where the waist's side rises to a raised deck's (N2.12). */
+const BULWARK_REACH = Math.max(...Array.from({ length: GIRTH_SAMPLES + 1 }, (_, i) => sideTop(alongAt(i)) - sheer(alongAt(i)))) + BULWARK.railThick;
 /** The ceiling inside her frames is mapped from her base up to her highest side, m. */
 const CEILING_REACH = HULL_HIGH;
-/** Places along her her girth is sampled at, to find the longest. */
-const GIRTH_SAMPLES = 64;
-
 /** Her longest girth from the bottom of her hull to the top of her side, m. */
-const MOST_GIRTH = Math.max(...Array.from({ length: GIRTH_SAMPLES + 1 }, (_, i) => sectionGirth(HULL_AFT + ((HULL_FORE - HULL_AFT) * i) / GIRTH_SAMPLES)));
+const MOST_GIRTH = Math.max(...Array.from({ length: GIRTH_SAMPLES + 1 }, (_, i) => sectionGirth(alongAt(i))));
 
 /** A region: the least u and v it holds (m), its size (m), and where its corner lies in the map (texels). */
 export interface DamageRegion {

@@ -9,7 +9,7 @@ import { Matrix4, Vector3 } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import { CHANNEL } from '../../sim/rules/rig';
 import { CHAIN_PLATE_FOOT, DEADEYE, MAIN_CHANNEL, MAIN_SHROUDS, PIN_RAIL, PLANKING, ROPE } from '../../sim/rules/ships';
-import { hullHalfBreadth, sheer } from '../../sim/ship/hull';
+import { hullHalfBreadth, waistDeck } from '../../sim/ship/hull';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { rigPlan, type RigPlan } from '../../sim/ship/rig';
 import { SIDES, type Deadeye } from '../../sim/ship/spars';
@@ -46,6 +46,8 @@ const BOLT = { sides: 8, radius: 0.022 } as const;
 const CHANNEL_BEYOND = { aft: 0.28, fore: 0.36 } as const;
 /** Deadeyes further apart than this along her are on separate channels or stools, m. */
 const CHANNEL_GAP = 1.6;
+/** Deadeyes further apart in height than this, m, are on two channels. */
+const CHANNEL_STEP = 0.3;
 /** The rope's colour where it is drawn as a solid (the turns round a pin): hemp. */
 const ROPE_HEMP_RGB = [0.18, 0.12, 0.065] as const;
 /** The pin rail runs this far beyond its first and last pin, m; pins further apart than this are on separate lengths of rail. */
@@ -141,7 +143,7 @@ function drawDeadeyes(rig: RigPlan, fittings: Fittings, out: ZoneParts, far: boo
 
 /** The chain plate under a channel's deadeye: an iron strap down her side, along the line's direction, to its bolt through the wale. */
 function chainPlate(out: ZoneParts, d: Deadeye, lower: Vector3, dir: Vector3): void {
-  const plateFoot = CHAIN_PLATE_FOOT + (sheer(d.along) - sheer(MAIN_SHROUDS[0]!));
+  const plateFoot = CHAIN_PLATE_FOOT + (waistDeck(d.along) - waistDeck(MAIN_SHROUDS[0]!));
   const footY = shipY(plateFoot), footX = d.side * (hullHalfBreadth(d.along, plateFoot) + PLANKING.wale + CHAIN_PLATE.thick);
   const strapTop = lower.clone().addScaledVector(dir, -DEADEYE.diameter / 2);
   const foot = new Vector3(footX, footY, strapTop.z - dir.z * (strapTop.y - footY) / Math.max(dir.y, SMALL_BEVEL));
@@ -155,7 +157,8 @@ function channels(out: ZoneParts, eyes: readonly Deadeye[]): void {
   const runs: Deadeye[][] = [];
   for (const d of sorted) {
     const last = runs[runs.length - 1];
-    if (last && d.along - last[last.length - 1]!.along < CHANNEL_GAP) last.push(d);
+    // A run parts where her side steps up to a raised deck's (N2.12): each channel lies under its own rail.
+    if (last && d.along - last[last.length - 1]!.along < CHANNEL_GAP && Math.abs(d.height - last[last.length - 1]!.height) < CHANNEL_STEP) last.push(d);
     else runs.push([d]);
   }
   for (const run of runs) {

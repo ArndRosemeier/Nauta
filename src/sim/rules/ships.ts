@@ -47,7 +47,14 @@ export const RAIL_TOP = 6.52;
  * The breaks of her raised decks (ship.md, "The view from the deck"), m forward of the mainmast: the quarterdeck runs
  * aft from the one, the forecastle forward from the other; between them is the waist.
  */
-export const BREAKS = { quarterdeck: -1.3, forecastle: 13.9 } as const;
+export const BREAKS = { quarterdeck: -1.3, forecastle: 13.45 } as const;
+/**
+ * Her raised decks (ship.md, "The view from the deck", plan N2.12): the quarterdeck and the forecastle stand this high
+ * over the waist's deck (the draught's deck line, PROFILE), m, with their rails this high over their own decks, m.
+ * Above her wales she departs from the draught here; the berth deck stays under the waist's deck line, so the cabins
+ * under the raised decks gain their rise in headroom.
+ */
+export const RAISED = { rise: 1.2, rail: 1.0 } as const;
 /**
  * The waist's side, lowered so the sea is seen over its rail (N2.10): the top of her side runs just over the waist's
  * port tops (hull.ts `sideTop`), so the rail stands about 1.1 m over the deck at her side and the ports are notches up
@@ -62,15 +69,22 @@ export const PORT = { sill: 5.49, top: 6.26, width: 0.85 } as const;
  * Her gun ports, the same each side, aft to fore (the sheer plan, N2.1): [mark, middle (m forward of the mainmast),
  * sill, top (m above the base), width (m)]. Ten a side, about 2.92 m apart; J is the narrow chase port in her bow.
  */
-export const PORTS: readonly (readonly [mark: string, along: number, sill: number, top: number, width: number])[] = [
+const DRAUGHT_PORTS: readonly (readonly [mark: string, along: number, sill: number, top: number, width: number])[] = [
   ['A', -7.93, 6.05, 6.84, 0.83], ['B', -5.01, 5.88, 6.64, 0.83], ['C', -2.07, 5.67, 6.46, 0.81], ['D', 0.82, 5.48, 6.27, 0.8],
   ['E', 3.73, 5.39, 6.17, 0.82], ['F', 6.74, 5.28, 6.05, 0.85], ['G', 9.67, 5.21, 5.97, 0.8], ['H', 12.56, 5.14, 5.93, 0.83],
   ['I', 15.43, 5.16, 5.9, 0.9], ['J', 18.08, 5.15, 5.86, 0.64],
 ];
-/** The waist's gun ports, m forward of the mainmast: B, C and D. */
-export const WAIST_PORTS: readonly number[] = [PORTS[1]![1], PORTS[2]![1], PORTS[3]![1]];
-/** The main channel: its upper side, m above the base; how far it stands out from her side and its thickness, m. */
-export const MAIN_CHANNEL = { top: 6.42, width: 0.4, thick: 0.1, aft: -4.6, fore: 0.3 } as const;
+/** Whether a place along her is on a raised deck: the quarterdeck aft of its break, the forecastle forward of its. */
+export const onRaisedDeck = (along: number): boolean => along <= BREAKS.quarterdeck || along >= BREAKS.forecastle;
+/** Her gun ports as she is built (N2.12): the draught's, those of the quarterdeck and forecastle raised with their decks. */
+export const PORTS: readonly (readonly [mark: string, along: number, sill: number, top: number, width: number])[] = DRAUGHT_PORTS.map(
+  ([mark, along, sill, top, width]) => (onRaisedDeck(along) ? [mark, along, sill + RAISED.rise, top + RAISED.rise, width] as const : [mark, along, sill, top, width] as const));
+/**
+ * The main channel: how far it stands out from her side and its thickness, m. The draught has its upper side at 6.42 m
+ * above the base; with her waist's side lowered and her quarterdeck raised (N2.9, N2.12) every channel lies just under
+ * the rail of the side it is on (spars.ts), so the main's three after shrouds stand on the quarterdeck's side.
+ */
+export const MAIN_CHANNEL = { width: 0.4, thick: 0.1, aft: -4.6, fore: 0.3 } as const;
 /** The main shrouds' deadeyes on the channel, m forward of the mainmast (the draught: six a side, N2.1's reading from the mast's middle). */
 export const MAIN_SHROUDS: readonly number[] = [-4.32, -3.51, -2.78, -1.44, -0.75, -0.06];
 /** The lower ends of the chain plates, m above the base (the draught: bolted through the wale). */
@@ -165,10 +179,11 @@ export const TRANSOM = {
 } as const;
 /**
  * Her stern board as the body plan draws it, seen from aft: the moulding across it where the counter meets the
- * upright stern (m above the base), and the two square stern ports above the deck: their middles either side of the
- * middle line, sill and top (m above the base) and width, m.
+ * upright stern (m above the base), and its two square windows: their middles either side of the middle line, sill
+ * and top (m above the base) and width, m. The body plan draws them as stern ports over the old deck; with the
+ * quarterdeck raised over them (N2.12) they are glazed windows under its beams.
  */
-export const STERN_BOARD = { moulding: 6.25, ports: { across: 1.2, sill: 6.6, top: 7.28, width: 0.66 } } as const;
+export const STERN_BOARD = { moulding: 6.25, windows: { across: 1.2, sill: 6.4, top: 6.95, width: 0.66 } } as const;
 /**
  * Her rudder (the draught's sheer plan): hung by its pintles on the sternpost's after face from the heel up, its
  * breadth fore and aft (m) at the heel [height above the base, breadth], where it begins to narrow and where it has
@@ -343,7 +358,6 @@ const COAMING_BELOW = 0.12;
  * except the main hatch's (1.9 m) and are a sloop's usual sizes.
  */
 export const OPENINGS: readonly OpeningRow[] = [
-  { id: 'bread-scuttle', name: 'bread room scuttle', kind: 'scuttle', level: 'weather', aft: -10.05, fore: -9.31, across: [-0.4, 0.4], coaming: COAMING },
   { id: 'companion', name: 'companion', kind: 'companion', level: 'weather', aft: -6.65, fore: -5.62, across: [-0.5, 0.5], coaming: HOOD },
   { id: 'after-ladderway', name: 'after ladderway', kind: 'ladderway', level: 'weather', aft: -5.41, fore: -4.59, across: [-0.45, 0.45], coaming: COAMING },
   { id: 'skylight', name: "officers' skylight", kind: 'skylight', level: 'weather', aft: -2.96, fore: -1.63, across: [-0.4, 0.4], coaming: SKYLIGHT_HOOD },
@@ -373,9 +387,11 @@ export interface LadderRow {
   readonly head: Toward;
   readonly step?: Toward;
 }
-/** Her ladders: one in every ladderway, companion and scuttle, and one down the berth deck's main hatch to the hold. */
+/**
+ * Her ladders: one in every ladderway, companion and scuttle, and one down the berth deck's main hatch to the hold. The
+ * bread room has no scuttle to the quarterdeck over it (N2.12): it is reached through the captain's cabin.
+ */
 export const LADDERS: readonly LadderRow[] = [
-  { id: 'bread-ladder', opening: 'bread-scuttle', below: 'breadroom', above: 'deck', head: 'aft' },
   { id: 'companion-ladder', opening: 'companion', below: 'cabin', above: 'deck', head: 'fore', step: 'starboard' },
   { id: 'after-ladder', opening: 'after-ladderway', below: 'passage', above: 'deck', head: 'aft', step: 'port' },
   { id: 'fore-ladder', opening: 'fore-ladderway', below: 'messdeck', above: 'deck', head: 'aft', step: 'starboard' },
@@ -383,6 +399,16 @@ export const LADDERS: readonly LadderRow[] = [
   { id: 'spirit-ladder', opening: 'spirit-scuttle', below: 'spirit', above: 'passage', head: 'starboard' },
   { id: 'hold-ladder', opening: 'main-hatch-below', below: 'hold', above: 'midships', head: 'aft', step: 'starboard' },
   { id: 'fore-hold-ladder', opening: 'fore-scuttle', below: 'fore-hold', above: 'fore-store', head: 'fore' },
+];
+
+/**
+ * The ladders at the breaks of her raised decks (ship.md, "The view from the deck"; plan N2.12): two at each break,
+ * one a side, this far from the centreline, m. Each stands in the waist against the break's face and climbs onto
+ * the raised deck, clear of the guns at the ports either side of the break and their crews.
+ */
+export const BREAK_LADDERS: readonly { readonly id: string; readonly break: keyof typeof BREAKS; readonly across: number }[] = [
+  { id: 'quarterdeck-ladder-p', break: 'quarterdeck', across: -1.6 }, { id: 'quarterdeck-ladder-s', break: 'quarterdeck', across: 1.6 },
+  { id: 'forecastle-ladder-p', break: 'forecastle', across: -1.6 }, { id: 'forecastle-ladder-s', break: 'forecastle', across: 1.6 },
 ];
 
 /** A door: the two spaces it joins and where it stands, m forward of the mainmast and from the centreline. */
@@ -453,22 +479,24 @@ export interface FittingRow {
 /**
  * The fife rails' places that make the ways across her deck (ship.md, "Crossing the deck": a way 0.7 m wide across
  * the centreline at least every 6 m, one forward of the foremast), m forward of the mainmast: the main fife rail on
- * the main bitts' after face, 0.48 m abaft the mainmast, leaving the way between it and the skylight; the foremast's
+ * the main bitts close abaft the mainmast, so no way too narrow to cross is left between them, nor between it and the
+ * quarterdeck's break (N2.12; the way across is on the quarterdeck and forward of the pumps); the foremast's
  * fore fife rail just clear of the mast, leaving the way between it and the bowsprit's heel and the long six's captain
  * his place (ship.md, "The forecastle is reached past the fore fife rail": narrow, its pins within 0.8 m of the middle).
  */
-export const MAIN_FIFE_AT = -0.89;
+export const MAIN_FIFE_AT = -0.65;
 /** The ways across her weather deck's centreline (ship.md, "Crossing the deck"): each this wide clear, m, and no more than `every` m of centreline without one. */
 export const DECK_CROSSING = { width: 0.7, every: 6 } as const;
 export const FORE_FIFE_FORE_AT = 15.06;
 /**
  * Her fittings in the way that are not furnished models (those are in the way as their own room, rules/fittings.ts
  * SOLID, so no fitting has two footprints), along her from the deck plans; across, a sloop's usual sizes. The store
- * scuttle stands to port over the sail room, off the centreline, leaving the way across between the galley chimney and the fore bitts
- * (over the dry store it would close the port gangway at the fore bitts).
+ * scuttle stands to port at the sail room's after end, off the centreline, leaving the way across between the galley
+ * chimney and the fore bitts (over the dry store it would close the port gangway at the fore bitts), and far enough
+ * aft to leave the way to the forecastle's port ladder and the H gun's men beside their captain (N2.12).
  */
 export const FITTINGS: readonly FittingRow[] = [
-  { id: 'store-scuttle', name: 'store scuttle', level: 'weather', aft: 11.6, fore: 12.22, across: [-2.05, -1.35] },
+  { id: 'store-scuttle', name: 'store scuttle', level: 'weather', aft: 10.75, fore: 11.37, across: [-2.05, -1.35] },
   { id: 'bins-p', name: "boatswain's bins", level: 'berth', aft: 7.01, fore: 10.92, across: [-SIDE, -3.4] },
   { id: 'bins-s', name: "carpenter's bins", level: 'berth', aft: 7.01, fore: 10.92, across: [3.4, SIDE] },
   { id: 'well', name: 'pump well', level: 'hold', aft: -0.75, fore: 0.75, across: [-0.95, 0.95] },
@@ -491,6 +519,11 @@ export const GUN_FOOTPRINT: Readonly<Record<GunKind, { readonly inboard: number;
 export const GUN_CREW: readonly (readonly [inboard: number, along: number])[] = [
   [2.4, 0], [1.0, 0.85], [1.0, -0.85], [1.7, 0.85], [1.7, -0.85],
 ];
+/**
+ * At a gun by a break of her raised decks (N2.12), the men whose places would stand on the other deck or at its edge
+ * stand on the gun's other side instead, this much farther inboard than their own places, m: beside the gun captain.
+ */
+export const CREW_PAST_GUN = 1.4;
 
 /**
  * The rails lines are made fast on. A pin rail runs inside the bulwark at a mast's shrouds, both sides, a pin every
@@ -501,14 +534,18 @@ export type RailRow =
   | { readonly id: string; readonly kind: 'pin rail'; readonly mast: 'fore' | 'main'; readonly aft: number; readonly fore: number }
   | { readonly id: string; readonly kind: 'fife rail'; readonly mast: 'fore' | 'main'; readonly at: number; readonly pins: readonly number[]; readonly toward: 1 | -1 };
 export const RAILS: readonly RailRow[] = [
-  { id: 'main-pins', kind: 'pin rail', mast: 'main', aft: -4.2, fore: -0.2 },
+  { id: 'main-pins', kind: 'pin rail', mast: 'main', aft: -4.2, fore: -0.04 },
   { id: 'fore-pins', kind: 'pin rail', mast: 'fore', aft: 10.9, fore: 14.6 },
-  { id: 'main-fife', kind: 'fife rail', mast: 'main', at: MAIN_FIFE_AT, pins: [-1.05, -0.8, 0.8, 1.05], toward: -1 },
-  { id: 'fore-fife', kind: 'fife rail', mast: 'fore', at: 13.15, pins: [-1.0, -0.85, 0.85, 1.0], toward: -1 },
+  // Its men haul on its fore side, between it and the mainmast: abaft it is the quarterdeck's break (N2.12).
+  { id: 'main-fife', kind: 'fife rail', mast: 'main', at: MAIN_FIFE_AT, pins: [-1.05, -0.8, 0.8, 1.05], toward: 1 },
+  // Close forward of the galley chimney, so no way too narrow to cross is left between them, and clear of the
+  // forecastle's break and its ladders (N2.12); its men haul abaft it.
+  { id: 'fore-fife', kind: 'fife rail', mast: 'fore', at: 12.85, pins: [-1.0, -0.85, 0.85, 1.0], toward: -1 },
   // The rig plan (N3.2) belays every running line on a pin of its own (about 100): the bulwark carries pins from the
-  // taffrail to the bow, between the ports, and the foremast's fife rail has pins on its fore side too.
+  // taffrail to the bow, between the ports, and the foremast's fife rail has pins on its fore side too. No pin stands
+  // at a break (N2.12): the main and waist rails reach a little farther forward for the four lost there.
   { id: 'quarter-pins', kind: 'pin rail', mast: 'main', aft: -11.36, fore: -4.6 },
-  { id: 'waist-pins', kind: 'pin rail', mast: 'main', aft: 0.1, fore: 10.6 },
+  { id: 'waist-pins', kind: 'pin rail', mast: 'main', aft: 0.1, fore: 10.66 },
   { id: 'bow-pins', kind: 'pin rail', mast: 'fore', aft: 14.92, fore: 19.1 },
   { id: 'fore-fife-fore', kind: 'fife rail', mast: 'fore', at: FORE_FIFE_FORE_AT, pins: [-0.75, -0.6, -0.45, 0.45, 0.6, 0.75], toward: 1 },
 ];
@@ -531,7 +568,7 @@ export interface StationRow {
 }
 /** The tops and the masthead (lookouts, marines) come with the rig plan (N3.2), aloft. */
 export const STATIONS: readonly StationRow[] = [
-  { id: 'wheel', name: 'the wheel', who: 'the master and the helmsmen', orders: ['course', 'come up', 'bear away', 'tack', 'wear', 'heave to'], space: 'deck', along: -9.5, across: 1.0 },
+  { id: 'wheel', name: 'the wheel', who: 'the master and the helmsmen', orders: ['course', 'come up', 'bear away', 'tack', 'wear', 'heave to'], space: 'deck', along: -10.15, across: 1.6 },
   { id: 'quarterdeck', name: 'the quarterdeck, by the capstan', who: 'the first lieutenant and the boatswain', orders: ['battle sail', 'plain sail', 'make sail', 'take in sail', 'reef', 'brace'], space: 'deck', along: -3.78, across: 1.3 },
   { id: 'waist', name: 'the waist, among the guns', who: 'the second lieutenant or the gunner, and the gun captains', orders: ['quarters', 'shot', 'target', 'run out', 'fire', 'cease fire', 'which side'], space: 'deck', along: 4.5, across: 0 },
   { id: 'magazine', name: 'the magazine', who: "the gunner's mate and the powder boys", orders: ['what is filled and passed up'], space: 'lightroom', along: -1.9, across: 0.6 },

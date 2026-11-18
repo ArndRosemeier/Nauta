@@ -5,16 +5,15 @@
  * the zone of the space it is over (zones.ts), so it is drawn only when that room can be seen.
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
-import { CARLING, DECK_BEAM, GRATING, MASTS, PARTNERS, PLANKING, type Level } from '../../sim/rules/ships';
+import { BREAK_LADDERS, BREAKS, BULWARK, CARLING, DECK_BEAM, GRATING, LADDER, MASTS, PARTNERS, PLANKING, RAISED, type Level } from '../../sim/rules/ships';
 import { hullHalfBreadth, sheer, weatherDeck } from '../../sim/ship/hull';
 import type { Opening, Rect, ShipPlan } from '../../sim/ship/plan';
 import { shipY, shipZ } from '../../sim/ship/section';
-import { box, lathe, sheet } from './shapes';
+import { box, facing, lathe, rod, sheet } from './shapes';
 import type { ShipParts, ZoneParts } from './parts';
-import { BLACK, DECK, DECK_BELOW, OAK, TAR } from './looks';
-import type { Finish } from './solid';
+import { BLACK, BUFF, BULWARK_BOARDS, DECK, DECK_BELOW, GLASS, OAK, TAR } from './looks';
 import { DAMAGE } from './damageMap';
-import { BEVEL, CORNER_AO, CORNER_REACH, EPSILON, SMALL_BEVEL, ceilingX, rowsAlong, rowsOf, steps, ROW_STEP } from './hullSide';
+import { BEVEL, BREAK_ROWS, BREAK_STEP, CORNER_AO, CORNER_REACH, EPSILON, SMALL_BEVEL, acrossABreak, bulwarkInside, ceilingX, rowsAlong, rowsOf, steps, ROW_STEP } from './hullSide';
 import { OUTSIDE, openingsOn, rectCentre, zoneUnder } from './zones';
 
 /** Timbers that meet are let into each other this far, m, so no light shows at the joint. */
@@ -32,10 +31,15 @@ const COAT = { up: 0.28, out: 0.14, knee: 1 / 3 } as const;
 const HOOD = { board: 0.04, overhang: 0.06, roof: 0.06 } as const;
 /** The skylight's glazed lids: their frame's width, how steep they stand (rad), and the bars across the glass, m. */
 const SKYLIGHT = { frame: 0.06, pitch: 0.42, bar: 0.025, bars: 3 } as const;
-/** The glass of the skylight, dark against the lit deck. */
-const GLASS: Finish = { rgb: [0.012, 0.016, 0.018], paint: 1 };
 /** Sides of turned pieces. */
 const SIDES = 24;
+/** The breast rail along a raised deck's edge at its break: its balusters' radius, sides and how far apart at most, m; the stanchions at its ends and either side of a ladder, m square. */
+const BALUSTER = { radius: 0.035, sides: 8, step: 0.32 } as const;
+const STANCHION = 0.12;
+/** Her two breaks, the quarterdeck's and the forecastle's. */
+const BREAK_NAMES = ['quarterdeck', 'forecastle'] as const;
+/** A ladder's gap in the breast rail is this much wider than the ladder each side, m. */
+const LADDER_GAP = 0.05;
 
 /** What the deck builders need: the plan, which zone each space is drawn in, the parts. */
 export interface DeckContext {
@@ -96,9 +100,12 @@ export function deckUnderside(ctx: DeckContext, alongs: readonly number[], xs: r
 function acrossCuts(plan: ShipPlan): number[] {
   return rowsOf([...plan.openings.flatMap((o) => [o.port, o.starboard]), ...plan.spaces.flatMap((s) => [s.port, s.starboard]), -PARTNERS / 2, PARTNERS / 2].filter((x) => Math.abs(x) < MOST_HALF));
 }
-/** Cuts along her: every edge of the openings and spaces, and of the partners. */
+/** Cuts along her: every edge of the openings and spaces, and of the partners, and a row either side of each break. */
 function alongCuts(plan: ShipPlan): number[] {
-  return [...plan.openings.flatMap((o) => [o.aft, o.fore]), ...plan.spaces.flatMap((s) => [s.aft, s.fore]), ...Object.values(MASTS).flatMap((m) => [m.along - PARTNERS / 2, m.along + PARTNERS / 2])];
+  return [
+    ...plan.openings.flatMap((o) => [o.aft, o.fore]), ...plan.spaces.flatMap((s) => [s.aft, s.fore]), ...Object.values(MASTS).flatMap((m) => [m.along - PARTNERS / 2, m.along + PARTNERS / 2]),
+    ...BREAK_ROWS,
+  ];
 }
 
 /** The weather deck's edge at a place along her: under her side planking, where it is let in. */
@@ -110,9 +117,62 @@ export function buildWeatherDeck(ctx: DeckContext, deckAft: number, deckFore: nu
   const alongs = rowsAlong(deckAft, deckFore, rowStep, alongCuts(plan)).reverse();
   const xs = steps(-MOST_HALF, MOST_HALF, rowStep, acrossCuts(plan));
   const holes = [...openingsOn(plan, 'weather'), ...Object.values(MASTS).map((m) => partners(m.along))];
-  const cells = deckCells(alongs, xs, deckEdge, weatherDeck, holes, rowStep), { top } = cells;
+  const all = deckCells(alongs, xs, deckEdge, weatherDeck, holes, rowStep);
+  const cells = { ...all, keep: (i: number, j: number) => all.keep(i, j) && !acrossABreak(alongs[i]!, alongs[i + 1]!) }, { top } = cells;
   sheet(parts.zone(OUTSIDE).wood, top, { ...DECK, damage: DAMAGE.weatherDeck }, (i, j) => [shipZ(alongs[i]!), top[i]![j]!.x], cells.keep, false, cells.ao);
   deckUnderside(ctx, alongs, xs, deckEdge, (a, x) => weatherDeck(a, x) - PLANKING.deck, cells, 'berth', DAMAGE.weatherDeck);
+  buildBreaks(ctx, xs);
+}
+
+/**
+ * Her breaks (N2.12): where the quarterdeck and the forecastle stand up from the waist, the face from the waist's deck
+ * up to the raised deck, boarded across and red as her bulwarks' inside, its back seen from the cabins under it; and
+ * along the raised deck's edge the breast rail on its balusters, open where the ladders come up.
+ */
+function buildBreaks(ctx: DeckContext, xs: readonly number[]): void {
+  const { plan, zones, parts } = ctx, out = parts.zone(OUTSIDE);
+  for (const name of BREAK_NAMES) {
+    // Toward the raised deck from the break: aft at the quarterdeck's, forward at the forecastle's.
+    const at = BREAKS[name], da = name === 'quarterdeck' ? -1 : 1, waist = at - (da * BREAK_STEP) / 2, raised = at + (da * BREAK_STEP) / 2;
+    // Across from her bulwark's inside to the other's, at the deck each row is on.
+    const inside = (a: number) => bulwarkInside(at, weatherDeck(a, 0)), alongs = [waist, raised];
+    const face = deckGrid(alongs, xs, inside, weatherDeck);
+    facing(out.wood, face, BULWARK_BOARDS, (i, j) => [face[i]![j]!.x, face[i]![j]!.y - face[0]![j]!.y], new Vector3(0, 0, da),
+      () => true, (i) => CORNER_AO + (1 - CORNER_AO) * i);
+    // Its back, under the raised deck: in the room each part of it stands over.
+    const back = deckGrid(alongs, xs, inside, (a, x) => weatherDeck(a, x) - PLANKING.deck);
+    const room = (j: number) => {
+      const z = zoneUnder(plan, zones, 'berth', raised + da * BREAK_STEP, (xs[j]! + xs[j + 1]!) / 2);
+      return z ? parts.zone(z).wood : null;
+    };
+    facing((_, j) => room(j), back, DECK_BELOW, (i, j) => [back[i]![j]!.x, back[i]![j]!.y], new Vector3(0, 0, -da));
+    buildBreastRail(out, name as keyof typeof BREAKS, da, ctx.far === true);
+  }
+}
+
+/** A breast rail across her at a break, on the raised deck's edge: the rail, a stanchion at each end of each length, balusters between (not on the far ship). */
+function buildBreastRail(out: ZoneParts, name: keyof typeof BREAKS, da: number, far: boolean): void {
+  const at = BREAKS[name], raised = at + (da * BREAK_STEP) / 2, z = shipZ(at + (da * BULWARK.railWidth) / 2);
+  const top = weatherDeck(raised, 0) + RAISED.rail, foot = (x: number) => weatherDeck(raised, x);
+  const inner = bulwarkInside(at, top);
+  // Its lengths: from her side to her side, open where a ladder comes up.
+  const gaps = BREAK_LADDERS.filter((l) => l.break === name).map((l) => [l.across - LADDER.width / 2 - LADDER_GAP, l.across + LADDER.width / 2 + LADDER_GAP] as const);
+  let lengths: [number, number][] = [[-inner, inner]];
+  for (const [p, q] of gaps) lengths = lengths.flatMap(([u, v]): [number, number][] => (q <= u || p >= v ? [[u, v]] : [[u, Math.max(u, p)], [Math.min(v, q), v]].filter(([a, b]) => b - a > EPSILON) as [number, number][]));
+  const w = BULWARK.railWidth, t = BULWARK.railThick;
+  for (const [u, v] of lengths) {
+    box(out.wood, new Matrix4().makeTranslation((u + v) / 2, shipY(top - t / 2), z), [v - u, t, w], BLACK, BEVEL, 0);
+    for (const x of [u + STANCHION / 2, v - STANCHION / 2]) {
+      const h0 = foot(x), h1 = top - t;
+      box(out.wood, new Matrix4().makeTranslation(x, shipY((h0 + h1) / 2), z), [STANCHION, h1 - h0, STANCHION], BLACK, SMALL_BEVEL, 1);
+    }
+    if (far) continue;
+    const n = Math.ceil((v - u - STANCHION) / BALUSTER.step);
+    for (let k = 1; k < n; k++) {
+      const x = u + STANCHION / 2 + ((v - u - STANCHION) * k) / n;
+      rod(out.wood, new Vector3(x, shipY(foot(x)), z), new Vector3(x, shipY(top - t), z), BALUSTER.radius, BALUSTER.sides, BUFF);
+    }
+  }
 }
 
 /** The partners round each mast on the weather deck, with the tarred coat that keeps the water out (the masts are N3.6's). */

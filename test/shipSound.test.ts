@@ -135,7 +135,7 @@ function walk(seconds: number, step: (t: number) => readonly [number, number, nu
 
 /** His body walking forward on her still deck (or standing, `forward` 0) for `seconds`: his soles' landings counted as the body shows them (a sole back on the floor after being lifted) and the footfalls heard, after `settle` s. */
 function walkWithBody(seconds: number, forward: number, below = 0, settle = 2) {
-  let w = walkerAt(plan, { space: 'deck', along: -4, across: 1.5 });
+  let w = walkerAt(plan, { space: 'deck', along: 3, across: 1.5 });
   const body = new CaptainBody({ stands: (x, z) => deckGround(plan, graph, doors).stand(x, z, w) !== null, handhold: () => null });
   const feet = new Footsteps(), heard: Footfall[] = [], still = startMotion(0, 0, 0).pose;
   let landings = 0, lifted = { L: false, R: false };

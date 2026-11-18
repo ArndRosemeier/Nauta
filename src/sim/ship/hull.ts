@@ -15,8 +15,8 @@
  */
 import { linearCurve, monotoneCurve, type Curve } from '../curve';
 import {
-  BODY_STATIONS, BREAKS, DESIGN_WATERLINE, KEEL_DEPTH, KEEL_HALF_SIDING, PORTS, PROFILE, STEM, STERN, TRANSOM, DECK_CAMBER, PLANKING,
-  WAIST_DRIFT,
+  BODY_STATIONS, BREAKS, BULWARK, DESIGN_WATERLINE, KEEL_DEPTH, KEEL_HALF_SIDING, PORTS, PROFILE, RAISED, STEM, STERN, TRANSOM, DECK_CAMBER,
+  PLANKING, WAIST_DRIFT, onRaisedDeck,
 } from '../rules/ships';
 
 /** The grid the surface is sampled on: steps along her and up, m. */
@@ -32,7 +32,6 @@ const ALONGS = col(PROFILE, 0);
 const KEEL_BOTTOM: Curve = linearCurve(ALONGS, col(PROFILE, 1));
 const RABBET: Curve = linearCurve(ALONGS, col(PROFILE, 2));
 const SHEER: Curve = monotoneCurve(ALONGS, col(PROFILE, 3));
-const SIDE_TOP: Curve = monotoneCurve(ALONGS, col(PROFILE, 4));
 /** The hull's ends at a height: forward the stem's face, aft the sternpost's face and above it the counter and transom. */
 const STEM_AT: Curve = monotoneCurve(col(STEM, 0), col(STEM, 1));
 const STERN_AT: Curve = monotoneCurve(col(STERN, 0), col(STERN, 1));
@@ -40,32 +39,44 @@ const TRANSOM_HALF: Curve = monotoneCurve(col(TRANSOM.outline, 0), col(TRANSOM.o
 /** Each station's half-breadth over height. */
 const STATIONS = BODY_STATIONS.map((s) => ({ ...s, curve: monotoneCurve(col(s.offsets, 0), col(s.offsets, 1)) }));
 
-/** The lowest and highest heights of her hull, and her ends along her. */
+/** The lowest height of her hull, and her ends along her (her highest, HULL_HIGH, follows her raised decks below). */
 export const HULL_LOW = Math.min(...col(PROFILE, 2));
-export const HULL_HIGH = Math.max(...col(PROFILE, 4), ...col(STEM, 0), ...col(STERN, 0));
 export const HULL_AFT = Math.min(...col(STERN, 1), ALONGS[0]!);
 export const HULL_FORE = Math.max(...col(STEM, 1), ALONGS[ALONGS.length - 1]!);
 
 /** The keel's underside at a place along her, m above the base (she draws more aft: the keel's drag). */
 export const keelBottom = (along: number): number => KEEL_BOTTOM(along);
-/** The weather deck's upper side at her side, m above the base: the sheer, rising toward bow and stern. */
-export const sheer = (along: number): number => SHEER(along);
+/**
+ * The waist's deck at her side, m above the base: the draught's deck line, rising toward bow and stern. The berth deck
+ * keeps under it the whole length of her (plan.ts `berthDeck`), under the raised decks too.
+ */
+export const waistDeck = (along: number): number => SHEER(along);
 /** Whether a place along her is in the waist, between the breaks of her raised decks. */
-export const inWaist = (along: number): boolean => along > BREAKS.quarterdeck && along < BREAKS.forecastle;
+export const inWaist = (along: number): boolean => !onRaisedDeck(along);
+/**
+ * The weather deck's upper side at her side, m above the base: the waist's deck line, and on the quarterdeck and the
+ * forecastle that line raised by RAISED.rise (plan N2.12), a step at each break.
+ */
+export const sheer = (along: number): number => SHEER(along) + (onRaisedDeck(along) ? RAISED.rise : 0);
 /**
  * How high the waist's side stands over the deck at her side, m: just over the highest edge of its ports' tops, so
  * every port is a notch up to the rail (ship.md, "The view from the deck").
  */
 export const WAIST_SIDE = Math.max(...PORTS.filter((p) => inWaist(p[1])).flatMap(([, along, , top, w]) => [top - SHEER(along - w / 2), top - SHEER(along + w / 2)]));
+/** The top of her side on a raised deck at a place, m above the base: its rail RAISED.rail over its deck. */
+const raisedTop = (along: number): number => SHEER(along) + RAISED.rise + RAISED.rail - BULWARK.railThick;
 /**
- * The top of her side (the plank-sheer under the rail), m above the base: the draught's, but in the waist lowered to
- * WAIST_SIDE over the deck, coming down to it from the draught's height over WAIST_DRIFT from each break.
+ * The top of her side (the plank-sheer under the rail), m above the base: on the raised decks RAISED.rail under the
+ * rail's top over their decks; in the waist WAIST_SIDE over its deck, coming down to it from the raised decks' height
+ * over WAIST_DRIFT from each break.
  */
 export function sideTop(along: number): number {
-  const drawn = SIDE_TOP(along), into = Math.min(along - BREAKS.quarterdeck, BREAKS.forecastle - along);
-  if (into <= 0) return drawn;
-  return drawn + (Math.min(drawn, SHEER(along) + WAIST_SIDE) - drawn) * Math.min(1, into / WAIST_DRIFT);
+  if (onRaisedDeck(along)) return raisedTop(along);
+  const low = SHEER(along) + WAIST_SIDE, into = Math.min(along - BREAKS.quarterdeck, BREAKS.forecastle - along);
+  return low + (raisedTop(along) - low) * Math.max(0, 1 - into / WAIST_DRIFT);
 }
+/** The highest height of her hull: the top of her side at the taffrail and at the stem, or her ends' own tops. */
+export const HULL_HIGH = Math.max(...ALONGS.map(sideTop), ...col(STEM, 0), ...col(STERN, 0));
 
 /** The weather deck's upper side at a place, m above the base: the sheer at her side plus the round of her beams. */
 export function weatherDeck(along: number, x: number): number {
@@ -75,6 +86,8 @@ export function weatherDeck(along: number, x: number): number {
 }
 /** The underside of the weather deck's planking on the centreline, m above the base. */
 export const weatherDeckUnderside = (along: number): number => weatherDeck(along, 0) - PLANKING.deck;
+/** The underside of the waist's deck line's planking on the centreline, m above the base: where the berth deck hangs from, the whole length of her. */
+export const waistDeckUnderside = (along: number): number => SHEER(along) + DECK_CAMBER - PLANKING.deck;
 
 /** Her ends at a height: the aftmost and foremost place of the moulded hull, m forward of the mainmast. */
 export function hullEnds(h: number): { aft: number; fore: number } {

@@ -6,7 +6,7 @@
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
 import {
-  BERTH_BEAM, DECK_BEAM, DOOR, DOORS, LADDER, LADDERS, LANTERNS, OPEN_JOINS, PLANKING, WAY_STANDOFF, type Toward,
+  BERTH_BEAM, BREAK_LADDERS, DECK_BEAM, DOOR, DOORS, LADDER, LADDERS, LANTERNS, OPEN_JOINS, PLANKING, WAY_STANDOFF, type Toward,
 } from '../../sim/rules/ships';
 import { weatherDeck } from '../../sim/ship/hull';
 import { berthDeck, floorAt, type Space } from '../../sim/ship/plan';
@@ -20,7 +20,7 @@ import { place, type Fittings } from './fittings';
 import { DAMAGE, SIDE_REGIONS } from './damageMap';
 import { CORNER_AO, CORNER_REACH, EPSILON, ROW_STEP, SMALL_BEVEL, ceilingX, rowsAlong, steps } from './hullSide';
 import { LET_IN, MOST_HALF, bentBeam, buildCoamings, deckCells, deckUnderside, type DeckContext } from './decks';
-import { doorAthwart, openingsOn, rectCentre, zoneUnder } from './zones';
+import { OUTSIDE, doorAthwart, openingsOn, rectCentre, zoneUnder } from './zones';
 
 /** A bulkhead's boards, m: each face stands half this off the bulkhead's line. */
 const BULKHEAD = 0.05;
@@ -202,7 +202,7 @@ function buildBerthBeams(ctx: DeckContext): void {
   }
 }
 
-/** Her ladders: two stringers at the ladder's slope from the floor below to its opening's end, treads a step apart. */
+/** Her ladders: two stringers at the ladder's slope from the floor below to its opening's end, treads a step apart; and the ladders up her breaks (N2.12), under the sky. */
 function buildLadders(ctx: DeckContext): void {
   const { plan, parts, zones } = ctx;
   for (const row of LADDERS) {
@@ -212,22 +212,30 @@ function buildLadders(ctx: DeckContext): void {
     const foot = { along: way.from.along + da * WAY_STANDOFF, across: way.from.across + dx * WAY_STANDOFF };
     const below = plan.spaces.find((x) => x.id === row.below)!;
     const bottom = floorAt(below, foot.along, foot.across);
-    const z = parts.zone(zones.get(below.id)!);
-    const dir = new Vector3(dx, 0, -da), up = new Vector3(0, 1, 0);
-    const side = new Vector3().crossVectors(up, dir).normalize();
+    const dir = new Vector3(dx, 0, -da);
     const start = new Vector3(foot.across, shipY(bottom), shipZ(foot.along));
     const end = start.clone().addScaledVector(dir, run).setY(shipY(bottom + rise));
-    const len = start.distanceTo(end), slopeDir = direction(start, end);
-    const basis = new Matrix4().makeBasis(side, slopeDir, new Vector3().crossVectors(side, slopeDir));
-    const half = Math.min(LADDER.width, o.starboard - o.port, o.fore - o.aft) / 2;
-    for (const s of [-1, 1]) {
-      const mid = start.clone().lerp(end, 1 / 2).addScaledVector(side, s * (half - STRINGER.thick / 2));
-      box(z.wood, basis.clone().setPosition(mid), [STRINGER.thick, len, STRINGER.deep], OAK, SMALL_BEVEL, 1);
-    }
-    for (let k = 1; k < way.steps; k++) {
-      const p = start.clone().lerp(end, k / way.steps);
-      box(z.wood, new Matrix4().makeBasis(side, up, new Vector3().crossVectors(side, up)).setPosition(p), [2 * half - STRINGER.thick, TREAD.thick, TREAD.deep], { ...OAK, seed: k }, SMALL_BEVEL, 0);
-    }
+    ladderBetween(parts.zone(zones.get(below.id)!), start, end, Math.min(LADDER.width, o.starboard - o.port, o.fore - o.aft) / 2, way.steps);
+  }
+  for (const l of BREAK_LADDERS) {
+    const way = plan.ways.find((w) => w.id === l.id)!, { foot, head } = way.line!;
+    ladderBetween(parts.zone(OUTSIDE), new Vector3(foot[1], shipY(foot[2]), shipZ(foot[0])), new Vector3(head[1], shipY(head[2]), shipZ(head[0])), way.width / 2, way.steps);
+  }
+}
+
+/** A ladder from its foot to its head (ship space), `half` its half-width, `steps` steps: two stringers, the treads between. */
+function ladderBetween(z: ZoneParts, start: Vector3, end: Vector3, half: number, steps: number): void {
+  const up = new Vector3(0, 1, 0), dir = new Vector3(end.x - start.x, 0, end.z - start.z).normalize();
+  const side = new Vector3().crossVectors(up, dir).normalize();
+  const len = start.distanceTo(end), slopeDir = direction(start, end);
+  const basis = new Matrix4().makeBasis(side, slopeDir, new Vector3().crossVectors(side, slopeDir));
+  for (const s of [-1, 1]) {
+    const mid = start.clone().lerp(end, 1 / 2).addScaledVector(side, s * (half - STRINGER.thick / 2));
+    box(z.wood, basis.clone().setPosition(mid), [STRINGER.thick, len, STRINGER.deep], OAK, SMALL_BEVEL, 1);
+  }
+  for (let k = 1; k < steps; k++) {
+    const p = start.clone().lerp(end, k / steps);
+    box(z.wood, new Matrix4().makeBasis(side, up, new Vector3().crossVectors(side, up)).setPosition(p), [2 * half - STRINGER.thick, TREAD.thick, TREAD.deep], { ...OAK, seed: k }, SMALL_BEVEL, 0);
   }
 }
 

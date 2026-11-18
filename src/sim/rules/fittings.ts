@@ -80,9 +80,10 @@ export const GUN_GEAR = {
  * Where the helm, the capstan and the galley stand on her centreline, m forward of the mainmast: the wheel (its drum
  * aft of its standards), the binnacle (its lights toward the helmsman), the capstan, and the Brodie stove on the berth
  * deck (its fire door aft) with the galley chimney over its flue on the weather deck. What is in the way there is the
- * models' own room (SOLID), so the plan keeps no oblong for them.
+ * models' own room (SOLID), so the plan keeps no oblong for them. On the raised quarterdeck (N2.12) her tumblehome
+ * brings the A ports' carronades inboard, so the wheel stands far enough aft to leave the way past them.
  */
-export const ON_CENTRELINE = { wheel: -8.65, binnacle: -7.95, capstan: -3.775, stove: 12.1 } as const;
+export const ON_CENTRELINE = { wheel: -9.4, binnacle: -7.95, capstan: -3.775, stove: 12.1 } as const;
 /**
  * The chain pumps side by side just forward of the mainmast's partners: their middles, m forward of the mast and from
  * the centreline, the dales running outboard. Here they leave the gangway between them and the guns at the D ports a

@@ -173,6 +173,17 @@ export function sheet(target: SheetTarget, rows: readonly (readonly Vector3[])[]
 }
 
 /**
+ * A sheet whose faces turn toward `want` (ship space): the side its middle cell's normal points decides, so a grid
+ * can be laid in whatever order its rows and columns come.
+ */
+export function facing(target: SheetTarget, rows: readonly (readonly Vector3[])[], f: Finish, grainAt: (i: number, j: number) => [number, number], want: Vector3,
+  kept: (i: number, j: number) => boolean = () => true, ao?: (i: number, j: number) => number): void {
+  const i = Math.min(Math.floor(rows.length / 2), rows.length - 2), j = Math.min(Math.floor(rows[0]!.length / 2), rows[0]!.length - 2);
+  const du = new Vector3().subVectors(rows[i + 1]![j]!, rows[i]![j]!), dv = new Vector3().subVectors(rows[i]![j + 1]!, rows[i]![j]!);
+  sheet(target, rows, f, grainAt, kept, new Vector3().crossVectors(du, dv).dot(want) < 0, ao);
+}
+
+/**
  * A profile swept along a path that runs along her (a rail, a waterway, a wale): `path` gives each row's place
  * (ship-space x and y of the profile's origin, and z), `profile` the cross-section as [out, up] from that origin
  * (out: away from her centreline, so the same profile serves both sides), going round it. The grain runs along the path.

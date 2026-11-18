@@ -20,6 +20,8 @@ const ways = (r: Route | null) => (r ? r.legs.flatMap((l) => (l.way ? [l.way] : 
 const deck = plan.spaces.find((s) => s.id === 'deck')!;
 /** A hand reckoning and the route's time agree within this share. */
 const HAND = 0.05;
+/** The wheel to the capstan is no longer than the straight line by more than this share. */
+const BENDS = 1.1;
 /** Routes timed, and the sine and cosine pairs one may take found again. */
 const ROUTES_TIMED = 10;
 const PAIRS_PER_ROUTE = 10_000;
@@ -51,9 +53,11 @@ test('route times match hand reckonings: up the main shrouds to the top, the whe
   const height = top.points[0]!.height - floorAt(deck, foot.along, foot.across), overhang = futtock.floor - futtock.lo;
   const onTop = rig.ways.find((w) => w.id === 'main-shrouds-s')!.to.across;
   near(routeTime(findRoute(foot, station('main-top'), calm)!, 0, 'walk'), (height - overhang) / PACE.ratlinesUp + overhang / PACE.overhangUp + onTop / PACE.aloft);
-  // The wheel to the capstan: nothing between, the straight line.
-  const wheel = station('wheel'), capstan = station(QUARTERDECK);
-  near(routeTime(findRoute(wheel, capstan, calm)!, 0, 'walk'), Math.hypot(capstan.along - wheel.along, capstan.across - wheel.across) / PACE.walk);
+  // The wheel to the capstan on the open quarterdeck: at the walking pace over the route's own line, which bends only
+  // round the A carronades and the buckets (her tumblehome brings them inboard there, N2.12).
+  const wheel = station('wheel'), capstan = station(QUARTERDECK), aft = findRoute(wheel, capstan, calm)!;
+  near(routeTime(aft, 0, 'walk'), aft.legs[0]!.length / PACE.walk);
+  assert.ok(aft.legs.length === 1 && aft.legs[0]!.length < Math.hypot(capstan.along - wheel.along, capstan.across - wheel.across) * BENDS, 'nearly straight');
   // From the fore ladder's foot up to the waist: the ladder's height, then round the fore hatch's starboard coaming
   // a body's half breadth (0.3 m) clear of it, and across to the waist.
   const ladder = plan.ways.find((w) => w.id === 'fore-ladder')!, hatch = plan.obstacles.find((o) => o.id === 'fore-hatch')!, waist = station('waist');
@@ -73,9 +77,10 @@ test('a shut ladder reroutes, wreckage across the deck sends men below, and a sh
   // A fallen spar across the whole deck abaft the foremast: from the bow to the wheel by the berth deck.
   const bow: Spot = { space: 'deck', along: 17, across: 1.5 };
   const wreck = { ...calm, closures: addBlock(openShip(), { id: 'spar', space: 'deck', aft: 6, fore: 7, port: -deck.starboard, starboard: deck.starboard }) };
-  assert.deepEqual(ways(findRoute(bow, station('wheel'), calm)), []);
+  // Over the open deck the only ways are the ladders down from the forecastle and up to the quarterdeck (N2.12).
+  assert.ok(ways(findRoute(bow, station('wheel'), calm)).every((w) => /^(forecastle|quarterdeck)-ladder-[ps]$/.test(w)));
   const below = ways(findRoute(bow, station('wheel'), wreck));
-  assert.equal(below[0], 'fore-ladder');
+  assert.ok(below.indexOf('fore-ladder') >= 0 && below.indexOf('fore-ladder') <= 1, below.join(' '));
   assert.ok(below.some((w) => w === 'after-ladder' || w === 'companion-ladder'), below.join(' '));
   assert.equal(findRoute(station('waist'), station('surgeon'), { ...calm, closures: closeWay(openShip(), 'cockpit-door') }), null);
 });

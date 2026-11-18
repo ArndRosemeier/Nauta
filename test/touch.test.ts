@@ -70,6 +70,8 @@ function sail(ships: readonly ShipStart[], leeway = 0): Run {
   return { end: s, events, together, deepest, apart: clear >= CLEAR_FOR * STEPS_PER_SECOND, before, turned };
 }
 
+/** A knock after a blow, as they part, is no harder than this share of it. */
+const KNOCK = 0.2;
 /** Turned off her heading by a blow: more than this, rad. */
 const TURNED = 5 * DEGREE;
 let headOnRun: Run | null = null;
@@ -96,8 +98,10 @@ test('a glancing blow: her stem catches the other\'s quarter as she crosses ahea
   const r = sail([{ x: 0, z: 44, heading: 0, speed: 3 }, { x: -8, z: 0, heading: 90 * DEGREE, speed: 3 }]);
   assert.ok(r.deepest < MOST_OVERLAP, `nothing passes through (deepest ${r.deepest.toFixed(3)} m)`);
   assert.ok(r.apart, 'they end apart');
-  const hits = struck(r);
+  // One blow; with her quarter's rail raised (N2.12) she may knock against the stem once or twice more as they part, softly.
+  const all = struck(r), hits = all.filter((e) => e.tick === all[0]!.tick);
   assert.equal(hits.length, 2, 'one blow');
+  assert.ok(all.every((e) => e.tick === hits[0]!.tick || e.speed < hits[0]!.speed * KNOCK), 'any knock after it is soft');
   const [stem, quarter] = [hits.find((e) => e.ship === 0)!, hits.find((e) => e.ship === 1)!];
   assert.ok(stem.along > 15 && quarter.along < 0 && quarter.across > 0, `her stem (${stem.along.toFixed(1)} m) on the other's starboard quarter (${quarter.along.toFixed(1)}, ${quarter.across.toFixed(1)} m)`);
   // Her stern pushed to larboard swings the other's bow to starboard.

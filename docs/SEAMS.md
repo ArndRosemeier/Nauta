@@ -93,6 +93,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The brig's measures (Cruizer class, from the Admiralty draught): her midship section, decks, ports, rig sizes | `src/sim/rules/ships.ts#MIDSHIP_SECTION` |
 | Her table of offsets: profile, stem, stern, transom, body plan stations | `src/sim/rules/ships.ts#BODY_STATIONS` |
 | Her gun ports and the gun in each | `src/sim/rules/ships.ts#PORTS` |
+| Where her quarterdeck and forecastle break from the waist, how high they stand and their rails (N2.12) | `src/sim/rules/ships.ts#BREAKS` |
+| Whether a place along her is on a raised deck | `src/sim/rules/ships.ts#onRaisedDeck` |
+| The ladders up her breaks, one a side | `src/sim/rules/ships.ts#BREAK_LADDERS` |
 | Her spaces, openings, ladders, doors, fittings, rails and stations (the plan's rules) | `src/sim/rules/ships.ts#SPACES` |
 | The body every space is sized for, and the sizes of ways (doors, hatches, ladders) | `src/sim/rules/ships.ts#BODY` |
 | What she carries fitted for sea, and timber densities | `src/sim/rules/ships.ts#LOADS` |
@@ -117,8 +120,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her hull's ends at a height (stem, sternpost, counter) | `src/sim/ship/hull.ts#hullEnds` |
 | The lowest height of her hull at a place along her | `src/sim/ship/hull.ts#hullBottom` |
 | Her keel's underside along her | `src/sim/ship/hull.ts#keelBottom` |
-| The sheer: the weather deck at her side along her | `src/sim/ship/hull.ts#sheer` |
-| The top of her side along her (the draught's, lowered in the waist, N2.10) | `src/sim/ship/hull.ts#sideTop` |
+| The sheer: the weather deck at her side along her (raised on the quarterdeck and forecastle) | `src/sim/ship/hull.ts#sheer` |
+| Her hull's own sheer: the waist's deck at her side, carried fore and aft under the raised decks (wales, chain plates) | `src/sim/ship/hull.ts#waistDeck` |
+| The top of her side along her (lowered in the waist, N2.10; raised with the quarterdeck and forecastle, N2.12) | `src/sim/ship/hull.ts#sideTop` |
 | Whether a place along her is in the waist, between the breaks of her raised decks | `src/sim/ship/hull.ts#inWaist` |
 | The weather deck's height anywhere (sheer and camber) | `src/sim/ship/hull.ts#weatherDeck` |
 | The underside of the weather deck's planking | `src/sim/ship/hull.ts#weatherDeckUnderside` |
@@ -150,6 +154,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A turned part (mast, hoops, ring bolts) | `src/render/ship/shapes.ts#lathe` |
 | A round bar between two points | `src/render/ship/shapes.ts#rod` |
 | A curved surface from rows of points (hull, decks, ceiling), cells into one solid or one per zone | `src/render/ship/shapes.ts#sheet` |
+| A sheet turned to face a way (whatever order its rows come in) | `src/render/ship/shapes.ts#facing` |
 | A profile swept along her (rail, waterway) | `src/render/ship/shapes.ts#sweep` |
 | A rounded oblong's profile for a sweep | `src/render/ship/shapes.ts#roundedProfile` |
 | The unit direction between two points | `src/render/ship/shapes.ts#direction` |
@@ -158,6 +163,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A line of the rig between two points, sagging across its chord | `src/render/ship/rope.ts#sagging` |
 | Which moving frames a piece of rope follows (hull, a turning spar, or between two) | `src/render/ship/rope.ts#legFollow` |
 | Her paint and the tints of her timber | `src/render/ship/looks.ts#BLACK` |
+| The red boards of her bulwarks' inside, her stern and her breaks | `src/render/ship/looks.ts#BULWARK_BOARDS` |
 | Loading the fittings pack made in AssetGenerator | `src/render/ship/fittings.ts#loadFittings` |
 | Placing a fitting into her solids, slot by slot | `src/render/ship/fittings.ts#place` |
 | The whole ship built: hull, decks, rooms, guns, masts and rigging, the far ship, her lights and portals (N2.4, N3.6) | `src/render/ship/ship.ts#buildShip` |
@@ -174,7 +180,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Which zones can be seen from the eye (portals on screen) | `src/render/ship/visibility.ts#Visibility` |
 | Each zone's solids and ropes, and her doors | `src/render/ship/parts.ts#ShipParts` |
 | Her outside: bands of planking, wales, copper, keel, stem, sternpost | `src/render/ship/hullSide.ts#buildOutside` |
-| Her stern: the stern board outside (ports, moulding, quarter pieces), its inside up from the deck's end, her bulwarks carried aft to it, the taffrail | `src/render/ship/stern.ts#buildStern` |
+| Her stern: the stern board outside (windows, moulding, quarter pieces), its inside up from the deck's end, her bulwarks carried aft to it, the taffrail | `src/render/ship/stern.ts#buildStern` |
 | Her rudder on the sternpost, its pintles and gudgeons | `src/render/ship/stern.ts#buildRudder` |
 | Her rudder's frame put over by her helm | `src/render/ship/stern.ts#rudderMatrix` |
 | Her bulwarks: the inside face, ports, lids, rail, waterway | `src/render/ship/hullSide.ts#buildBulwarks` |
@@ -182,7 +188,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her side's outside and inside lines (planking, bulwark, ceiling) | `src/render/ship/hullSide.ts#outsideX` |
 | A port lid's lower edge when up (its lanyard's end) | `src/render/ship/gunPlaces.ts#lidEdge` |
 | Places along her for rows, cut at given places | `src/render/ship/hullSide.ts#rowsAlong` |
-| The weather deck and its underside, per zone | `src/render/ship/decks.ts#buildWeatherDeck` |
+| The weather deck and its underside, per zone; the faces of her breaks and their breast rails | `src/render/ship/decks.ts#buildWeatherDeck` |
+| Rows along her either side of each break, and whether two rows cross one (her deck steps there) | `src/render/ship/hullSide.ts#BREAK_ROWS` |
 | A deck's planking cut for holes, and its underside per zone | `src/render/ship/decks.ts#deckCells` |
 | The deck beams, knees and carlings | `src/render/ship/decks.ts#buildDeckBeams` |
 | The weather deck's openings: coamings, gratings, the companion, the skylight | `src/render/ship/decks.ts#buildDeckOpenings` |
