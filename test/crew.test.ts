@@ -50,12 +50,16 @@ test('the roster is the brig\'s 121, every man posted at a crew place of the pla
   for (const gang of Object.values(GANGS)) for (const part of [gang.aloft, ...gang.deck]) if (part) assert.ok(roster.some((m) => m.part === part), part);
 });
 
+/** Long enough for each pacer to stand at both ends (a stay of PACE_SECONDS, staggered). */
+const PACE_TEST_SECONDS = 40;
+
 test('the officers of the watch pace the quarterdeck: out to the other end of their walk and back, stopping at each, while she stands by', () => {
-  const roster = brigRoster(), pacers = roster.flatMap((m, i) => (m.paces ? [i] : []));
+  // The pacers alone, which is far cheaper to step than the whole crew.
+  const roster = brigRoster().filter((m) => m.paces), pacers = roster.map((_, i) => i);
   assert.deepEqual(pacers.map((i) => roster[i]!.rank), ['first lieutenant', 'boatswain']);
   let crew = startCrew(roster);
   const seen = new Map(pacers.map((i) => [i, { ends: new Set<string>(), walked: 0, stood: 0 }]));
-  for (let tick = 0; tick < 60 * STEPS_PER_SECOND; tick++) {
+  for (let tick = 0; tick < PACE_TEST_SECONDS * STEPS_PER_SECOND; tick++) {
     crew = stepCrew(crew, startTold(), { tick, heel: 0, closures: openShip(), captain: null, canvas: startSail().canvas }, roster).crew;
     for (const i of pacers) {
       const h = crew.men[i]!, s = seen.get(i)!, m = roster[i]!;
@@ -69,8 +73,12 @@ test('the officers of the watch pace the quarterdeck: out to the other end of th
   for (const [i, s] of seen) assert.ok(s.ends.size === 2 && s.walked > 0 && s.stood > s.walked, `${roster[i]!.rank} paces: ${[...s.ends]}, ${s.walked} steps walking, ${s.stood} standing`);
 });
 
+/** Long enough for a boy to walk to his gun, stand there and come back (the climb from the bunk, a stay of POWDER_SECONDS at the post and the ladders), s. */
+const POWDER_TEST_SECONDS = 150;
+
 test('at quarters the powder boys carry cartridges: each goes from his post to a powder place by a gun of the side she fights and back, and every powder place can be walked to', () => {
-  const roster = brigRoster(), boys = roster.flatMap((m, i) => (m.powderBoy !== null ? [i] : []));
+  // The boys alone, which is far cheaper to step than the whole crew.
+  const roster = brigRoster().filter((m) => m.powderBoy !== null), boys = roster.map((_, i) => i);
   assert.equal(boys.length, 8);
   const powder = [...crewPlaces().values()].filter((p) => p.kind === 'powder');
   assert.equal(powder.length, shipPlan().guns.filter((g) => !g.chase).length);
@@ -78,7 +86,7 @@ test('at quarters the powder boys carry cartridges: each goes from his post to a
   for (const p of powder) assert.ok(nodeAt(graph, p) >= 0, `${p.id} stands on a clear deck`);
   let crew = startCrew(roster);
   const seen = new Map(boys.map((i) => [i, new Set<string>()]));
-  for (let tick = 0; tick < 150 * STEPS_PER_SECOND; tick++) {
+  for (let tick = 0; tick < POWDER_TEST_SECONDS * STEPS_PER_SECOND; tick++) {
     crew = stepCrew(crew, startTold(), { tick, heel: 0, closures: openShip(), captain: null, canvas: startSail().canvas, quarters: 1 }, roster).crew;
     for (const i of boys) {
       const h = crew.men[i]!;
@@ -86,6 +94,7 @@ test('at quarters the powder boys carry cartridges: each goes from his post to a
       const at = h.stands ?? placeSpot(roster[i]!.home), place = powder.find((p) => sameSpot(at, placeSpot(p.id)));
       seen.get(i)!.add(place ? 'gun' : sameSpot(at, placeSpot(roster[i]!.post)) ? 'post' : 'elsewhere');
     }
+    if ([...seen.values()].every((s) => s.has('gun') && s.has('post'))) break;
   }
   for (const [i, s] of seen) assert.ok(s.has('gun') && s.has('post'), `boy ${i} stood at a gun and at his post: ${[...s]}`);
 });

@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OUTFITS, type CharacterCatalog } from '@actors/generator';
-import { CAPTAIN_CLEAR, FULL, JOB_CLIPS, MEDIUM, POOL_STICK, SLEEPING, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
+import { CAPTAIN_CLEAR, DUCK, FULL, JOB_CLIPS, LYING, MEDIUM, POOL_STICK, RUNNING, SLEEPING, WALKING, duckTo, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
 import { BERTH_HEADROOM, BREAKS } from '../src/sim/rules/ships.ts';
 import { shipY } from '../src/sim/ship/section.ts';
 import { heightAt, routeNetwork } from '../src/sim/crew/network.ts';
@@ -238,4 +238,16 @@ test('every voice of the bubbles is a man of the roster of his rank', () => {
   assert.equal(new Set(men).size, VOICES.length);
   assert.equal(roster[voiceMan('lookout')]!.post, 'top-main-p');
   assert.equal(roster[voiceMan('master')]!.rank, 'master');
+});
+
+test('shot striking near a man makes him duck for a moment, each man a little apart; a man walking, lying, asleep or holding on does not', () => {
+  const seeds = [0, 1, 2, 3];
+  for (const seed of seeds) {
+    assert.equal(duckTo('talk', Infinity, seed, false), 'talk', 'no shot near: his own clip');
+    assert.equal(duckTo('talk', 0.5, seed, false), DUCK, 'ducking by half a second after');
+    assert.equal(duckTo('talk', 2, seed, false), 'talk', 'up again after');
+    for (const clip of [WALKING, RUNNING, LYING, SLEEPING, JOB_CLIPS.carry]) assert.equal(duckTo(clip, 0.5, seed, false), clip, `${clip} goes on`);
+    assert.equal(duckTo('interact', 0.5, seed, true), 'interact', 'on a ladder or aloft he holds on');
+  }
+  assert.notEqual(duckTo('talk', 0, 0, false), duckTo('talk', 0, 3, false), 'a man whose turn is later has not ducked yet at the instant');
 });
