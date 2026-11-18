@@ -1,8 +1,8 @@
 /**
- * Drawings of the brig's plan (N2.1), for Arnd and for checking by eye: the sheer and body plan from the table of
- * offsets, the three levels with their spaces, openings, fittings, guns and ways, and the walk graph's map.
- * `npx tsx tools/plan/draw.ts [outDir]` writes plan-lines.svg, plan-decks.svg and plan-walk.svg (default:
- * docs/design/ship/).
+ * Drawings of the brig's plan (N2.1) and rig (N3.2), for Arnd and for checking by eye: the sheer and body plan from
+ * the table of offsets, the three levels with their spaces, openings, fittings, guns and ways, the walk graph's map,
+ * the sail plan, and the rigging plan with the ways aloft. `npx tsx tools/plan/draw.ts [outDir]` writes
+ * plan-lines.svg, plan-decks.svg, plan-walk.svg, rig-sails.svg and rig-lines.svg (default: docs/design/ship/).
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -12,6 +12,8 @@ import {
 } from '../../src/sim/ship/hull.ts';
 import { berthDeck, floorAt, insideBreadth, shipPlan, type Space } from '../../src/sim/ship/plan.ts';
 import { nodeAt, reachable, walkGraph, WALK_CELL } from '../../src/sim/ship/walk.ts';
+import { rigPlan } from '../../src/sim/ship/rig.ts';
+import { sailArea } from '../../src/sim/ship/sails.ts';
 
 const out = process.argv[2] ?? 'docs/design/ship';
 const plan = shipPlan();
@@ -28,8 +30,8 @@ const poly = (pts: [number, number][], fill: string, stroke = INK, width = 1, ex
   `<polygon points="${pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="${width}" ${extra}/>`;
 const line = (pts: [number, number][], stroke = INK, width = 1, extra = '') =>
   `<polyline points="${pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}" fill="none" stroke="${stroke}" stroke-width="${width}" ${extra}/>`;
-const svg = (h: number, body: string[]) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}"><rect width="${W}" height="${h}" fill="${PAPER}"/>${body.join('')}</svg>`;
+const svg = (h: number, body: string[], w = W) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="${PAPER}"/>${body.join('')}</svg>`;
 const steps = (a: number, b: number, n: number) => Array.from({ length: n + 1 }, (_, i) => a + ((b - a) * i) / n);
 
 // ---- The lines: sheer plan and body plan --------------------------------------------------------------------------
@@ -147,8 +149,77 @@ function decks(walk: boolean): string {
   return svg(1200, o);
 }
 
+// ---- The rig: sail plan and rigging plan -------------------------------------------------------------------------
+const rig = rigPlan(plan);
+const RS = 22; // px per metre for the rig
+const RIG_AFT = -17, RIG_FORE = 37;
+const RW = Math.ceil((RIG_FORE - RIG_AFT) * RS + 2 * PAD);
+const RX = (along: number) => PAD + (along - RIG_AFT) * RS;
+const ACT_COLOUR: Record<string, string> = { holds: INK, braces: '#c0392b', lifts: '#8e44ad', hoists: '#2471a3', sheets: '#d68910', tacks: '#d68910', gathers: '#239b56', reefs: '#239b56', 'hauls down': '#2471a3', 'hauls out': '#2471a3', steadies: '#8e44ad' };
+
+/** The hull in profile, the waterline and the spars, under a rig drawing whose base is at `base` px. */
+function rigProfile(base: number): string[] {
+  const o: string[] = [], Y = (h: number) => base - h * RS;
+  const as = steps(HULL_AFT, HULL_FORE, 300);
+  o.push(poly([...as.map((a) => [RX(a), Y(sideTop(a))] as [number, number]), ...as.slice().reverse().map((a) => [RX(a), Y(hullBottom(a))] as [number, number])], HULL));
+  o.push(line([[RX(HULL_AFT - 4), Y(designWaterline(HULL_AFT))], [RX(HULL_FORE + 16), Y(designWaterline(HULL_FORE))]], WATER, 1.5));
+  for (const s of rig.spars) {
+    const w = Math.max(1.5, s.diameter * RS);
+    if (s.kind === 'yard') o.push(line([[RX(s.heel.along) - w / 2, Y(s.heel.height)], [RX(s.heel.along) + w / 2, Y(s.heel.height)]], '#5a4632', w));
+    else o.push(line([[RX(s.heel.along), Y(s.heel.height)], [RX(s.head.along), Y(s.head.height)]], '#9c7a52', w));
+  }
+  return o;
+}
+
+export function sailPlan(): string {
+  const base = 960, Y = (h: number) => base - h * RS, o: string[] = [];
+  o.push(text(PAD, 30, 'The brig\'s sail plan (N3.2): eleven sails, the spar table from Steel\'s brig of 1794 (estimated)', 18, 'start', INK, 'bold'));
+  o.push(text(PAD, 50, 'Side view, metres. Square sails are laid flat in the drawing as sail plans draw them, centred on their mast; fore-and-aft sails in their true shape.', 12, 'start', MUTED));
+  o.push(...rigProfile(base));
+  let total = 0;
+  for (const sail of rig.sails) {
+    const area = sailArea(sail);
+    total += area;
+    const pts = sail.corners.map((c) => {
+      // A square sail laid flat: its across measure turned into the drawing, about its mast's line.
+      const along = sail.kind === 'square' ? sail.corners[0]!.at.along + c.at.across : c.at.along;
+      return [RX(along), Y(c.at.height)] as [number, number];
+    });
+    o.push(poly(pts, 'rgba(236, 226, 200, 0.85)', '#7a6a4a', 1.2));
+    const cx = pts.reduce((t, p) => t + p[0], 0) / pts.length, cy = pts.reduce((t, p) => t + p[1], 0) / pts.length;
+    o.push(text(cx, cy, sail.name, 11, 'middle'));
+    o.push(text(cx, cy + 13, `${area.toFixed(0)} m²`, 10, 'middle', MUTED));
+  }
+  o.push(text(PAD, base + 60, `Plain sail ${total.toFixed(0)} m². Reefs: courses one, topsails three, boom sail two. Lower yards brace 38°, topsail yards 42°, topgallant yards 45°; the boom and gaff swing 75° either side.`, 12));
+  return svg(base + 90, o, RW);
+}
+
+export function riggingPlan(): string {
+  const base = 960, Y = (h: number) => base - h * RS, o: string[] = [];
+  const running = rig.lines.filter((l) => !l.standing).length;
+  o.push(text(PAD, 30, `The brig's rigging plan (N3.2): ${rig.lines.length} lines, ${rig.lines.length - running} standing and ${running} running, and the ways aloft`, 18, 'start', INK, 'bold'));
+  o.push(text(PAD, 50, 'Side view. Black: standing rigging. Running rigging by what it does: red braces, blue halliards and outhauls, orange sheets and tacks, green clewlines, buntlines and reef tackles, violet lifts and vangs.', 12, 'start', MUTED));
+  o.push(text(PAD, 66, 'Green bands: the surfaces aloft the walk graph reaches (tops, crosstrees, footropes, bowsprit). Each running line ends on its own pin at the rail.', 12, 'start', MUTED));
+  o.push(...rigProfile(base));
+  for (const l of rig.lines) {
+    const pts = [l.ends[0], ...l.via, l.ends[1]].map((p) => [RX(p.along), Y(p.height)] as [number, number]);
+    o.push(line(pts, ACT_COLOUR[l.act] ?? INK, l.standing ? 1 : 0.7, l.standing ? '' : 'opacity="0.75"'));
+  }
+  for (const s of rig.surfaces) {
+    const pts = s.points.map((p) => [RX(p.along), Y(p.height)] as [number, number]);
+    o.push(line(s.kind === 'top' || s.kind === 'crosstrees' ? [pts[0]!, pts[1]!] : pts, '#2e8b57', 4, 'opacity="0.6" stroke-linecap="round"'));
+  }
+  for (const st of rig.stations) {
+    const surface = rig.surfaces.find((x) => x.id === st.space)!;
+    o.push(text(RX(st.along), Y(surface.points[0]!.height) - 8, st.name, 11, 'middle', '#6c3483'));
+  }
+  return svg(base + 40, o, RW);
+}
+
 mkdirSync(out, { recursive: true });
 writeFileSync(path.join(out, 'plan-lines.svg'), lines());
 writeFileSync(path.join(out, 'plan-decks.svg'), decks(false));
 writeFileSync(path.join(out, 'plan-walk.svg'), decks(true));
-console.log(`wrote plan-lines.svg, plan-decks.svg, plan-walk.svg to ${out}`);
+writeFileSync(path.join(out, 'rig-sails.svg'), sailPlan());
+writeFileSync(path.join(out, 'rig-lines.svg'), riggingPlan());
+console.log(`wrote plan-lines.svg, plan-decks.svg, plan-walk.svg, rig-sails.svg, rig-lines.svg to ${out}`);

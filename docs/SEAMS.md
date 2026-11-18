@@ -183,3 +183,34 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The bench on the page: flying, measuring, the result on screen | `src/app/benchRun.ts#BenchRun` |
 | The built game in a headless browser (for screenshots) | `tools/shot/browser.mjs#openGame` |
 | The standard sea shots (times of day × seas × eye heights), each scene set on one page by main.ts's `window.__nautaScene` | `tools/shot/sea.mjs#seaShots` |
+| The rig's measures: masts, yards, booms, the heights yards hang at, how far they brace (Steel's brig, estimated) | `src/sim/rules/rig.ts#MAST_SPARS` |
+| Her sails' cuts and reefs | `src/sim/rules/rig.ts#SAILS` |
+| What each kind of line is and does (standing or running, diameter, its act) | `src/sim/rules/rig.ts#LINE_KINDS` |
+| Which rail each running line belays on | `src/sim/rules/rig.ts#BELAYING` |
+| The climb aloft's limits (ratline rise, footrope ends, spar slope) | `src/sim/rules/rig.ts#CLIMB` |
+| A mast's heights and its spars' axes (rake, doublings) | `src/sim/ship/spars.ts#mastGeometry` |
+| Her spars placed in her, each a chain of segments between the places it breaks | `src/sim/ship/spars.ts#buildSpars` |
+| A point on a spar, and at a named mark of it | `src/sim/ship/spars.ts#onSpar` |
+| The point at a spar's named mark | `src/sim/ship/spars.ts#atMark` |
+| An entry of a list by its name (a mark, a corner) | `src/sim/ship/spars.ts#named` |
+| A point a share of the way between two points of the rig | `src/sim/ship/spars.ts#between` |
+| The distance between two points of the rig | `src/sim/ship/spars.ts#distance` |
+| Her deadeyes: channels, backstay stools, the tops' rims | `src/sim/ship/spars.ts#buildDeadeyes` |
+| Her sails: corners, what they are bent to, their shapes | `src/sim/ship/sails.ts#buildSails` |
+| A sail's area as it stands (furled, reefed, set) | `src/sim/ship/sails.ts#sailArea` |
+| The ways a sail can stand | `src/sim/ship/sails.ts#sailSettings` |
+| A sail's named corner | `src/sim/ship/sails.ts#corner` |
+| A point on a sail's edge (a leech's middle, a reef cringle) | `src/sim/ship/sails.ts#edgePoint` |
+| The stays | `src/sim/ship/lines.ts#buildStays` |
+| The standing rigging: shrouds, futtock shrouds, backstays, slings, the bowsprit's | `src/sim/ship/lines.ts#buildStanding` |
+| The running rigging, each line on a pin of its own | `src/sim/ship/lines.ts#buildRunning` |
+| The shroud climbs of each mast in ship space (`@futuremagic/figure` ladders, the futtock stave at the gait) | `src/sim/ship/aloft.ts#buildClimbs` |
+| The surfaces and ways aloft, the stations and crew places there | `src/sim/ship/aloft.ts#buildAloft` |
+| A yard's footrope as the climb takes it | `src/sim/ship/aloft.ts#footropeOf` |
+| The walk graph with the rig joined to it | `src/sim/ship/aloft.ts#walkAloft` |
+| The brig's rig plan, built once: spars, deadeyes, sails, every line, climbs, surfaces, ways | `src/sim/ship/rig.ts#rigPlan` |
+| The one walk graph of decks and rig together (what the captain and crew go by) | `src/sim/ship/rig.ts#rigWalk` |
+| A spar of the rig by id | `src/sim/ship/rig.ts#sparOf` |
+| A station's crew place | `src/sim/ship/plan.ts#stationPlace` |
+| Freezing a plan built once | `src/sim/ship/plan.ts#deepFreeze` |
+| The rig's drawings (sail plan, rigging plan) | `tools/plan/draw.ts#sailPlan` |

@@ -454,6 +454,12 @@ export const RAILS: readonly RailRow[] = [
   { id: 'fore-pins', kind: 'pin rail', mast: 'fore', aft: 10.9, fore: 14.6 },
   { id: 'main-fife', kind: 'fife rail', mast: 'main', at: -1.19, pins: [-1.05, -0.8, 0.8, 1.05], toward: -1 },
   { id: 'fore-fife', kind: 'fife rail', mast: 'fore', at: 13.26, pins: [-1.0, -0.85, 0.85, 1.0], toward: -1 },
+  // The rig plan (N3.2) belays every running line on a pin of its own (about 100): the bulwark carries pins from the
+  // taffrail to the bow, between the ports, and the foremast's fife rail has pins on its fore side too.
+  { id: 'quarter-pins', kind: 'pin rail', mast: 'main', aft: -11.36, fore: -4.6 },
+  { id: 'waist-pins', kind: 'pin rail', mast: 'main', aft: 0.1, fore: 10.6 },
+  { id: 'bow-pins', kind: 'pin rail', mast: 'fore', aft: 14.92, fore: 19.1 },
+  { id: 'fore-fife-fore', kind: 'fife rail', mast: 'fore', at: 15.88, pins: [-1.15, -1.0, -0.85, 0.85, 1.0, 1.15], toward: 1 },
 ];
 /** A fife rail's pins stand this high over the deck, m. */
 export const BELAY_HEIGHT = 0.9;

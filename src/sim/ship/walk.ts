@@ -60,6 +60,8 @@ export interface WalkGraph {
   readonly edges: readonly WalkEdge[];
   /** Ways that do not fit the body, or whose ends stand nowhere, with the reason. */
   readonly refused: readonly { readonly way: string; readonly why: string }[];
+  /** The surfaces aloft joined to the graph (aloft.ts#walkAloft) and the node each is: a top, the crosstrees, a footrope, the bowsprit. */
+  readonly aloft: ReadonlyMap<string, number>;
 }
 
 /** The square's middle of column c and row r of a grid. */
@@ -153,6 +155,8 @@ function floorGrid(plan: ShipPlan, space: Space, body: Body, first: number): { g
 
 /** The node a spot stands on in a graph, or -1 (outside every node of its space). */
 export function nodeAt(graph: WalkGraph, spot: Spot): number {
+  const aloft = graph.aloft.get(spot.space);
+  if (aloft !== undefined) return aloft;
   const g = graph.grids.get(spot.space);
   if (!g) return -1;
   const c = Math.floor((spot.along - g.space.aft) / WALK_CELL), r = Math.floor((spot.across - g.space.port) / WALK_CELL);
@@ -182,7 +186,8 @@ export function walkGraph(plan: ShipPlan, body: Body = BODY): WalkGraph {
     grids.set(space.id, grid);
     areas.forEach((area) => nodes.push({ index: nodes.length, space: space.id, area }));
   }
-  const partial: WalkGraph = { body, grids, nodes, edges: [], refused: [] };
+  const aloft = new Map<string, number>();
+  const partial: WalkGraph = { body, grids, nodes, edges: [], refused: [], aloft };
   const edges: WalkEdge[] = [], refused: { way: string; why: string }[] = [];
   for (const w of plan.ways) {
     const why = misfit(w, body);
@@ -192,7 +197,7 @@ export function walkGraph(plan: ShipPlan, body: Body = BODY): WalkGraph {
     else if (b < 0) refused.push({ way: w.id, why: `its end in ${w.to.space} stands where a body cannot` });
     else edges.push({ way: w.id, a, b });
   }
-  return { body, grids, nodes, edges, refused };
+  return { body, grids, nodes, edges, refused, aloft };
 }
 
 /** The nodes reachable from a node by the graph's ways. */

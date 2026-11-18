@@ -111,7 +111,7 @@ export interface Belay {
 /** A crew place: where a man stands for a task, and what it is for. */
 export interface CrewPlace extends Spot {
   readonly id: string;
-  readonly kind: 'gun' | 'pin' | 'ladder' | 'shroud' | 'station';
+  readonly kind: 'gun' | 'pin' | 'ladder' | 'shroud' | 'station' | 'top' | 'yard';
   readonly of: string;
 }
 
@@ -368,9 +368,12 @@ function makePlaces(guns: readonly GunPlace[], belays: readonly Belay[], ways: r
       out.push({ id: `shroud-${mast}-${side > 0 ? 's' : 'p'}`, kind: 'shroud', of: `${mast} shrouds`, space: 'deck', along, across });
     }
   }
-  for (const s of stations) out.push({ id: `station-${s.id}`, kind: 'station', of: s.id, space: s.space, along: s.along, across: s.across });
+  for (const s of stations) out.push(stationPlace(s));
   return out;
 }
+
+/** The crew place of a station: where the one who gives or takes its orders stands. */
+export const stationPlace = (s: Station): CrewPlace => ({ id: `station-${s.id}`, kind: 'station', of: s.id, space: s.space, along: s.along, across: s.across });
 /** How far inboard of a pin its hand stands, and of her side the man going aloft at the shrouds, m. */
 const PIN_STANDOFF = 0.55;
 const SHROUD_STANDOFF = 0.6;
@@ -444,7 +447,8 @@ export function shipPlan(): ShipPlan {
   return built;
 }
 
-function deepFreeze<T>(v: T): T {
+/** A value and everything in it, frozen (a plan built once is never changed). */
+export function deepFreeze<T>(v: T): T {
   if (v && typeof v === 'object' && !Object.isFrozen(v)) {
     Object.freeze(v);
     for (const k of Object.keys(v)) deepFreeze((v as Record<string, unknown>)[k]);
