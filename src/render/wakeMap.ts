@@ -186,14 +186,15 @@ const WET_EDGE = 0.06;
  * Her side wet from the sea (plan N2.5, "water running off"): at a point of her outside (ship space), how wet it is,
  * 0..1: up to where the water has climbed her side lately and is draining down (the stations' wet line), and her bow
  * wave at speed; ragged in streaks below the line as it runs off. `colour` and `rough` darkened and made glossy by it.
+ * `on`: 0 leaves the surface dry (the other ship's: the stations watch her own side only).
  */
-export function wetHull(p, colour, rough) {
+export function wetHull(p, colour, rough, on = float(1)) {
   const st = stationAt(p.z, sign(p.x)), speed = WAKE_INPUTS.now.x;
   const zeta = max(p.z.sub(STEM_Z), 0), bowWave = speed.mul(speed).div(2 * GRAVITY).mul(WAKE.bowRise).mul(exp(zeta.div(-WAKE.bowReach)));
   const line = st.w.add(st.z).add(bowWave);
   // Streaks: a hash per strip along her, so the edge runs down in fingers.
   const strip = p.z.mul(STREAKS).floor(), streak = sin(strip.mul(STREAK_SEED * TURN * STREAKS)).mul(HALF).add(HALF);
-  const wet = float(1).sub(smoothstep(line.sub(streak.mul(STREAK_DEPTH)), line.sub(streak.mul(STREAK_DEPTH)).add(WET_EDGE), p.y)).mul(WAKE_INPUTS.now.w);
+  const wet = float(1).sub(smoothstep(line.sub(streak.mul(STREAK_DEPTH)), line.sub(streak.mul(STREAK_DEPTH)).add(WET_EDGE), p.y)).mul(WAKE_INPUTS.now.w).mul(on);
   return { colour: mix(colour, colour.mul(WET_DARK), wet), rough: mix(rough, float(WET_ROUGH), wet) };
 }
 

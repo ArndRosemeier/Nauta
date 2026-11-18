@@ -10,10 +10,11 @@ export interface LookInput {
 }
 
 /**
- * `radPerPixel`: the view's vertical angle over its height now (it changes when the window does). `leave`: pointers
- * that are not for looking (the walking thumb's, walkInput.ts).
+ * `radPerPixel`: the view's vertical angle over its height now (it changes when the window does, and through the
+ * glass). `leave`: pointers that are not for looking (the walking thumb's, walkInput.ts). `waits`: true while the drag
+ * does not turn the look (two fingers pinching the glass, glassInput.ts).
  */
-export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => number, leave: (e: PointerEvent) => boolean = () => false): LookInput {
+export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => number, leave: (e: PointerEvent) => boolean = () => false, waits: () => boolean = () => false): LookInput {
   const state = { look: start };
   /** The pointer that is dragging (the first one down), and where it was last. */
   let id: number | null = null, x = 0, y = 0;
@@ -25,7 +26,7 @@ export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => numbe
   });
   el.addEventListener('pointermove', (e) => {
     if (e.pointerId !== id) return;
-    state.look = turn(state.look, e.clientX - x, e.clientY - y, radPerPixel());
+    if (!waits()) state.look = turn(state.look, e.clientX - x, e.clientY - y, radPerPixel());
     x = e.clientX; y = e.clientY;
   });
   const end = (e: PointerEvent) => { if (e.pointerId === id) id = null; };

@@ -6,6 +6,10 @@
  *
  * However she is laid (floating on her own, or sailed by a match), she keeps her track and watches the water at her
  * side (render/wake.ts, plan N2.5) for the sea's wake map and the spray from her bow.
+ *
+ * The other captain's ship is a second ShipView of the same build (plan N3.8, `index` 1): her outside only, the same
+ * meshes' buffers, her moving frames and sails in her own rows of the per-ship textures, posed from the match, sunk by
+ * the earth's curve as she draws away, and crossfaded to her far level by her distance through the glass.
  */
 import {
   Color, Euler, Group, Matrix4, Mesh, Quaternion, Vector2, Vector3, Vector4, type DirectionalLight, type Material, type Object3D, type PerspectiveCamera,
@@ -26,7 +30,7 @@ import {
 } from '../materials';
 import type { QualityKnobs } from '../../app/quality';
 import { SailsView } from './sailsView';
-import { SAIL_TEXTURE, SAIL_TIME } from './sailMaterial';
+import { SAIL_TIME, setShipSails } from './sailMaterial';
 import { SEA_CUT } from '../seaCut';
 import { MOST_LAMPS, MOST_SKIES, SHIP_INPUTS, setShipFrame } from './shipMaterials';
 import { rigPlan } from '../../sim/ship/rig';
@@ -39,6 +43,7 @@ import { Visibility } from './visibility';
 import { outsideX } from './hullSide';
 import { sideTop } from '../../sim/ship/hull';
 import { shipY } from '../../sim/ship/section';
+import { earthDrop } from '../earth';
 
 /** Where she lies: her middle on the sea and her heading (bow north), lying still (no sailing yet). */
 const AT = { x: 0, z: 0, heading: 0 } as const;
@@ -82,6 +87,11 @@ const DOORS_AJAR: Readonly<Record<string, number>> = {
 };
 /** Numbers per lamp and opening in the build's lists. */
 const XYZ = 3;
+/**
+ * The other ship joins her own in the sun's shadow map while their middles are within this, m (alongside): the map
+ * then covers both, a little coarser. Further off the other ship is drawn without shadows of her own.
+ */
+const SHARED_SHADOW_WITHIN = 80;
 
 
 /** Her kinds, and what each draws with while it is being crossfaded. */
@@ -98,9 +108,23 @@ interface Part {
 /** Her way through the water, m/s: ahead and to starboard (her leeway). */
 export type ShipWay = Pick<WakeSource, 'ahead' | 'leeway'>;
 
+/**
+ * The spyglass at the eye (app/glass.ts `Spyglass`): how far it is raised (0..1), and, given her pitch and roll now
+ * (rad) and the frame's seconds, the tilt of her deck the captain's hands do not take out of the glass.
+ */
+export interface Steadying {
+  readonly raised: number;
+  hold(pitch: number, roll: number, dt: number): readonly [pitch: number, roll: number];
+}
+
 export class ShipView {
   /** Her meshes in ship space; it goes in through `stage.add`. */
   readonly group = new Group();
+  /** The glass held steady against her motion while raised (app/glass.ts); null: no glass. */
+  steadying: Steadying | null = null;
+  /** How much the eye magnifies now (the glass): her level of detail is chosen by her distance over it. */
+  zoom = 1;
+  private readonly held = new Quaternion();
   /** Her pose as drawn this frame: between her last two steps. */
   drawn: ShipPose;
   /**
@@ -152,13 +176,18 @@ export class ShipView {
   private time = 0;
   readonly triangles: number;
 
-  constructor(build: ShipBuild) {
+  /**
+   * `index`: whose ship she is among those drawn: 0 the captain's own (every zone, her doors, her lanterns, the sea cut
+   * out of her), 1 the other captain's, seen only from outside (her outside, rig and sails; plan N3.8).
+   */
+  constructor(build: ShipBuild, readonly index = 0) {
     this.drawn = this.motion.pose;
-    this.group.name = 'ship';
-    const ranges = this.lights(build);
+    this.group.name = index === 0 ? 'ship' : 'other ship';
+    const own = index === 0;
+    const ranges = own ? this.lights(build) : new Map<string, Vector4>();
     this.ranges = ranges;
     let tris = 0;
-    for (const z of build.zones) {
+    for (const z of build.zones.filter((x) => own || x.name === OUTSIDE)) {
       const g = new Group();
       g.name = `zone ${z.name}`;
       for (const p of this.meshes(z, g, ranges.get(z.name))) if (z.name === OUTSIDE) this.outside.push(p);
@@ -166,7 +195,7 @@ export class ShipView {
       this.zones.set(z.name, g);
       this.group.add(g);
     }
-    for (const d of build.doors) {
+    for (const d of own ? build.doors : []) {
       const pivot = new Group();
       pivot.position.set(...d.hinge);
       const angle = DOORS_AJAR[d.id] ?? 0;
@@ -231,7 +260,8 @@ export class ShipView {
     for (let k = 0; k < 2 * 2 * 2; k++) this.box.push(new Vector3(k & 1 ? max.x : min.x, k & 2 ? max.y : min.y, k & (2 * 2) ? max.z : min.z));
     const rng = new Rng(FLICKER_SEED);
     this.phases = [rng.float() * TURN, rng.float() * TURN];
-    SEA_CUT.on.value = 1;
+    if (own) SEA_CUT.on.value = 1;
+    this.group.traverse((o) => { o.userData.ship = index; });
   }
 
   /** One mesh of a kind from packed vertices. */
@@ -302,6 +332,7 @@ export class ShipView {
     object.traverse((o) => {
       if (!(o as Mesh).isMesh) return;
       o.userData.light = light;
+      o.userData.ship = this.index;
       o.castShadow &&= light === undefined || ((o as Mesh).material as Material).name === SHIP_WOOD.name;
     });
     zone.add(object);
@@ -347,7 +378,7 @@ export class ShipView {
     for (const w of this.swings.values()) {
       const m = swingMatrix(w.swing, w.angle, w.hoist, w.matrix);
       for (const g of w.groups) g.matrix.copy(m);
-      setShipFrame(w.swing.frame, m);
+      setShipFrame(w.swing.frame, m, this.index);
     }
   }
   /** Where the far ship starts to fade in, m (quality.ts `shipFarFrom`). */
@@ -370,30 +401,53 @@ export class ShipView {
     this.sails.follow(dt);
     for (const [id, share] of this.sails.hoists()) this.setHoist(id, share);
     this.moveSwings();
-    this.sails.write((id) => this.swings.get(id)?.matrix ?? null, this.group.quaternion, this.time, setShipFrame);
-    (SAIL_TEXTURE.image.data as Float32Array).set(this.sails.rows);
-    SAIL_TEXTURE.needsUpdate = true;
-    SAIL_TIME.value = this.time;
+    this.sails.write((id) => this.swings.get(id)?.matrix ?? null, this.group.quaternion, this.time, (f, m) => setShipFrame(f, m, this.index));
+    setShipSails(this.sails.rows, this.index);
+    if (this.index === 0) SAIL_TIME.value = this.time;
   }
 
   /**
-   * Once a frame: her pose on the water at `t`, the eye at `where` looking `look`, what of her is drawn, the sun's
-   * shadow round her, and what her shaders read. `seaOrigin`: where the sea's own frame stands (seaView.ts).
+   * Her pose at `t` and her group placed on the water, sunk by `sink` m (the earth's curve), her spars and sails
+   * moved: what every ship drawn does each frame.
    */
-  update(sea: SeaState, t: number, dt: number, camera: PerspectiveCamera, where: Standpoint, look: Look, sun: DirectionalLight, sunDir: Vector3, gain: number, radPerPixel: number, seaOrigin: Vector3): void {
+  private lay(sea: SeaState, t: number, dt: number, sink = 0): void {
     this.time += dt;
     this.float(sea, t);
-    // The water at her side, whoever lays her (plan N2.5): its churn, her wet line, slams at her bow.
-    this.slams.length = 0;
-    this.churn.keepUp(this.drawn, sea, t, this.slams);
     const g = this.group;
     g.position.set(...shipOrigin(this.drawn, this.origin));
+    g.position.y -= sink;
     // Pitch: bow up turns her about +x the other way (bow is -z); roll to starboard turns her about -z the other way.
     this.euler.set(this.drawn.pitch, -this.drawn.heading, -this.drawn.roll, 'YXZ');
     g.quaternion.setFromEuler(this.euler);
     g.updateMatrixWorld(true);
     this.inverse.copy(g.matrixWorld).invert();
     this.moveSails(dt);
+  }
+
+  /**
+   * Once a frame for the other captain's ship (plan N3.8): her pose at `t`, sunk below the eye's level by the
+   * earth's curve as the sea is (render/earth.ts), so she goes hull-down far off, and near or far drawn by her
+   * distance from `camera` over the glass's magnification. Call it after her own ship has placed the eye.
+   */
+  follow(sea: SeaState, t: number, dt: number, camera: PerspectiveCamera): void {
+    const at = this.poseFrom ? this.poseFrom(t) : this.drawn;
+    this.lay(sea, t, dt, earthDrop(Math.hypot(at.x - camera.position.x, at.z - camera.position.z)));
+    this.zones.get(OUTSIDE)!.visible = true;
+    this.crossfade(camera.position.distanceTo(this.group.position) / this.zoom);
+    this.trianglesDrawn = this.countDrawn();
+  }
+
+  /**
+   * Once a frame: her pose on the water at `t`, the eye at `where` looking `look`, what of her is drawn, and what
+   * her shaders read. `seaOrigin`: where the sea's own frame stands (seaView.ts). The sun's shadow is fitted after
+   * every ship is placed (`shade`).
+   */
+  update(sea: SeaState, t: number, dt: number, camera: PerspectiveCamera, where: Standpoint, look: Look, gain: number, radPerPixel: number, seaOrigin: Vector3): void {
+    this.lay(sea, t, dt);
+    const g = this.group;
+    // The water at her side, whoever lays her (plan N2.5): its churn, her wet line, slams at her bow.
+    this.slams.length = 0;
+    this.churn.keepUp(this.drawn, sea, t, this.slams);
 
     // The eye: on board it rides with her, its tilt eased toward level; off her it stands still where she lies.
     this.eye.set(...where.eye);
@@ -409,6 +463,12 @@ export class ShipView {
     this.ride.setFromEuler(this.euler);
     // A body on her deck holds its head its own way (app/body.ts): her turn, then the head's tilt in her frame.
     if (where.up && !where.off) this.ride.copy(g.quaternion).multiply(this.tilt.setFromUnitVectors(UP, this.headUp.set(...where.up)));
+    // The glass raised: the hands hold it against her motion, all but what they are too slow for (app/glass.ts).
+    const glass = this.steadying;
+    if (glass && !where.off) {
+      const [pitch, roll] = glass.hold(this.drawn.pitch, this.drawn.roll, dt);
+      if (glass.raised > 0) this.ride.slerp(this.held.setFromEuler(this.euler.set(pitch, -this.drawn.heading, -roll, 'YXZ')), glass.raised);
+    }
     this.euler.set(look.pitch, look.yaw, 0, 'YXZ');
     this.look.setFromEuler(this.euler);
     camera.quaternion.copy(this.ride).multiply(this.look);
@@ -419,7 +479,7 @@ export class ShipView {
     const eyeShip = camera.position.clone().applyMatrix4(this.inverse);
     const zone = zoneAt(this.plan, this.spaceZones, -eyeShip.z, eyeShip.x, eyeShip.y + LOAD_WATERLINE);
     this.below = zone !== null && zone !== OUTSIDE ? 1 : 0;
-    const distance = camera.position.distanceTo(g.position);
+    const distance = camera.position.distanceTo(g.position) / this.zoom;
     this.toClip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(g.matrixWorld);
     const seen = distance > INSIDE_REACH ? new Set([OUTSIDE]) : this.visibility.seen(zone, this.toClip, (id) => (this.doors.get(id)?.angle ?? 0) > DOOR_OPEN, eyeShip);
     for (const [name, group] of this.zones) group.visible = !seen || seen.has(name);
@@ -432,7 +492,6 @@ export class ShipView {
     this.crossfade(distance);
     this.trianglesDrawn = this.countDrawn();
 
-    this.fitShadow(sun, sunDir);
     SHIP_INPUTS.pixel.value = radPerPixel;
     SHIP_INPUTS.time.value = this.time;
     const f = 1 + FLICKER.depth * (Math.sin(this.time * FLICKER.slow * TURN + this.phases[0]) + Math.sin(this.time * FLICKER.fast * TURN + this.phases[1])) / 2;
@@ -485,6 +544,11 @@ export class ShipView {
     for (const p of this.farParts) p.mesh.userData.fade = new Vector2(1 - t, 1);
   }
 
+  /** Whether her whole outside (not only her far level) is drawn this frame. */
+  get nearDrawn(): boolean {
+    return this.zones.get(OUTSIDE)!.visible;
+  }
+
   /** Triangles of the meshes drawn this frame. */
   private countDrawn(): number {
     let n = 0;
@@ -497,10 +561,19 @@ export class ShipView {
     return n;
   }
 
-  /** The sun's shadow camera fitted round her, its frame turned with her heading so the map hugs her length. */
-  private fitShadow(sun: DirectionalLight, sunDir: Vector3): void {
+  /** Her bounding box's corners as she lies now (the world). */
+  private corners(): Vector3[] {
+    return this.box.map((c) => c.clone().applyMatrix4(this.group.matrixWorld));
+  }
+
+  /**
+   * The sun's shadow camera fitted round her, its frame turned with her heading so the map hugs her length; round
+   * `other` too while she is alongside (`SHARED_SHADOW_WITHIN`). Once a frame, after every ship is placed.
+   */
+  shade(sun: DirectionalLight, sunDir: Vector3, other: ShipView | null = null): void {
     const g = this.group, centre = new Vector3();
-    const corners = this.box.map((c) => c.clone().applyMatrix4(g.matrixWorld));
+    const near = other !== null && other.group.visible && other.group.position.distanceTo(g.position) < SHARED_SHADOW_WITHIN;
+    const corners = [...this.corners(), ...(near ? other.corners() : [])];
     for (const c of corners) centre.add(c);
     centre.divideScalar(corners.length);
     sun.target.position.copy(centre);

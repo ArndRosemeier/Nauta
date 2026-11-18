@@ -43,9 +43,15 @@ export class Gathered {
   }
 }
 
-/** The typed arrays (gathered here or in a worker) as a geometry. */
+/** Geometries made from packed arrays: both ships drawn from one build share them (plan N3.8), so her buffers are on the GPU once. */
+const made = new WeakMap<Packed, BufferGeometry>();
+
+/** The typed arrays (gathered here or in a worker) as a geometry; the same arrays give the same geometry. */
 export function geometryOf(p: Packed): BufferGeometry {
+  const known = made.get(p);
+  if (known) return known;
   const g = new BufferGeometry();
+  made.set(p, g);
   for (const a of p.attributes) g.setAttribute(a.name, new Float32BufferAttribute(a.data, a.size));
   g.setIndex(new Uint32BufferAttribute(p.index, 1));
   g.computeBoundingBox();

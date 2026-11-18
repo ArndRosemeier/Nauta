@@ -19,15 +19,20 @@ import {
   SHIVER_SLANT, SHIVER_WAVES,
 } from './sailForm';
 import { ENSIGN_PATTERN, FLAGS, PENNANT_PATTERN, SAIL_ATLAS_SIZE } from './sailGrid';
-import { crossfadeMask, nearest } from './shipMaterials';
+import { SHIPS_DRAWN, SHIP_OBJECT, crossfadeMask, nearest } from './shipMaterials';
 
 /** Rows of the sails' state: her 11 sails, the ensign and the pennant, and room to spare. */
 export const MOST_SAIL_ROWS = 16;
 /** Numbers per texel. */
 const RGBA = 4;
-/** Each sail's numbers (sailForm.ts ROW), a row of texels per sail: written by sailsView.ts, read by the vertex stage. */
-export const SAIL_TEXTURE = new DataTexture(new Float32Array(MOST_SAIL_ROWS * ROW_TEXELS * RGBA), ROW_TEXELS, MOST_SAIL_ROWS, RGBAFormat, FloatType);
+/** Each sail's numbers (sailForm.ts ROW), a row of texels per sail, a block of rows per ship drawn: written by sailsView.ts, read by the vertex stage. */
+export const SAIL_TEXTURE = new DataTexture(new Float32Array(SHIPS_DRAWN * MOST_SAIL_ROWS * ROW_TEXELS * RGBA), ROW_TEXELS, SHIPS_DRAWN * MOST_SAIL_ROWS, RGBAFormat, FloatType);
 nearest(SAIL_TEXTURE);
+/** Ship `ship`'s sail rows (sailsView.ts `rows`) into the texture, for the next frame. */
+export function setShipSails(rows: Float32Array, ship = 0): void {
+  (SAIL_TEXTURE.image.data as Float32Array).set(rows, ship * MOST_SAIL_ROWS * ROW_TEXELS * RGBA);
+  SAIL_TEXTURE.needsUpdate = true;
+}
 /**
  * The sails' hole map (sailGrid.ts `sailAtlas`): a texel per 5 cm of every sail's cloth. N6.5 writes shot holes and
  * scorches into it; now its green darkens the canvas as scorch does her timber.
@@ -47,7 +52,7 @@ const NO_NORMAL = 1e-14;
 // --- The shape (sailForm.ts clothAt, line for line).
 /** A row's texels by number. */
 const TEXELS = Array.from({ length: ROW_TEXELS }, (_, i) => i);
-const T = (row, k) => textureLoad(SAIL_TEXTURE, ivec2(int(k), int(row)));
+const T = (row, k) => textureLoad(SAIL_TEXTURE, ivec2(int(k), int(row).add(int(SHIP_OBJECT.ship).mul(MOST_SAIL_ROWS))));
 const sinHalf = (x) => sin(x.mul(Math.PI));
 const bilerp = (p00, p10, p01, p11, u, v) => mix(mix(p00, p10, u), mix(p01, p11, u), v);
 /** sailForm.ts `scallop`. */

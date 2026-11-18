@@ -16,7 +16,6 @@ import { shipPlan } from '../../sim/ship/plan';
 import { OUTSIDE, zoneOfSpaces, zoneUnder } from './zones';
 import { FITTED_GLOW, FITTED_IRON, FITTED_WOOD } from '../materials';
 import { place, type Fittings, type SlotTarget } from './fittings';
-import { TO_SHIP } from './fitted';
 import { OAK, RED } from './looks';
 import { MODEL } from '../../sim/rules/fittings';
 import { Solid } from './solid';
@@ -93,12 +92,12 @@ function radiusOf(fittings: Fittings, name: string): number {
   return r;
 }
 
-/** A model's levels of detail: its own and its spec's lower levels, by distance from its size. */
-function drawKind(fittings: Fittings, name: string): DrawKind {
+/** A model's levels of detail: its own and its spec's lower levels, by distance from its size; `shadows`: whether its bigger parts cast the sun's shadow. */
+function drawKind(fittings: Fittings, name: string, shadows: boolean): DrawKind {
   const names = [name];
   for (let k = 1; k <= MOST_LEVELS && fittings.has(`${name}_lod${k}`); k++) names.push(`${name}_lod${k}`);
   const r = radiusOf(fittings, name), m = fittings.get(name)!;
-  const casts = [0, 1, 2].map((k) => m.max[k]! - m.min[k]!).sort((a, b) => a - b)[1]! >= LEAST_CASTER;
+  const casts = shadows && [0, 1, 2].map((k) => m.max[k]! - m.min[k]!).sort((a, b) => a - b)[1]! >= LEAST_CASTER;
   const far = Math.min(FAR_MOST, Math.max(FAR_LEAST, r * FAR_PER_METRE));
   const lods: DrawLod[] = names.map((n, i) => {
     const near = i === 0 ? 0 : Math.min(far, r * NEAR_PER_METRE * LEVEL_STEP ** (i - 1));
@@ -115,26 +114,32 @@ function drawKind(fittings: Fittings, name: string): DrawKind {
 export class Furnishings {
   /** The draws of each zone of her (zones.ts): a zone's fittings are seen when it is, and lit by its lanterns. */
   readonly zones = new Map<string, InstanceDraws>();
-  /** Her frame: from her space to the world, read by the draws on each update. */
+  /** Her frame: from her space to the world, read by the draws on each update; and back, for her materials (fitted.ts `TO_SHIP`). */
   private readonly frame = new Matrix4();
+  private readonly fromWorld = new Matrix4();
   private readonly sunDir = new Vector3(0, -1, 0);
   /** How many fittings stand on her, and their triangles at full detail (for the HUD and the plan's notes). */
   readonly count: number;
   readonly triangles: number;
 
-  constructor(renderer: WebGPURenderer, fittings: Fittings, list: readonly Furnishing[]) {
+  /**
+   * `outsideOnly`: only what stands in her outside zone, and casting no shadow (the other ship's, seen from outside
+   * alone, plan N3.8: every caster is drawn again in the shadow map, and her draws count against the ships' 250).
+   */
+  constructor(renderer: WebGPURenderer, fittings: Fittings, list: readonly Furnishing[], outsideOnly = false) {
     const plan = shipPlan(), spaceZones = zoneOfSpaces(plan);
     const zoneOf = (f: Furnishing) => (f.level === 'weather' ? OUTSIDE : zoneUnder(plan, spaceZones, f.level, -f.z, f.x)) ?? OUTSIDE;
     const byZone = new Map<string, Furnishing[]>();
     for (const f of list) {
       const z = zoneOf(f);
+      if (outsideOnly && z !== OUTSIDE) continue;
       byZone.set(z, [...(byZone.get(z) ?? []), f]);
     }
     let triangles = 0;
     for (const [zone, here] of byZone) {
       const models: string[] = [];
       for (const f of here) if (!models.includes(f.model)) models.push(f.model);
-      const kinds = models.map((m) => drawKind(fittings, m));
+      const kinds = models.map((m) => drawKind(fittings, m, !outsideOnly));
       const draws = createInstanceDraws(renderer, kinds, { frames: [this.frame], shadow: { dir: this.sunDir, reach: SHADOW_REACH }, capacity: CAPACITY });
       draws.group.name = `furnishings ${zone}`;
       const data = new Float32Array(here.length * RECORD), m = new Matrix4(), spin = new Matrix4(), lean = new Matrix4();
@@ -150,7 +155,7 @@ export class Furnishings {
       draws.set(data, here.length);
       this.zones.set(zone, draws);
     }
-    this.count = list.length;
+    this.count = [...byZone.values()].reduce((n, here) => n + here.length, 0);
     this.triangles = triangles;
   }
 
@@ -162,8 +167,14 @@ export class Furnishings {
   /** Each frame once her group is posed: her frame from it, the way back for her materials, and the draws' levels. */
   update(ship: Object3D, camera: Camera, sunDir?: Vector3): void {
     this.frame.copy(ship.matrixWorld);
-    TO_SHIP.value.copy(this.frame).invert();
+    this.fromWorld.copy(this.frame).invert();
     if (sunDir) this.sunDir.copy(sunDir).negate();
     for (const d of this.zones.values()) d.update(camera);
+    this.markFrames();
+  }
+
+  /** Every mesh of her draws told which ship's frame it is in (fitted.ts `TO_SHIP`); the draws may add meshes as they grow. */
+  private markFrames(): void {
+    for (const d of this.zones.values()) d.group.traverse((o) => { o.userData.fromWorld = this.fromWorld; });
   }
 }
