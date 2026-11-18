@@ -52,9 +52,16 @@ const TEXEL = 4;
  * works alike on WebGPU and WebGL 2.
  */
 export const FRAMES_TEXTURE = new DataTexture(new Float32Array(MOST_FRAMES * FRAME_ROWS * TEXEL), FRAME_ROWS, MOST_FRAMES, RGBAFormat, FloatType);
-FRAMES_TEXTURE.magFilter = NearestFilter;
-FRAMES_TEXTURE.minFilter = NearestFilter;
+nearest(FRAMES_TEXTURE);
 for (let f = 0; f < MOST_FRAMES; f++) setShipFrame(f, new Matrix4());
+
+/** A data texture read texel by texel: no filtering, and uploaded on first use. */
+export function nearest(t: DataTexture): DataTexture {
+  t.magFilter = NearestFilter;
+  t.minFilter = NearestFilter;
+  t.needsUpdate = true;
+  return t;
+}
 
 /** Moving frame `frame` of hers set to `m` (ship space to ship space), for her ropes' shaders. */
 export function setShipFrame(frame: number, m: Matrix4): void {
@@ -176,7 +183,7 @@ function belowDeck(ao) {
 }
 
 /** Where a mesh being crossfaded is not drawn (its share of the screen's dither lies elsewhere). */
-function fading() {
+export function crossfadeMask() {
   const d = hash(screenCoordinate.xy), f = SHIP_OBJECT.fade;
   return step(f.x, d).mul(step(d, f.y.sub(TINY / 2))).greaterThan(1 / 2);
 }
@@ -237,7 +244,7 @@ export function makeWoodMaterial(crossfade = false): MeshStandardNodeMaterial {
   const light = belowDeck(ao);
   m.aoNode = light.sky;
   m.emissiveNode = m.colorNode.mul(light.lamp);
-  if (crossfade) m.maskNode = fading();
+  if (crossfade) m.maskNode = crossfadeMask();
   return m;
 }
 
@@ -255,7 +262,7 @@ export function makeIronMaterial(crossfade = false): MeshStandardNodeMaterial {
   const light = belowDeck(sh.x);
   m.aoNode = light.sky;
   m.emissiveNode = fin.rgb.mul(light.lamp);
-  if (crossfade) m.maskNode = fading();
+  if (crossfade) m.maskNode = crossfadeMask();
   return m;
 }
 
@@ -297,7 +304,7 @@ export function makeCopperMaterial(crossfade = false): MeshStandardNodeMaterial 
   m.colorNode = wet.colour;
   m.metalnessNode = float(1).sub(green);
   m.roughnessNode = wet.rough;
-  if (crossfade) m.maskNode = fading();
+  if (crossfade) m.maskNode = crossfadeMask();
   return m;
 }
 

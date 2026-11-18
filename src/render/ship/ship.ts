@@ -19,6 +19,7 @@ import { bulwarkInside, buildBulwarks, buildOutside, deckEnds, lidEdge, outsideX
 import { buildDeckBeams, buildDeckOpenings, buildPartners, buildWeatherDeck, type DeckContext } from './decks';
 import { buildRooms } from './rooms';
 import { buildRigs } from './rig';
+import { buildSailGrids, type SailDetail } from './sailGrid';
 import { OUTSIDE, levelAt, openingsOn, rectCentre, portals, zoneOfSpaces, zoneUnder, type Portal } from './zones';
 
 /** The breeching's ring bolts either side of a port (m from its middle, m above the deck) and the rope's slack. */
@@ -75,6 +76,8 @@ export interface ShipBuild {
   readonly portals: readonly Portal[];
   /** Metres of rope laid, for the notes. */
   readonly rope: number;
+  /** Her sails and flags as grids shaped on the GPU (sailGrid.ts): fine and coarse near (a quality knob), and the far ship's. */
+  readonly sails: Readonly<Record<SailDetail, Packed>>;
 }
 
 /** Every buffer of a build, to hand it from the worker to the page without a copy. */
@@ -83,6 +86,7 @@ export function shipBuffers(build: ShipBuild): ArrayBuffer[] {
   const add = (p: Packed) => { for (const a of p.attributes) out.push(a.data.buffer as ArrayBuffer); out.push(p.index.buffer as ArrayBuffer); };
   for (const z of [...build.zones, build.far, ...build.swings, ...build.farSwings]) for (const p of [z.wood, z.iron, z.copper, z.glow, z.ropes]) add(p);
   for (const d of build.doors) { add(d.wood); add(d.iron); }
+  for (const p of Object.values(build.sails)) add(p);
   return [...new Set(out)];
 }
 
@@ -121,6 +125,7 @@ export function buildShip(fittings: Fittings): ShipBuild {
     skies: skyOpenings(plan, zones),
     portals: portals(plan),
     rope,
+    sails: { fine: buildSailGrids('fine'), coarse: buildSailGrids('coarse'), far: buildSailGrids('far') },
   };
 }
 

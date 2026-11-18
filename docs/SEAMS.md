@@ -191,6 +191,16 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A turning spar's frame from its brace or swing angle and hoist | `src/render/ship/swings.ts#swingMatrix` |
 | A point of the rig plan in ship space | `src/render/ship/swings.ts#shipPoint` |
 | Handing the moving frames to the rope shader | `src/render/ship/shipMaterials.ts#setShipFrame` |
+| A sail's shape from its numbers (belly, shiver, breathing, folds gathered, rolled on its yard, a reef rolled) and a flag's, on the CPU: the one the sail shader mirrors (N3.10) | `src/render/ship/sailForm.ts#clothAt` |
+| How each sail is drawn, from the rig plan: corners, the spars that carry them, belly shape, folds | `src/render/ship/sailForm.ts#sailForms` |
+| The points of a sail lines are made fast to, each with its own moving frame | `src/render/ship/sailForm.ts#sailPoints` |
+| The sails' and flags' grids, with seams, reef bands, edges and the hole map's place per vertex | `src/render/ship/sailGrid.ts#buildSailGrids` |
+| The sails' hole map: each sail's place in it (for N6.5) | `src/render/ship/sailGrid.ts#sailAtlas` |
+| The sails' shader: shaped on the GPU, canvas, flags, sunlight through the cloth | `src/render/ship/sailMaterial.ts#makeSailMaterial` |
+| Her sails as drawn this frame: set and furled seen happening, belly and shiver eased, the yards' hoists, the flags in the true wind, the frames of the lines to the sails | `src/render/ship/sailsView.ts#SailsView` |
+| How a ship's sails stand in a match's state, for the drawing | `src/app/sailsSeen.ts#sailsSeen` |
+| A data texture read texel by texel | `src/render/ship/shipMaterials.ts#nearest` |
+| The far ship's crossfade: where a mesh is not drawn | `src/render/ship/shipMaterials.ts#crossfadeMask` |
 | The timber's grain, pores and grime as one texture | `src/render/ship/grain.ts#makeGrainTexture` |
 | Her timber's shader: grain, planks, seams, paint, wear, grime | `src/render/ship/shipMaterials.ts#makeWoodMaterial` |
 | Her iron, copper, lantern glow and rope shaders | `src/render/ship/shipMaterials.ts#makeRopeMaterial` |

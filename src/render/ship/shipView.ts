@@ -22,8 +22,11 @@ import { LOAD_WATERLINE } from '../../sim/rules/ships';
 import type { Look } from '../../app/look';
 import type { Standpoint } from '../../app/standpoints';
 import {
-  SHIP_COPPER, SHIP_COPPER_FADING, SHIP_GLOW, SHIP_IRON, SHIP_IRON_FADING, SHIP_ROPE, SHIP_WOOD, SHIP_WOOD_FADING,
+  SHIP_COPPER, SHIP_COPPER_FADING, SHIP_GLOW, SHIP_IRON, SHIP_IRON_FADING, SHIP_ROPE, SHIP_SAILS, SHIP_SAILS_FADING, SHIP_WOOD, SHIP_WOOD_FADING,
 } from '../materials';
+import type { QualityKnobs } from '../../app/quality';
+import { SailsView } from './sailsView';
+import { SAIL_TEXTURE, SAIL_TIME } from './sailMaterial';
 import { SEA_CUT } from '../seaCut';
 import { MOST_LAMPS, MOST_SKIES, SHIP_INPUTS, setShipFrame } from './shipMaterials';
 import { rigPlan } from '../../sim/ship/rig';
@@ -125,7 +128,11 @@ export class ShipView {
   private readonly farParts: Part[] = [];
   private readonly doors = new Map<string, { pivot: Group; shut: number; opens: number; zones: readonly [string, string]; angle: number }>();
   /** The spars that turn (swings.ts): each one's groups near and far, its brace or swing (rad) and hoist (1 hoisted). */
-  private readonly swings = new Map<string, { swing: Swing; groups: Group[]; angle: number; hoist: number }>();
+  private readonly swings = new Map<string, { swing: Swing; groups: Group[]; angle: number; hoist: number; matrix: Matrix4 }>();
+  /** Her sails and flags (plan N3.10): how they stand is told through `sails.stand` and `sails.blow`. */
+  readonly sails: SailsView;
+  /** The sails' meshes near, fine and coarse (one shown, a quality knob), and far. */
+  private readonly sailMeshes: { fine: Mesh; coarse: Mesh; far: Mesh };
   private swingsMoved = true;
   /** Each zone's ranges in her shaders' light lists. */
   private readonly ranges: Map<string, Vector4>;
@@ -194,8 +201,24 @@ export class ShipView {
         into.add(g);
         groups.push(g);
       }
-      this.swings.set(swing.id, { swing, groups, angle: 0, hoist: 1 });
+      this.swings.set(swing.id, { swing, groups, angle: 0, hoist: 1, matrix: new Matrix4() });
     }
+    // The sails and flags: near in her outside (fine or coarse), and on the far ship; shaped on the GPU, so never culled by their flat bounds.
+    this.sails = new SailsView(rigPlan(this.plan));
+    const sail = (packed: Packed, into: Group, parts: Part[], fading: boolean): Mesh => {
+      const m = this.mesh(fading ? SHIP_SAILS_FADING : SHIP_SAILS, packed);
+      m.frustumCulled = false;
+      into.add(m);
+      parts.push({ mesh: m, plain: SHIP_SAILS.make(), fading: SHIP_SAILS_FADING.make() });
+      return m;
+    };
+    this.sailMeshes = {
+      fine: sail(build.sails.fine, this.zones.get(OUTSIDE)!, this.outside, false),
+      coarse: sail(build.sails.coarse, this.zones.get(OUTSIDE)!, this.outside, false),
+      far: sail(build.sails.far, this.far, this.farParts, true),
+    };
+    this.sailMeshes.coarse.visible = false;
+    tris += packedTriangles(build.sails.fine);
     this.far.visible = false;
     this.group.add(this.far);
     this.triangles = tris;
@@ -321,22 +344,36 @@ export class ShipView {
   private moveSwings(): void {
     if (!this.swingsMoved) return;
     this.swingsMoved = false;
-    for (const { swing, groups, angle, hoist } of this.swings.values()) {
-      const m = swingMatrix(swing, angle, hoist, this.swingFrame);
-      for (const g of groups) g.matrix.copy(m);
-      setShipFrame(swing.frame, m);
+    for (const w of this.swings.values()) {
+      const m = swingMatrix(w.swing, w.angle, w.hoist, w.matrix);
+      for (const g of w.groups) g.matrix.copy(m);
+      setShipFrame(w.swing.frame, m);
     }
   }
-  private readonly swingFrame = new Matrix4();
   /** Where the far ship starts to fade in, m (quality.ts `shipFarFrom`). */
   private fadeFrom = FADE_FROM;
   /** Her rope meshes, whose shadow is a quality knob. */
   private readonly ropeMeshes: Mesh[] = [];
 
-  /** The quality level's knobs for her (quality.ts): whether her ropes cast shadows, and how far off the far ship starts. */
-  setQuality(ropeShadows: boolean, farFrom: number): void {
-    for (const m of this.ropeMeshes) m.castShadow = ropeShadows && m.userData.light === undefined;
-    this.fadeFrom = farFrom;
+  /** The quality level's knobs for her (quality.ts): whether her ropes and sails cast shadows, how fine her sails' grids are, and how far off the far ship starts. */
+  setQuality(k: Pick<QualityKnobs, 'ropeShadows' | 'shipFarFrom' | 'sailGrid' | 'sailShadows'>): void {
+    for (const m of this.ropeMeshes) m.castShadow = k.ropeShadows && m.userData.light === undefined;
+    this.fadeFrom = k.shipFarFrom;
+    const fine = k.sailGrid === 'fine';
+    this.sailMeshes.fine.visible = fine;
+    this.sailMeshes.coarse.visible = !fine;
+    for (const m of Object.values(this.sailMeshes)) m.castShadow = k.sailShadows;
+  }
+
+  /** Her sails stepped `dt` s, their yards hoisted as they are drawn; then, the spars placed, each sail's numbers and its lines' frames. */
+  private moveSails(dt: number): void {
+    this.sails.follow(dt);
+    for (const [id, share] of this.sails.hoists()) this.setHoist(id, share);
+    this.moveSwings();
+    this.sails.write((id) => this.swings.get(id)?.matrix ?? null, this.group.quaternion, this.time, setShipFrame);
+    (SAIL_TEXTURE.image.data as Float32Array).set(this.sails.rows);
+    SAIL_TEXTURE.needsUpdate = true;
+    SAIL_TIME.value = this.time;
   }
 
   /**
@@ -346,7 +383,6 @@ export class ShipView {
   update(sea: SeaState, t: number, dt: number, camera: PerspectiveCamera, where: Standpoint, look: Look, sun: DirectionalLight, sunDir: Vector3, gain: number, radPerPixel: number, seaOrigin: Vector3): void {
     this.time += dt;
     this.float(sea, t);
-    this.moveSwings();
     // The water at her side, whoever lays her (plan N2.5): its churn, her wet line, slams at her bow.
     this.slams.length = 0;
     this.churn.keepUp(this.drawn, sea, t, this.slams);
@@ -357,6 +393,7 @@ export class ShipView {
     g.quaternion.setFromEuler(this.euler);
     g.updateMatrixWorld(true);
     this.inverse.copy(g.matrixWorld).invert();
+    this.moveSails(dt);
 
     // The eye: on board it rides with her, its tilt eased toward level; off her it stands still where she lies.
     this.eye.set(...where.eye);

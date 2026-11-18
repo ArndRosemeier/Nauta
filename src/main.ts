@@ -10,6 +10,7 @@ import { Walking } from './app/walking';
 import { QUALITY_LEVELS, QualityChooser, type QualityKnobs } from './app/quality';
 import { showMotionSetting } from './app/motionSetting';
 import { OrderPanel } from './app/orderPanel';
+import { sailsSeen } from './app/sailsSeen';
 import { PageMatch, pageSeconds, sparAngles } from './app/pageMatch';
 import { RoomPanel } from './app/roomPanel';
 import { createView } from './render/view';
@@ -37,6 +38,7 @@ import { formatBytes } from './probe/report';
 import { Vector3 } from 'three/webgpu';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
 import { simTime } from './sim/state';
+import { parseOrder } from './sim/orders';
 import { makeWind, meanWind, windAt } from './sim/wind';
 import { followWind, startSea } from './sim/sea/sea';
 import type { Look } from './app/look';
@@ -65,6 +67,8 @@ const SCENE_FRAMES = 1;
 const SHOT_SEA_TIME = 60;
 /** Where the crew trial looks from her quarterdeck: forward over her waist, her twin's crew off the starboard bow in view. */
 const CREW_LOOK: Look = { yaw: -0.25, pitch: -0.1 };
+/** The browser checks' jumps run the match on by this much at a time, s: within what one pump of the match catches up (net/duel.ts MOST_STEPS). */
+const JUMP_PIECE = 1;
 
 declare global {
   interface Window {
@@ -77,6 +81,12 @@ declare global {
      * shots on one page with it (tools/shot/sea.mjs).
      */
     __nautaScene?: (query: string) => Promise<void>;
+    /**
+     * Sailing (`?sail`), for the browser checks: `give` an order in words (as the order panel takes them; answers why
+     * not, or ''), and run the match `onward` by so many seconds at once (the sails as drawn catch up with it), resolving
+     * once the next frame is drawn; `sails`: how many of her sails are drawn set and furled (tools/shot/sails.mjs).
+     */
+    __nautaSail?: { give: (words: string) => string; onward: (seconds: number) => Promise<void>; sails: () => { sails: number; set: number; furled: number; deepest: number } };
   }
 }
 
@@ -93,7 +103,9 @@ async function start(): Promise<void> {
   const sailing = params.sail || params.room || params.join !== null;
   const build = params.ship !== null || walking || sailing ? await loadShip(import.meta.env.BASE_URL) : null;
   const ship = build ? new ShipView(build) : null;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed) : null;
+  /** Seconds the browser checks have run the match on ahead of the page's clock (`__nautaSail.onward`). */
+  let ahead = 0;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => pageSeconds() + ahead) : null;
   // The other captain's ship, where the match has her (until N3.8 draws her whole).
   const other = build && match ? new OtherShipView(build) : null;
   if (ship && match) ship.poseFrom = () => match.pose(match.ship)!;
@@ -206,6 +218,17 @@ async function start(): Promise<void> {
   // Walking: the calm view, how much of his body's motion the view takes (plan N2.7).
   if (walking) showMotionSetting(el<HTMLButtonElement>('motion'), params.motion, (s) => { walking.body.strength = s; });
   const orders = match ? new OrderPanel(match) : null;
+  /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
+  let jump = 0, jumped: (() => void) | null = null;
+  if (match) window.__nautaSail = {
+    give: (words) => { const o = parseOrder(words, match.ship); if (typeof o === 'string') return o; match.give(o); return ''; },
+    onward: (seconds) => new Promise((done) => {
+      // The match runs on piece by piece, each pumped at once: one jump of minutes would leave it running late instead.
+      for (let left = seconds; left > 0; left -= JUMP_PIECE) { ahead += Math.min(JUMP_PIECE, left); match.frame(); }
+      jump += seconds; jumped = done;
+    }),
+    sails: () => ship!.sails.summary(),
+  };
   // Walking, the calm view's button has the top right corner: the panel stands below it.
   if (orders && walking) el('orders').classList.add('under-motion');
   if (match) {
@@ -213,7 +236,7 @@ async function start(): Promise<void> {
     match.onChange(() => rooms.refresh());
   }
   const apply = (k: QualityKnobs) => {
-    view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k.ropeShadows, k.shipFarFrom);
+    view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k);
     seaView.wake.levels = k.wakeLevels;
   };
   apply(quality.knobs);
@@ -270,6 +293,13 @@ async function start(): Promise<void> {
     const phase = trial?.phaseAt(now) ?? null;
     if (phase) input.look = { ...CREW_LOOK };
     if (ship) {
+      // Her sails as the match says they stand (furled when no match sails her), the flags in the true wind; after a
+      // jump of the browser checks, the sails as drawn catch up with it at once.
+      const seen = match ? sailsSeen(match.state, match.ship) : null;
+      ship.sails.stand(seen?.standing ?? null, seen?.canvas ?? null);
+      ship.sails.blow(windAt(wind, ship.drawn.x, ship.drawn.z, seaTime));
+      if (jump > 0) ship.sails.follow(jump);
+      jump = 0;
       if (walking) {
         where = walking.walk(dt, ship.drawn, input);
         walking.swingDoors((id, angle) => ship.setDoor(id, angle));
@@ -316,6 +346,7 @@ async function start(): Promise<void> {
     bench?.worked(performance.now() - now);
     trial?.measured(now, performance.now() - now, crew?.stats.ms ?? 0, view.renderer.info.render.drawCalls);
     frames++;
+    if (jumped && jump === 0) { jumped(); jumped = null; }
     if (sceneDrawn && --sceneFrames <= 0) { sceneDrawn(); sceneDrawn = null; held = true; }
     if (showHud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;

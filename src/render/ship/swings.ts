@@ -10,8 +10,8 @@ import { sparOf, type RigPlan } from '../../sim/ship/rig';
 import type { RigPoint, Spar } from '../../sim/ship/spars';
 import { shipY, shipZ } from '../../sim/ship/section';
 
-/** How many moving frames her ropes can follow: her hull and every spar that turns (the rope kind's frames texture, shipMaterials.ts). */
-export const MOST_FRAMES = 12;
+/** How many moving frames her ropes can follow: her hull, every spar that turns, and every point of a sail a line is made fast to (sailForm.ts `sailPoints`; the rope kind's frames texture, shipMaterials.ts). */
+export const MOST_FRAMES = 64;
 
 /** A spar that turns: its moving frame's number, the point it turns about and the axis (ship space), and how far a lowered yard drops. */
 export interface Swing {
