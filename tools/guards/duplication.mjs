@@ -16,20 +16,38 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.join(HERE, '../..');
 export const BASELINE_FILE = path.join(HERE, 'duplication-baseline.json');
 
-/** What the finders find under `dir`, as stable keys (names and files, never line numbers). */
-export function duplicationFindings(dir = path.join(REPO, 'src')) {
-  const rep = scanRepeated(dir, { displayBase: dir });
-  const clones = rep.clones.clusters.map((c) => `clone: ${[...new Set(c.fns.map((f) => `${f.file}#${f.name}`))].sort().join(' + ')}`);
-  const idioms = rep.idioms.idioms.map((d) => `idiom: [${d.names.join(' ')}] in ${[...new Set(d.at.map((a) => a.file))].sort().join(' + ')}`);
-  const g = groupCandidates(scanTree(dir, { displayBase: dir }).functions);
-  const names = [...g.tier1, ...g.tier2]
-    .filter((p) => (p.status === 'compared' || p.status === 'confirmed') && p.sim >= DEFAULT_CONFIRM_FLOOR)
-    .map((p) => `same name: ${[`${p.a.file}#${p.a.name}`, `${p.b.file}#${p.b.name}`].sort().join(' + ')}`);
-  return [...new Set([...clones, ...idioms, ...names])].sort();
+/**
+ * The two finders: copied bodies and repeated idioms (`repeated`), and alike functions of one name (`names`). Each
+ * finding's key starts with the kind that finds it, so the ratchet can be held one finder at a time (the test suite
+ * runs them as two tests, each inside one test's time).
+ */
+export const FINDERS = ['repeated', 'names'];
+const FINDER_OF = { 'clone: ': 'repeated', 'idiom: ': 'repeated', 'same name: ': 'names' };
+const finderOf = (key) => Object.entries(FINDER_OF).find(([prefix]) => key.startsWith(prefix))?.[1];
+
+/** What the finders (`finders`, all by default) find under `dir`, as stable keys (names and files, never line numbers). */
+export function duplicationFindings(dir = path.join(REPO, 'src'), finders = FINDERS) {
+  const found = [];
+  if (finders.includes('repeated')) {
+    const rep = scanRepeated(dir, { displayBase: dir });
+    found.push(...rep.clones.clusters.map((c) => `clone: ${[...new Set(c.fns.map((f) => `${f.file}#${f.name}`))].sort().join(' + ')}`));
+    found.push(...rep.idioms.idioms.map((d) => `idiom: [${d.names.join(' ')}] in ${[...new Set(d.at.map((a) => a.file))].sort().join(' + ')}`));
+  }
+  if (finders.includes('names')) {
+    const g = groupCandidates(scanTree(dir, { displayBase: dir }).functions);
+    found.push(...[...g.tier1, ...g.tier2]
+      .filter((p) => (p.status === 'compared' || p.status === 'confirmed') && p.sim >= DEFAULT_CONFIRM_FLOOR)
+      .map((p) => `same name: ${[`${p.a.file}#${p.a.name}`, `${p.b.file}#${p.b.name}`].sort().join(' + ')}`));
+  }
+  return [...new Set(found)].sort();
 }
 
-/** The ratchet: every problem as a line (none: the code holds no copy that is not accounted for). */
-export function checkDuplication(findings, baseline) {
+/**
+ * The ratchet: every problem as a line (none: the code holds no copy that is not accounted for). `finders`: the
+ * finders that made `findings` (baseline entries of the others are not held against them).
+ */
+export function checkDuplication(findings, baseline, finders = FINDERS) {
+  baseline = baseline.filter((b) => !finderOf(b.key) || finders.includes(finderOf(b.key)));
   const known = new Map(baseline.map((b) => [b.key, b])), found = new Set(findings), problems = [];
   for (const f of findings) {
     if (f.startsWith('clone: ')) problems.push(`COPY ${f}\n    The same body twice: keep one and call it from both places. A clone cannot be put in the baseline.`);
