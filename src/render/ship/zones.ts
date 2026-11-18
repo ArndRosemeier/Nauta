@@ -8,14 +8,14 @@
  * Places are the plan's: m forward of the mainmast (`along`), m from the centreline (`across`), heights m above her base.
  */
 import { DOOR, DOORS, OPEN_JOINS, PLANKING, BERTH_BEAM, type Level } from '../../sim/rules/ships';
-import { berthDeck, floorAt, insideBreadth, type ShipPlan, type Space } from '../../sim/ship/plan';
+import { berthDeck, floorAt, insideBreadth, rectCentre, type ShipPlan, type Space } from '../../sim/ship/plan';
 import { weatherDeck, weatherDeckUnderside } from '../../sim/ship/hull';
 
 /** The outside: her hull, the weather deck and everything on and above it. */
 export const OUTSIDE = 'out';
 
-/** The middle of an oblong of the plan. */
-export const rectCentre = (r: { aft: number; fore: number; port: number; starboard: number }) => ({ along: (r.aft + r.fore) / 2, across: (r.port + r.starboard) / 2 });
+/** The middle of an oblong of the plan (the plan's, here for the drawing's callers). */
+export { rectCentre };
 
 /** The plan's openings through the deck of a level. */
 export const openingsOn = (plan: ShipPlan, level: Level) => plan.openings.filter((o) => o.level === level);

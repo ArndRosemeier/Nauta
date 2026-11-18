@@ -1,0 +1,3 @@
+You can hear the brig herself: her timbers creak as she rolls, rarely in a calm and one after another in a breeze, water runs along her sides, and from a fresh breeze on the sea slaps up under her stern. Tap once for sound; headphones help. Try ?walk&wind=1 and ?walk&wind=5.
+Walk her and you hear your own steps on the deck and on each ladder tread.
+Go below and the sea and wind outside turn muffled and far, the water against her planking is right beside you and the room has its own close echo; under a hatch the outside comes back. Try ?ship=berth-deck, ?ship=cabin and ?ship=hold.

@@ -210,6 +210,9 @@ export function spacesById(plan: ShipPlan): ReadonlyMap<string, Space> {
   return m;
 }
 
+/** The middle of an oblong of the plan. */
+export const rectCentre = (r: Rect): { along: number; across: number } => ({ along: (r.aft + r.fore) / 2, across: (r.port + r.starboard) / 2 });
+
 export const holds = (r: Rect, along: number, across: number): boolean => along >= r.aft && along <= r.fore && across >= r.port && across <= r.starboard;
 
 /** Every floor under a place, lowest first: the spaces whose oblong holds it (what the walker stands on, N2.3). */
