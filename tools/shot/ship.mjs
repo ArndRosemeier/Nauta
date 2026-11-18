@@ -1,10 +1,11 @@
 /**
- * The ship-and-water check (plan N2.5): `npm run check:ship [-- <out dir> [words...]]` (run `npm run build` first).
+ * The ship-and-water check (plan N2.5): `npm run check:ship [-- <out dir> [all | words...]]` (run `npm run build` first).
  * The brig sailed by a match (`?sail`, the duel's start: on the beam under battle sail) in a force 6 sea, seen over
  * her side, from her bowsprit, astern along her wake, from 50 m off and from above, and from her berth deck (no water
  * inside her). One page: she sails for a while first so her wake lies behind her, then each scene is set with
  * `window.__nautaScene` (`ship=` the standpoint; the match keeps its own clock, so she sails on between pictures).
- * Writes `<out dir>/<name>.png` (default `shots/ship`). Words narrow the set (`npm run check:ship -- shots/ship bow`).
+ * CI takes three of the six (CI_SHOTS); `all` takes every one, words narrow the set (`npm run check:ship -- shots/ship
+ * bow`). Writes `<out dir>/<name>.png` (default `shots/ship`).
  * The browser's switches are browser.mjs's (CHROMIUM_PATH, SHOT_GPU, SHOT_SIZE); the quality is fixed at `high`.
  * It fails on any error or warning on the page (browser.mjs), or when a picture does not change between scenes.
  */
@@ -18,6 +19,13 @@ const SHIP_SHOT_SIZE = '800x500';
 const SEED = 4;
 /** How long she sails before the first picture, ms: her wake is laid behind her as frames are drawn. */
 const SAIL_FIRST_MS = 30000;
+
+/**
+ * The pictures CI takes, each a frame of the whole brig (10 to 16 s on CI's software GPU): the water along her side
+ * and her waterline, her wake under way from above, and no water inside her. The bowsprit, astern and 50 m off by hand
+ * (`all`), as the sea's and the sails' full sets (docs/CHECKS.md, "Browser checks: the rule").
+ */
+const CI_SHOTS = ['rail', 'above', 'berth'];
 
 /** Every shot: its file name and the scene's query (a standpoint of src/app/standpoints.ts and an hour). */
 export function shipShots() {
@@ -33,7 +41,8 @@ export function shipShots() {
 
 async function main() {
   const [outDir = 'shots/ship', ...words] = process.argv.slice(2);
-  const shots = shipShots().filter((s) => words.every((w) => s.name.includes(w)));
+  const shots = words.includes('all') ? shipShots()
+    : words.length ? shipShots().filter((s) => words.every((w) => s.name.includes(w))) : shipShots().filter((s) => CI_SHOTS.includes(s.name));
   if (!shots.length) { console.error(`no shot's name holds ${words.join(' and ')}`); process.exit(2); }
   mkdirSync(outDir, { recursive: true });
   const t0 = performance.now(), served = await openBrowser();

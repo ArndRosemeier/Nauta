@@ -1,0 +1,1 @@
+Behind the scenes: the build server's ship check takes three of its six pictures, so it stays inside its time; all six still come by hand.
