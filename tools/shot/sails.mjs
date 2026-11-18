@@ -37,8 +37,8 @@ const { width, height } = shotSize('800x500');
 const served = await openBrowser();
 const game = await openGame(served, '?sail&ship=50-m-off&hud&quality=high&wind=4', { width, height });
 const { page } = game;
-// The panels would hide her: only the standpoints stay, as the check clicks them.
-await page.addStyleTag({ content: '#version,#orders,#room{display:none!important}' });
+// The panels would hide her: only the standpoints stay, as the check clicks them (the officer row lies over their buttons).
+await page.addStyleTag({ content: '#version,#orders,#room,.nt-officers{display:none!important}' });
 const problems = [];
 const say = async (words) => { const why = await page.evaluate((w) => window.__nautaSail.say(w), words); if (why) problems.push(`"${words}" refused: ${why}`); };
 /** The match runs on at once; the software GPU draws only the pictures (each `shot` draws the frame that catches the sails up). */
