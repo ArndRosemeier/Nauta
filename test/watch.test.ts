@@ -44,7 +44,9 @@ test('a match watched has no ship of mine and both ships are commanded by comput
   assert.equal(new DuelSession({ build: 'test', now: () => 0, seed: 3, foe: 'master' }).watched, false);
 });
 
-test('the page runs a match watched as soon as it is given, with the first ship its own and the other beside it', () => {
+test('the page runs a match watched as soon as it is given, with the first ship its own and the other beside it', (t) => {
+  // The page's pump is a setInterval that nothing stops; a mocked one cannot hold this file's process open (run alone, it timed out).
+  t.mock.timers.enable({ apis: ['setInterval'] });
   const m = new PageMatch('test', null, () => 0);
   const s = new DuelSession({ build: 'test', now: () => 0, seed: 5, watch: { first: 'seasoned', second: 'seasoned' } });
   m.useSession(s, 'british');
