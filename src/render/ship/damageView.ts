@@ -34,14 +34,14 @@ export class DamageView {
     );
   }
 
-  /** Her marks brought up to `d` (null: as nothing struck her); what she now needs drawn holed. */
-  marksFor(d: Damage | null): DamageShown {
+  /** Her marks brought up to `d` (null: as nothing struck her), her sails `gone` over the side cut out; what she now needs drawn holed. */
+  marksFor(d: Damage | null, gone: readonly boolean[] = []): DamageShown {
     if (!d) return this.shown;
     if (this.hull.bringUpTo(d)) {
       DAMAGE_TEXTURE.needsUpdate = true;
       this.shown = { ...this.shown, hullCut: this.shown.hullCut || this.hull.cut };
     }
-    if (this.sails.bringUpTo(d.rent)) {
+    if (this.sails.bringUpTo(d.rent, gone)) {
       SAIL_DAMAGE_TEXTURE.needsUpdate = true;
       this.shown = { ...this.shown, sailsCut: true };
     }

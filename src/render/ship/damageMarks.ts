@@ -188,6 +188,8 @@ export class HullMarks {
   private drawn = new Set<number>();
   private stopped = new Set<number>();
   private stove = new Set<number>();
+  /** The most each space has burnt (a share of it): its scorch stays when the fire is out. */
+  private readonly burnt = new Map<number, number>();
   private was: Damage | null = null;
 
   constructor(private readonly block: MapBlock) {}
@@ -198,9 +200,16 @@ export class HullMarks {
     this.was = d;
     const now = new Set(d.holes), plugged = new Set(d.plugged);
     const lost = [...this.drawn].some((c) => !now.has(c)) || [...plugged].some((c) => !this.stopped.has(c));
-    if (lost) { clear(this.block); this.drawn = new Set(); this.stove = new Set(); }
+    if (lost) { clear(this.block); this.drawn = new Set(); this.stove = new Set(); for (const [space, size] of this.burnt) scorch(this.block, space, size); }
     this.stopped = plugged;
     let changed = lost;
+    for (const f of d.fires) {
+      // Scorched as it grows (a step's growth at a time, not every step).
+      if (f.size < (this.burnt.get(f.space) ?? 0) + SCORCH_STEP) continue;
+      this.burnt.set(f.space, f.size);
+      scorch(this.block, f.space, f.size);
+      changed = true;
+    }
     for (const code of d.holes) {
       if (this.drawn.has(code)) continue;
       this.drawn.add(code);
@@ -220,6 +229,36 @@ export class HullMarks {
     return false;
   }
 }
+
+/**
+ * A fire's mark (plan N6.5): the decks it burns between charred from its space's middle out, over `size` (the share
+ * alight) of the space: the floor it burns on (the berth deck; the hold's floor is not in the map) and the deck over
+ * it, whose underside is the same region. Darker toward the middle, its edge ragged.
+ */
+function scorch(b: MapBlock, space: number, size: number): void {
+  const s = shipPlan().spaces[space];
+  if (!s) return;
+  const regions = s.level === 'berth' ? [DAMAGE.berthDeck, DAMAGE.weatherDeck] : s.level === 'hold' ? [DAMAGE.berthDeck] : [DAMAGE.weatherDeck];
+  const reach = Math.sqrt(Math.min(1, size)), ra = ((s.fore - s.aft) / 2) * reach, rx = ((s.starboard - s.port) / 2) * reach;
+  const za = shipZ((s.aft + s.fore) / 2), xa = (s.port + s.starboard) / 2, seed = space ^ EDGE_SEED;
+  // Its reach in texels; a space as broad as her may reach past a deck's region, so the box is kept inside it.
+  const ru = Math.max(ra / DAMAGE_TEXEL, 1), rv = Math.max(rx / DAMAGE_TEXEL, 1);
+  for (const region of regions) {
+    const m = damageTexel(region, za, xa), r = DAMAGE_REGIONS.find((d) => d.id === region)!;
+    if (!m) continue;
+    const top = r.y + Math.ceil(r.height / DAMAGE_TEXEL) - 1;
+    for (let y = Math.max(r.y, Math.floor(m[1] - rv)); y <= Math.min(top, Math.ceil(m[1] + rv)); y++) {
+      for (let x = Math.max(0, Math.floor(m[0] - ru)); x <= Math.min(b.width - 1, Math.ceil(m[0] + ru)); x++) {
+        const out = Math.hypot((x + 1 / 2 - m[0]) / ru, (y + 1 / 2 - m[1]) / rv) + SCORCH_RAGGED * (hash2f(seed, x >> 1, y >> 1) - 1 / 2);
+        if (out < 1) raise(b, x, y, MARK.scorch, FULL * Math.min(1, (1 - out) / SCORCH_EDGE));
+      }
+    }
+  }
+}
+/** A fire's scorch is drawn again each time it has grown this share of its space; its edge is this ragged and comes up to full char over this share of its reach. */
+const SCORCH_STEP = 0.05;
+const SCORCH_RAGGED = 0.3;
+const SCORCH_EDGE = 0.35;
 
 /** The rows of one ship's block in the damage map. */
 export const HULL_BLOCK_ROWS = DAMAGE_MAP_SIZE.height;
@@ -252,15 +291,24 @@ const PICK = { across: 0, down: 1, size: 2, stretch: 3 } as const;
 /** One ship's holes in her sails, kept up with `rent` (holes per sail, rig plan order). */
 export class SailMarks {
   private shown: readonly number[] = [];
+  /** The sails gone with a wreck, cut out whole. */
+  private readonly lost = new Set<number>();
 
   constructor(private readonly map: SailMap, private readonly rects: readonly SailRect[]) {}
 
-  /** Brings the holes up to `rent`; true if any byte changed. */
-  bringUpTo(rent: readonly number[]): boolean {
-    if (rent === this.shown) return false;
+  /** Brings the holes up to `rent`, and cuts out whole each sail `gone` (gone over the side with its spar, plan N6.5); true if any byte changed. */
+  bringUpTo(rent: readonly number[], gone: readonly boolean[] = []): boolean {
+    let changed = false;
+    gone.forEach((g, s) => {
+      const r = this.rects[s];
+      if (!g || !r || this.lost.has(s)) return;
+      this.lost.add(s);
+      for (let y = r.y; y < r.y + r.height; y++) for (let x = r.x; x < r.x + r.width; x++) raise(this.map, x, y, MARK.cut, FULL);
+      changed = true;
+    });
+    if (rent === this.shown) return changed;
     const was = this.shown;
     this.shown = rent;
-    let changed = false;
     const sails = rigPlan().sails;
     rent.forEach((n, s) => {
       const r = this.rects[s], had = was[s] ?? 0;

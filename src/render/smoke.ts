@@ -16,6 +16,10 @@
  *
  * One instanced mesh of quads facing the eye, a ring of puffs the CPU writes as guns fire (gunfire.ts's way). A puff
  * the eye is inside of is faded out, so the cloud thins around the eye instead of a quad filling the view.
+ *
+ * A burning ship's fires (plan N6.5, fireView.ts) pour into the same ring (`pourPuff`): black soot, and flames, small
+ * puffs glowing with their own light that rise fast and burn out in a second. A puff's kind rides in its seed's
+ * hundreds (`PUFF_KIND`), so one shader draws all three.
  */
 import { Rng } from '@futuremagic/core';
 import {
@@ -32,6 +36,15 @@ import { SEA_INPUTS, daylight } from './seaMaterial';
 
 /** The puffs in the ring: a broadside of nine guns pours about 70, both ships fire every 40 s or so, and a puff lasts 90 s. */
 export const MOST_PUFFS = 1024;
+/**
+ * Fires' puffs (fireView.ts) have rings of their own after the guns', so a burning ship never eats her gun smoke: one
+ * for long lives (her soot) and one for short (flames), a puff going to the long one when it lives longer than
+ * `LONG_LIFE` s. The flames' comes last, so they are drawn over the soot they burn in (puffs are drawn in their
+ * order, unsorted). Each is sized so it comes round no sooner than its puffs die out with two ships each burning in
+ * two places.
+ */
+export const FIRE_RINGS = { short: 256, long: 768 } as const;
+const LONG_LIFE = 2;
 /** Numbers per puff in each of its attributes. */
 export const PUFF_STRIDE = 4;
 /** A puff's attributes: where and when it starts (x, y, z from the origin, s); how it is thrown (m/s) and its first radius (m); its life (s), seed, density and how fast it rises (m/s). */
@@ -98,6 +111,17 @@ const LONG_SIX_SHARE = 0.6;
 const SOFT_LEAST = 0.5;
 /** Where each number sits. */
 const X = 0, Y = 1, Z = 2, W = 3;
+/** A puff's kind, in its seed's hundreds (the seed's own part is under `KIND_STEP`): powder smoke, a fire's soot, a fire's flame. */
+export const PUFF_KIND = { powder: 0, soot: 1, flame: 2 } as const;
+const KIND_STEP = 100;
+/** Soot's albedo (black smoke from burning timber, tar and canvas), and how much less it spreads than powder smoke (a fire's smoke stands in a column). */
+const SOOT_ALBEDO = 0.008;
+const SOOT_SPREAD = 0.45;
+/** A flame's own light (on the light rig's scale), its colour young and burnt out, and how much less it spreads than smoke. */
+const FLAME_LIGHT = 10;
+const FLAME_YOUNG = [1, 0.5, 0.12] as const;
+const FLAME_OLD = [0.75, 0.16, 0.03] as const;
+const FLAME_SPREAD = 0.15;
 /** Every puff starts long dead, this far back, s. */
 const DEAD = -1000;
 /** Every flash light starts this long ago (s): dark. */
@@ -126,9 +150,12 @@ export function makeSmokeMaterial(): MeshBasicNodeMaterial {
   const vDeep = varyingProperty('vec2', 'vPuffDeep');
   const depth = sceneDepth;
   const vLight = varyingProperty('vec3', 'vPuffLight'), vGlow = varyingProperty('float', 'vPuffGlow'), vSunSide = varyingProperty('vec3', 'vPuffSunSide'), vSeed = varyingProperty('float', 'vPuffSeed');
+  const vAlbedo = varyingProperty('float', 'vPuffAlbedo');
   return flownMaterial('smoke', true, () => {
     const p = attribute(PUFF_ATTRIBUTE, 'vec4'), th = attribute(PUFF_THROW, 'vec4'), look = attribute(PUFF_LOOK, 'vec4');
     const age = ageOf(I.now, p), life = look.x, seed = look.y;
+    // Its kind (fireView.ts): powder smoke, soot, or a flame.
+    const kind = seed.div(KIND_STEP).floor(), soot = kind.equal(PUFF_KIND.soot), flame = kind.greaterThanEqual(PUFF_KIND.flame);
     const alive = age.greaterThanEqual(0).and(age.lessThan(life));
     const t = max(age, 0);
     // Thrown out, stopped by the air, then with the wind, rising; wandering on its eddies.
@@ -137,7 +164,7 @@ export function makeSmokeMaterial(): MeshBasicNodeMaterial {
     const eddy = t.mul(EDDY).min(EDDY_MOST);
     const wave = (k: number) => sin(t.mul(turn).mul(EDDY_RATES[k]!).add(seed.mul(k + 1)));
     centre.addAssign(vec3(wave(0), wave(1).mul(EDDY_UP), wave(2)).mul(eddy).mul(t.min(EDDY_GROWN)));
-    const radius = th.w.add(sqrt(t).mul(SPREAD));
+    const radius = th.w.add(sqrt(t).mul(SPREAD).mul(select(flame, float(FLAME_SPREAD), select(soot, float(SOOT_SPREAD), float(1)))));
     // Its powder spread over its size; faded in, out at its end, and out where the eye is inside it.
     const spread = th.w.div(radius);
     const fade = smoothstep(float(0), float(FADE_IN), t).mul(oneMinus(smoothstep(life.mul(1 - FADE_OUT), life, t)));
@@ -155,7 +182,11 @@ export function makeSmokeMaterial(): MeshBasicNodeMaterial {
       lit.addAssign(select(since.greaterThanEqual(0), exp(since.div(-FLASH_DECAY)), float(0)).div(d.mul(d).add(1)));
     });
     vGlow.assign(against.mul(against).mul(AGAINST_SUN).add(1));
-    vLight.assign(vec3(...FLASH_COLOUR).mul(lit).mul(FLASH_LIGHT));
+    // A flame burns with its own light, yellow young and red as it dies.
+    const burnt = saturate(t.div(life));
+    const own = select(flame, mix(vec3(...FLAME_YOUNG), vec3(...FLAME_OLD), burnt).mul(oneMinus(burnt).mul(FLAME_LIGHT)), vec3(0));
+    vLight.assign(vec3(...FLASH_COLOUR).mul(lit).mul(FLASH_LIGHT).add(own));
+    vAlbedo.assign(select(flame, float(0), select(soot, float(SOOT_ALBEDO), float(ALBEDO))));
     passCorner(vCorner);
     vSeed.assign(seed);
     vDeep.assign(vec2(eye.z.negate(), radius));
@@ -181,7 +212,7 @@ export function makeSmokeMaterial(): MeshBasicNodeMaterial {
     const a = saturate(vDensity.mul(shape).mul(seen));
     const shade = mix(float(SHADED), float(1), saturate(n.dot(vSunSide).mul(1 / 2).add(1 / 2)));
     // The day's light is read here: the sky's map is sampled in the fragment stage only.
-    return vec4(daylight().mul(ALBEDO).mul(vGlow).add(vLight).mul(shade).mul(a), a);
+    return vec4(daylight().mul(vAlbedo).mul(vGlow).add(vLight).mul(shade).mul(a), a);
   });
 }
 
@@ -195,6 +226,22 @@ export function puffsPoured(plenty: number): { puffs: number; density: number } 
   return { puffs, density: 1 - (1 - DENSITY) ** (PUFFS / puffs) };
 }
 
+/** A fire's puff (`SmokeView.pourPuff`): its kind, where (world) and when, how thrown, how big, how long, how dense, how fast it rises, its scatter. */
+export interface FirePuff {
+  readonly kind: 'soot' | 'flame';
+  readonly at: readonly [number, number, number];
+  readonly t: number;
+  readonly throwing: readonly [number, number, number];
+  readonly radius: number;
+  readonly life: number;
+  readonly density: number;
+  readonly rise: number;
+  readonly seed: number;
+}
+
+/** Every puff drawn: the guns' ring and the fires'. */
+const ALL_PUFFS = MOST_PUFFS + FIRE_RINGS.short + FIRE_RINGS.long;
+
 /** Powder smoke drawn: the ring of puffs, from the sea's origin. */
 export class SmokeView {
   readonly mesh: Mesh;
@@ -203,6 +250,9 @@ export class SmokeView {
   private readonly throwOf: InstancedBufferAttribute;
   private readonly look: InstancedBufferAttribute;
   private next = 0;
+  /** The next puff of each fire ring (counted from its own start). */
+  private nextShort = 0;
+  private nextLong = 0;
   private lights = 0;
   private readonly rng = new Rng(SMOKE_SEED);
   private written = false;
@@ -212,13 +262,13 @@ export class SmokeView {
   constructor(material: Material) {
     const g = eyeQuad();
     [this.puff, this.throwOf, this.look] = [PUFF_ATTRIBUTE, PUFF_THROW, PUFF_LOOK].map((n) => {
-      const a = new InstancedBufferAttribute(new Float32Array(MOST_PUFFS * PUFF_STRIDE), PUFF_STRIDE);
+      const a = new InstancedBufferAttribute(new Float32Array(ALL_PUFFS * PUFF_STRIDE), PUFF_STRIDE);
       g.setAttribute(n, a);
       return a;
     }) as [InstancedBufferAttribute, InstancedBufferAttribute, InstancedBufferAttribute];
     const d = this.puff.array as Float32Array, l = this.look.array as Float32Array;
-    for (let i = 0; i < MOST_PUFFS; i++) { d[i * PUFF_STRIDE + W] = DEAD; l[i * PUFF_STRIDE + X] = 1; }
-    this.mesh = flownMesh(g, material, 'smoke', MOST_PUFFS, SMOKE_ORDER);
+    for (let i = 0; i < ALL_PUFFS; i++) { d[i * PUFF_STRIDE + W] = DEAD; l[i * PUFF_STRIDE + X] = 1; }
+    this.mesh = flownMesh(g, material, 'smoke', ALL_PUFFS, SMOKE_ORDER);
   }
 
   /** Once a frame: the clock `t`, the wind and the sea's `origin`; the flashes whose time has come pour their smoke and light it. */
@@ -227,6 +277,22 @@ export class SmokeView {
     if (dx !== 0 || dz !== 0) for (const f of SMOKE_INPUTS.flashes.array as Vector4[]) { f.x -= dx; f.z -= dz; }
     for (const f of flashes) this.pour(f, longSix(f) ? LONG_SIX_SHARE : 1);
     if (this.written) { this.puff.needsUpdate = this.throwOf.needsUpdate = this.look.needsUpdate = true; this.written = false; }
+  }
+
+  /**
+   * One puff of a fire (fireView.ts): soot or a flame, at `at` (world) at time `t`, thrown at `throwing` (m/s), its
+   * first radius (m), life (s), density young and how fast it rises (m/s); `seed` (0..KIND_STEP) its own scatter.
+   */
+  pourPuff(p: FirePuff): void {
+    const long = p.life > LONG_LIFE, o = this.origin;
+    const k = (long ? MOST_PUFFS + this.nextLong : MOST_PUFFS + FIRE_RINGS.long + this.nextShort) * PUFF_STRIDE;
+    if (long) this.nextLong = (this.nextLong + 1) % FIRE_RINGS.long;
+    else this.nextShort = (this.nextShort + 1) % FIRE_RINGS.short;
+    const pd = this.puff.array as Float32Array, pt = this.throwOf.array as Float32Array, pl = this.look.array as Float32Array;
+    pd[k + X] = p.at[X] - o.x; pd[k + Y] = p.at[Y] - o.y; pd[k + Z] = p.at[Z] - o.z; pd[k + W] = p.t;
+    pt[k + X] = p.throwing[X]; pt[k + Y] = p.throwing[Y]; pt[k + Z] = p.throwing[Z]; pt[k + W] = p.radius;
+    pl[k + X] = p.life; pl[k + Y] = PUFF_KIND[p.kind] * KIND_STEP + (p.seed % KIND_STEP); pl[k + Z] = p.density; pl[k + W] = p.rise;
+    this.written = true;
   }
 
   /** A gun's smoke poured out of her port along her bore, and her flash's light on it; `power`: her share of a carronade's. */
