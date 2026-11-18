@@ -1,0 +1,1 @@
+Behind the scenes: the walk-everywhere check really walks in the rolling force 6 sea again (it had lost the sea when the sailing model came), and the checking tools are now type-checked too.

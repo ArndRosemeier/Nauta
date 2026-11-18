@@ -18,8 +18,8 @@ import { BOWSPRIT_STEP } from '../../src/sim/rules/rig.ts';
 import { BODY, DOOR } from '../../src/sim/rules/ships.ts';
 import { EYE_BELOW_TOP } from '../../src/sim/rules/walking.ts';
 import { startSea } from '../../src/sim/sea/sea.ts';
-import { shipFrame, startMotion, stepMotion, toWorld, type ShipMotion } from '../../src/sim/ship/motion.ts';
-import { floorAt, holds, insideBreadth, overheadAt, shipPlan, type Space, type Spot, type Way } from '../../src/sim/ship/plan.ts';
+import { lyingStill, shipFrame, startMotion, stepMotion, toWorld, type ShipMotion } from '../../src/sim/ship/motion.ts';
+import { floorAt, holds, insideBreadth, overheadAt, shipPlan, type Spot, type Way } from '../../src/sim/ship/plan.ts';
 import { shipY } from '../../src/sim/ship/section.ts';
 import { WALK_CELL, nodeAt } from '../../src/sim/ship/walk.ts';
 import { rigObstacles, rigPlan, rigWalk } from '../../src/sim/ship/rig.ts';
@@ -46,6 +46,8 @@ const LOOK_AHEAD = 0.5;
 const STUCK_SECONDS = 8;
 /** On a ladder he keeps within this of its line (from the spot one stands at its foot to the one at its head), m. */
 const LADDER_ZONE = 0.9;
+/** She must roll at least this far beam-on in force 6 (about 10°), rad, or the check is not in the sea it claims. */
+const LEAST_ROLL = 5 * DEGREE;
 /** Beside the bowsprit's inboard part, m out from it. */
 const BESIDE_BOWSPRIT = 0.5;
 
@@ -53,7 +55,7 @@ const plan = shipPlan(), graph = rigWalk(plan), planWays = new Set(plan.ways.map
 const spaces = new Map(plan.spaces.map((s) => [s.id, s]));
 const sea = startSea(SEED, { speed: beaufortSpeed(DUEL_FORCES.most), toward: WIND_TOWARD }, 0);
 let motion: ShipMotion = startMotion(0, 0, HEADING), t = 0;
-const course = { heading: HEADING, speed: 0 };
+const course = lyingStill(HEADING);
 const start = plan.stations.find((s) => s.id === 'quarterdeck')!;
 const captain = new Captain(plan, graph, start);
 const failures: string[] = [];
@@ -143,7 +145,9 @@ function checkClimbing(way: Way): void {
 function step(intent: { forward: number; strafe: number; heading: number }, planned: Way | null = null): void {
   motion = stepMotion(motion, sea, t, course);
   t += STEP_SECONDS;
-  worstRoll = Math.max(worstRoll, Math.abs(motion.pose.roll));
+  const p = motion.pose;
+  if (![p.x, p.z, p.heave, p.heading, p.pitch, p.roll].every(Number.isFinite)) { fail('her pose is not a number: the check is not at sea'); return; }
+  worstRoll = Math.max(worstRoll, Math.abs(p.roll));
   captain.update(intent, upOf(), STEP_SECONDS);
   const way = captain.ladder;
   if (way && way !== planned) { if (!unasked) fail(`climbed ${way.id} unasked at ${at(captain.spot)}`); unasked = true; }
@@ -293,6 +297,7 @@ else for (const goal of forward) if (walkTo(goal, `the bowsprit's side at ${at(g
 const ladders = plan.ways.filter((w) => w.kind === 'ladder');
 const climbedBoth = ladders.filter((l) => crossed.filter((c) => c.startsWith(`${l.id} `)).length >= 2).length;
 const spacesSeen = new Set([...seenNode].map((n) => graph.nodes[n]!.space));
+if (worstRoll < LEAST_ROLL) fail(`she rolled only ${(worstRoll / DEGREE).toFixed(1)}°: not the strongest duel sea beam-on`);
 if (seenNode.size < deckNodes.length) fail(`stood in ${seenNode.size} of ${deckNodes.length} parts of her spaces`);
 if (crossed.length < deckEdges.length * 2) fail(`crossed ${crossed.length} of ${deckEdges.length * 2} ways`);
 console.log(`walk everywhere: force ${DUEL_FORCES.most} beam-on, rolling up to ${(worstRoll / DEGREE).toFixed(1)}°; ${(t / 60).toFixed(1)} simulated minutes in ${((performance.now() - t0) / 1000).toFixed(1)} s`);

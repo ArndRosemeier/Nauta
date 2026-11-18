@@ -19,7 +19,7 @@ const out = process.argv[2] ?? 'docs/design/ship';
 const plan = shipPlan();
 const S = 34; // px per metre
 const PAD = 60;
-const INK = '#2b2b2b', MUTED = '#8a8a8a', PAPER = '#f7f4ee', WATER = '#4f7fa8', HULL = '#e8d9bf', ROOM = '#f3ead8';
+const INK = '#2b2b2b', MUTED = '#8a8a8a', PAPER = '#f7f4ee', WATER = '#4f7fa8', HULL = '#e8d9bf';
 const LEVEL_FILL: Record<string, string> = { weather: '#efe3cb', berth: '#f3ead8', hold: '#e2d2b0' };
 const X = (along: number) => PAD + (along - HULL_AFT) * S;
 const W = Math.ceil((HULL_FORE - HULL_AFT) * S + 2 * PAD);
