@@ -12,6 +12,7 @@
     "src/app/settings.ts",
     "src/app/words.ts",
     "src/app/orderReport.ts",
+    "src/app/speech",
     "src/app/pageMatch.ts",
     "src/app/glass.ts",
     "src/app/crew.ts",

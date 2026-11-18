@@ -633,3 +633,4 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A part of the sound (ship, crew, battle) at the player's level | `src/audio/channel.ts#Channel` |
 | The walking keys from one key a direction (arrows always walk) | `src/app/thumbs.ts#walkKeys` |
 | The interface's look: colours, type, the sheet, buttons, choices, sliders (every panel's CSS) | `src/ui/nauta.css` |
+| Who speaks in a bubble, where his head is and his mouth moving (the drawing puts its men there; N4.5) | `src/app/speech/speakers.ts#Speakers` |
