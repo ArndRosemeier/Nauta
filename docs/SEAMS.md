@@ -8,7 +8,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The direction looked along | `src/app/look.ts#lookDir` |
 | Reading the page's address (`?hud`, `?hour=`, `?eye=`, `?wind=`, `?yaw=`, `?pitch=`) | `src/app/params.ts#readParams` |
 | Defining a material (every shader the game draws with; the registry is `@futuremagic/stage` Kinds) | `src/render/materials.ts#defineKind` |
-| Renderer, scene, camera and the Stage | `src/render/view.ts#createView` |
+| Renderer, scene, camera and the Stage; the share of the device's pixels drawn (render scale) | `src/render/view.ts#createView` |
 | Sun, moon, stars and clouds through the day, and the light they throw (the light rig MasterWorld shares: `@futuremagic/sky/rig` SkyRig, its numbers in `@futuremagic/sky` light.ts) | `src/render/skyView.ts#SkyView` |
 | The light rig's test bodies (`?rig`): matte balls of known albedo | `src/render/testBodies.ts#makeTestBodies` |
 | Units of time and angle | `src/sim/units.ts#HOURS_PER_DAY` |
@@ -141,3 +141,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | No water drawn inside her hull | `src/render/seaCut.ts#seaCut` |
 | The ship drawn and riding the sea, the eye carried with her | `src/render/ship/shipView.ts#ShipView` |
 | The sun's shadow map round her | `src/render/ship/shipView.ts#shadowingSun` |
+| Every knob that trades looks for frame time, by quality level (a package that costs frame time adds its knob here) | `src/app/quality.ts#QUALITY_LEVELS` |
+| Choosing the quality level from measured frame time in the first seconds (`?quality=` fixes one) | `src/app/quality.ts#QualityChooser` |
+| The triangles of a sea tile's grid at a density (every second or fourth vertex of the densest) | `src/render/seaGrid.ts#seaTileTriangles` |
+| The densities a sea tile's grid can be drawn at | `src/render/seaGrid.ts#seaCellChoices` |
