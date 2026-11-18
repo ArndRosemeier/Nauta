@@ -123,7 +123,8 @@ interface Stand { readonly along: number; readonly across: number; readonly heig
 
 /**
  * Where each man of the roster stands at his post when the match has him there: the first man of each post on it,
- * then the others on the nearest clear points about theirs (`AROUND`, along the side first), each a step from every man placed
+ * then the others on the nearest clear points about theirs (`AROUND`, along the side first; those who share the
+ * captain's post 2 m from him), each a step from every man placed
  * before him (some places of her plan lie closer than that: a pin beside a gun's place). Worked out once: the roster
  * and her plan do not change. Aloft a man keeps his place (the places on a yard are its own).
  */
@@ -131,8 +132,11 @@ function postSpots(): Map<number, Stand> {
   if (posted) return posted;
   const net = routeNetwork(), roster = brigRoster(), out = new Map<number, Stand>(), taken: Spot[] = [], first = new Set<string>();
   const clear = (p: Spot, gap: number) => taken.every((t) => floorApart(t, p) >= gap - TINY);
+  const captain = placeSpot(roster[CAPTAIN]!.post);
   const put = (i: number) => {
     const spot = placeSpot(roster[i]!.post), inboard = spot.across >= 0 ? -1 : 1, aloft = net.surfaces.get(spot.space);
+    // The officers who share his post keep their distance from the captain (the quarterdeck is his: design ruling 2026-11-18).
+    const room = i !== CAPTAIN && roster[i]!.post === roster[CAPTAIN]!.post ? CAPTAIN_ROOM : 0;
     // On a yard the places are its own; in a top or on the crosstrees, the men a half step apart round the place.
     if (aloft && aloft.kind !== 'top' && aloft.kind !== 'crosstrees') return;
     for (const gap of aloft ? [SPREAD / 2] : [SPREAD, SPREAD / 2]) {
@@ -141,7 +145,7 @@ function postSpots(): Map<number, Stand> {
         const p = { space: spot.space, along: spot.along + f * gap, across: spot.across + inboard * k * gap };
         // His own place is where the match has him, standable or not (a pin at the rail); the others must be clear deck.
         if ((f !== 0 || k !== 0) && !standable(net, p, [])) continue;
-        if (!clear(p, gap)) continue;
+        if (!clear(p, gap) || floorApart(captain, p) < room - TINY) continue;
         taken.push(p);
         out.set(i, { along: p.along, across: p.across, height: heightAt(net, p) });
         return;
@@ -154,6 +158,9 @@ function postSpots(): Map<number, Stand> {
   return (posted = out);
 }
 let posted: Map<number, Stand> | null = null;
+/** The captain is the first man of the roster; the men who share his post stand at least this far from him, m. */
+const CAPTAIN = 0;
+const CAPTAIN_ROOM = 2;
 /** In a top, the men stand within this many half steps of their place (a top is about 3 m across). */
 const TOP_STEPS = 2;
 /** Slack for points on the grid's steps, m. */

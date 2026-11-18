@@ -10,7 +10,7 @@
 import { ROSTER, type Part } from '../rules/crew';
 import { deepFreeze, shipPlan, bareSpot, type CrewPlace, type Spot } from '../ship/plan';
 import { rigPlan } from '../ship/rig';
-import { sideLetter } from '../ship/spars';
+import { SIDES, sideLetter } from '../ship/spars';
 
 /** One man of the roster. */
 export interface Man {
@@ -21,6 +21,8 @@ export interface Man {
   readonly post: string;
   /** The gun he is stationed at (its plan id), or null. */
   readonly gun: string | null;
+  /** Where he goes at quarters when he is at no gun (rules/crew.ts `quarters`; `*` the side she fights), or null: his post. */
+  readonly quarters: string | null;
 }
 
 let places: ReadonlyMap<string, CrewPlace> | null = null;
@@ -70,7 +72,8 @@ export function brigRoster(): readonly Man[] {
   for (const row of ROSTER) {
     for (let k = 0; k < row.count; k++) {
       if (row.posts !== 'guns') {
-        men.push({ rank: row.rank, part: row.part, skill: row.skill, post: row.posts[k % row.posts.length]!, gun: null });
+        const quarters = row.quarters ? row.quarters[k % row.quarters.length]! : null;
+        men.push({ rank: row.rank, part: row.part, skill: row.skill, post: row.posts[k % row.posts.length]!, gun: null, quarters });
         continue;
       }
       // Round the pairs, skipping any whose places are all taken.
@@ -79,13 +82,19 @@ export function brigRoster(): readonly Man[] {
       const place = free.get(pair)!.shift();
       if (!place) throw new Error('more men posted at the guns than the guns have places');
       next++;
-      men.push({ rank: row.rank, part: row.part, skill: row.skill, post: place.place, gun: place.gun });
+      men.push({ rank: row.rank, part: row.part, skill: row.skill, post: place.place, gun: place.gun, quarters: null });
     }
   }
-  for (const m of men) placeSpot(m.post);
+  for (const m of men) {
+    placeSpot(m.post);
+    for (const side of SIDES) if (m.quarters) placeSpot(atQuartersOf(m.quarters, side));
+  }
   built = deepFreeze(men);
   return built;
 }
+
+/** A man's place at quarters at no gun (`Man.quarters`) with her fighting `side` (+1 starboard, -1 larboard). */
+export const atQuartersOf = (quarters: string, side: number): string => quarters.replace('*', sideLetter(side));
 
 /** A man's place in his gun's crew (1 the gun captain), from his post `gun-<gun>-<k>`; 0 for a man not at a gun. */
 const gunPlace = (m: Man): number => (m.gun === null ? 0 : Number(m.post.slice(m.post.lastIndexOf('-') + 1)));

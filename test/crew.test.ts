@@ -12,10 +12,12 @@ import { encode } from '../src/sim/codec.ts';
 import { openShip } from '../src/sim/crew/closures.ts';
 import { startCrew, stepCrew, taskOf, type Crew } from '../src/sim/crew/crew.ts';
 import { jobWork } from '../src/sim/crew/drill.ts';
-import { brigRoster, crewPlaces } from '../src/sim/crew/roster.ts';
+import { atQuartersOf, brigRoster, crewPlaces, placeSpot } from '../src/sim/crew/roster.ts';
 import type { Order } from '../src/sim/orders.ts';
 import { COMPLEMENT, FEWEST, GANGS, JOBS, ROSTER } from '../src/sim/rules/crew.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
+import { SIDES } from '../src/sim/ship/spars.ts';
+import { BREAKS } from '../src/sim/rules/ships.ts';
 import { decodeState, encodeState, startMatch } from '../src/sim/state.ts';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { drive, fullCrewOrder, give, MOST_SECONDS, short, skillOf, startSail, startTold } from './support/crew.ts';
@@ -25,8 +27,8 @@ import { duelSetup } from './support/match.ts';
 const STATE_BYTES = 16 * 1024;
 /** Long enough for the men sent first for plain sail to reach their places (the most are on their way about 3 s in), s. */
 const BUSY_SECONDS = 8;
-/** Long enough for the men of a job to be at their places, s. */
-const WAIT_SECONDS = 10;
+/** Long enough for the men of a job to be at their places (a marine from the cabin door below too), s. */
+const WAIT_SECONDS = 15;
 
 test('the roster is the brig\'s 121, every man posted at a crew place of the plan, the guns\' men each at a place of his own', () => {
   const roster = brigRoster(), places = crewPlaces();
@@ -40,6 +42,26 @@ test('the roster is the brig\'s 121, every man posted at a crew place of the pla
   const pairs = new Set(shipPlan().guns.map((g) => g.id.slice(0, -1)));
   for (const pair of pairs) assert.ok(atGuns.filter((m) => m.gun!.slice(0, -1) === pair).length >= 2, `pair ${pair} manned`);
   for (const gang of Object.values(GANGS)) for (const part of [gang.aloft, ...gang.deck]) if (part) assert.ok(roster.some((m) => m.part === part), part);
+});
+
+test('the marines stand as ruled: two sentries aft, one at the cabin door, the rest below or in the waist; at quarters two aft, six aloft, six forward, five on the engaged side', () => {
+  const marines = brigRoster().filter((m) => m.rank.endsWith('of marines'));
+  assert.equal(marines.length, 19);
+  const count = (at: (m: (typeof marines)[number]) => string, pred: (p: string) => boolean): number => marines.filter((m) => pred(at(m))).length;
+  // Before quarters.
+  assert.equal(count((m) => m.post, (p) => p === 'station-sentries'), 2);
+  assert.equal(count((m) => m.post, (p) => p === 'station-cabin-door'), 1);
+  assert.equal(count((m) => m.post, (p) => p === 'station-marines-waist' || p === 'station-marines-below'), 16);
+  // Nobody of them is posted on the quarterdeck but the two sentries aft.
+  assert.equal(count((m) => m.post, (p) => placeSpot(p).space === 'deck' && placeSpot(p).along <= BREAKS.quarterdeck), 2);
+  // At quarters, on either side.
+  for (const side of SIDES) {
+    const at = (m: (typeof marines)[number]) => (m.quarters === null ? m.post : atQuartersOf(m.quarters, side));
+    assert.equal(count(at, (p) => p === 'station-sentries'), 2, 'two stay aft');
+    assert.equal(count(at, (p) => p.startsWith('top-')), 6, 'six to the tops');
+    assert.equal(count(at, (p) => p === 'station-forecastle'), 6, 'six to the forecastle');
+    assert.equal(count(at, (p) => p === (side > 0 ? 'station-marines-s' : 'station-marines-p')), 5, 'five along the engaged side');
+  }
 });
 
 test('an order done by a full crew takes the time in the table once its men are there, and none is short-handed', () => {

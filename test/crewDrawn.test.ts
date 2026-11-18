@@ -40,6 +40,15 @@ test('at their posts every man is drawn somewhere of his own, playing a motion o
   }
 });
 
+test('the men who share the captain\'s post stand clear of him', () => {
+  const men = drawnAll(ship, ship), captain = men[0]!, room = 2;
+  roster.forEach((m, i) => {
+    if (i === 0 || m.post !== roster[0]!.post) return;
+    const d = men[i]!;
+    assert.ok(Math.hypot(d.x - captain.x, d.z - captain.z) >= room - 0.05, `${m.rank} ${i} is ${Math.hypot(d.x - captain.x, d.z - captain.z).toFixed(2)} m from the captain`);
+  });
+});
+
 test('making sail, men on their way walk or run and men at work play their job\'s motion; between two steps they are between', () => {
   const sailing = startSail(), told = give(startTold(), sailing, { kind: 'sail', ship: 0, canvas: 'plain' });
   let crew: Crew = ship.crew, before = crew;

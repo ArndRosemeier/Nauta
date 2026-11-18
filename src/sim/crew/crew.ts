@@ -22,7 +22,7 @@ import type { Closures } from './closures';
 import { goingAt, goingRoute, startGoing, stepGoings, type Going } from './going';
 import { heightAt, lineLength, routeNetwork } from './network';
 import { drill, isRepair, jobLeft, jobWork, shareAt, type Job, type JobWork } from './drill';
-import { billOrder, brigRoster, placeSpot, quartersPlace, type Man } from './roster';
+import { atQuartersOf, billOrder, brigRoster, placeSpot, quartersPlace, type Man } from './roster';
 import { rigPlan } from '../ship/rig';
 import { SIDES } from '../ship/spars';
 
@@ -150,12 +150,15 @@ function target(i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Ta
 }
 
 /**
- * Where a man with no task goes: his post; at quarters, a gun's man stands to his pair's gun on the side she fights
+ * Where a man with no task goes: his post; at quarters, a man at no gun to his place at quarters (`Man.quarters`), a gun's man stands to his pair's gun on the side she fights
  * (roster.ts `quartersPlace`), at his post when she fights both sides (his pair split), and where he stands or is
  * going while neither side bears, if that is at one of his pair's guns.
  */
 function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged | undefined): string {
-  const post = roster[i]!.post;
+  const post = roster[i]!.post, marine = roster[i]!.quarters;
+  // A man at no gun with a place at quarters (the marines): there, on the side she fights; while neither or both
+  // sides bear, the men take the sides in turn.
+  if (quarters !== undefined && marine !== null) return atQuartersOf(marine, typeof quarters === 'number' ? quarters : SIDES[i % SIDES.length]!);
   if (quarters === undefined || quarters === 'both' || roster[i]!.gun === null) return post;
   if (quarters !== 'none') return quartersPlace(i, quarters, roster) ?? post;
   const at = h.going?.path.to ?? h.stands;
