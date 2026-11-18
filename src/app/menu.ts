@@ -24,6 +24,7 @@ import type { SettingsMenu } from './settingsPanel';
 import { choiceRow, row } from './settingsPanel';
 import type { SettingsStore } from './settingsStore';
 import { endCard, Tally, type Ending } from './tally';
+import { FIRST_HOUR, FIRST_MATCH } from './lessons';
 import {
   HOUR_AT, HOURS, hourOf, LENGTHS, MATCH_DAY_MINUTES, matchMinutes, NAVIES, newSeed, NO_LIMIT, otherNavy, readSeed, readTerms, startTerms,
   type HourChoice, type MatchTerms, type Navy,
@@ -80,12 +81,15 @@ export interface MenuHooks {
   sky(hour: number, dayMinutes: number): void;
   /** The match's clock stopped (the pause, alone) or running on. */
   pause(on: boolean): void;
+  /** The first lieutenant's lessons (plan N7.4) begin in this session, or end (null: any other match). */
+  firstCommand(session: DuelSession | null): void;
 }
 
 /** What is played now. */
 type Playing =
   | { readonly kind: 'quiet' }
   | { readonly kind: 'walk' }
+  | { readonly kind: 'first' }
   | { readonly kind: 'alone'; readonly terms: MatchTerms; readonly seed: number }
   | { readonly kind: 'duel'; readonly session: DuelSession };
 
@@ -147,6 +151,7 @@ export class Menu {
     this.tally.reset();
     this.playing = playing;
     this.h.match.useSession(s);
+    this.h.firstCommand(playing.kind === 'first' ? s : null);
   }
 
   /** Her alone at sea on a quiet morning, hove to: the sea behind the main screen. */
@@ -196,6 +201,7 @@ export class Menu {
         b.append(make('small', '', say[help]));
         choices.append(b);
       };
+      choice('firstCommand', 'firstCommandHelp', () => this.first());
       choice('fightAlone', 'fightAloneHelp', () => this.setup('alone'), true);
       choice('hostDuel', 'hostDuelHelp', () => this.setup('host'));
       choice('joinDuel', 'joinDuelHelp', () => this.joinScreen());
@@ -270,6 +276,14 @@ export class Menu {
       : new DuelSession({ build: this.h.build, now: this.h.now, seed, alone: true, terms: startTerms(t), minutes: QUIET_MINUTES });
     this.run(s, kind === 'alone' ? { kind, terms: t, seed } : { kind });
     this.h.sky(hourOf(t.hour, seed), MATCH_DAY_MINUTES);
+    this.aboard();
+  }
+
+  /** Your first command (plan N7.4): always the same match, the first lieutenant leading, a green captain waiting hove to. */
+  private first(): void {
+    const s = new DuelSession({ ...FIRST_MATCH, build: this.h.build, now: this.h.now });
+    this.run(s, { kind: 'first' });
+    this.h.sky(FIRST_HOUR, MATCH_DAY_MINUTES);
     this.aboard();
   }
 
@@ -413,7 +427,7 @@ export class Menu {
 
   /** The fight is over: after the quiet moment on deck, the end card. */
   private fightOver(): void {
-    if (this.playing.kind !== 'alone' && this.playing.kind !== 'duel') return;
+    if (this.playing.kind === 'quiet' || this.playing.kind === 'walk') return;
     clearTimeout(this.endTimer);
     this.endTimer = window.setTimeout(() => this.endScreen(), END_QUIET_MS);
   }
@@ -421,7 +435,7 @@ export class Menu {
   /** The end card: how it ended, how long it lasted, a few numbers for each ship; again, or back. */
   private endScreen(): void {
     const p = this.playing, found = endCard(this.h.match.state, this.h.match.ship, this.tally);
-    if (!found || (p.kind !== 'alone' && p.kind !== 'duel')) return;
+    if (!found || p.kind === 'quiet' || p.kind === 'walk') return;
     const card = found;
     const drawScreen = () => {
       const say = this.wordsNow;
@@ -439,8 +453,8 @@ export class Menu {
       line('shotStruck', (n) => n.struck);
       line('menLost', (n) => n.men);
       line('sparsDown', (n) => n.spars);
-      const again = menuButton('nt-button menu-go', say.again, () => { if (p.kind === 'alone') this.sail('alone', true); });
-      if (p.kind !== 'alone') { again.disabled = true; again.classList.add('coming'); }
+      const again = menuButton('nt-button menu-go', say.again, () => { if (p.kind === 'alone') this.sail('alone', true); else if (p.kind === 'first') this.first(); });
+      if (p.kind === 'duel') { again.disabled = true; again.classList.add('coming'); }
       const back = menuButton('nt-button', say.back, () => this.main());
       const foot = make('div', 'menu-sheet-foot');
       foot.append(back, again);

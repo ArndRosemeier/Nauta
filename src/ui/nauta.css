@@ -279,6 +279,21 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .nt-steer-mark { position: fixed; z-index: 14; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; box-sizing: border-box; border: 2px solid var(--brass); border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 1px #0008, inset 0 0 0 1px #0008; }
 .nt-steer-mark::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: var(--brass); }
 
+/* ---------- The first match's lessons (src/app/firstCommand.ts, plan N7.4) ----------
+ * The man the first lieutenant asks him to tap wears a still brass ring (his rank at the screen's edge when he is out
+ * of view); the order to choose in his fan, the glass's tag and the large "Fire!" carry a brass ring outside their own.
+ * Nothing moves but with the man. */
+.nt-lesson-ring {
+  position: fixed; z-index: 6; left: 0; top: 0; width: 76px; height: 76px; box-sizing: border-box; pointer-events: none; will-change: transform;
+  border: 2px solid var(--brass); border-radius: 50%; box-shadow: 0 0 0 1px #0009, inset 0 0 0 1px #0009, 0 0 0 5px var(--brass-faint);
+}
+.nt-lesson-edge { position: fixed; z-index: 6; margin-top: -26px; pointer-events: none; color: var(--brass); font: 400 17px/1 var(--title-font); letter-spacing: 0.1em; text-transform: uppercase; }
+.nt-lesson-ring[hidden], .nt-lesson-edge[hidden], .nt-lesson-skip[hidden] { display: none; }
+.nt-fan-tag.lesson:not(.under), #glass-button.lesson, .nt-fire.lesson { box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-faint), 0 0 0 3px var(--lacquer), 0 0 0 6px var(--brass), 0 4px 12px #0008; }
+.nt-fan-tag.lesson:not(.under) { border-color: var(--brass-line); color: var(--brass); }
+.nt-lesson-skip { position: fixed; z-index: 10; margin: 0; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); background: var(--lacquer-over); color: var(--ivory); }
+body.in-menu .nt-lesson-ring, body.in-menu .nt-lesson-edge, body.in-menu .nt-lesson-skip { display: none; }
+
 /* ---------- The menu (src/app/menu.ts, plan N7.2, docs/design/menu.md) ---------- */
 /* The main screen sits over the live view (her quarterdeck at sea): the name on its plate, four choices largest first,
    the version and the language in the foot's corners. It holds the finger, so no tap behind it walks or opens a fan. */

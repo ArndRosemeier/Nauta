@@ -136,7 +136,9 @@ export class OfficersView {
     return this.drawn.map((d) => {
       this.at.set(0, CHEST, 0).applyMatrix4(d.place.matrixWorld).project(camera);
       const seen = d.place.visible && this.at.z > -1 && this.at.z < 1 && Math.abs(this.at.x) <= 1 && Math.abs(this.at.y) <= 1;
-      return { who: d.who, x: ((this.at.x + 1) / 2) * width, y: ((1 - this.at.y) / 2) * height, seen };
+      // Behind the eye the projection turns over: his side is the other one.
+      const left = this.at.z > 1 ? this.at.x > 0 : this.at.x < 0;
+      return { who: d.who, x: ((this.at.x + 1) / 2) * width, y: ((1 - this.at.y) / 2) * height, seen, left };
     });
   }
 

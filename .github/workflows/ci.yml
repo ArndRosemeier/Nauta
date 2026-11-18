@@ -155,6 +155,8 @@ jobs:
       - run: npm ci
       - name: Computer captains fight duels to the end; each closes, fires and strikes when beaten, and no order of his is refused (N7.1)
         run: node tools/guards/budget.mjs 120 180 -- npm run check:captains
+      - name: A novice plays the first match doing only what the first lieutenant asks; every lesson comes and is done (N7.4)
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:first
       - name: All slow checks together within the job's 10 minutes
         if: always()
         run: node tools/guards/budget.mjs --sum 600

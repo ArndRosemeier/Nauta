@@ -89,7 +89,15 @@ export interface DuelOptions {
   readonly terms?: StartTerms;
   /** A match played alone with her alone at sea, no enemy (menu.md, "Walk the ship"). */
   readonly alone?: boolean;
+  /**
+   * A match played alone against `foe`: his ship lies hove to and he gives no orders until `wakeFoe()`; then she fills
+   * and he commands her (the first match, plan N7.4: she waits while the first lieutenant teaches sailing).
+   */
+  readonly foeWaits?: boolean;
 }
+
+/** Where the computer captain of a match played alone stands: to heave to (and wait), waiting hove to, to fill, or commanding. */
+type FoeState = 'heave' | 'hove' | 'fill' | 'awake';
 
 /** What the page draws: her pose between two steps, `f` of the way from `from` to `to`, at the match's time `time` (s). */
 export interface Drawn {
@@ -121,6 +129,7 @@ export class DuelSession {
   private readonly build: string;
   /** The computer captain of the other ship of a match played alone, or null. */
   private readonly foe: Skill | null;
+  private foeState: FoeState;
   /** The length of a match this machine starts, minutes, or undefined for the rules' own. */
   private readonly minutes: number | undefined;
   /** The wind and the meeting of a match this machine starts. */
@@ -151,6 +160,7 @@ export class DuelSession {
     this.now = options.now;
     this.build = options.build;
     this.foe = options.foe ?? null;
+    this.foeState = options.foeWaits ? 'heave' : 'awake';
     this.minutes = options.minutes;
     this.terms = options.terms ?? {};
     if (!this.hub) {
@@ -246,6 +256,17 @@ export class DuelSession {
     }
   }
 
+  /** The computer captain who waits (`foeWaits`) fills and fights from the next step on; nothing when he is awake already. */
+  wakeFoe(): void {
+    if (this.foeState === 'heave') this.foeState = 'awake';
+    else if (this.foeState === 'hove') this.foeState = 'fill';
+  }
+
+  /** Whether the computer captain still waits for `wakeFoe`. */
+  get foeWaiting(): boolean {
+    return this.foeState === 'heave' || this.foeState === 'hove';
+  }
+
   /** Runs the match up to the clock: a host steps it, a guest runs on through the host's orders. Call it every frame. */
   pump(): void {
     if (!this.known) return;
@@ -319,6 +340,16 @@ export class DuelSession {
     if (this.state.tick < target) { this.baseTick = this.state.tick; this.baseTime = this.now(); }
   }
 
+  /** The computer captain's orders for this step: hove to and waiting first when he waits (`foeWaits`), then his own. */
+  private foeOrders(foe: Skill): Order[] {
+    switch (this.foeState) {
+      case 'heave': this.foeState = 'hove'; return [{ kind: 'heave', ship: FOE_SHIP }];
+      case 'hove': return [];
+      case 'fill': this.foeState = 'awake'; return [{ kind: 'fill', ship: FOE_SHIP }];
+      case 'awake': return captainOrders(this.state, FOE_SHIP, foe);
+    }
+  }
+
   /** The tick of the host's last snapshot. */
   private snapshotTick = -Infinity;
   /** A guest's: the host's hashes not yet reached, by tick; whether it has asked for the host's state. */
@@ -331,7 +362,7 @@ export class DuelSession {
     for (const t of taken) this.acks.set(t.player, Math.max(t.seq, this.acks.get(t.player) ?? 0));
     const orders = taken.map((t) => t.order);
     // Played alone against a computer captain, his orders are stepped with the player's (sim/captain).
-    if (this.foe && this.role === 'solo') orders.push(...captainOrders(this.state, FOE_SHIP, this.foe));
+    if (this.foe && this.role === 'solo') orders.push(...this.foeOrders(this.foe));
     if (orders.length) this.stepped.push({ tick, orders });
     this.advance(orders);
     if (!this.hub) { this.stepped = []; return; }

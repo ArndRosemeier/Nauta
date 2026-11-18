@@ -175,7 +175,12 @@ export interface ManOnScreen {
   readonly x: number;
   readonly y: number;
   readonly seen: boolean;
+  /** Out of view: whether he is to the left of the look (turn left to see him). */
+  readonly left?: boolean;
 }
+
+/** Officer `who` among the men on the view (undefined: not drawn). */
+export const manOnScreen = (men: readonly ManOnScreen[], who: Officer): ManOnScreen | undefined => men.find((m) => m.who === who);
 
 /** The man nearest a point on the screen within `reach` px of him, or null. */
 export function manAt(men: readonly ManOnScreen[], x: number, y: number, reach: number): Officer | null {

@@ -23,10 +23,11 @@ import type { Line, Term } from './phrases';
 import type { Voice } from './speakers';
 
 /**
- * What kind of thing is said: an answer to the captain's order, the order passed down the chain, a report, or a cry
- * in danger (larger, with a sound, the only kind that may interrupt another bubble).
+ * What kind of thing is said: an answer to the captain's order, the order passed down the chain, a report, a cry
+ * in danger (larger, with a sound, the only kind that may interrupt another bubble), or the first lieutenant teaching
+ * a new captain in his first match (plan N7.4, app/lessons.ts: read longer, never dropped as soon as a report).
  */
-export type SayKind = 'answer' | 'pass' | 'report' | 'cry';
+export type SayKind = 'answer' | 'pass' | 'lesson' | 'report' | 'cry';
 
 /** One thing a man says. */
 export interface Say {

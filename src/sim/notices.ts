@@ -51,7 +51,7 @@ const ABEAM = Math.PI / 2;
 const SIDES = [[0, -1], [1, 1]] as const;
 
 /** Her bearing off ship `ship`'s bow, rad (+ starboard), and whether there is another ship at all. */
-function herOff(s: SimState, ship: number): number | null {
+export function herOff(s: SimState, ship: number): number | null {
   const other = s.ships[1 - ship];
   if (s.ships.length < 2 || !other) return null;
   const me = s.ships[ship]!.motion.pose, her = other.motion.pose;
