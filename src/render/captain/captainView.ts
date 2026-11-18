@@ -189,10 +189,10 @@ export class CaptainView {
     g.L!.w = 0; g.R!.w = 0; g.curlW = 0;
     const hold = body.hold;
     if (hold) {
-      const hand = g[hold.side]!, [x, y, z] = hold.at.point, rail = hold.at.kind === 'rail';
-      this.world(hand.p.set(x, y + (rail ? OVER_RAIL : -UNDER_BEAM), z));
+      const hand = g[hold.side]!, [x, y, z] = hold.at.point, kind = hold.at.kind;
+      this.world(hand.p.set(x, y + (kind === 'rail' ? OVER_RAIL : kind === 'beam' ? -UNDER_BEAM : 0), z));
       hand.w = hold.w;
-      hand.pole = rail ? RAIL_POLE : BEAM_POLE;
+      hand.pole = kind === 'beam' ? BEAM_POLE : RAIL_POLE;
       g.curlW = hold.w;
     }
     return g;

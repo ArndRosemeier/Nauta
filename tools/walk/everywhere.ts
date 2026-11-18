@@ -27,8 +27,12 @@ import { doorAngle, doorLeaves, doorPasses, type DoorLeaf } from '../../src/sim/
 import { spotOf, underDoorHead } from '../../src/sim/ship/deckWalk.ts';
 import { DEGREE, STEP_SECONDS } from '../../src/sim/units.ts';
 import { Captain } from '../../src/app/captain.ts';
+import { aloftTour } from './aloft.ts';
+import { surfaceOf } from '../../src/sim/ship/aloftWalk.ts';
 
 const LOG = process.argv.includes('--log');
+/** The tour aloft only (N3.11): `--aloft`. */
+const ALOFT_ONLY = process.argv.includes('--aloft');
 const SEED = 1805;
 /** She lies beam-on to the strongest duel sea, rolling hardest; she has no way on yet (sailing comes with N3.3). */
 const WIND_TOWARD = 0.4;
@@ -51,7 +55,7 @@ const LEAST_ROLL = 5 * DEGREE;
 /** Beside the bowsprit's inboard part, m out from it. */
 const BESIDE_BOWSPRIT = 0.5;
 
-const plan = shipPlan(), graph = rigWalk(plan), planWays = new Set(plan.ways.map((w) => w.id)), solids = [...plan.obstacles, ...rigObstacles(rigPlan(plan))];
+const plan = shipPlan(), graph = rigWalk(plan), rig = rigPlan(plan), planWays = new Set(plan.ways.map((w) => w.id)), solids = [...plan.obstacles, ...rigObstacles(rigPlan(plan))];
 const spaces = new Map(plan.spaces.map((s) => [s.id, s]));
 const sea = startSea(SEED, { speed: beaufortSpeed(DUEL_FORCES.most), toward: WIND_TOWARD }, 0);
 let motion: ShipMotion = startMotion(0, 0, HEADING), t = 0;
@@ -141,17 +145,21 @@ function checkClimbing(way: Way): void {
   last = null;
 }
 
-/** One step of her and of him. */
-function step(intent: { forward: number; strafe: number; heading: number }, planned: Way | null = null): void {
+/** One step of her and of him; `pitch`: how far he looks up (on a top: up the shrouds or down over the rim). */
+function step(intent: { forward: number; strafe: number; heading: number }, planned: Way | null = null, pitch = 0): void {
   motion = stepMotion(motion, sea, t, course);
   t += STEP_SECONDS;
   const p = motion.pose;
   if (![p.x, p.z, p.heave, p.heading, p.pitch, p.roll].every(Number.isFinite)) { fail('her pose is not a number: the check is not at sea'); return; }
   worstRoll = Math.max(worstRoll, Math.abs(p.roll));
-  captain.update(intent, upOf(), STEP_SECONDS);
+  captain.update(intent, upOf(), STEP_SECONDS, pitch);
   const way = captain.ladder;
   if (way && way !== planned) { if (!unasked) fail(`climbed ${way.id} unasked at ${at(captain.spot)}`); unasked = true; }
-  if (way) checkClimbing(way); else checkWalking();
+  if (captain.aloft.active && !aloft.asked) { if (!unasked) fail(`went aloft unasked at ${at(spotOf(captain.walker))}`); unasked = true; }
+  if (way) checkClimbing(way);
+  else if (captain.aloft.active) aloft.checkClimbing();
+  else if (surfaceOf(rig, captain.walker.place)) aloft.checkStanding();
+  else checkWalking();
 }
 const upOf = () => { const f = shipFrame(motion.pose), r = f.rotation; return { x: r[3]!, y: r[4]!, z: r[5]! }; };
 
@@ -283,7 +291,8 @@ function visit(node: number): void {
     if (cross(way, there, here)) crossed.push(`${way.id} ${forward ? 'back' : 'out'}`);
   });
 }
-visit(nodeOf(start));
+const aloft = aloftTour({ captain, rig, step, fail, time: () => t, walkTo, standStill, at, log: LOG });
+if (!ALOFT_ONLY) visit(nodeOf(start));
 // Back on deck, forward round the bowsprit's heel to where one gets onto it, across her aft of the heel, and aft again.
 const bowsprit = rigObstacles(rigPlan(plan))[0]!;
 const forward: Spot[] = [
@@ -292,15 +301,19 @@ const forward: Spot[] = [
   { space: 'deck', along: start.along, across: start.across },
 ];
 if (spotOf(captain.walker).space !== 'deck') fail(`the tour ended in ${spotOf(captain.walker).space}, not on deck`);
-else for (const goal of forward) if (walkTo(goal, `the bowsprit's side at ${at(goal)}`)) standStill();
+else if (!ALOFT_ONLY) for (const goal of forward) if (walkTo(goal, `the bowsprit's side at ${at(goal)}`)) standStill();
+const tAloft = t;
+aloft.run();
 
 const ladders = plan.ways.filter((w) => w.kind === 'ladder');
 const climbedBoth = ladders.filter((l) => crossed.filter((c) => c.startsWith(`${l.id} `)).length >= 2).length;
 const spacesSeen = new Set([...seenNode].map((n) => graph.nodes[n]!.space));
 if (worstRoll < LEAST_ROLL) fail(`she rolled only ${(worstRoll / DEGREE).toFixed(1)}°: not the strongest duel sea beam-on`);
-if (seenNode.size < deckNodes.length) fail(`stood in ${seenNode.size} of ${deckNodes.length} parts of her spaces`);
-if (crossed.length < deckEdges.length * 2) fail(`crossed ${crossed.length} of ${deckEdges.length * 2} ways`);
+if (!ALOFT_ONLY && seenNode.size < deckNodes.length) fail(`stood in ${seenNode.size} of ${deckNodes.length} parts of her spaces`);
+if (!ALOFT_ONLY && crossed.length < deckEdges.length * 2) fail(`crossed ${crossed.length} of ${deckEdges.length * 2} ways`);
+const climbed = aloft.result();
 console.log(`walk everywhere: force ${DUEL_FORCES.most} beam-on, rolling up to ${(worstRoll / DEGREE).toFixed(1)}°; ${(t / 60).toFixed(1)} simulated minutes in ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+console.log(`  aloft: ${climbed.reached} of ${climbed.goals} mastheads, yardarms and the jib-boom's ends reached in ${((t - tAloft) / 60).toFixed(1)} simulated minutes, holding on for ${climbed.held.toFixed(0)} s of it`);
 console.log(`  ${spacesSeen.size} of ${plan.spaces.length} spaces (${seenNode.size} of ${deckNodes.length} parts, standing still in ${stood}), ${climbedBoth} of ${ladders.length} ladders up and down, ${crossed.length} of ${deckEdges.length * 2} ways crossed; nearest a solid part ${nearest.toFixed(2)} m`);
 if (failures.length) {
   console.log(`FAILED (${failures.length}${failures.length >= 40 ? '+' : ''}):\n  ${failures.join('\n  ')}`);

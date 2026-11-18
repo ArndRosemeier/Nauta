@@ -376,7 +376,15 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The captain's eye on her decks | `src/sim/ship/deckWalk.ts#eyeOf` |
 | How the captain walks (paces, grip, stooping) | `src/sim/rules/walking.ts#WALK_PACE` |
 | The forces a duel is fought in | `src/sim/rules/wind.ts#DUEL_FORCES` |
-| The captain aboard: walking, climbing her ladders as a seen figure, her doors | `src/app/captain.ts#Captain` |
+| The captain aboard: walking, climbing her ladders and the rig as a seen figure, her doors | `src/app/captain.ts#Captain` |
+| The captain climbing the rig: steered up and down the shrouds, across onto a footrope and along it, over a rim, onto and off the bowsprit and the jib-boom, his eye bent over a yard | `src/app/aloftClimb.ts#AloftClimb` |
+| Where he stands on a top, the crosstrees or the bowsprit | `src/sim/ship/aloftWalk.ts#standsOn` |
+| A surface aloft as the walker's ground | `src/sim/ship/aloftWalk.ts#aloftGround` |
+| One step of the captain walking on a surface aloft | `src/sim/ship/aloftWalk.ts#stepAloftWalker` |
+| The captain standing still on a surface aloft (at the nearest spot he may) | `src/sim/ship/aloftWalk.ts#walkerAloft` |
+| The way aloft he gets onto, pushing into it (the shrouds, up or down from a top, the bowsprit, the jib-boom) | `src/sim/ship/aloftWalk.ts#aloftOffered` |
+| A mast's shrouds at a tier as he climbs them, and where he stands off them | `src/sim/ship/aloftWalk.ts#chainOf` |
+| A mast's climbs on a side | `src/sim/ship/aloft.ts#climbOn` |
 | Walking her decks on the page (`?walk`): thumbs to captain to standpoint and doors | `src/app/walking.ts#Walking` |
 | The captain's body on a moving deck: his lean against her roll, his feet stepping, his walk's bob, holding on, a blow's stagger, the eye and the head's hold it gives, the calm view's share | `src/app/body.ts#CaptainBody` |
 | The captain's own body drawn in first person: an Actors figure posed from his body (or the climb), his eyes at the view, his head not drawn | `src/render/captain/captainView.ts#CaptainView` |
@@ -385,6 +393,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | How fast a walker goes over her deck | `src/sim/ship/deckWalk.ts#paceOf` |
 | The body's tuning: lean and balance, legs and stance, cadence, holding on, the calm view's steps | `src/sim/rules/body.ts#LEAN_SHARE` |
 | What a hand can hold where he stands (her rail on deck, the beam overhead below) | `src/sim/ship/handholds.ts#handholdNear` |
+| What a hand can hold aloft (the shrouds over a top or the crosstrees) | `src/sim/ship/handholds.ts#handholdAloft` |
 | How fast a point of her moves in the world from her heave, pitch and roll (what feet on her deck feel) | `src/sim/ship/motion.ts#pointVelocity` |
 | The calm view's button (how much of his body's motion the view takes; the device remembers it) | `src/app/motionSetting.ts#showMotionSetting` |
 | The walking thumb's stick as a push | `src/app/thumbs.ts#stickPush` |
