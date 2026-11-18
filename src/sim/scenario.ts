@@ -76,6 +76,10 @@ export function sidesIn(sc: Scenario): number[] {
 
 /** The ship the player on this machine commands, or -1. */
 export const youShip = (sc: Scenario): number => sc.ships.findIndex((s) => s.command.kind === 'you');
+/** The skill of each ship's computer captain in the match's order; null for a ship a person commands (you or a player who joins). */
+export const skillsOf = (sc: Scenario): (Offered | null)[] => sc.ships.map((s) => (s.command.kind === 'computer' ? s.command.skill : null));
+/** The side of each ship in the match's order. */
+export const sidesOfShips = (sc: Scenario): number[] => sc.ships.map((s) => s.side);
 /** The ships other players will command. */
 export const playerShips = (sc: Scenario): number[] => sc.ships.flatMap((s, i) => (s.command.kind === 'player' ? [i] : []));
 

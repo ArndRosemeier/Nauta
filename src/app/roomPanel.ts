@@ -6,7 +6,7 @@
  */
 import type { RoomSummary } from '../../vendor/gamehub/gamehub';
 import { DuelSession, type DuelHub } from '../net/duel';
-import { MOST_PLAYERS, roomRefusal } from '../net/wire';
+import { roomRefusal } from '../net/wire';
 import { make } from './dom';
 import { openSheet } from './sheet';
 import type { WordKey } from './words';
@@ -52,7 +52,7 @@ export class RoomPanel {
     const s = this.current();
     const captains = s.shipCaptains.filter((c) => c !== null).length;
     const say = this.say();
-    this.button.textContent = s.role === 'solo' ? say.twoPlayers : `${say.room} ${s.code || '…'} · ${captains}/${MOST_PLAYERS} ${say.captainsOf}`;
+    this.button.textContent = s.role === 'solo' ? say.twoPlayers : `${say.room} ${s.code || '…'} · ${captains}/${s.seats} ${say.captainsOf}`;
     this.open?.();
   }
 

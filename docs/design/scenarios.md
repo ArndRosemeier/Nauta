@@ -21,7 +21,7 @@ Two sides: opposite lines as the duel's, one ship each is exactly `duelStart` (t
 | 1 | Scenario model, `fleetStart`, the dialog and its placement map. Runs what the duel runs (two ships of two sides in two navies); the rest is shown dimmed with the reason | built (PR 152) |
 | 2 | Sim: sides (`SimShip.side`), `foes.ts` (enemies nearest first, her foe), each gun on the nearest enemy its side faces, the end rule by side (`winningSide`), parting between sides. The duel is unchanged. "Target her" waits for stage 6 with its buttons | built |
 | 3 | The computer captain for N: he sights and fights the nearest enemy of another side (`sightOf`, `captainOrders`, the master's kept order). Choosing a target on purpose and holding it is left to "Make captains manoeuvre in battle" | built |
-| 4 | Netcode: room for up to 8, host runs computer captains, scenario in snapshot and meta, coarse crew for unmanned ships | open |
+| 4 | Netcode (`PROTOCOL` 3): a room for as many captains as the scenario has seats (up to 8); the scenario in the room's meta; the host steps the computer captains and a new host goes on with them; players seated in the ships a person commands. The state is **deflated** (fflate) instead of coarse crews for unmanned ships: 8 ships at work measure about 18 KB as sent against GameHub's 64 KB, and every ship stays exact. Which player sits in which ship is picked in the waiting room (stage 6); until then they take the seats in order | built |
 | 5 | Rendering: N ship views (one near, the rest far), textures, wakes, crews near the camera | open |
 | 6 | Page and watch: free camera over N ships, end card by side, spectate after your ship is lost | open |
 | 7 | Checks: runs and ends for 4 and 8 ships, shots | open |

@@ -62,6 +62,7 @@
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",
     "@futuremagic/stage": "file:vendor/assetgenerator/packages/stage",
     "@futuremagic/texgen": "file:vendor/assetgenerator/packages/texgen",
+    "fflate": "0.8.3",
     "three": "^0.186.1"
   },
   "devDependencies": {

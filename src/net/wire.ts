@@ -4,20 +4,22 @@
  * the host (`Intent`). The model is GameHub's own (gameserver docs/PATTERNS.md): one host runs the simulation, the
  * others send intents. No DOM, no three.js: it runs in tests, in the page and in a worker alike.
  *
- * The simulation's state goes as the codec's bytes (sim/codec.ts) in base64, never as JSON numbers, so the guests get
- * it bit for bit (JSON loses -0 and NaN). Orders go as JSON; the host passes every order it steps, its own too,
+ * The simulation's state goes as the codec's bytes (sim/codec.ts), deflated, in base64, never as JSON numbers, so the guests get
+ * it bit for bit (JSON loses -0 and NaN). Deflated, eight ships' crews at work stay a third of GameHub's 64 KB (docs/design/scenarios.md). Orders go as JSON; the host passes every order it steps, its own too,
  * through the same JSON first (`cleanOrder`), so every machine steps exactly the values the host stepped.
  */
 import type { Order } from '../sim/orders';
 import type { LoggedOrders } from '../sim/replay';
+import { deflateSync, inflateSync } from 'fflate';
+import { MOST_SHIPS, readScenario, type Scenario } from '../sim/scenario';
 import { decodeState, encodeState, hashState, type SimState } from '../sim/state';
 
 /** The game's id on GameHub (registered there by Arnd: `npm run apps -- add nauta`). */
 export const GAME = 'nauta';
 /** The version of this protocol; a machine never joins a room of another. Raise it when a message changes shape. */
-export const PROTOCOL = 2;
-/** The most players in a room: two captains, one ship each (Arnd, 2026-11-17: every player is a captain of his own ship). */
-export const MOST_PLAYERS = 2;
+export const PROTOCOL = 3;
+/** The most players in a room: a captain a ship (Arnd, 2026-11-17: every player is a captain of his own ship), up to the most ships a match holds. */
+export const MOST_PLAYERS = MOST_SHIPS;
 /** The most orders one message may carry; the rest are dropped (a captain gives a few a minute). */
 export const MOST_ORDERS = 16;
 /** The longest word an order may carry (its kind, canvas or mast); longer ones are cut, so an order stays small. */
@@ -34,7 +36,7 @@ export interface Snapshot {
   readonly protocol: number;
   /** The state's tick. */
   readonly tick: number;
-  /** The state as the codec's bytes, base64. */
+  /** The state as the codec's bytes, deflated, base64. */
   readonly state: string;
   /** Its hash (sim/state.ts `hashState`), so a guest checks without decoding. */
   readonly hash: string;
@@ -84,8 +86,9 @@ export interface RoomMeta {
 /**
  * The host's choices for a room's match, as the page names them (docs/design/menu.md, "Match setup"): the wind, the
  * hour the sky starts at (the guest's page draws the same sky), how the ships meet, the length in minutes (0: no
- * limit) and the host's navy (the guest takes the other). Only the host's machine starts the match from them; the
- * guest takes its state from the host.
+ * limit) and the host's navy. `scenario`: the ships, their sides and who commands each (sim/scenario.ts), which every
+ * machine needs: the guests to dress and seat the ships, whoever becomes host to go on with the computer captains and
+ * the next round. Only the host's machine starts the match from the terms; the guest takes its state from the host.
  */
 export interface RoomTerms {
   readonly wind: string;
@@ -93,6 +96,8 @@ export interface RoomTerms {
   readonly meet: string;
   readonly minutes: number;
   readonly navy: string;
+  /** The scenario as `Scenario` JSON; none (an older host's): a duel. */
+  readonly scenario?: unknown;
 }
 
 /** The host's choices in a room's meta, or null when it has none (an older build, another game). */
@@ -101,6 +106,12 @@ export function roomTerms(meta: unknown): RoomTerms | null {
   if (!t || typeof t !== 'object') return null;
   const ok = typeof t.wind === 'string' && typeof t.meet === 'string' && typeof t.navy === 'string' && Number.isFinite(t.hour) && Number.isFinite(t.minutes);
   return ok ? (t as RoomTerms) : null;
+}
+
+/** The scenario a room's match runs, or null when its meta names none (a plain duel). */
+export function roomScenario(meta: unknown): Scenario | null {
+  const t = roomTerms(meta);
+  return t && t.scenario !== undefined ? readScenario(t.scenario) : null;
 }
 
 /** Why a machine of this protocol and build may not join a room, or ''. */
@@ -127,12 +138,12 @@ function fromBase64(text: string): Uint8Array {
 
 /** The host's state as a snapshot. */
 export function makeSnapshot(state: SimState, captains: Captains, acks: readonly Ack[], round = 0, ready: readonly number[] = []): Snapshot {
-  return { protocol: PROTOCOL, tick: state.tick, state: toBase64(encodeState(state)), hash: hashState(state), captains: [...captains], acks: [...acks], round, ready: [...ready] };
+  return { protocol: PROTOCOL, tick: state.tick, state: toBase64(deflateSync(encodeState(state))), hash: hashState(state), captains: [...captains], acks: [...acks], round, ready: [...ready] };
 }
 
 /** A snapshot's state; fails on one that does not hold a state. */
 export function snapshotState(snapshot: Snapshot): SimState {
-  return decodeState(fromBase64(snapshot.state));
+  return decodeState(inflateSync(fromBase64(snapshot.state)));
 }
 
 /** A field of an untrusted order kept as the JSON would carry it: a number, or a word cut to length; anything else is null. */
