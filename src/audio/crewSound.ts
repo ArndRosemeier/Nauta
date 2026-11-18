@@ -12,7 +12,7 @@ import type { SimEvent } from '../sim/step';
 import type { Room } from './acoustics';
 import { playHeard } from './heard';
 import { CrewWatch, type CrewHeard } from './crewHearing';
-import { BELL, CARRY_ON, HAUL_PULL, ORDER_CALLS, RUN_STEP, SAILED_CALLS } from './crewTuning';
+import { BELL, CARRY_ON, HAUL_PULL, LIFE_CALLS, ORDER_CALLS, RUN_STEP, SAILED_CALLS } from './crewTuning';
 
 export class CrewSound {
   private readonly watch: CrewWatch;
@@ -25,7 +25,7 @@ export class CrewSound {
     this.watch = new CrewWatch(seed, ship);
     // The calls and the short sounds are fetched as soon as sound opens (about 250 KB): a call that comes late says
     // the wrong thing. The crowd's feet and the drum are beds, fetched when first heard.
-    const calls = new Set([...Object.values(ORDER_CALLS), ...Object.values(SAILED_CALLS).flat(), CARRY_ON].map((c) => c.id));
+    const calls = new Set([...Object.values(ORDER_CALLS), ...Object.values(LIFE_CALLS), ...Object.values(SAILED_CALLS).flat(), CARRY_ON].map((c) => c.id));
     sound.preload([...calls, RUN_STEP.id, HAUL_PULL.id, BELL.id]);
   }
 

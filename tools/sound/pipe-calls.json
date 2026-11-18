@@ -132,6 +132,50 @@
         { "note": [1, 0], "tone": "plain", "s": 0.15 },
         { "note": [0, 0], "tone": "plain", "s": 0.35 }
       ]
+    },
+    {
+      "id": "pipe/pumps",
+      "what": "Hands to the pumps (N6.8): the general call cut short, then three slow strokes of the pump brakes, each the low note rising to the high and falling back.",
+      "segments": [
+        { "note": [0, 1], "tone": "plain", "s": 0.3 },
+        { "note": [1, 1], "tone": "warble", "s": 0.5 },
+        { "rest": 0.2 },
+        { "note": [0, 1], "tone": "plain", "s": 0.25 },
+        { "note": [1, 0], "tone": "plain", "s": 0.25 },
+        { "rest": 0.08 },
+        { "note": [0, 1], "tone": "plain", "s": 0.25 },
+        { "note": [1, 0], "tone": "plain", "s": 0.25 },
+        { "rest": 0.08 },
+        { "note": [0, 1], "tone": "plain", "s": 0.25 },
+        { "note": [1, 0], "tone": "plain", "s": 0.25 }
+      ]
+    },
+    {
+      "id": "pipe/fires",
+      "what": "Fire party (N6.8): urgent, three trilled high notes, each cut short, with a quick drop after the last.",
+      "segments": [
+        { "note": [1, 1], "tone": "trill", "s": 0.35 },
+        { "rest": 0.12 },
+        { "note": [1, 1], "tone": "trill", "s": 0.35 },
+        { "rest": 0.12 },
+        { "note": [1, 1], "tone": "trill", "s": 0.45 },
+        { "note": [1, 0], "tone": "plain", "s": 0.15 }
+      ]
+    },
+    {
+      "id": "pipe/wreckage",
+      "what": "Clear the wreckage (N6.8): Away, a trilled low note, then two sharp chops, a high note snapped down to the low twice.",
+      "segments": [
+        { "note": [0, 0], "tone": "trill", "s": 0.6 },
+        { "rest": 0.15 },
+        { "note": [1, 1], "tone": "plain", "s": 0.2 },
+        { "note": [1, 0], "tone": "plain", "s": 0.06 },
+        { "note": [0, 0], "tone": "plain", "s": 0.1 },
+        { "rest": 0.12 },
+        { "note": [1, 1], "tone": "plain", "s": 0.2 },
+        { "note": [1, 0], "tone": "plain", "s": 0.06 },
+        { "note": [0, 0], "tone": "plain", "s": 0.15 }
+      ]
     }
   ]
 }

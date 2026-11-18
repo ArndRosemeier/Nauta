@@ -36,6 +36,7 @@ import { CrewSound } from './audio/crewSound';
 import { beatingToQuarters } from './sim/guns/gunnery';
 import { SailSound } from './audio/sailSound';
 import { GunSound } from './audio/gunSound';
+import { DamageSound } from './audio/damageSound';
 import { OPEN_AIR } from './audio/acoustics';
 import { CrewView } from './render/crew/crewView';
 import { CaptainView } from './render/captain/captainView';
@@ -343,6 +344,9 @@ async function start(): Promise<void> {
   // Gunfire heard (N5.6), both ships' guns as the match fires them.
   const gunSound = ship && match ? new GunSound(sound.engine) : null;
   if (match && gunSound) match.on('events', (events) => gunSound.onFired(events));
+  // Damage heard (N6.8): blows where each ship was struck, masts going, fires, the sea coming in, breaking up.
+  const damageSound = ship && match ? new DamageSound(sound.engine, MATCH_SEED) : null;
+  if (match && damageSound) match.on('events', (events) => damageSound.onDamage(events));
   const drawnSails: SailHeard[] = [];
   let aloft = meanWind(wind, 0);
   const ear = new Vector3(), facing = new Vector3(), crown = new Vector3(), gust = meanWind(wind, 0);
@@ -465,6 +469,10 @@ async function start(): Promise<void> {
     const gunfire = gunSound && match ? gunSound.roar({ t: seaTime, ear: [ear.x, ear.y, ear.z], earShip: where.eye, aboard: where.off ? -1 : match.ship, below: herRoom.below }, herRoom) : null;
     for (const j of gunfire?.jolts ?? []) walking?.body.jolt(j.x, j.z, j.strength);
     const room = gunfire?.room ?? herRoom;
+    if (damageSound && match && ship) {
+      const ships = match.state.ships.map((s, i) => ({ pose: (i === match.ship ? ship.drawn : match.pose(i)) ?? ship.drawn, damage: s.damage }));
+      for (const j of damageSound.struck({ t: seaTime, ear: [ear.x, ear.y, ear.z], earShip: where.eye, aboard: where.off ? -1 : match.ship, below: herRoom.below, ships })) walking?.body.jolt(j.x, j.z, j.strength);
+    }
     if (crewSound && match) { const mine = match.state.ships[match.ship]; crewSound.drum = !!mine && beatingToQuarters(mine.told, mine.guns); }
     if (ship && crewSound && match && sailing) crewSound.atWork(sailing, simTime(match.state), ship.drawn, where.eye, room);
     else if (ship && crewSound && !still) crewSound.bellAlone(seaTime, ship.drawn, room);

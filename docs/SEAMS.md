@@ -270,6 +270,14 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A room as a deafened ear hears it | `src/audio/gunHearing.ts#deafened` |
 | Gunfire heard: its sounds played through the ship's engine, the jolts and the deafened room handed back | `src/audio/gunSound.ts#GunSound` |
 | A watch's frame emptied to be filled again | `src/audio/heard.ts#clearHeard` |
+| How far between a near take and a far one a sound at a distance is heard (a gun's report, a ball striking) | `src/audio/gunHearing.ts#farShare` |
+| Sounds kept until they are heard by the speed of sound, handed on with their delay, too late ones dropped | `src/audio/due.ts#DueSounds` |
+| The distance between two points of the world | `src/audio/due.ts#worldDistance` |
+| The nearest few of a list by distance | `src/audio/due.ts#nearest` |
+| Damage's sound as data: shot striking timber near and far, splinters, iron, a line parting, canvas torn, a mast going, her magazine going up, fire, the sea rushing in, breaking up, the jolts (the takes: tools/sound/sounds.json) | `src/audio/damageTuning.ts#HIT_NEAR` |
+| What is heard of damage, from the hit and aftermath events and the damage as it stands: blows where they struck, a spar going with its rigging, the explosion, fires, the sea at her holes, her breaking up, jolts | `src/audio/damageHearing.ts#DamageWatch` |
+| A place in her (damage's along, across, height) in ship space | `src/audio/damageHearing.ts#shipSpaceOf` |
+| Damage heard: its sounds played through the ship's engine, the jolts handed back | `src/audio/damageSound.ts#DamageSound` |
 | A frequency glided in log frequency | `src/audio/acoustics.ts#logLerp` |
 | The apparent wind's speed on a ship under way | `src/sim/ship/sailing.ts#apparentSpeed` |
 | Each sail as drawn, for the sound | `src/render/ship/sailsView.ts#SailsView` |

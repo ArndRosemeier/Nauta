@@ -1,5 +1,14 @@
 {
  "sounds": {
+  "bed/breakup": {
+   "kind": "bed",
+   "files": [
+    "bed/breakup.mp3"
+   ],
+   "seconds": [
+    29.825
+   ]
+  },
   "bed/canvas-flog-a": {
    "kind": "bed",
    "files": [
@@ -36,6 +45,24 @@
     31.325
    ]
   },
+  "bed/fire-a": {
+   "kind": "bed",
+   "files": [
+    "bed/fire-a.mp3"
+   ],
+   "seconds": [
+    29.83
+   ]
+  },
+  "bed/fire-b": {
+   "kind": "bed",
+   "files": [
+    "bed/fire-b.mp3"
+   ],
+   "seconds": [
+    31.32
+   ]
+  },
   "bed/hull-inside-a": {
    "kind": "bed",
    "files": [
@@ -67,6 +94,24 @@
    "kind": "bed",
    "files": [
     "bed/hull-run-b.mp3"
+   ],
+   "seconds": [
+    31.335
+   ]
+  },
+  "bed/inrush-a": {
+   "kind": "bed",
+   "files": [
+    "bed/inrush-a.mp3"
+   ],
+   "seconds": [
+    29.835
+   ]
+  },
+  "bed/inrush-b": {
+   "kind": "bed",
+   "files": [
+    "bed/inrush-b.mp3"
    ],
    "seconds": [
     31.335
@@ -495,6 +540,129 @@
     0.815
    ]
   },
+  "hit/canvas": {
+   "kind": "calls",
+   "files": [
+    "hit/canvas-1.mp3",
+    "hit/canvas-2.mp3",
+    "hit/canvas-3.mp3",
+    "hit/canvas-4.mp3",
+    "hit/canvas-5.mp3",
+    "hit/canvas-6.mp3"
+   ],
+   "seconds": [
+    1.155,
+    0.585,
+    1.525,
+    1.28,
+    0.985,
+    1.405
+   ]
+  },
+  "hit/far": {
+   "kind": "calls",
+   "files": [
+    "hit/far-1.mp3",
+    "hit/far-2.mp3",
+    "hit/far-3.mp3",
+    "hit/far-4.mp3",
+    "hit/far-5.mp3",
+    "hit/far-6.mp3"
+   ],
+   "seconds": [
+    0.975,
+    2,
+    1.84,
+    1.92,
+    2,
+    1.345
+   ]
+  },
+  "hit/iron": {
+   "kind": "calls",
+   "files": [
+    "hit/iron-1.mp3",
+    "hit/iron-2.mp3",
+    "hit/iron-3.mp3",
+    "hit/iron-4.mp3",
+    "hit/iron-5.mp3",
+    "hit/iron-6.mp3"
+   ],
+   "seconds": [
+    0.815,
+    0.78,
+    0.77,
+    0.605,
+    0.56,
+    0.705
+   ]
+  },
+  "hit/rope": {
+   "kind": "calls",
+   "files": [
+    "hit/rope-1.mp3",
+    "hit/rope-2.mp3",
+    "hit/rope-3.mp3",
+    "hit/rope-4.mp3",
+    "hit/rope-5.mp3",
+    "hit/rope-6.mp3"
+   ],
+   "seconds": [
+    0.31,
+    0.275,
+    0.345,
+    0.285,
+    0.28,
+    0.235
+   ]
+  },
+  "hit/splinters": {
+   "kind": "calls",
+   "files": [
+    "hit/splinters-1.mp3",
+    "hit/splinters-2.mp3",
+    "hit/splinters-3.mp3",
+    "hit/splinters-4.mp3"
+   ],
+   "seconds": [
+    3,
+    2.205,
+    3,
+    3
+   ]
+  },
+  "hit/timber": {
+   "kind": "calls",
+   "files": [
+    "hit/timber-1.mp3",
+    "hit/timber-2.mp3",
+    "hit/timber-3.mp3",
+    "hit/timber-4.mp3",
+    "hit/timber-5.mp3",
+    "hit/timber-6.mp3"
+   ],
+   "seconds": [
+    1.295,
+    1.265,
+    1.14,
+    2.5,
+    2.5,
+    0.82
+   ]
+  },
+  "mast/fall": {
+   "kind": "calls",
+   "files": [
+    "mast/fall-1.mp3",
+    "mast/fall-2.mp3",
+    "mast/fall-3.mp3"
+   ],
+   "seconds": [
+    6.525,
+    5.34,
+    8
+   ]
+  },
   "pipe/back": {
    "kind": "call",
    "files": [
@@ -522,6 +690,15 @@
     2.5
    ]
   },
+  "pipe/fires": {
+   "kind": "call",
+   "files": [
+    "pipe/fires.mp3"
+   ],
+   "seconds": [
+    1.59
+   ]
+  },
   "pipe/haul": {
    "kind": "call",
    "files": [
@@ -547,6 +724,15 @@
    ],
    "seconds": [
     0.99
+   ]
+  },
+  "pipe/pumps": {
+   "kind": "call",
+   "files": [
+    "pipe/pumps.mp3"
+   ],
+   "seconds": [
+    2.71
    ]
   },
   "pipe/sail": {
@@ -592,6 +778,26 @@
    ],
    "seconds": [
     3.85
+   ]
+  },
+  "pipe/wreckage": {
+   "kind": "call",
+   "files": [
+    "pipe/wreckage.mp3"
+   ],
+   "seconds": [
+    1.69
+   ]
+  },
+  "ship/explode": {
+   "kind": "calls",
+   "files": [
+    "ship/explode-1.mp3",
+    "ship/explode-2.mp3"
+   ],
+   "seconds": [
+    6.59,
+    6.64
    ]
   },
   "shot/pass": {

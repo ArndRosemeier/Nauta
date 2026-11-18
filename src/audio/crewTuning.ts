@@ -46,6 +46,11 @@ export const ORDER_CALLS: Readonly<Record<SailingKind, PipeCall>> = {
   fill: call('fill', 2.45),
 };
 
+/** The first lieutenant's parties for her life (N6.3), each piped as it is ordered (N6.8); the carpenter's orders go to his crew by word, and striking is not piped. */
+export type LifeParty = 'pumps' | 'fires' | 'wreckage';
+export const LIFE_CALLS: Readonly<Record<LifeParty, PipeCall>> = { pumps: call('pumps', 2.71), fires: call('fires', 1.59), wreckage: call('wreckage', 1.69) };
+export const LIFE_PARTIES = Object.keys(LIFE_CALLS) as readonly LifeParty[];
+
 /** When she comes through the wind or round before it the yards are swung: Haul Away. */
 export const HAUL_CALL = call('haul', 1.09);
 /** She missed stays: the Still, every man stops (the master's report is a bubble, N4.5). */

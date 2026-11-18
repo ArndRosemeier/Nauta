@@ -301,6 +301,30 @@
       "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Carry On: a short high note falling to the low; the work is done, the men go back to what they were doing."
     },
     {
+      "id": "pipe/pumps",
+      "kind": "call",
+      "from": [
+        "pipe/pumps.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Hands to the pumps: the general call cut short, then three slow strokes of the pump brakes."
+    },
+    {
+      "id": "pipe/fires",
+      "kind": "call",
+      "from": [
+        "pipe/fires.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Fire party: three urgent trilled high notes."
+    },
+    {
+      "id": "pipe/wreckage",
+      "kind": "call",
+      "from": [
+        "pipe/wreckage.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Clear the wreckage: Away, then two sharp chops."
+    },
+    {
       "id": "bed/rigging-low-a",
       "kind": "bed",
       "prompt": "The sound of a fresh wind whistling through the taut rigging of a tall wooden sailing ship, heard close on her deck: thin airy whistling and singing notes of the wind across many tight ropes and shrouds, a clear high hum that rises and falls with the gusts, bright and close, no deep rumble, no low drone, no flapping, no creaking, no water, no waves, no voices, no talking, no music, continuous for thirty seconds"
@@ -418,6 +442,103 @@
         "gun/ring.wav"
       ],
       "about": "Synthesised by tools/sound/ring.mjs: the ringing in the ears after a broadside fired close by, a thin high whine that wavers a little and dies away over about six seconds."
+    },
+    {
+      "id": "hit/timber",
+      "kind": "calls",
+      "prompt": "The sound of six separate heavy iron cannonballs smashing into the thick oak side of a wooden sailing ship close by, each a huge splintering crash, timber cracking and bursting, wood fragments clattering down on the deck, close and clear, one at a time with four seconds of complete silence between them, nothing else, no explosions, no guns firing, no thunder, no voices, no talking, no shouting, no screaming, no music",
+      "count": 6,
+      "most": 2.5,
+      "quiet": 0.04,
+      "gap": 0.8
+    },
+    {
+      "id": "hit/far",
+      "kind": "calls",
+      "prompt": "The sound of six separate cannonballs striking the wooden hull of another sailing ship some way off across the open sea, each a heavy dull thud with a crack of breaking timber, softened by distance, one at a time with four seconds of complete silence between them, nothing else, no guns firing, no explosions, no thunder, no waves, no voices, no talking, no shouting, no screaming, no music",
+      "count": 6,
+      "most": 2,
+      "quiet": 0.05,
+      "gap": 0.8
+    },
+    {
+      "id": "hit/splinters",
+      "kind": "calls",
+      "prompt": "The sound of six separate showers of sharp wooden splinters flying across the deck of a sailing ship, each a burst of whizzing shards and a dry clatter of broken wood scattering over the planks, close and clear, one at a time with four seconds of complete silence between them, nothing else, no explosions, no guns firing, no glass, no voices, no talking, no shouting, no screaming, no music",
+      "count": 4,
+      "most": 3,
+      "quiet": 0.04,
+      "gap": 0.8
+    },
+    {
+      "id": "hit/iron",
+      "kind": "calls",
+      "prompt": "The sound of six separate times a cannonball strikes an iron cannon on a ship's deck, each a deafening ringing metallic clang and the heavy wooden gun carriage crashing over onto the planks, close and clear, one at a time with four seconds of complete silence between them, nothing else, no explosions, no guns firing, no bells, no voices, no talking, no shouting, no screaming, no music",
+      "count": 6,
+      "most": 2.5,
+      "quiet": 0.04,
+      "gap": 0.8
+    },
+    {
+      "id": "hit/rope",
+      "kind": "calls",
+      "prompt": "The sound of six separate, clearly spaced thick taut ropes of a sailing ship's rigging being shot through and parting, each a sharp loud twang and the whipping lash of the loose rope, a wooden block rattling, close and clear, one at a time with four seconds of complete silence between them, nothing else, no guns firing, no explosions, no wind, no water, no voices, no talking, no shouting, no screaming, no music",
+      "count": 6,
+      "most": 1.6,
+      "quiet": 0.07,
+      "gap": 0.5
+    },
+    {
+      "id": "hit/canvas",
+      "kind": "calls",
+      "prompt": "The sound of six separate cannonballs tearing through a large canvas sail overhead, each a sharp ripping tear of heavy sailcloth and a loud flap of the torn canvas, close and clear, one at a time with four seconds of complete silence between them, nothing else, no guns firing, no explosions, no water, no voices, no talking, no shouting, no screaming, no music",
+      "count": 6,
+      "most": 1.6,
+      "quiet": 0.04,
+      "gap": 0.8
+    },
+    {
+      "id": "mast/fall",
+      "kind": "calls",
+      "prompt": "The sound of three separate times a tall wooden mast of a sailing ship breaks and falls over the side, each a loud sharp crack, a long tearing groan of splitting timber, ropes snapping and whipping, blocks clattering, a heavy crash on the rail and a great splash into the sea, close and clear, each about six seconds, one at a time with five seconds of complete silence between them, nothing else, no explosions, no guns firing, no thunder, no voices, no talking, no shouting, no screaming, no music",
+      "count": 3,
+      "most": 8,
+      "quiet": 0.01,
+      "gap": 1.5
+    },
+    {
+      "id": "ship/explode",
+      "kind": "calls",
+      "prompt": "The sound of two separate times the powder magazine of a wooden warship blows up nearby at sea, each a gigantic deep explosion, then a long rain of timber, debris and splashes falling back into the water all around, each about eight seconds, one at a time with five seconds of complete silence between them, nothing else, no guns firing, no thunder, no music, no voices, no talking, no shouting, no screaming, no music",
+      "count": 2,
+      "most": 10,
+      "quiet": 0.03,
+      "gap": 1.2
+    },
+    {
+      "id": "bed/fire-a",
+      "kind": "bed",
+      "prompt": "The sound of a fire burning inside the wooden hull of a sailing ship: flames roaring and crackling, timber popping and spitting, the rush of hot air, heard close by, bright sharp crackling and snapping in the foreground, no low roar, no deep rumble, no wind, continuous for thirty seconds, no sirens, no water, no voices, no talking, no shouting, no screaming, no music"
+    },
+    {
+      "id": "bed/fire-b",
+      "kind": "bed",
+      "prompt": "The sound of a blaze of tarred timber and rope burning close by: loud crackling, snapping and hissing flames, sparks bursting, a steady roar, heard close by, bright sharp crackling and snapping in the foreground, no low roar, no deep rumble, no wind, continuous for thirty seconds, no sirens, no water, no voices, no talking, no shouting, no screaming, no music"
+    },
+    {
+      "id": "bed/inrush-a",
+      "kind": "bed",
+      "prompt": "The sound of sea water forcing in through a shot hole in the wooden side of a ship below deck: a powerful hissing jet of water gushing and splashing loudly onto the timbers and into the water already in the hold, close and clear, no deep rumble, continuous for thirty seconds, no rain, no surf, no voices, no talking, no shouting, no screaming, no music"
+    },
+    {
+      "id": "bed/inrush-b",
+      "kind": "bed",
+      "prompt": "The sound of water pouring hard into a ship's hold through a hole in her planking: a gushing spout drumming and splashing, sloshing water rising, close and clear, no deep rumble, continuous for thirty seconds, no rain, no surf, no voices, no talking, no shouting, no screaming, no music"
+    },
+    {
+      "id": "bed/breakup",
+      "kind": "bed",
+      "prompt": "The sound of a wooden sailing ship breaking up and going down: deep groaning and cracking of her timbers under strain, beams splitting, loose things crashing about, the sea roaring in through her, continuous for thirty seconds, no explosions, no guns, no voices, no talking, no shouting, no screaming, no music"
     }
   ]
 }

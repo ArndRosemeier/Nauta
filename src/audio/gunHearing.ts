@@ -19,18 +19,16 @@ import { PATH_STEP, SPEED_OF_SOUND } from '../sim/rules/guns';
 import type { SimEvent } from '../sim/step';
 import { STEP_SECONDS } from '../sim/units';
 import {
-  DEAF, DULL, GUN_FAR, GUN_NEAR, GUN_PITCH, GUN_THROUGH, JOLT, LATE, LOOK_AHEAD, NEAR_TO_FAR, PASS_CLEAR, PASS_LEAD, PASS_PITCH,
+  DEAF, DULL, GUN_FAR, GUN_NEAR, GUN_PITCH, GUN_THROUGH, JOLT, LATE, NEAR_TO_FAR, PASS_CLEAR, PASS_LEAD, PASS_PITCH,
   OPEN_HZ, PASS_REACH, PASS_SLOWEST, RING, RING_EVERY, RING_FROM, SHOT_PASS, SHOT_SPLASH, SKIP_GAIN, SKIP_PITCH, SPLASH_REACH, SPLASHES_A_SHOT,
 } from './gunTuning';
-import { clearHeard, type Heard, type PlacedShot } from './heard';
-import type { SlapKind } from './tuning';
+import { clearHeard, type Heard } from './heard';
+import { DueSounds, nearest, worldDistance, type DueShot } from './due';
 
 type Vec3 = readonly [number, number, number];
 
 /** A sound to start, with its playback rate (a gun's kind, a skip). */
-export interface GunShot extends PlacedShot {
-  readonly pitch: number;
-}
+export type GunShot = DueShot;
 
 /** A blow to the captain's body (body.ts `jolt`): from a direction in ship space (x, z), of a strength. */
 export interface Jolt {
@@ -60,12 +58,6 @@ export interface GunHeard extends Heard {
   ring: number;
 }
 
-/** A sound still to be heard, at a time of the match's clock, s. */
-interface Due {
-  readonly at: number;
-  readonly sound: GunShot;
-}
-
 /** A report still to arrive: its load on the ears and its jolt, at a time of the match's clock, s. */
 interface Blow {
   readonly at: number;
@@ -80,11 +72,9 @@ export function deafened(room: Room, deaf: number): Room {
   return { ...room, muffle: Math.min(room.muffle ?? OPEN_HZ, dull), through: room.through * (1 - (1 - DULL.through) * deaf) };
 }
 
-const earDistance = (a: Vec, b: Vec3): number => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-
-/** How far between the near report (0) and the far one (1) a gun at `d` m is heard, eased in log distance. */
-export function farShare(d: number): number {
-  const [near, far] = NEAR_TO_FAR;
+/** How far between the near sound (0) and the far one (1) something at `d` m is heard, eased in log distance between `range`'s two distances (a gun's report by default). */
+export function farShare(d: number, range: readonly [number, number] = NEAR_TO_FAR): number {
+  const [near, far] = range;
   return smoothstep(0, 1, clamp(Math.log(d / near) / Math.log(far / near), 0, 1));
 }
 
@@ -101,8 +91,8 @@ export function nearestPass(path: readonly Vec[], ear: Vec3, reach = PASS_REACH,
     const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], len2 = dx * dx + dy * dy + dz * dz;
     const u = len2 > 0 ? clamp(((ear[0] - a[0]) * dx + (ear[1] - a[1]) * dy + (ear[2] - a[2]) * dz) / len2, 0, 1) : 0;
     const at: Vec3 = [a[0] + dx * u, a[1] + dy * u, a[2] + dz * u];
-    const d = earDistance(at, ear);
-    if (d > reach || (best && d >= best.d) || earDistance(at, muzzle) < clear) continue;
+    const d = worldDistance(at, ear);
+    if (d > reach || (best && d >= best.d) || worldDistance(at, muzzle) < clear) continue;
     best = { t: (i + u) * PATH_STEP, at, d, speed: Math.sqrt(len2) / PATH_STEP };
   }
   return best;
@@ -110,7 +100,7 @@ export function nearestPass(path: readonly Vec[], ear: Vec3, reach = PASS_REACH,
 
 export class GunWatch {
   private readonly fresh: GunFired[] = [];
-  private readonly due: Due[] = [];
+  private readonly due = new DueSounds();
   private readonly blows: Blow[] = [];
   private load = 0;
   private lastT: number | null = null;
@@ -145,13 +135,7 @@ export class GunWatch {
       this.rungAt = s.t;
       out.ring = RING.gain * out.deaf;
     }
-    for (let i = this.due.length - 1; i >= 0; i--) {
-      const d = this.due[i]!;
-      if (d.at > s.t + LOOK_AHEAD) continue;
-      this.due.splice(i, 1);
-      if (d.at < s.t - LATE) continue;
-      out.shots.push({ ...d.sound, delay: Math.max(0, d.at - s.t) });
-    }
+    this.due.take(s.t, out.shots);
     return out;
   }
 
@@ -164,14 +148,14 @@ export class GunWatch {
   private heard(e: GunFired, s: GunScene): void {
     const fired = e.tick * STEP_SECONDS, ball = e.fired.balls[0], place = battery()[e.gun];
     if (!ball || !place) return;
-    const muzzle = ball.path[0]!, d = earDistance(muzzle, s.ear), at = fired + d / SPEED_OF_SOUND;
+    const muzzle = ball.path[0]!, d = worldDistance(muzzle, s.ear), at = fired + d / SPEED_OF_SOUND;
     const pitch = GUN_PITCH[place.gun], hers = e.ship === s.aboard;
-    if (hers && s.below > 1 / 2) this.sound(at, GUN_THROUGH, muzzle, 'body', pitch);
+    if (hers && s.below > 1 / 2) this.due.keep(at, GUN_THROUGH, muzzle, 'body', pitch);
     else {
       // Her own guns are her own sound (never muffled below); the enemy's are the world's.
       const far = farShare(d), bus = hers ? 'body' : 'world';
-      if (far < 1) this.sound(at, GUN_NEAR, muzzle, bus, pitch, 1 - far);
-      if (far > 0) this.sound(at, GUN_FAR, muzzle, bus, pitch, far);
+      if (far < 1) this.due.keep(at, GUN_NEAR, muzzle, bus, pitch, 1 - far);
+      if (far > 0) this.due.keep(at, GUN_FAR, muzzle, bus, pitch, far);
     }
     const dose = DEAF.dose * Math.min(DEAF.near / Math.max(d, 1), 1) * (hers && s.below > 1 / 2 ? DEAF.below : 1);
     let jolt: Jolt | null = null;
@@ -194,7 +178,7 @@ export class GunWatch {
     if (!best) return;
     const gain = Math.min(SHOT_PASS.ref / Math.max(best.d, 1), 1);
     // A ball passing soon after it was fired (the enemy close) starts its rush with the shot: it is heard a little late.
-    this.sound(Math.max(fired + best.t + best.d / SPEED_OF_SOUND - PASS_LEAD, fired), SHOT_PASS, best.at, 'world', PASS_PITCH[shot.shot], gain);
+    this.due.keep(Math.max(fired + best.t + best.d / SPEED_OF_SOUND - PASS_LEAD, fired), SHOT_PASS, best.at, 'world', PASS_PITCH[shot.shot], gain);
   }
 
   /** A shot's skips and plunges near the ear, the nearest few, each heard when its sound comes. */
@@ -202,17 +186,12 @@ export class GunWatch {
     const near: { at: number; where: Vec; d: number; plunge: boolean }[] = [];
     for (const b of shot.balls) {
       b.touches.forEach((where, k) => {
-        const d = earDistance(where, s.ear);
+        const d = worldDistance(where, s.ear);
         if (d <= SPLASH_REACH) near.push({ at: fired + b.splashes[k]! + d / SPEED_OF_SOUND, where, d, plunge: k === b.touches.length - 1 });
       });
     }
-    near.sort((a, b) => a.d - b.d);
-    for (const n of near.slice(0, SPLASHES_A_SHOT)) {
-      this.sound(n.at, SHOT_SPLASH, n.where, 'world', n.plunge ? 1 : SKIP_PITCH, n.plunge ? 1 : SKIP_GAIN);
+    for (const n of nearest(near, SPLASHES_A_SHOT)) {
+      this.due.keep(n.at, SHOT_SPLASH, n.where, 'world', n.plunge ? 1 : SKIP_PITCH, n.plunge ? 1 : SKIP_GAIN);
     }
-  }
-
-  private sound(at: number, kind: SlapKind, where: Vec, bus: 'body' | 'world', pitch: number, share = 1): void {
-    this.due.push({ at, sound: { id: kind.id, at: [where[0], where[1], where[2]], ref: kind.ref, gain: kind.gain * share, bus, delay: 0, pitch } });
   }
 }
