@@ -58,8 +58,8 @@ export interface GunneryDeck {
   readonly drill?: number;
   /** The powder smoke about her (guns/smoke.ts; clear if not given). */
   readonly smoke?: number;
-  /** The enemy's pose, or null when there is none to fire at. */
-  readonly enemy: ShipPose | null;
+  /** The enemies' poses, nearest first (foes.ts); none when there is none to fire at. Each gun takes the nearest of them it bears on. */
+  readonly enemies: readonly ShipPose[];
   readonly sea: SeaState | null;
 }
 
@@ -136,16 +136,21 @@ export function stepGunnery(d: GunneryDeck): Gunnery {
   const told = d.told;
   if (!told.quarters && secured(d.guns)) return { guns: d.guns, fired: [], spent: false };
   const places = battery(), { men, shares } = pairHands(handsAtGuns(d.crew, undefined, d.out ?? null));
-  const target = d.enemy && told.quarters ? aimPoint(d.enemy, d.pose, told.aim) : null;
+  const targets = told.quarters ? d.enemies.map((e) => aimPoint(e, d.pose, told.aim)) : [];
   const lays: (Lay | null)[] = places.map(() => null);
   const wants = places.map((place, i): GunWant => {
     if (!told.quarters) return SECURED;
     const g = gunAt(d.guns, i), want: GunWant = { load: told.shot, runOut: true, train: 0, elevation: 0 };
-    if (!target || g.dismounted || !offSide(d.pose, place.side, muzzleAt(place), target)) return want;
-    const lay = layOn({ seed: d.seed, ship: d.ship, gun: i, tick: d.tick, place, pose: d.pose, shot: g.loadedWith ?? told.shot, heel: d.heel ?? 0 }, target);
-    if (Math.abs(lay.train) > GUNS[place.gun].train) return want;
-    lays[i] = lay;
-    return { ...want, train: lay.train, elevation: lay.laid };
+    if (g.dismounted) return want;
+    // The nearest enemy this gun's side faces and she can train on; each gun its own (a broadside to each beam).
+    for (const target of targets) {
+      if (!offSide(d.pose, place.side, muzzleAt(place), target)) continue;
+      const lay = layOn({ seed: d.seed, ship: d.ship, gun: i, tick: d.tick, place, pose: d.pose, shot: g.loadedWith ?? told.shot, heel: d.heel ?? 0 }, target);
+      if (Math.abs(lay.train) > GUNS[place.gun].train) continue;
+      lays[i] = lay;
+      return { ...want, train: lay.train, elevation: lay.laid };
+    }
+    return want;
   });
   // Each gun at her share of her pair's crew, as well drilled as they are.
   let guns = stepGuns(d.guns, men, wants, shares.map((x) => x * (d.drill ?? 1)));

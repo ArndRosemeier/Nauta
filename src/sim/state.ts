@@ -23,6 +23,8 @@ import { makeWind, meanWind, windAt, type WindState } from './wind';
 
 /** One ship of the match: how she lies on the water (motion.ts owns it), how she sails (sailing.ts), what she has been told (orders.ts), her crew at work (crew/crew.ts), what is shut aboard her (crew/closures.ts), her guns (guns/guns.ts) and what shot has done to her (damage.ts). */
 export interface SimShip {
+  /** The side she fights for: ships of one side are friends, those of every other side her enemies (foes.ts). Made once by `startMatch`. */
+  readonly side: number;
   readonly motion: ShipMotion;
   /** Her heading, way, helm, canvas and yards: the sailing model's state. */
   readonly sailing: Sailing;
@@ -74,6 +76,8 @@ export interface ShipStart {
   readonly canvas?: CanvasName;
   /** How well her gun crews are drilled, their pace at the guns (1 if not given: a player's crew; a computer captain's by his skill, captain.ts `crewedBy`). */
   readonly drill?: number;
+  /** The side she fights for (any whole number; ships of one are friends); her place in the list if not given, so every ship is her own side and a duel is two sides. */
+  readonly side?: number;
 }
 
 /** What a match starts from. How the ships are placed (distance, who has the wind) is the caller's: an open design question. */
@@ -104,7 +108,8 @@ export function startMatch(setup: MatchSetup): SimState {
     tick: 0,
     wind,
     sea: startSea(deriveSeed(seed, 'sea'), { speed, toward }, 0),
-    ships: setup.ships.map((s) => ({
+    ships: setup.ships.map((s, i) => ({
+      side: s.side ?? i,
       motion: startMotion(s.x, s.z, s.heading),
       sailing: startSailing(s, windAt(wind, s.x, s.z, 0), setup.windForce),
       told: startOrders(s.heading, s.canvas ?? START_CANVAS),

@@ -11,6 +11,7 @@ import { angleDiff } from '@futuremagic/core';
 import { sideReports } from './captain/sight';
 import { founderTonnes } from './damage/flood';
 import { waterIn } from './end';
+import { foeOf } from './foes';
 import { POINT } from './rules/orders';
 import type { SimState } from './state';
 import { simTime } from './state';
@@ -52,8 +53,8 @@ const SIDES = [[0, -1], [1, 1]] as const;
 
 /** Her bearing off ship `ship`'s bow, rad (+ starboard), and whether there is another ship at all. */
 export function herOff(s: SimState, ship: number): number | null {
-  const other = s.ships[1 - ship];
-  if (s.ships.length < 2 || !other) return null;
+  const foe = foeOf(s.ships, ship), other = foe === null ? undefined : s.ships[foe];
+  if (!other) return null;
   const me = s.ships[ship]!.motion.pose, her = other.motion.pose;
   return angleDiff(s.ships[ship]!.sailing.heading, bearingTo(me, her));
 }
@@ -83,7 +84,7 @@ export function noticed(before: SimState, after: SimState, ship: number, firstLo
   const off = herOff(after, ship), offBefore = herOff(before, ship);
   // The lookout: her sail at the first look; her ports opening.
   if (off !== null && firstLook) out.push({ kind: 'sighted', tick, ship, off });
-  const her = after.ships[1 - ship], herWas = before.ships[1 - ship];
+  const foe = foeOf(after.ships, ship), her = foe === null ? undefined : after.ships[foe], herWas = foe === null ? undefined : before.ships[foe];
   if (off !== null && her && herWas && her.told.quarters && !herWas.told.quarters) out.push({ kind: 'ports', tick, ship });
   // The gunner: a side all ready; ready guns bearing on her while they wait for a word.
   if (off !== null && offBefore !== null) {
