@@ -1,0 +1,2 @@
+You can cross the weather deck from side to side more often now: a gap between the skylight and the mainmast's bitts, one between the galley chimney and the fore bitts, and one just in front of the foremast. The store scuttle moved to the port side to make room.
+Try it with ?walk: walk forward along one side and cross over in front of the foremast.

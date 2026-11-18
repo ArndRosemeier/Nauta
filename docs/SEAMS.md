@@ -290,3 +290,4 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The walking thumb's stick as a push | `src/app/thumbs.ts#stickPush` |
 | Keys held as a push (WASD and arrows) | `src/app/thumbs.ts#keyPush` |
 | The walking thumb and keys on the page (the left half's floating stick) | `src/app/walkInput.ts#watchWalk` |
+| The ways across her weather deck's centreline: how wide, how often (the fife rails' places that make them: `MAIN_FIFE_AT`, `FORE_FIFE_FORE_AT`) | `src/sim/rules/ships.ts#DECK_CROSSING` |
