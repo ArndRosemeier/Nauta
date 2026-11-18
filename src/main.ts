@@ -710,7 +710,7 @@ async function start(): Promise<void> {
         crew.poolInUse = phase && !phase.pool ? 0 : startCrew.pool;
         crew.everyFrame = phase?.everyFrame ?? false;
         crew.noShadows = phase?.noShadows ?? false;
-        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds(), violence: settings.now.violence });
+        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds(), violence: settings.now.violence, ...(spectator?.watching ? { pooled: spectator.nearestShip, watching: true } : {}) });
       }
       jump = 0;
       sky.below = ship.below;

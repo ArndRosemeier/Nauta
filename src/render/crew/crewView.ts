@@ -134,6 +134,10 @@ export interface CrewFrame {
   readonly state: { from: SimState; to: SimState; f: number };
   /** Which ship is the captain's. */
   readonly mine: number;
+  /** Which ship's men the near pool dresses as full characters (default: the captain's; watching a battle, the ship the eye is nearer). */
+  readonly pooled?: number;
+  /** Watching a battle (plan N7.8): no captain walks, so every man of every ship, the first ship's captain too, is drawn. */
+  readonly watching?: boolean;
   readonly camera: PerspectiveCamera;
   readonly knobs: CrewKnobs;
   /** The glass's magnification (1 without): the other ship's men drawn as far as they look near. */
@@ -299,6 +303,13 @@ export class CrewView {
     }
   }
 
+  /** How many of each ship's men the near pool shows now as full characters (by her place in the match): for the browser checks. */
+  pooledByShip(): number[] {
+    const n = this.groups.map(() => 0);
+    for (const p of this.pool.chars) if (p.man !== null && p.shown) n[this.all[p.man]!.ship]!++;
+    return n;
+  }
+
   /** The figures and pool together: what they hold in memory (geometry, the pose atlas), for the HUD and the trial. */
   memory(): { figures: number; atlas: number; pool: number; workbench: number } {
     const f = this.figures.memory(), seen = new Set<ArrayBufferView>();
@@ -330,7 +341,7 @@ export class CrewView {
       const at = fr.state.to.tick / STEPS_PER_SECOND;
       this.blood[ship]!.showLevel(fr.violence, at);
       for (const d of men) {
-        if (ship === fr.mine && d.man === 0) continue; // the captain: the player's own body
+        if (ship === fr.mine && d.man === 0 && !fr.watching) continue; // the captain: the player's own body
         d.struck += dt;
         this.noteHurt(d, to, at, fr.violence);
         const step = this.everyFrame ? 1 : d.step;
@@ -508,20 +519,20 @@ export class CrewView {
 
   /** The pool handed out: the men who matter and the nearest seen of her crew within its reach; the rest given back. */
   private handOut(fr: CrewFrame): void {
-    const mine = this.byShip[fr.mine] ?? [], size = this.crews > 0 ? this.poolInUse : 0;
+    const pooled = fr.pooled ?? fr.mine, mine = this.byShip[pooled] ?? [], size = this.crews > 0 ? this.poolInUse : 0;
     const at = fr.state.to.tick / STEPS_PER_SECOND;
     // A man just hurt matters too (plan "Faces": speaking, struck or addressed): his face is a living one, near enough to be seen.
-    const candidates = mine.filter((d) => d.man !== 0 && d.crowd !== null && d.covered === 0).map((d) => ({
+    const candidates = mine.filter((d) => (d.man !== 0 || fr.watching) && d.crowd !== null && d.covered === 0).map((d) => ({
       man: d.man, distance: d.distance, seen: d.seen,
       matters: (this.matters.get(d.man) ?? 0) > fr.now || (at - d.hurtAt < HURT_MATTERS && d.distance <= HURT_REACH),
     }));
     this.held.clear();
-    for (const p of this.pool.chars) if (p.man !== null) this.held.add(p.man - fr.mine * brigRoster().length);
+    for (const p of this.pool.chars) if (p.man !== null) this.held.add(p.man - pooled * brigRoster().length);
     const chosen = new Set(choosePool(candidates, fr.knobs, this.held, size));
     for (const p of this.pool.chars) {
       if (p.man === null) continue;
       const d = this.all[p.man]!;
-      if (d.ship !== fr.mine || !chosen.has(d.man) || !d.crowd) this.pool.giveBack(p, this.figures, d.crowd);
+      if (d.ship !== pooled || !chosen.has(d.man) || !d.crowd) this.pool.giveBack(p, this.figures, d.crowd);
     }
     for (const man of chosen) {
       const d = mine.find((x) => x.man === man)!, key = this.key(d);
@@ -532,6 +543,9 @@ export class CrewView {
       const dressed = this.pool.dressedAs(p, key);
       if (!dressed && fr.now - this.dressedAt < fr.knobs.dressEvery) continue;
       if (!dressed) this.dressedAt = fr.now;
+      // The pool's men ride in the group of the ship whose man each is.
+      const group = this.groups[d.ship]!;
+      if (p.place.parent !== group) group.add(p.place);
       this.pool.takeOver(p, key, fullLook(this.pool.catalog, d.figure), wears, this.figures, () => d.crowd, (q) => this.placeChar(q, d));
       const words = this.waiting.get(this.key(d));
       if (words) { p.words = words; this.waiting.delete(this.key(d)); }
@@ -549,10 +563,9 @@ export class CrewView {
   /** The pool's men: placed, playing their man's clip, at their level, their faces, their looks and words. */
   private animatePool(dt: number, fr: CrewFrame): void {
     this.pool.fadeOut(dt);
-    const ship = fr.state.to.ships[fr.mine];
     for (const p of this.pool.chars) {
-      if (p.man === null || !p.shown || !ship) { if (p.leaving > 0) p.ch.update(dt); continue; }
-      const d = this.all[p.man]!;
+      const d = p.man === null ? null : this.all[p.man]!, ship = d ? fr.state.to.ships[d.ship] : undefined;
+      if (!d || !p.shown || !ship) { if (p.leaving > 0) p.ch.update(dt); continue; }
       this.placeChar(p, d);
       if (d.clip && d.clip !== p.clip) { p.clip = d.clip; void p.ch.play(d.clip, CLIP_FADE); }
       const level = p.full ? poolLevel(fr.knobs, d.distance, p.level) : MEDIUM;
@@ -561,7 +574,7 @@ export class CrewView {
       p.ch.actor.animationSteps = [d.step, d.step];
       // His face: from what he is doing and what has just happened to him (app/faces.ts).
       const task = taskOf(ship.crew, d.man), voice = [...this.voices].find(([, man]) => man === d.man)?.[0];
-      const end = fr.state.to.fight.end, ended = !end ? null : end.lost[fr.mine] ? 'lost' : end.lost.some((l) => l !== null) ? 'won' : null;
+      const end = fr.state.to.fight.end, ended = !end ? null : end.lost[d.ship] ? 'lost' : end.lost.some((l) => l !== null) ? 'won' : null;
       const gun = gunWork(ship, d.man, d.m);
       const present = facesNow({
         gun: gun ? { strains: gunStrains(gun), captain: gun.part === 'captain', sinceFired: gun.sinceFired } : undefined,

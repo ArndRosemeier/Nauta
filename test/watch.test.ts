@@ -8,7 +8,7 @@ import { DuelSession } from '../src/net/duel.ts';
 import { PageMatch } from '../src/app/pageMatch.ts';
 import { readParams } from '../src/app/params.ts';
 import { lookDir } from '../src/app/look.ts';
-import { ABOVE_WATER, BOOST, CEILING, flightSpeed, FreeCam, lookToward, SPEED_LEAST, SPEED_MOST, vantageOf, vantageOfBoth, type Flying } from '../src/app/freeCam.ts';
+import { ABOVE_WATER, BOOST, CEILING, flightSpeed, FreeCam, lookToward, SPEED_LEAST, SPEED_MOST, vantageOf, vantageOfBoth, vantageOver, type Flying } from '../src/app/freeCam.ts';
 import { SKILL } from '../src/sim/rules/captain.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 
@@ -150,5 +150,17 @@ test('looking toward a place agrees with the direction looked along; both ships 
     const to = [ship.x - v.at[0], -v.at[1], ship.z - v.at[2]] as const, l = Math.hypot(...to);
     // Each within 60° of the middle of the view.
     assert.ok((forward[0] * to[0] + forward[1] * to[1] + forward[2] * to[2]) / l > Math.cos(Math.PI / 3));
+  }
+});
+
+test('the opening shot stands close behind the first ship, with her and the far enemy both near the middle of the view', () => {
+  const a = { x: 0, z: 0, heading: 0 }, b = { x: 1200, z: -900, heading: 3 };
+  const v = vantageOver(a, b), forward = lookDir(v.look);
+  // Close: the ship is under 60 m off, and the enemy is a mile and a half away.
+  assert.ok(Math.hypot(v.at[0] - a.x, v.at[2] - a.z) < 60);
+  for (const ship of [a, b]) {
+    const to = [ship.x - v.at[0], 8 - v.at[1], ship.z - v.at[2]] as const, l = Math.hypot(...to);
+    // Each within 40° of the middle of the view.
+    assert.ok((forward[0] * to[0] + forward[1] * to[1] + forward[2] * to[2]) / l > Math.cos(Math.PI * 40 / 180));
   }
 });

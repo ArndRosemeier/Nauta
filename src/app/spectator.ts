@@ -12,7 +12,7 @@ import { make } from './dom';
 import { makeButton } from './button';
 import type { Look } from './look';
 import type { Standpoint } from './standpoints';
-import { FreeCam, vantageOf, vantageOfBoth, type Hull, type Vec3 } from './freeCam';
+import { FreeCam, vantageOf, vantageOfBoth, vantageOver, type Hull, type Vec3 } from './freeCam';
 import type { Push } from './thumbs';
 import type { WordKey } from './words';
 import type { Offered } from '../sim/rules/captain';
@@ -36,6 +36,8 @@ const START_HEIGHT = 60;
 const HINT_MS = 12000;
 /** A ship's middle stands this high over the water for the distance to her, m: the eye's nearness is to her hull, not her waterline. */
 const SHIP_MIDDLE = 8;
+/** The eye is nearer the other ship than the one it was nearest to only when it is this share of the distance to her: no flicker midway between the two. */
+const NEARER_SHARE = 0.8;
 /** The words the controls speak with, by key. */
 type Say = Readonly<Record<WordKey, string>>;
 
@@ -68,6 +70,9 @@ export class Spectator {
   private up!: HTMLButtonElement;
   private down!: HTMLButtonElement;
   private hintTimer = 0;
+  private nearest = 0;
+  /** The opening shot is set again from where the ships are at the first frame (the page's poses are those of the last frame when it begins). */
+  private opening = false;
   /** For the browser checks: a push, a climb and the boost held in place of the thumb and keys (null: the thumb and keys). */
   forced: { readonly push: Push; readonly climb: number; readonly boost: boolean } | null = null;
 
@@ -86,21 +91,30 @@ export class Spectator {
     return this.cam.at;
   }
 
+  /** Which ship (her place in the match) the eye is nearest to: the one whose men are drawn as full characters. */
+  get nearestShip(): number {
+    return this.nearest;
+  }
+
   /** Whether a battle is being watched now: the page draws no captain and takes no orders while it is. */
   get watching(): boolean {
     return this.on;
   }
 
   /**
-   * Begins watching: the eye at the place to see both ships from at once, the look to take. `caption`: who fights
+   * Begins watching: the eye over the British ship's shoulder, looking out to the French on the horizon (keeping company with her),
+   * the look to take. `caption`: who fights
    * (shown small at the top of the view). Call `end` when the match is left.
    */
   begin(ships: readonly Hull[], caption: string): Look {
     this.on = true;
-    this.company = 'both';
+    this.company = 'british';
     this.hulls = ships;
+    this.nearest = 0;
+    this.opening = true;
     this.held.clear();
-    const v = ships.length > 1 ? vantageOfBoth(ships[0]!, ships[1]!) : vantageOf(ships[0]!);
+    this.cam.parted();
+    const v = ships.length > 1 ? vantageOver(ships[0]!, ships[1]!) : vantageOf(ships[0]!);
     this.cam.x = v.at[0]; this.cam.y = v.at[1]; this.cam.z = v.at[2];
     this.caption.textContent = caption;
     for (const el of [this.bar, this.arrows, this.caption]) el.hidden = false;
@@ -186,11 +200,21 @@ export class Spectator {
   eyeFor(dt: number, look: Look, ships: readonly Hull[], water: (x: number, z: number) => number): { readonly where: Standpoint; readonly look: Look } {
     this.hulls = ships;
     const c = this.cam;
-    const near = Math.min(Infinity, ...ships.map((s) => Math.hypot(s.x - c.x, SHIP_MIDDLE - c.y, s.z - c.z)));
+    let opened: Look | null = null;
+    if (this.opening && ships.length > 1) {
+      this.opening = false;
+      const v = vantageOver(ships[0]!, ships[1]!);
+      [c.x, c.y, c.z] = v.at;
+      c.parted();
+      opened = v.look;
+    }
+    const apart = ships.map((s) => Math.hypot(s.x - c.x, SHIP_MIDDLE - c.y, s.z - c.z)), near = Math.min(Infinity, ...apart);
+    const closest = apart.indexOf(near);
+    if (closest >= 0 && closest !== this.nearest && near < (apart[this.nearest] ?? Infinity) * NEARER_SHARE) this.nearest = closest;
     const pressed = (keys: readonly string[]) => keys.some((k) => this.held.has(k));
     const climb = (pressed(CLIMB_KEYS) ? 1 : 0) - (pressed(DESCEND_KEYS) ? 1 : 0) + this.buttonClimb;
     const f = this.forced, ask = { push: f?.push ?? this.page.push(), climb: f?.climb ?? Math.max(-1, Math.min(1, climb)), boost: f?.boost ?? pressed(BOOST_KEYS) };
-    const turned = c.onward(dt, look, { ...ask, near, water: water(c.x, c.z) }, this.companyNow());
+    const turned = c.onward(dt, opened ?? look, { ...ask, near, water: water(c.x, c.z) }, this.companyNow());
     const eye: Vec3 = c.at;
     return { where: { name: 'watch', eye, look: turned, off: true, world: true }, look: turned };
   }

@@ -101,6 +101,24 @@ export function vantageOfBoth(a: Hull, b: Hull): Vantage {
   return { at, look: lookToward(at, [mx, 0, mz]) };
 }
 
+/** Where the over-the-shoulder shot stands: behind the ship, away from the enemy, and to the right of the line, m; and how high. */
+const SHOULDER_BACK = 45;
+const SHOULDER_ABEAM = 20;
+const SHOULDER_HEIGHT = 14;
+/** The shot looks at the line to the enemy this far from the ship, m, at about her rail's height: she stands in the foreground, the enemy small and far. */
+const SHOULDER_LOOK = 150;
+const SHOULDER_LOOK_HEIGHT = 10;
+
+/**
+ * The opening shot of a battle: just behind `ship`'s quarter, looking out past her to `enemy` on the horizon. She fills
+ * the foreground, the enemy comes on from afar. (Two ships a mile apart are two specks from anywhere that has both in view.)
+ */
+export function vantageOver(ship: Hull, enemy: Hull): Vantage {
+  const dx = enemy.x - ship.x, dz = enemy.z - ship.z, apart = apartOnWater(ship, enemy) || 1, fx = dx / apart, fz = dz / apart;
+  const at: Vec3 = [ship.x - fx * SHOULDER_BACK - fz * SHOULDER_ABEAM, SHOULDER_HEIGHT, ship.z - fz * SHOULDER_BACK + fx * SHOULDER_ABEAM];
+  return { at, look: lookToward(at, [ship.x + fx * SHOULDER_LOOK, SHOULDER_LOOK_HEIGHT, ship.z + fz * SHOULDER_LOOK]) };
+}
+
 /** An angle brought into -pi..pi. */
 const wrapAngle = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
 
