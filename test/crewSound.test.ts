@@ -24,6 +24,7 @@ import { startMatch, type SimShip } from '../src/sim/state.ts';
 import type { SimEvent } from '../src/sim/step.ts';
 import { DEGREE, STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { steadyWind } from './support/sail.ts';
+import './support/warm.ts';
 
 const FORCE = 4;
 const WIND = steadyWind(FORCE, 0);

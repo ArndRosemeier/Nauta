@@ -14,6 +14,7 @@ import { rigPlan } from '../src/sim/ship/rig.ts';
 import { sailsStanding, setShares } from '../src/sim/ship/sailing.ts';
 import { drawShare, sailArea, sailShare } from '../src/sim/ship/sails.ts';
 import { drive, startSail, WIND } from './support/crew.ts';
+import './support/warm.ts';
 
 const COURSE = 3, TOPSAIL = 4, BOOM = 6;
 const TINY = 1e-9;
