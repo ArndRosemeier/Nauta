@@ -22,8 +22,9 @@ import type { Closures } from './closures';
 import { goingAt, goingRoute, startGoing, stepGoings, type Going } from './going';
 import { heightAt, lineLength, routeNetwork } from './network';
 import { drill, isRepair, jobLeft, jobWork, shareAt, type Job, type JobWork } from './drill';
-import { billOrder, brigRoster, placeSpot, type Man } from './roster';
+import { billOrder, brigRoster, placeSpot, quartersPlace, type Man } from './roster';
 import { rigPlan } from '../ship/rig';
+import { SIDES } from '../ship/spars';
 
 /** One man's state, by his place in the roster. */
 export interface Hand {
@@ -79,7 +80,12 @@ export interface Deck {
   /** The men out of the quarter bill (badly hurt or killed: damage.ts `outOf`), and the repairs wanted now (crew/repairs.ts), in the order they are manned. */
   readonly out?: ReadonlySet<number>;
   readonly repairs?: readonly Repair[];
+  /** At quarters, the side she fights on (gunnery.ts `engagedSide`): where the gun crews stand (`restPlace`); left out when she is not at quarters. */
+  readonly quarters?: Engaged;
 }
+
+/** The side a ship at quarters fights on: +1 starboard, -1 larboard, both at once, or neither yet. */
+export type Engaged = number | 'both' | 'none';
 
 /** A repair wanted (crew/repairs.ts): the job, what it is done on (a hole, a line, a spar part, a space, a man) and where (used when its task is made). */
 export interface Repair {
@@ -141,6 +147,20 @@ function target(i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Ta
   if (t.at) return t.at;
   const places = jobWork(t.job, t.on).places;
   return placeSpot(places[t.hands.indexOf(i) % places.length]!);
+}
+
+/**
+ * Where a man with no task goes: his post; at quarters, a gun's man stands to his pair's gun on the side she fights
+ * (roster.ts `quartersPlace`), at his post when she fights both sides (his pair split), and where he stands or is
+ * going while neither side bears, if that is at one of his pair's guns.
+ */
+function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged | undefined): string {
+  const post = roster[i]!.post;
+  if (quarters === undefined || quarters === 'both' || roster[i]!.gun === null) return post;
+  if (quarters !== 'none') return quartersPlace(i, quarters, roster) ?? post;
+  const at = h.going?.path.to ?? h.stands;
+  if (!at) return post;
+  return SIDES.map((side) => quartersPlace(i, side, roster)).find((p) => p !== null && sameSpot(at, placeSpot(p))) ?? post;
 }
 
 /** Whether a man is where he must be, standing. */
@@ -294,7 +314,7 @@ function sendMen(men: readonly Hand[], roster: readonly Man[], byMan: ReadonlyMa
   for (const i of order) {
     if (sent >= SENT_PER_STEP) break;
     if (struck.has(i)) continue;
-    const h = men[i]!, to = target(i, roster, byMan);
+    const h = men[i]!, to = byMan.has(i) ? target(i, roster, byMan) : placeSpot(restPlace(i, h, roster, deck.quarters));
     if (h.blocked === deck.closures.waysSerial) continue;
     let from: Spot;
     if (h.going) {
@@ -306,7 +326,9 @@ function sendMen(men: readonly Hand[], roster: readonly Man[], byMan: ReadonlyMa
       from = standing(h, roster[i]!);
       if (sameSpot(from, to)) continue;
     }
-    const going = startGoing(from, to, byMan.has(i) ? 'smart' : 'walk', deck.heel, deck.closures);
+    // A gun's man goes smartly at quarters (to his gun on the side she fights), as every man does to a task.
+    const smart = byMan.has(i) || (deck.quarters !== undefined && roster[i]!.gun !== null);
+    const going = startGoing(from, to, smart ? 'smart' : 'walk', deck.heel, deck.closures);
     sent++;
     out[i] = going ? { stands: null, going, blocked: null } : { ...h, blocked: deck.closures.waysSerial };
   }
@@ -339,7 +361,8 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
   let c = strikeOut(syncRepairs(syncTasks(crew, told, deck), deck.repairs ?? [], deck.tick), out, roster);
   // An act with nothing left to do (its sail already stands as told) is done at once.
   const idle = told.acts.filter((a) => !c.tasks.some((t) => t.act === a.id)).map((a) => a.id);
-  if (c.tasks.length === 0 && c.men.every((h) => h.going === null && h.stands === null)) return { crew: c, done: idle, events: [], sails: [], mended: [] };
+  // Nothing to do and every man at his post (unless she fights a side at quarters: then the gun crews stand to it).
+  if (c.tasks.length === 0 && typeof deck.quarters !== 'number' && c.men.every((h) => h.going === null && h.stands === null)) return { crew: c, done: idle, events: [], sails: [], mended: [] };
   const events: CrewEvent[] = [];
   let tasks = manTasks(c.tasks, c.men, roster, deck.tick, out);
   const byMan = new Map(tasks.flatMap((t) => t.hands.map((i) => [i, t] as const)));

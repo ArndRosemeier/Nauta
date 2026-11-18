@@ -8,7 +8,7 @@
  * orders in one step never race; orders.ts answers each: taken, taken with words (`answered`) or refused with its reason), the sea follows the
  * wind's mean at the step's start, and every ship has the acts of her orders falling due now carried out (orders.ts),
  * sails one step in the true wind at her place (sailing.ts), works and fires her guns at the other ship as she has
- * been told (guns/gunnery.ts) and floats one step on that sea as her sailing says (motion.ts).
+ * been told (guns/gunnery.ts; her gun crews stand to the side that bears, `engagedSide`) and floats one step on that sea as her sailing says (motion.ts).
  * Before she sails, what her damage leads to is worked out (damage.ts `stepAftermath`: water, falling spars, fire), and
  * what is left of her sails, her steering and the water's weight go to her sailing and floating.
  * Last, ships that have run into each other are pushed apart (ship/touch.ts: struck, fouled), and the fight is
@@ -23,7 +23,7 @@ import { launch, outOf, stepAftermath, stepHits, type Aftermath, type Hit } from
 import { carryOut, giveOrder, heard, masterSteers, wordSpent, type AnswerCode, type Order, type OrderMoment, type RefusalCode, type SailingOrder } from './orders';
 import { stepFight, waterIn, type FightEvent } from './end';
 import { masterOrder } from './captain/helm';
-import { stepGunnery } from './guns/gunnery';
+import { engagedSide, stepGunnery } from './guns/gunnery';
 import type { GunFired } from './guns/shot';
 import { followWind } from './sea/sea';
 import { stepMotion } from './ship/motion';
@@ -148,7 +148,10 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     const pose = s.motion.pose;
     // The men out of the quarter bill (badly hurt, killed), and what the crew does for her life now (crew/repairs.ts).
     const out = outOf(s.damage), repairs = repairsDue(s.damage, s.told, s.crew, tick);
-    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, repairs });
+    // At quarters, the side her guns bear on the enemy: her gun crews stand to it (gunnery.ts, crew.ts).
+    const enemies = ships.flatMap((o, k) => (k === i ? [] : [o.motion.pose]));
+    const quarters = s.told.quarters ? engagedSide(pose, enemies, s.told.aim) : undefined;
+    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, repairs, quarters });
     for (const e of crewed.events) {
       const given = s.told.given.find((g) => g.id === e.of);
       if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });

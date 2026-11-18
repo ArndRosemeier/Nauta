@@ -6,14 +6,16 @@
  * end to end, from the water to her rail, as she lies at the instant of firing). Prints the share that strike her, and
  * fails if they stray from the design (about 3 in 4 at 100 m, half at 200 m, 1 in 5 at 400 m) by more than SHARE_SLACK,
  * or if the check did not do what it says: the sea rolled her less than LEAST_ROLL, too few shots were fired, a path
- * or a pose stopped being a number. Also prints how far chain and grape carry. About 20 s.
+ * or a pose stopped being a number. Also prints how far chain and grape carry, and checks the gun crews at quarters in
+ * a whole match (`crewsAtQuarters`: they man the side that bears, cross the deck, and reload at the table's pace). About 35 s.
  *
  *   npm run check:gunnery
  */
-import { battery, fireGun, gunAt, laidAt, standingWants, startGuns, stepGuns, type Battery, type GunWant } from '../../src/sim/guns/guns.ts';
+import { battery, fireGun, gunAt, handsAtGuns, laidAt, standingWants, startGuns, stepGuns, type Battery, type GunWant } from '../../src/sim/guns/guns.ts';
+import { engagedSide } from '../../src/sim/guns/gunnery.ts';
 import { bears, fireShot, layOn, type Flight, type Vec } from '../../src/sim/guns/shot.ts';
 import { RAIL_TOP, TOP_OF_SIDE } from '../../src/sim/rules/ships.ts';
-import type { ShotKind } from '../../src/sim/rules/guns.ts';
+import { GUNS, type ShotKind } from '../../src/sim/rules/guns.ts';
 import { hullEnds, hullHalfBreadth, sideTop } from '../../src/sim/ship/hull.ts';
 import { lyingStill, startMotion, stepMotion, toShip, type ShipMotion, type ShipPose } from '../../src/sim/ship/motion.ts';
 import { LOAD_WATERLINE } from '../../src/sim/rules/ships.ts';
@@ -83,6 +85,51 @@ function broadsideByOrders(): void {
     if (fired.some((e) => e.fired.balls.some((b) => b.path.length < 2 || b.path.some((p) => !p.every(Number.isFinite))))) problems.push('broadside: a shot has no flight');
     if (ticks.size < Math.ceil(fired.length / RIPPLE)) problems.push(`broadside: ${fired.length} guns in ${ticks.size} steps, more than ${RIPPLE} a step`);
   }
+}
+
+/** The crews at quarters in a whole match (orders.md): the most each part may take, s (crossing the deck smartly is about 5 s). */
+const MANNED_WITHIN = 20;
+/** How near a gun with her whole crew reloads to the table's time, s. */
+const RELOAD_SLACK = 1;
+/** The longest she is sailed for the gun crews' check, s. */
+const CREWS_FOR = 400;
+
+/**
+ * The gun crews at quarters in a whole match (orders.md, one crew to a pair of guns): the duel's start as `?sail`
+ * gives it, the first ship bears away to bring the enemy onto her starboard beam and beats to quarters, firing as they
+ * bear. Her pairs' crews go to the starboard guns as that side comes to bear, and a gun there reloads in the table's
+ * time with her whole crew; then she puts her helm over to bring the enemy onto her larboard beam, and the crews cross
+ * the deck. Fails if a side is not manned within `MANNED_WITHIN` of coming to bear, or a reload strays.
+ */
+function crewsAtQuarters(): void {
+  let s = startMatch(duelStart(SEED));
+  const say = (words: string): Order => { const o = parseOrder(words, 0); if (typeof o === 'string') throw new Error(o); return o; };
+  const enemy = Math.atan2(s.ships[1]!.motion.pose.x - s.ships[0]!.motion.pose.x, -(s.ships[1]!.motion.pose.z - s.ships[0]!.motion.pose.z));
+  const course = Math.round(wrapBearing(enemy - Math.PI / 2) / DEGREE) % 360;
+  const manned = (side: number) => { const men = handsAtGuns(s.ships[0]!.crew); return battery().every((p, i) => p.side !== side || men[i]! >= p.crew.length); };
+  const side = () => engagedSide(s.ships[0]!.motion.pose, [s.ships[1]!.motion.pose], s.ships[0]!.told.aim);
+  const at = { bore: -1, manned: -1, fired: -1, ready: -1, turned: -1, crossBore: -1, crossed: -1 };
+  let gun = -1;
+  for (let k = 0; k < CREWS_FOR * STEPS_PER_SECOND && at.crossed < 0; k++) {
+    const orders = k === 0 ? [say(`steer ${String(course).padStart(3, '0')}`), say('beat to quarters'), say('fire as they bear')] : [];
+    if (at.ready >= 0 && at.turned < 0) { orders.push(say(`steer ${String((course + 180) % 360).padStart(3, '0')}`)); at.turned = k; }
+    const r = step(s, orders);
+    s = r.state;
+    if (at.bore < 0 && side() === 1) at.bore = k;
+    if (at.bore >= 0 && at.manned < 0 && manned(1)) at.manned = k;
+    // The first gun fired with the starboard crews all there, and when she stands ready again.
+    for (const e of r.events) if (e.kind === 'fired' && e.ship === 0 && at.manned >= 0 && at.fired < 0) { at.fired = k; gun = e.gun; }
+    if (at.fired >= 0 && at.ready < 0 && gunAt(s.ships[0]!.guns, gun).drill === 'ready') at.ready = k;
+    if (at.turned >= 0 && at.crossBore < 0 && side() === -1) at.crossBore = k;
+    if (at.crossBore >= 0 && manned(-1)) at.crossed = k;
+  }
+  const secs = (a: number, b: number) => (a < 0 || b < 0 ? Infinity : (b - a) / STEPS_PER_SECOND);
+  const man = secs(at.bore, at.manned), reload = secs(at.fired, at.ready), cross = secs(at.crossBore, at.crossed);
+  const row = GUNS[battery()[Math.max(0, gun)]!.gun];
+  console.log(`crews at quarters: starboard manned ${man.toFixed(1)} s after it bore; a ${row.what} reloaded in ${reload.toFixed(1)} s (table ${row.reload} s); crossed to larboard in ${cross.toFixed(1)} s after it bore`);
+  if (!(man <= MANNED_WITHIN)) problems.push(`crews: the starboard guns manned ${man.toFixed(1)} s after that side bore`);
+  if (!(Math.abs(reload - row.reload) <= RELOAD_SLACK)) problems.push(`crews: a gun with her whole crew reloaded in ${reload.toFixed(1)} s, the table says ${row.reload} s`);
+  if (!(cross <= MANNED_WITHIN)) problems.push(`crews: the crews crossed to larboard ${cross.toFixed(1)} s after it bore`);
 }
 
 /**
@@ -189,6 +236,7 @@ for (const shot of ['chain', 'grape'] as const) {
   console.log(`${shot} at 100 m: ${out.struck} of ${out.fired} balls through her side; the farthest went ${out.farthest.toFixed(0)} m`);
 }
 broadsideByOrders();
+crewsAtQuarters();
 headlessDuel();
 console.log(`gunnery: ${((performance.now() - began) / 1000).toFixed(1)} s`);
 if (problems.length > 0) {

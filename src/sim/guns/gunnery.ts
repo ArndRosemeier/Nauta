@@ -15,20 +15,26 @@
  *   spent when every one of them has fired. **Cease firing:** the guns load and stand ready.
  * - At most `RIPPLE` guns of a ship fire in a step, in battery order: a broadside ripples over a few steps.
  *
- * Not built yet: the gun crews going to the side that fights at quarters (each pair's crew stands half at each gun, so
- * the guns work short-handed, guns.ts); shifting a long six to her chase port; her steady heel in the laying (laid as
- * if she lay upright).
+ * - **The gun crews at quarters** (orders.md): one crew serves a pair of guns. The side that bears on the enemy
+ *   (`engagedSide`) is told to the crew (crew.ts), whose gun crews cross the deck to that side's guns on the walk
+ *   graph; while neither side bears they stay where they stand. A pair whose men stand at both its guns (both sides
+ *   bear, or she made ready before either did and they stand at their posts in the quarter bill) is split: each gun is
+ *   worked by the whole crew at `SPLIT_SHARE` of its pace (`pairHands`).
+ *
+ * Not built yet: shifting a long six to her chase port; her steady heel in the laying (laid as if she lay upright).
  */
-import { AIM_HEIGHT, GUNS, LAID_WITHIN, RIPPLE, SHOT, type ShotKind } from '../rules/guns';
+import { AIM_HEIGHT, GUNS, LAID_WITHIN, RIPPLE, SHOT, SPLIT_SHARE, type ShotKind } from '../rules/guns';
 import { LOAD_WATERLINE } from '../rules/ships';
 import type { ShipOrders } from '../orders';
 import type { SeaState } from '../sea/sea';
 import { hullHalfBreadth } from '../ship/hull';
 import { toWorld, type ShipPose } from '../ship/motion';
+import type { GunPlace } from '../ship/plan';
 import type { Sailing } from '../ship/sailing';
-import type { Crew } from '../crew/crew';
+import type { Crew, Engaged } from '../crew/crew';
+import { pairOf } from '../crew/roster';
 import { battery, cannotFire, fireGun, gunAt, gunCount, handsAtGuns, laidAt, stepGuns, type Battery, type GunWant } from './guns';
-import { bears, elevationFor, fireShot, layOn, muzzleAt, type GunFired, type Lay, type Vec } from './shot';
+import { bears, elevationFor, fireShot, layOn, muzzleAt, trainTo, type GunFired, type Lay, type Vec } from './shot';
 
 /** What a ship's guns are worked from in a step. */
 export interface GunneryDeck {
@@ -82,11 +88,47 @@ function offSide(pose: ShipPose, side: number, muzzle: Vec, target: Vec): boolea
   return (out[0] - at[0]) * (target[0] - at[0]) + (out[2] - at[2]) * (target[2] - at[2]) > 0;
 }
 
+/** Whether a gun at `place` bears on `target` as she lies at `pose`: it lies off her side, within the gun's training. */
+function bearsOn(pose: ShipPose, place: GunPlace, target: Vec): boolean {
+  return offSide(pose, place.side, muzzleAt(place), target) && Math.abs(trainTo(place, pose, target).train) <= GUNS[place.gun].train;
+}
+
+/**
+ * The side a ship at quarters fights on, for her gun crews (crew.ts): the side (+1 starboard, -1 larboard) whose guns
+ * bear on the enemy (some gun of it, as the gun captains lay: `aimPoint`), 'both' when guns of both sides bear on
+ * enemies, 'none' when no gun bears on any (no enemy, or none off either side within training).
+ */
+export function engagedSide(pose: ShipPose, enemies: readonly ShipPose[], aim: ShipOrders['aim']): Engaged {
+  const bearing = new Set<number>();
+  for (const enemy of enemies) {
+    const target = aimPoint(enemy, pose, aim);
+    for (const place of battery()) if (!bearing.has(place.side) && bearsOn(pose, place, target)) bearing.add(place.side);
+  }
+  if (bearing.size === 0) return 'none';
+  return bearing.size > 1 ? 'both' : [...bearing][0]!;
+}
+
+/**
+ * The hands that work each gun and the share of their pace it gets: a pair whose men stand at both its guns is split,
+ * so each gun is worked by the pair's whole crew (counted at both) at `SPLIT_SHARE`; otherwise a gun has the men at
+ * her, at her full pace (`stepGun`).
+ */
+export function pairHands(atGuns: readonly number[]): { men: number[]; shares: number[] } {
+  const places = battery(), men = [...atGuns], shares = places.map(() => 1);
+  places.forEach((place, i) => {
+    const j = places.findIndex((o, k) => k !== i && pairOf(o.id) === pairOf(place.id));
+    if (j < 0 || atGuns[i] === 0 || atGuns[j] === 0) return;
+    men[i] = atGuns[i]! + atGuns[j]!;
+    shares[i] = SPLIT_SHARE;
+  });
+  return { men, shares };
+}
+
 /** A step of a ship's guns at the orders she has been told, firing at the enemy where they bear (see the file's head). */
 export function stepGunnery(d: GunneryDeck): Gunnery {
   const told = d.told;
   if (!told.quarters && secured(d.guns)) return { guns: d.guns, fired: [], spent: false };
-  const places = battery(), men = handsAtGuns(d.crew, undefined, d.out ?? null);
+  const places = battery(), { men, shares } = pairHands(handsAtGuns(d.crew, undefined, d.out ?? null));
   const target = d.enemy && told.quarters ? aimPoint(d.enemy, d.pose, told.aim) : null;
   const lays: (Lay | null)[] = places.map(() => null);
   const wants = places.map((place, i): GunWant => {
@@ -98,7 +140,7 @@ export function stepGunnery(d: GunneryDeck): Gunnery {
     lays[i] = lay;
     return { ...want, train: lay.train, elevation: lay.laid };
   });
-  let guns = stepGuns(d.guns, men, wants);
+  let guns = stepGuns(d.guns, men, wants, shares);
   const fired: GunFired[] = [];
   const word = told.firing === 'hold' && told.word;
   let left = 0;

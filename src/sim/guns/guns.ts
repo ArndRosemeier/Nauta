@@ -217,12 +217,12 @@ function lay(value: number, goal: number, rate: number, pace: number): number {
 /**
  * One step of a gun with `men` at her and her crew told `want`: laid toward the want within her arcs, and taken on
  * through her drill (a step's end carries into the next within the step). A working step goes at her pace
- * (`drillPace`); the recoil takes its time whoever is there; with fewer than `FEWEST_AT_GUN` men nothing but the
- * recoil goes on. A dismounted gun does nothing.
+ * (`drillPace`, times `share` when her crew serves her pair's other gun too, gunnery.ts); the recoil takes its time
+ * whoever is there; with fewer than `FEWEST_AT_GUN` men nothing but the recoil goes on. A dismounted gun does nothing.
  */
-export function stepGun(gun: Gun, place: GunPlace, men: number, want: GunWant): Gun {
+export function stepGun(gun: Gun, place: GunPlace, men: number, want: GunWant, share = 1): Gun {
   if (gun.dismounted) return gun;
-  const row = gunRow(place.gun), pace = drillPace(men, place.crew.length);
+  const row = gunRow(place.gun), pace = drillPace(men, place.crew.length) * share;
   let { drill, drillLeft, loadedWith, trained, elevated } = gun;
   if (pace > 0 && drill !== 'recoil') {
     const aim = withinArcs(row, want.train, want.elevation);
@@ -252,12 +252,12 @@ export function stepGun(gun: Gun, place: GunPlace, men: number, want: GunWant): 
   return { ...gun, drill, drillLeft, loadedWith, trained, elevated };
 }
 
-/** One step of the whole battery: each gun with the men at her and her want, by battery place. */
-export function stepGuns(guns: Battery, men: readonly number[], wants: readonly GunWant[]): Battery {
+/** One step of the whole battery: each gun with the men serving her, her want and the share of their pace she gets (1 if not given), by battery place. */
+export function stepGuns(guns: Battery, men: readonly number[], wants: readonly GunWant[], shares: readonly number[] = []): Battery {
   const at = battery();
   let out = guns;
   for (let i = 0; i < gunCount(guns); i++) {
-    const g = gunAt(guns, i), next = stepGun(g, at[i]!, men[i] ?? 0, wants[i]!);
+    const g = gunAt(guns, i), next = stepGun(g, at[i]!, men[i] ?? 0, wants[i]!, shares[i] ?? 1);
     if (next !== g) out = withGun(out, i, next);
   }
   return out;

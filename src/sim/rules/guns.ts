@@ -74,6 +74,14 @@ export const STRETCH = 1;
 /** With fewer men than this at a gun she stops: no drill, no laying, no firing (one man cannot run out a gun). */
 export const FEWEST_AT_GUN = 2;
 
+/**
+ * One crew serves a pair of guns (orders.md, design thread 2026-11-18). At quarters each pair's crew stands to the gun of
+ * its pair on the engaged side and crosses the deck when the other side comes to bear. Split between the pair (fought on
+ * both sides at once, or both sides made ready before either bears), the whole crew serves both guns in turn and each is
+ * worked at a little over half the pace the crew would give one gun alone.
+ */
+export const SPLIT_SHARE = 0.55;
+
 /** What a gun is loaded with (orders.md: the gunner's "Shot: Round, Chain, Grape"); its flight is N5.2's. */
 export type ShotKind = 'round' | 'chain' | 'grape';
 

@@ -1,0 +1,2 @@
+At quarters the gun crews now man the side that faces the enemy: one crew works each pair of guns, so the guns on that side load at full speed.
+When the enemy comes round to the other side, the crews cross the deck to those guns, which takes a few seconds. Try it in ?sail: beat to quarters, then turn her through the wind.

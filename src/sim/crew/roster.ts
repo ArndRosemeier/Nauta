@@ -3,13 +3,14 @@
  * his skill and his post (where he stands at his quarters when nothing is ordered), built once from rules/crew.ts and
  * the plan's crew places, and frozen. A man is known by his place in the roster; the crew's state (crew.ts) holds what
  * changes. The seamen of every part are shared out among the guns, pair by pair (each pair of guns, larboard and
- * starboard, has one crew, as on a ship that fights one side at a time; until she beats to quarters, N5, it stands half
- * at each gun), so a gun crew is a mix of topmen,
+ * starboard, has one crew, as on a ship that fights one side at a time; it stands half at each gun until a side comes
+ * to bear at quarters, `quartersPlace`), so a gun crew is a mix of topmen,
  * forecastle men, afterguard and waisters, and sail work takes men from the guns.
  */
 import { ROSTER, type Part } from '../rules/crew';
 import { deepFreeze, shipPlan, bareSpot, type CrewPlace, type Spot } from '../ship/plan';
 import { rigPlan } from '../ship/rig';
+import { sideLetter } from '../ship/spars';
 
 /** One man of the roster. */
 export interface Man {
@@ -100,5 +101,33 @@ export function billOrder(roster: readonly Man[] = brigRoster()): readonly numbe
   out = roster.flatMap((m, i) => (m.gun === null ? [] : [i]))
     .sort((a, b) => Number(roster[b]!.part === 'waist') - Number(roster[a]!.part === 'waist') || gunPlace(roster[b]!) - gunPlace(roster[a]!) || a - b);
   bills.set(roster, out);
+  return out;
+}
+
+const atQuarters = new WeakMap<readonly Man[], Map<string, string | null>>();
+/**
+ * Where a gun's man stands at quarters with his pair's crew all on `side` (+1 starboard, -1 larboard): one crew serves
+ * a pair of guns (orders.md). The men posted at that side's gun stay at their posts; the men posted at the other gun
+ * take that gun's places after theirs in turn (more men than places double up from the first). Null for a man at no
+ * gun, or at a chase port's (it serves no gun).
+ */
+export function quartersPlace(man: number, side: number, roster: readonly Man[] = brigRoster()): string | null {
+  let kept = atQuarters.get(roster);
+  if (!kept) { kept = new Map(); atQuarters.set(roster, kept); }
+  const key = `${man}${sideLetter(side)}`;
+  let out = kept.get(key);
+  if (out !== undefined) return out;
+  out = null;
+  const m = roster[man]!;
+  const id = m.gun === null ? '' : `${pairOf(m.gun)}${sideLetter(side)}`, gun = shipPlan().guns.find((g) => g.id === id);
+  if (gun && !gun.chase) {
+    if (m.gun === id) out = m.post;
+    else {
+      const here = roster.filter((o) => o.gun === id).length;
+      const crossing = roster.flatMap((o, i) => (o.gun !== null && o.gun !== id && pairOf(o.gun) === pairOf(id) ? [i] : []));
+      out = `gun-${id}-${((here + crossing.indexOf(man)) % gun.crew.length) + 1}`;
+    }
+  }
+  kept.set(key, out);
   return out;
 }

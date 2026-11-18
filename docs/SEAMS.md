@@ -484,6 +484,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The brig's people and the quarter bill: every man's rank, part, skill, post and gun | `src/sim/crew/roster.ts#brigRoster` |
 | Every crew place of the plan and the rig, by id | `src/sim/crew/roster.ts#crewPlaces` |
 | A crew place's spot | `src/sim/crew/roster.ts#placeSpot` |
+| Where a gun's man stands at quarters with his pair's crew all on one side (one crew serves a pair of guns) | `src/sim/crew/roster.ts#quartersPlace` |
 | What the crew does for an act of an order: its jobs, their places, hands, work and which waits for which (the drill) | `src/sim/crew/drill.ts#drill` |
 | How far a sail's job takes it (furled, hanging, sheeted home), and its work left from where the sail stands | `src/sim/crew/drill.ts#jobSpan` |
 | Who works a sail (its gang) | `src/sim/crew/drill.ts#gangOf` |
@@ -504,6 +505,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The battery: the brig's 18 guns' plan places in battery order (kind, port, side, crew places) | `src/sim/guns/guns.ts#battery` |
 | A battery at the start, every gun housed | `src/sim/guns/guns.ts#startGuns` |
 | How many men stand at each gun now (read from the crew) | `src/sim/guns/guns.ts#handsAtGuns` |
+| The side a ship at quarters fights on: the side whose guns bear on the enemy, both, or neither | `src/sim/guns/gunnery.ts#engagedSide` |
+| The hands that work each gun and their share of its pace: a pair's crew split between both its guns works each at a little over half pace | `src/sim/guns/gunnery.ts#pairHands` |
 | The pace of a gun's handwork by the men at her (short hands stretch it; under two she stops) | `src/sim/guns/guns.ts#drillPace` |
 | The seconds of full-crew work of a step of the drill | `src/sim/guns/guns.ts#handWork` |
 | A gun's training and elevation kept within her arcs | `src/sim/guns/guns.ts#withinArcs` |
@@ -519,6 +522,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | One ball's flight under gravity and drag, skipping off the water, to where it is spent | `src/sim/guns/shot.ts#fly` |
 | The elevation that puts a gun's shot through a point (the laying table) | `src/sim/guns/shot.ts#elevationFor` |
 | How a gun captain lays his gun on a point (training, the elevation he wants, laid against her heel; his misjudged range) | `src/sim/guns/shot.ts#layOn` |
+| The training a gun needs to bear on a point, and its range | `src/sim/guns/shot.ts#trainTo` |
 | Whether a gun bears: her roll brings her bore through the elevation laid for | `src/sim/guns/shot.ts#bears` |
 | A gun's bore's elevation above the horizon now, and its rate | `src/sim/guns/shot.ts#boreElevation` |
 | Where a gun's muzzle stands in ship space | `src/sim/guns/shot.ts#muzzleAt` |
