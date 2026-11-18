@@ -18,7 +18,7 @@ import type { GunFired, Vec } from '../src/sim/guns/shot.ts';
 import { gunsSeen, recoilOut } from '../src/app/gunsSeen.ts';
 import { ShotsSeen, STALE } from '../src/app/shotsSeen.ts';
 import {
-  CARRONADE, LID_OPEN, carronadeRest, cascabelRing, gunMove, lidEdge, lidHinge, lidMove, lidSize, splitCarronade,
+  CARRONADE, LID_OPEN, TIPS_ABOUT, carronadeRest, cascabelRing, gunMove, lidEdge, lidHinge, lidMove, lidSize, splitCarronade,
 } from '../src/render/ship/gunPlaces.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { puffsPoured } from '../src/render/smoke.ts';
@@ -62,6 +62,11 @@ test('a gun trains about her pivot and runs in along her axis; a lid swings on i
   assert.ok(Math.abs(run.x - (pivot.x - 0.9)) < NEAR && Math.abs(run.z - pivot.z) < NEAR, 'run in inboard (starboard: toward -x)');
   const muzzle = new Vector3(pivot.x + 1, pivot.y, pivot.z).applyMatrix4(gunMove(place, pivot, 0.3, 0, m));
   assert.ok(muzzle.z < pivot.z, 'trained toward the bow (-z)');
+  // Elevated, she tips about a point inboard of her pivot: the muzzle rises, her breech sinks, the point stays.
+  const lifted = (at: Vector3) => at.clone().applyMatrix4(gunMove(place, pivot, 0, 0, m, undefined, 0.1));
+  const abaft = (inboard: number) => new Vector3(pivot.x - inboard, pivot.y, pivot.z);
+  assert.ok(lifted(abaft(-1)).y > pivot.y && lifted(abaft(1.5)).y < pivot.y, 'muzzle up, breech down');
+  assert.ok(lifted(abaft(TIPS_ABOUT.carronade)).distanceTo(abaft(TIPS_ABOUT.carronade)) < NEAR, 'the tipping point stays');
   const port = shipPlan().guns[0]!, hinge = lidHinge(port);
   assert.ok(lidEdge(port).distanceTo(lidEdge(port).applyMatrix4(lidMove(port, hinge, LID_OPEN, m))) < NEAR, 'up is as built');
   const shut = lidEdge(port).applyMatrix4(lidMove(port, hinge, 0, m));
@@ -90,6 +95,7 @@ test('a shot is seen as its flash at the muzzle, its ball along its path, a spla
   const at = seen.sightsAt(t0 + 0.5);
   assert.equal(at.flashes.length, 1);
   assert.deepEqual(at.flashes[0]!.dir, [1, 0, 0]);
+  assert.ok(Math.abs(at.flashes[0]!.speed - 100) < NEAR, 'the shot left at the speed of its first stretch');
   assert.ok(Math.abs(at.balls[0]!.to[0] - 50) < NEAR, 'the ball is half a second along its path');
   assert.ok(Number.isNaN(seen.firedFor(0, 1, t0)) && Math.abs(seen.firedFor(0, 0, t0 + 1) - 1) < NEAR);
   const later = seen.sightsAt(t0 + 1.2);

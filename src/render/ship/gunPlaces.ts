@@ -31,6 +31,9 @@ export const LID_THICK = 0.075;
 export const LID_LAP = 0.05;
 /** How far each kind runs in from run out, m (inboard along her slide or on her trucks): the muzzle comes in clear of the port to be sponged and loaded. */
 export const RUN_BACK = { carronade: 0.95, long6: 1.2 } as const;
+/** How far inboard of her pivot (and her run in) a gun tips about when elevated, m: about her middle, so her muzzle rises as her breech sinks. */
+export const TIPS_ABOUT = { carronade: 0.6, long6: 0.8 } as const;
+const TIP = new Matrix4(), TIP_ABOUT = new Vector3(), TIP_AXIS = new Vector3(), TIP_TURNED = new Vector3();
 /** The carronade's parts above this height of the model (m, between the slide's top and the carriage's foot) ride the carriage. */
 const CARRIAGE_FROM = 0.35;
 /** A quarter turn, rad. */
@@ -54,11 +57,12 @@ export function carronadeRest(along: number, sill: number, side: number): Matrix
 export const pivotOf = (rest: Matrix4): Vector3 => new Vector3().setFromMatrixPosition(rest);
 
 /**
- * A gun's frame (ship space as built to where she is now): trained `train` rad toward the bow about her pivot, and
- * run in `back` m along her own axis (her side's outboard direction as trained). `slide`: the same without the run (a
- * carronade's slide). Written into `out`.
+ * A gun's frame (ship space as built to where she is now): trained `train` rad toward the bow about her pivot, run in
+ * `back` m along her own axis (her side's outboard direction as trained) and elevated `lift` rad (+ muzzle up) about
+ * a point `TIPS_ABOUT` inboard of her. `slide`: the same without the run or the lift (a carronade's slide). Written
+ * into `out`.
  */
-export function gunMove(place: GunPlace, pivot: Vector3, train: number, back: number, out: Matrix4, slide?: Matrix4): Matrix4 {
+export function gunMove(place: GunPlace, pivot: Vector3, train: number, back: number, out: Matrix4, slide?: Matrix4, lift = 0): Matrix4 {
   const turn = place.side * train;
   out.makeRotationY(turn);
   const c = Math.cos(turn), s = Math.sin(turn);
@@ -68,7 +72,14 @@ export function gunMove(place: GunPlace, pivot: Vector3, train: number, back: nu
   slide?.copy(out).setPosition(tx, 0, tz);
   // Run in: inboard along her axis as trained (R applied to (−side·back, 0, 0)).
   out.setPosition(tx - c * place.side * back, 0, tz + s * place.side * back);
-  return out;
+  if (lift === 0) return out;
+  // Elevated: about the horizontal axis across her bore, through the point `TIPS_ABOUT` (and her run) inboard of her pivot.
+  const bx = place.side * c, bz = -place.side * s, inboard = TIPS_ABOUT[place.gun] + back;
+  TIP_ABOUT.set(pivot.x - bx * inboard, pivot.y, pivot.z - bz * inboard);
+  TIP.makeRotationAxis(TIP_AXIS.set(-bz, 0, bx), lift);
+  TIP_TURNED.copy(TIP_ABOUT).applyMatrix4(TIP);
+  TIP.setPosition(TIP_ABOUT.x - TIP_TURNED.x, TIP_ABOUT.y - TIP_TURNED.y, TIP_ABOUT.z - TIP_TURNED.z);
+  return out.premultiply(TIP);
 }
 
 /** A lid's hinge (ship space): at the top of its port outside, a lap above. */

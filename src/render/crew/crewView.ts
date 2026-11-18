@@ -41,6 +41,7 @@ import {
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
 import { facesNow, stepFace } from '../../app/faces';
+import { GUN_CLIP_NAMES, gunStrains, gunWork } from '../../app/gunDrill';
 import { VOICES, type Point3, type Speaker, type Voice } from '../../app/speech/speakers';
 import type { CrewKnobs } from '../../app/quality';
 import { pageSeconds } from '../../app/pageMatch';
@@ -235,7 +236,7 @@ export class CrewView {
     const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, clipLibraries: false, levels: [CROWD_LEVEL] });
     const kinds = crowdKinds(workbench.catalog, rosters);
     note(`baking ${kinds.length} kinds of men`);
-    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, LYING, WALK, 'jog', 'idle'])];
+    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, ...GUN_CLIP_NAMES, LYING, WALK, 'jog', 'idle'])];
     const figures = await buildCrowdFigures(workbench, { material: createNodeCrowdFigureMaterial, builds: { ...BUILDS }, kinds, clips, once: ONCE_CLIPS, fps: BAKE_FPS });
     note('the officers come on deck');
     const pool = await NearPool.load(renderer, `${base}${PACK}`, workbench, knobs.pool, knobs.poolFull, fullLook(workbench.catalog, figureOf(0, 1, rosters[0]![1]!)));
@@ -547,7 +548,9 @@ export class CrewView {
       // His face: from what he is doing and what has just happened to him (app/faces.ts).
       const task = taskOf(ship.crew, d.man), voice = [...this.voices].find(([, man]) => man === d.man)?.[0];
       const end = fr.state.to.fight.end, ended = !end ? null : end.lost[fr.mine] ? 'lost' : end.lost.some((l) => l !== null) ? 'won' : null;
+      const gun = gunWork(ship, d.man, d.m);
       const present = facesNow({
+        gun: gun ? { strains: gunStrains(gun), captain: gun.part === 'captain', sinceFired: gun.sinceFired } : undefined,
         job: task && task.began !== null ? task.job : null, aloft: !!d.at.way || routeNetwork().surfaces.has(d.at.space), sinceStruck: d.struck,
         fighting: ship.told.quarters, harm: d.harm, sinceHurt: fr.state.to.tick / STEPS_PER_SECOND - d.hurtAt, shouting: voice === 'boatswain' && (this.matters.get(d.man) ?? 0) > fr.now, ended,
       });

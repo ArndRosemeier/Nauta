@@ -22,7 +22,7 @@ import { clamp } from '@futuremagic/core';
 import { DRILL_SHARES, FEWEST_AT_GUN, GUNS, STRETCH, type DrillStep, type GunRow, type HandStep, type ShotKind } from '../rules/guns';
 import type { GunKind } from '../rules/ships';
 import { DEGREE, STEP_SECONDS, STEPS_PER_SECOND } from '../units';
-import type { Crew } from '../crew/crew';
+import type { Crew, Hand } from '../crew/crew';
 import { brigRoster, crewPlaces, type Man } from '../crew/roster';
 import { deepFreeze, shipPlan, type GunPlace, type Spot } from '../ship/plan';
 
@@ -137,28 +137,41 @@ export const laidAt = (g: Gun): { train: number; elevation: number } => ({ train
 export const drillSeconds = (g: Gun): number => g.drillLeft / WORK_PER_STEP / STEPS_PER_SECOND;
 
 const spotKey = (s: Spot): string => `${s.space}|${s.along}|${s.across}`;
-let gunAtPlace: ReadonlyMap<string, number> | null = null;
+let gunAtPlace: ReadonlyMap<string, Served> | null = null;
 
-/** The battery's gun by each of her crew places' id and spot. */
-function gunsByPlace(): ReadonlyMap<string, number> {
+/** A gun's crew place: the gun (her place in the battery) and the place's number in her crew (1 her gun captain). */
+export interface Served {
+  readonly gun: number;
+  readonly place: number;
+}
+
+/** The gun and crew number by each of her crew places' id and spot. */
+function gunsByPlace(): ReadonlyMap<string, Served> {
   if (gunAtPlace) return gunAtPlace;
   const index = new Map(battery().map((g, i) => [g.id, i]));
-  const out = new Map<string, number>();
+  const out = new Map<string, Served>();
   for (const p of crewPlaces().values()) {
-    const i = p.kind === 'gun' ? index.get(p.of) : undefined;
-    if (i !== undefined) { out.set(p.id, i); out.set(spotKey(p), i); }
+    const gun = p.kind === 'gun' ? index.get(p.of) : undefined;
+    if (gun === undefined) continue;
+    const served = { gun, place: Number(p.id.slice(p.id.lastIndexOf('-') + 1)) };
+    out.set(p.id, served);
+    out.set(spotKey(p), served);
   }
   gunAtPlace = out;
   return gunAtPlace;
 }
 
+/** The gun a man stands to and his place in her crew, or null: he is on his way, or stands at none (`home`: his home place, `Man.home`). */
+export function servedBy(hand: Hand, home: string): Served | null {
+  return hand.going ? null : gunsByPlace().get(hand.stands ? spotKey(hand.stands) : home) ?? null;
+}
+
 /** How many men stand at each gun's crew places now, by battery place (men on their way are at none, nor the men `struck` out of the quarter bill). */
 export function handsAtGuns(crew: Crew, roster: readonly Man[] = brigRoster(), struck: ReadonlySet<number> | null = null): number[] {
-  const at = gunsByPlace(), out = battery().map(() => 0);
+  const out = battery().map(() => 0);
   crew.men.forEach((h, i) => {
-    if (h.going || struck?.has(i)) return;
-    const g = at.get(h.stands ? spotKey(h.stands) : roster[i]!.home);
-    if (g !== undefined) out[g]!++;
+    const g = struck?.has(i) ? null : servedBy(h, roster[i]!.home);
+    if (g) out[g.gun]!++;
   });
   return out;
 }

@@ -305,8 +305,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What is heard of gunfire, from the fired events: reports arriving by the speed of sound, balls passing and falling near the ear, the ears' load, jolts | `src/audio/gunHearing.ts#GunWatch` |
 | Where a ball's path passes nearest a point | `src/audio/gunHearing.ts#nearestPass` |
 | A ball's place on its path a time after firing (damage traces it, the drawing flies it) | `src/sim/guns/shot.ts#pathAt` |
-| How a ship's guns stand for the drawing: run out or in, leaping back when fired, trained; her lids wanted up (N5.4a) | `src/app/gunsSeen.ts#gunsSeen` |
+| How a ship's guns stand for the drawing: run out or in, leaping back when fired, trained and elevated; her lids wanted up (N5.4a) | `src/app/gunsSeen.ts#gunsSeen` |
 | How far run out a gun stands through her recoil (the leap back on her breeching) | `src/app/gunsSeen.ts#recoilOut` |
+| What a man at a gun does and shows: his part in her crew, the motion of the drill's step, whether she is worked, strain, and the seconds since she fired (N5.4b) | `src/app/gunDrill.ts#gunWork` |
+| Which gun a man stands to and his place in her crew | `src/sim/guns/guns.ts#servedBy` |
 | What is seen of gunfire, from the events and the shots in flight: flashes, balls along their paths, splashes where they touch the sea, strikes; a ball stopped in a ship drawn no further | `src/app/shotsSeen.ts#ShotsSeen` |
 | Her guns and port lids drawn moving: slides trained, carriages run out and in, the long sixes on their trucks, lids swung, as instances in moving frames (N5.4a) | `src/render/ship/gunsView.ts#GunsView` |
 | A gun's moving frame: trained about her pivot and run in along her axis | `src/render/ship/gunPlaces.ts#gunMove` |
@@ -315,7 +317,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A carronade at her port as built (run out, square) | `src/render/ship/gunPlaces.ts#carronadeRest` |
 | The carronade cut into her slide and the gun on her carriage | `src/render/ship/gunPlaces.ts#splitCarronade` |
 | The ring on a carronade's cascabel her breeching is rove through | `src/render/ship/gunPlaces.ts#cascabelRing` |
-| Gunfire drawn: muzzle flashes and first puffs, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
+| Gunfire drawn: muzzle flashes, first puffs and burning wads, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
 | Powder smoke: poured from the ports as guns fire, drifting with the wind, swelling and thinning, lit by the day and the flashes (N5.5) | `src/render/smoke.ts#SmokeView` |
 | Fire drawn: each fire's flames on its floor and out of its vent, its black smoke, poured into the smoke's fire rings, seeded (N6.5) | `src/render/fireView.ts#FireView` |
 | Where a fire in a space of the plan is seen: its floor, its reach, the weather-deck opening it vents by | `src/render/fireView.ts#fireSeat` |

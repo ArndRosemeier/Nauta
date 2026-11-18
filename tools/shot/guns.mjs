@@ -11,6 +11,11 @@
  * starboard side). `dusk`: the same at 20:00. `foe`: the other brig
  * commanded by the computer captain (`&foe=master`) instead, and her broadside received: through the glass as she
  * fires, then from 50 m off and over the rail as her shot arrives.
+ * `drill` (N5.4b): instead of the broadside, the gun crews at their work through the first reload after the order to
+ * beat to quarters (the men still crossing to their guns), then a minute on, every crew at its gun and every gun
+ * ready (her captain crouched behind her), from the gun standpoint looking forward and aft and from the rail. The match does not keep men clear of the captain,
+ * so the crews queue behind wherever he stands: the pictures show the guns with the men at them and the muster
+ * round the eye, not a clean line of settled crews.
  * Each picture is `<out dir>/<name>.png`; fails if the page throws or a broadside never comes.
  */
 import { mkdirSync } from 'node:fs';
@@ -22,6 +27,8 @@ mkdirSync(out, { recursive: true });
 const SEED = 1;
 const HOUR = words.includes('dusk') ? 20 : 11;
 const FOE = words.includes('foe');
+/** `drill`: the starboard gun crews at their work through a reload. */
+const DRILL = words.includes('drill');
 /** `half`: the smoke drawn at half resolution through the post chain (`?smoke=half`, N5.5's trial). */
 const HALF = words.includes('half');
 /** Which side she fires: +1 the other brig abeam to starboard, -1 to larboard. */
@@ -43,17 +50,34 @@ const FIRED = SIDE > 0
 /** The pictures of her broadside received, from the instant she is seen to fire. */
 const RECEIVED = [['glass-crosstrees', 0], ['glass-crosstrees', 0.3], ['50-m-off', 0.4], ['rail', 0.4], ['50-m-off', 0.6]];
 
+/** The drill's steps pictured after the broadside, and the views each is taken from (the crews stand half at each side's guns until a side bears: the starboard guns, the battery's second half, are looked at). */
+const DRILL_STEPS = ['loading', 'running-out'];
+/** After the last, the match runs on so long (s) for every crew to be at its guns and every gun ready, and is pictured again. */
+const SETTLED = 60;
+const DRILL_VIEWS = [['gun', 'yaw=0&pitch=-6'], ['gun', 'yaw=180&pitch=-6'], ['rail', 'yaw=100&pitch=-8']];
+const STARBOARD = 9;
+const MOST_WAIT = 60;
+
 const t0 = performance.now(), served = await openBrowser();
-const game = await openGame(served, `?ship&sail&seed=${SEED}&day=0&quality=high&hud${FOE ? '&foe=master' : ''}${HALF ? '&smoke=half' : ''}`, shotSize('800x500'));
+const game = await openGame(served, `?ship&sail&seed=${SEED}&day=0&quality=high${DRILL ? '' : '&hud'}${FOE ? '&foe=master' : ''}${HALF ? '&smoke=half' : ''}`, shotSize('800x500'));
 const { page } = game;
-await page.addStyleTag({ content: '#version,#standpoints,#orders,#room{display:none!important}' });
+await page.addStyleTag({ content: `#version,#standpoints,#orders,#room${DRILL ? ',#bubbles,.nt-fire' : ''}{display:none!important}` });
 const sail = (f, ...a) => page.evaluate(([fn, args]) => window.__nautaSail[fn](...args), [f, a]);
 const scene = (q) => page.evaluate((query) => window.__nautaScene(query), `${q}&hour=${HOUR}&day=0`);
 const say = async (w) => { const why = await sail('say', w); if (why) { console.error(`"${w}" refused: ${why}`); process.exitCode = 1; } };
 let failed = false, k = 0;
 
+/** The match runs on (half a second at a time) until a starboard gun is in `step` of her drill; false if none gets there in time. */
+async function untilDrill(step) {
+  for (let waited = 0; waited < MOST_WAIT; waited += 0.5) {
+    if ((await sail('drill', 0)).slice(STARBOARD).includes(step)) return true;
+    await sail('onward', 0.5, false);
+  }
+  return false;
+}
+
 /** A picture from `view` once the match has run on `dt` s more (a frame drawn at that moment). */
-async function picture(view, dt) {
+async function picture(view, dt, label = '') {
   if (view.startsWith('glass-')) {
     await scene(`ship=${view.slice('glass-'.length)}`);
     await page.evaluate(() => { window.__nautaSail.glass(4); window.__nautaSail.aimAtOther(); });
@@ -62,7 +86,7 @@ async function picture(view, dt) {
     await scene(`ship=${view}`);
   }
   await sail('onward', dt || 0.001);
-  const file = `${out}/${String(k++).padStart(2, '0')}-${view}.png`;
+  const file = `${out}/${String(k++).padStart(2, '0')}${label}-${view.split('&')[0]}.png`;
   await snap(page, file);
   console.log(`${file} at ${((performance.now() - t0) / 1000).toFixed(0)} s`);
 }
@@ -83,6 +107,18 @@ if (FOE) {
   await picture('gun', 0);
   await say('beat to quarters');
   await say('hold for my word');
+  if (DRILL) {
+    // The first reload after the order while the crews run to their guns, then the guns ready with the crews settled.
+    for (const step of DRILL_STEPS) {
+      if (!(await untilDrill(step))) { console.error(`no gun came to ${step}`); failed = true; continue; }
+      for (const [view, look] of DRILL_VIEWS) await picture(`${view}${look ? `&${look}` : ''}`, 0, `-${step}`);
+    }
+    await sail('onward', SETTLED, false);
+    for (const [view, look] of DRILL_VIEWS) await picture(`${view}${look ? `&${look}` : ''}`, 0, '-settled');
+    await game.context.close();
+    await served.close();
+    process.exit(game.failed() || failed || process.exitCode ? 1 : 0);
+  }
   let waited = 0;
   while (waited < WAIT.most && (await sail('apart')) > TURN_AT) { await sail('onward', WAIT.step, false); waited += WAIT.step; }
   // To larboard: the two start heading at each other square to the wind, so she cannot bring the other abeam to

@@ -51,6 +51,8 @@ export const FLINCH_SECONDS = 0.5;
 export const FEAR_SECONDS = 6;
 /** A man wounded but fighting on shows his pain this long, s, then a set face: only the badly hurt keep it (N6.6). */
 export const PAIN_SECONDS = 8;
+/** A gun's captain cries the word, and her crew flinch at her report, for this long after she fires, s. */
+export const WORD_SECONDS = 0.5;
 
 /** What is happening to a man now, as the simulation tells it. */
 export interface FaceWhy {
@@ -69,6 +71,8 @@ export interface FaceWhy {
   readonly shouting: boolean;
   /** The fight is over: his ship won, lost, or neither (null). */
   readonly ended: 'won' | 'lost' | null;
+  /** At his gun (app/gunDrill.ts): her work takes his strength now, whether he is her captain, and the seconds since she fired (Infinity: not just). Left out: not at a gun. */
+  readonly gun?: { readonly strains: boolean; readonly captain: boolean; readonly sinceFired: number };
 }
 
 /** The causes present for a man now. */
@@ -79,6 +83,9 @@ export function facesNow(w: FaceWhy): FaceCause[] {
   if (w.sinceStruck < FLINCH_SECONDS) out.push('flinch');
   if (w.sinceStruck < FEAR_SECONDS) out.push('fear');
   if (w.shouting) out.push('shout');
+  if (w.gun?.captain && w.gun.sinceFired < WORD_SECONDS) out.push('shout');
+  else if (w.gun && w.gun.sinceFired < FLINCH_SECONDS) out.push('flinch');
+  if (w.gun?.strains) out.push('strain');
   if (w.job && STRAINING.has(w.job)) out.push('strain');
   if (w.ended === 'won') out.push('joy');
   if (w.ended === 'lost') out.push('dismay');

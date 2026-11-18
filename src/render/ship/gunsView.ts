@@ -135,7 +135,7 @@ export class GunsView {
     const wanted = this.ports.map(() => (seen ? 0 : LID_OPEN));
     this.rests.forEach((g, i) => {
       const s = seen?.[i], out = s ? s.out : 1;
-      gunMove(g.place, g.pivot, s?.train ?? 0, (1 - out) * RUN_BACK[g.place.gun], this.carriage, this.slide);
+      gunMove(g.place, g.pivot, s?.train ?? 0, (1 - out) * RUN_BACK[g.place.gun], this.carriage, this.slide, s?.lift ?? 0);
       this.frames[1 + i]!.multiplyMatrices(her!, this.slide);
       this.frames[1 + n + i]!.multiplyMatrices(her!, this.carriage);
       setShipFrame(gunFrame(i), this.carriage, this.index);

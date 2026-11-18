@@ -23,6 +23,7 @@ import { floorApart } from './officers';
 import { standByClip, standToClip } from './standBy';
 import { apartOnWater } from '../sim/units';
 import { BREAKS } from '../sim/rules/ships';
+import { gunClip, gunWork } from './gunDrill';
 
 /** The motion a man hauling plays (at a pin, tailing on a fall). */
 const HAUL = 'pick up';
@@ -283,13 +284,16 @@ export function manDrawn(from: SimShip, to: SimShip, f: number, man: number, m: 
   return out;
 }
 
-/** The motion a man plays: lying if struck down, on his way walking or running, at work by his job, else busy at his home place. */
+/** The motion a man plays: lying if struck down, on his way walking or running, at work by his job, at his gun by her drill (N5.4b), else busy at his home place. */
 function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, seed: number): string {
   const harm = harmOf(ship.damage, man);
   if (harm === 'killed' || harm === 'badly') return LYING;
   const hand = ship.crew.men[man]!;
   if (at.moving) return task?.job === 'carry' ? JOB_CLIPS.carry : hand.going?.haste === 'smart' ? RUNNING : WALKING;
   if (task) return task.began === null ? standToClip(m, seed) : JOB_CLIPS[task.job];
+  // At his gun he works the drill (gunDrill.ts); the steps that give his part no work, he stands to.
+  const gun = gunWork(ship, man, m), work = gun && gunClip(gun);
+  if (work) return work;
   // At his home place he busies himself (standBy.ts); away from it (at his gun at quarters) he stands to, ready.
   return hand.stands === null ? standByClip(m, seed) : standToClip(m, seed);
 }

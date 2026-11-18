@@ -6,6 +6,8 @@
  *   second, added to the light (it is fire, not lit by the day).
  * - **The first puff** with it: grey-white smoke thrown out of the port along the bore, slowed fast by the air and
  *   carried off by the wind as it swells and thins (the smoke that hangs and drifts is N5.5's).
+ * - **The wad** that went down the bore on the shot, burning: a spark flung out along the bore, flickering as it flies
+ *   and falling into the sea, a bright dot that shows the gun's line (a long six's flies farther).
  * - **Splinters** where shot strikes a ship: a flash of dust and a spray of oak shards flung out from where it struck,
  *   falling.
  * - **The ball** in flight: a dark streak along the stretch of its path the eye smears in a frame, never thinner than a
@@ -22,7 +24,7 @@ import {
 } from 'three/webgpu';
 import {
   abs, attribute, cameraProjectionMatrix, cross, float, length, max, mix, modelViewMatrix, normalize, oneMinus, positionGeometry, saturate,
-  select, smoothstep, uniform, varyingProperty, vec3, vec4,
+  select, sin, smoothstep, uniform, varyingProperty, vec3, vec4,
 } from 'three/tsl';
 import { GRAVITY } from '../sim/units';
 import type { Wind } from '../sim/wind';
@@ -47,7 +49,7 @@ export const BALL_FROM = 'ballFrom';
 export const BALL_TO = 'ballTo';
 
 /** What a bit is. */
-const FLASH = 0, PUFF = 1, SHARD = 2, DUST = 3;
+const FLASH = 0, PUFF = 1, SHARD = 2, DUST = 3, WAD = 4;
 
 /**
  * The flash: its size at the muzzle (m, a carronade's; a long six's a share of it), how far along the bore its fire
@@ -77,6 +79,21 @@ const PUFF_DRAG = 2.4;
 const PUFF_FALL = -0.02;
 const PUFF_DENSITY = 0.7;
 const SMOKE_ALBEDO = 0.62;
+/**
+ * The burning wad: how many leave a gun, how fast (m/s, a share of the shot's) and how widely they scatter, their size
+ * (m), how long they burn (s: till they fall into the sea from her port, about a second), the air's drag (1/s), gravity's pull (a share: the wad is light but not a feather), how
+ * bright they glow, how fast they flicker (rad per life) and how deep (a share of their glow).
+ */
+const WADS = 1;
+const WAD_SPEED = [0.12, 0.3] as const;
+const WAD_SPREAD = 3;
+const WAD_SIZE = 0.14;
+const WAD_LIFE = [0.7, 0.95] as const;
+const WAD_DRAG = 0.6;
+const WAD_FALL = 0.5;
+const WAD_GLOW = 6;
+const WAD_FLICKER = 90;
+const WAD_FLICKER_DEPTH = 0.3;
 /** Splinters: how many shards and dust puffs a strike throws, their speed out (m/s) and spread, sizes (m), lives (s), drag (1/s), and their albedo (oak, dust). */
 const SHARDS = 18;
 const SHARD_SPEED = [6, 22] as const;
@@ -143,14 +160,16 @@ export function makeGunfireMaterial(): MeshBasicNodeMaterial {
     const day = daylight();
     // Fire: bright, added (alpha 0), dying fast.
     const left = saturate(oneMinus(vAge)), fire = vec3(...FLASH_COLOUR).mul(FLASH_GLOW).mul(soft).mul(left).mul(left);
+    // A burning wad: a small hot dot that flickers as it flies and cools to nothing.
+    const wad = vec3(...FLASH_COLOUR).mul(WAD_GLOW).mul(soft).mul(left).mul(sin(vAge.mul(WAD_FLICKER)).mul(WAD_FLICKER_DEPTH).add(1 - WAD_FLICKER_DEPTH));
     const smoke = soft.mul(PUFF_DENSITY).mul(fade);
     const dust = soft.mul(fade).mul(1 / 2);
     const shard = hard.mul(fade);
     // The kind, rounded: a varying need not come through exactly.
-    const kind = vKind.add(1 / 2).floor(), isFire = kind.equal(FLASH), isPuff = kind.equal(PUFF), isShard = kind.equal(SHARD);
+    const kind = vKind.add(1 / 2).floor(), isFire = kind.equal(FLASH).or(kind.equal(WAD)), isPuff = kind.equal(PUFF), isShard = kind.equal(SHARD);
     const a = select(isFire, float(0), select(isPuff, smoke, select(isShard, shard, dust)));
     const albedo = select(isPuff, vec3(SMOKE_ALBEDO), select(isShard, vec3(...SHARD_ALBEDO), vec3(...DUST_ALBEDO)));
-    return vec4(select(isFire, fire, day.mul(albedo).mul(a)), a);
+    return vec4(select(kind.equal(WAD), wad, select(isFire, fire, day.mul(albedo).mul(a))), a);
   });
 }
 
@@ -253,6 +272,12 @@ export class GunfireView {
       const speed = r.range(PUFF_SPEED[0], PUFF_SPEED[1]) * power;
       const v = [dx * speed + r.gaussian(0, PUFF_SPREAD), dy * speed + r.gaussian(0, PUFF_SPREAD), dz * speed + r.gaussian(0, PUFF_SPREAD)];
       this.throwBit(PUFF, f.at, v, r.range(PUFF_SIZE[0], PUFF_SIZE[1]) * power / this.plenty ** (1 / 2), f.t, r.range(PUFF_LIFE[0], PUFF_LIFE[1]), PUFF_DRAG, PUFF_FALL);
+    }
+    // The wad, speed by the gun's shot (a carronade's 230 m/s: about 30 to 70 m/s; a long six's 480: 60 to 140).
+    for (let q = 0; q < WADS; q++) {
+      const speed = r.range(WAD_SPEED[0], WAD_SPEED[1]) * f.speed;
+      const v = [dx * speed + r.gaussian(0, WAD_SPREAD), dy * speed + r.gaussian(0, WAD_SPREAD), dz * speed + r.gaussian(0, WAD_SPREAD)];
+      this.throwBit(WAD, f.at, v, WAD_SIZE, f.t, r.range(WAD_LIFE[0], WAD_LIFE[1]), WAD_DRAG, WAD_FALL);
     }
     for (let q = 0; q < FLASH_QUADS; q++) {
       const along = (FLASH_REACH * power * q) / FLASH_QUADS;
