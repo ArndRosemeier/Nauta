@@ -185,6 +185,7 @@ export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
       return [e.mark >= WATER_CRY ? cry('carpenter', ship, line) : report('carpenter', ship, line)];
     }
     case 'wind': return [report('master', ship, `wind ${e.how}`)];
+    case 'off beam': return mine ? [report('master', ship, `her ${e.how} of the beam`)] : [];
   }
 }
 

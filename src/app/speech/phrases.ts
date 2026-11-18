@@ -112,6 +112,8 @@ export const PHRASES = {
   'wind shifts': p(["The wind's shifting, sir.", "Wind's coming round, sir."], ['Der Wind dreht, Herr Kapitän.', 'Der Wind geht herum, Herr Kapitän.']),
   'wind freshens': p(["It's freshening, sir.", "Wind's getting up, sir."], ['Es frischt auf, Herr Kapitän.', 'Der Wind nimmt zu, Herr Kapitän.']),
   'wind eases': p(["It's easing, sir.", "Wind's falling light, sir."], ['Es flaut ab, Herr Kapitän.', 'Der Wind lässt nach, Herr Kapitän.']),
+  'her ahead of the beam': p(["She's drawing ahead, sir.", "We're dropping astern of her, sir."], ['Sie zieht voraus, Herr Kapitän.', 'Wir fallen achteraus, Herr Kapitän.']),
+  'her astern of the beam': p(["She's dropping astern, sir.", "We're running ahead of her, sir."], ['Sie fällt achteraus, Herr Kapitän.', 'Wir laufen ihr voraus, Herr Kapitän.']),
   'light': p(['The light is failing, sir.', "We'll lose the light soon, sir."], ['Das Licht schwindet, Herr Kapitän.', 'Bald wird es dunkel, Herr Kapitän.']),
   'short-handed': p(["Too few hands for that, sir. It'll be slow.", "We're short of hands, sir."], ['Zu wenig Leute dafür, Herr Kapitän. Das dauert.', 'Uns fehlen Hände, Herr Kapitän.']),
   // ---- Reports: the lookout on her ----

@@ -9,7 +9,8 @@ import assert from 'node:assert/strict';
 import { angleDiff } from '@futuremagic/core';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import { apartOnWater, bearingTo, DEGREE } from '../src/sim/units.ts';
-import { soundingLine } from '../src/app/speech/reports.ts';
+import { noticed } from '../src/sim/notices.ts';
+import { saysOf, soundingLine } from '../src/app/speech/reports.ts';
 import { run, SEED, FROM, MODERATE, underWay } from './support/orders.ts';
 
 /** Two brigs in a north wind, mine heading east, the other `south` m to the south of mine (on my starboard beam, to leeward) heading `hers` degrees. */
@@ -48,4 +49,23 @@ test('no ship in sight, nothing to steer by; the well sounded is answered with t
   assert.ok(sounded?.kind === 'answered' && sounded.code === 'sounded' && sounded.amount === 0);
   assert.equal(soundingLine(0), 'sounded 0');
   assert.equal(soundingLine(1e6), 'sounded 3');
+});
+
+/** My ship heading east with her `ahead` m forward of my starboard beam (300 m to the south), my master keeping her abeam or not. */
+const kept = (ahead: number, keeping = true): SimState => {
+  const s = duel(300);
+  const ships = s.ships.map((sh, i) => (i === 1 ? { ...sh, motion: { ...sh.motion, pose: { ...sh.motion.pose, x: ahead } } } : sh));
+  return { ...s, tick: 1, ships: ships.map((sh, i) => (i === 0 && keeping ? { ...sh, told: { ...sh.told, keep: { kind: 'abeam', range: 300 } } } : sh)) };
+};
+const offBeam = (before: SimState, after: SimState) => noticed(before, after, 0).filter((n) => n.kind === 'off beam');
+
+test('her on the beam: the master reports her drawing ahead or dropping astern, once, so the captain may make or shorten sail', () => {
+  const ahead = offBeam(kept(0), kept(200));
+  assert.deepEqual(ahead.map((n) => n.kind === 'off beam' && n.how), ['ahead']);
+  assert.deepEqual(saysOf(ahead[0]!, 0).map((x) => [x.voice, x.line]), [['master', 'her ahead of the beam']]);
+  assert.deepEqual(offBeam(kept(0), kept(-200)).map((n) => n.kind === 'off beam' && n.how), ['astern']);
+  assert.equal(offBeam(kept(200), kept(210)).length, 0, 'once, not again while she stays ahead');
+  assert.equal(offBeam(kept(0), kept(50)).length, 0, 'within two points of the beam he says nothing');
+  assert.equal(offBeam(kept(200, false), kept(200)).length, 1, 'as the order is given with her already ahead');
+  assert.equal(offBeam(kept(0, false), kept(200, false)).length, 0, 'only while he keeps her on the beam');
 });
