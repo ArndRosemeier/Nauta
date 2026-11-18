@@ -1,0 +1,3 @@
+A title now plays while the game gets ready: a brig under sail at sunset, the other brig hull down on the horizon.
+Tap once to hear the title theme. Drag across the sky to move the sun and the light follows; tap the brig and she fires a gun, and the other brig answers.
+To look at it without the game loading behind it, open the page with ?title.

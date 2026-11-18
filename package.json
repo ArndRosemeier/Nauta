@@ -31,6 +31,7 @@
     "shot:sails": "node tools/shot/sails.mjs",
     "shot:glass": "node tools/shot/glass.mjs",
     "shot:guns": "node tools/shot/guns.mjs",
+    "shot:title": "node tools/shot/title.mjs",
     "walk:check": "tsx tools/walk/everywhere.ts",
     "check:room": "node tools/net/room.mjs",
     "packs": "node tools/crew/pack.mjs",

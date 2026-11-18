@@ -118,5 +118,7 @@ export const CREST_LOUDNESS: readonly [number, number] = [0.5, 1.3];
  * What is not playing goes first when more is needed, least recently heard first.
  */
 export const SOUND_MEMORY = 140 * 1024 * 1024;
+/** The seed the engine picks a sound's takes by (never the same take twice running): the first match's, as it was. */
+export const SOUND_SEED = 1805;
 /** Under water the world's sound is heard through a low-pass at this frequency, Hz. */
 export const UNDER_WATER_HZ = 350;
