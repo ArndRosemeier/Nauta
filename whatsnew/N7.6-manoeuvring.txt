@@ -1,0 +1,2 @@
+Computer captains now manoeuvre in a fight: they cross each other's sterns and bows to rake, wear round to bring their loaded side to bear and keep out of her guns, and a better captain plans further ahead. Watch with ?watch=master.
+The master has two new orders in "Keep her": "Cross her stern" and "Cross her bow". He plans the pass himself and tells you when her stern or bow is under your guns.

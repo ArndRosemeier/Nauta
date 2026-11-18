@@ -49,6 +49,21 @@ export interface SkillRow {
   readonly plainBeyond: number;
   /** He sends the hands to the pumps once this much water is in her, t. */
   readonly pumpsAt: number;
+  /**
+   * How he plans the manoeuvre (captain/tactics.ts, N7.6): how far ahead he projects both ships when he looks round, s (0: the first
+   * match's captain, who only closes and lays a broadside as before); how many headings he tries; how much of her reply he takes into
+   * account (1: all; a green captain thinks of his own guns first); whether he knows when each side of his battery, and of hers,
+   * will be loaded again; whether he can slow her to let her draw ahead (the main topsail aback); and how much his judgement of
+   * the best course wavers, as a share of its worth (seeded for each look).
+   */
+  readonly horizon: number;
+  readonly headings: number;
+  readonly caution: number;
+  readonly reckons: boolean;
+  readonly slows: boolean;
+  readonly waver: number;
+  /** He leaves the course his fighting ranges and sides would give him only for a plan that rakes her (or takes him out of her rake) and is worth this much more (a broadside's worth is 1): a green captain wants a surer thing than a master (tactics.ts). */
+  readonly margin: number;
   /** He sends a fire party once a fire holds this share of its space (0: at once), each fire noticed a little sooner or later (`FIRE_NOTICE`). */
   readonly fireAt: number;
   /** He has the carpenter's crew plug first once this many holes let the sea in (0: never). */
@@ -85,19 +100,19 @@ export const SKILL: Readonly<Record<Skill, SkillRow>> = {
    */
   raw: {
     look: 40, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
-    grape: 0, roundAt: 'rigging', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 80, fireAt: 0.3, plugAt: 0, saveMast: Infinity, strikeAfter: 0, drill: 1,
+    grape: 0, roundAt: 'rigging', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 80, fireAt: 0.3, plugAt: 0, saveMast: Infinity, strikeAfter: 0, drill: 1, horizon: 0, headings: 0, caution: 0, reckons: false, slows: false, waver: 0, margin: 0,
   },
   green: {
     look: 8, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
-    grape: 0, roundAt: 'hull', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.14, plugAt: 0, saveMast: 20, strikeAfter: 0, drill: 0.95,
+    grape: 0, roundAt: 'hull', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.14, plugAt: 0, saveMast: 20, strikeAfter: 0, drill: 0.95, horizon: 18, headings: 12, caution: 0.5, reckons: false, slows: false, waver: 0.3, margin: 1,
   },
   seasoned: {
     look: 4, judgeRange: 0.12, judgeBearing: 2 * DEGREE, range: 110, gauge: 150, rake: 0.5, lead: 0.5, quarters: 1500, open: 500,
-    grape: 50, roundAt: 'hull', chain: false, word: false, keepBearing: true, plainBeyond: 1200, pumpsAt: 10, fireAt: 0, plugAt: 0, saveMast: 5, strikeAfter: 10, drill: 1,
+    grape: 50, roundAt: 'hull', chain: false, word: false, keepBearing: true, plainBeyond: 1200, pumpsAt: 10, fireAt: 0, plugAt: 0, saveMast: 5, strikeAfter: 10, drill: 1, horizon: 40, headings: 24, caution: 0.8, reckons: true, slows: true, waver: 0.1, margin: 0.7,
   },
   master: {
     look: 2, judgeRange: 0.05, judgeBearing: 1 * DEGREE, range: 90, gauge: 250, rake: 1, lead: 1, quarters: Infinity, open: 400,
-    grape: 60, roundAt: 'hull', chain: true, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, saveMast: 0, strikeAfter: 20, drill: 1.05,
+    grape: 60, roundAt: 'hull', chain: true, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, saveMast: 0, strikeAfter: 20, drill: 1.05, horizon: 60, headings: 36, caution: 1, reckons: true, slows: true, waver: 0.02, margin: 0.5,
   },
 };
 
@@ -185,3 +200,67 @@ export const STATION_RANGES = 2;
 export const STRIKE_AGAIN = 1;
 /** Plain sail is set to close only up to this force: above it battle sail drives her hard enough. */
 export const PLAIN_UP_TO = 5;
+
+// ---- Planning a manoeuvre (N7.6, captain/tactics.ts) ----
+
+/**
+ * What a captain who plans knows of how she handles, as a captain of the day would: how fast she turns, rad/s, how soon
+ * her way follows the wind (a time constant, s), the share of her speed she keeps while her head is coming round (and while she tacks), and the share of her speed she makes with her
+ * main topsail aback (`slows`). First proposals, measured against `check:sailing`.
+ */
+export const HANDLING = { turn: 3.5 * DEGREE, way: 14, turning: 0.8, tacking: 0.45, slowed: 0.35 } as const;
+/** Her speed at each force of wind, as a share of her speed at force 5 and over (the light-airs table of rules/sailing.ts, shape and all). */
+export const FORCE_SPEED: readonly (readonly [force: number, share: number])[] = [[2, 0.55], [3, 0.7], [4, 0.85], [5, 1]];
+/** Her speed under each canvas as a share of her speed under plain sail (the table above is plain sail's): measured in `check:sailing`, battle sail about half. */
+export const CANVAS_SPEED: Readonly<Record<'bare' | 'battle' | 'plain' | 'all', number>> = { bare: 0.05, battle: 0.5, plain: 1, all: 1.1 };
+/** Under this angle off the wind, degrees, she makes no way (the speed table starts at 55° with a knot); the angle a turn is checked for crossing the wind at, rad; and a turn is done within `TURNED` rad. */
+export const NO_WAY_BELOW = 45;
+export const ARC_STEP = 5 * DEGREE;
+export const TURNED = 1e-6;
+/** Distances the plan counts in, m: the pull of the end ordered is per `PULL_PER`; the weather position is worth its tanh of this far to windward; the `gauge` of a skill is a share of `GAUGE_FULL`. */
+export const PULL_PER = 100;
+export const GAUGE_SCALE = 200;
+export const GAUGE_FULL = 250;
+/** One broadside's worth is 1; a ball raking her counts this much (rules/damage.ts `RAKING.times`, with the dismounting and the men down her side). */
+export const RAKE_WORTH = 2.5;
+/** The seconds a side takes to load again after it has fired, and the share of its guns that makes it ready enough to fire. */
+export const RELOAD_TIME = 40;
+export const READY_ENOUGH = 0.5;
+/** How far from square a gun still bears on her, rad: the carronade's training less what the roll and the laying lose. */
+export const BEARS_ON = 26 * DEGREE;
+/** A broadside's worth falls off beyond the range he wants to fight at, by this many of those ranges (a worth 1 / (1 + x²) at x of them beyond it). */
+export const WORTH_FALLS = 1;
+/** A side must keep her bearing this many seconds before it fires: the gun captains train and elevate their guns first (rules/guns.ts `trainRate`, `elevateRate`), so a ship swinging through an arc gets off nothing. */
+export const LAYING_TIME = 6;
+/** Planned moments are this many seconds apart. */
+export const PLAN_STEP = 2;
+/** Having to close, each fighting range he is still beyond at the end of his plan costs this much (a broadside's worth is 1). */
+export const APPROACH_COST = 0.6;
+/** Still closing (beyond his fighting range and `ENGAGE_BEYOND`), no guns are lost by manoeuvring: he leaves his course for any plan worth this much more, whatever his skill. */
+export const APPROACH_MARGIN = 0.3;
+/** A plan in which none of his broadsides is fired costs this much: a captain who only keeps out of her arc never wins a fight (a broadside's worth is 1). */
+export const IDLE_COST = 0.5;
+/** Two ships within `CLOSEST` of each other at any moment of the plan cost this much a moment. */
+export const COLLISION_COST = 4;
+/** The weather position at the end of his plan is worth this much, by how far to windward of her he lies in 200 m (his `gauge`: 250 is all of it). */
+export const GAUGE_WORTH = 1;
+/** Turning the helm costs, by the share of a half turn, and slowing her costs, so that he does not change his mind for nothing. */
+export const TURN_COST = 0.04;
+export const SLOW_COST = 0.08;
+/**
+ * He keeps to the course he has given unless another is worth more: a course within `HOLD_WITHIN` of the one the helmsman
+ * has been told, or the topsail as it lies, counts this much more (a broadside's worth is 1). A tack costs `TACK_COST`
+ * besides, and her way stays down for `TACK_RECOVERY` s after it (her fore yards coming over, her sails filling).
+ */
+export const STICK = { course: 0.15, topsail: 0.1 } as const;
+/** A rake is worth leaving his fighting course for only within this many of his fighting ranges: farther off the balls hardly tell and he closes first. */
+export const RAKE_REACH = 2.5;
+export const HOLD_WITHIN = 10 * DEGREE;
+export const TACK_COST = 0.25;
+export const TACK_RECOVERY = 20;
+/** Ordered to cross her stern or her bow (orders.ts `rake`): broadsides fired otherwise count this share, those across the one wanted this much more (a worth of 1 stays 1). Besides, each 100 m the end of the plan lies from the point `reach` m beyond her stern or bow costs `pull`, so he heads for the end ordered even where no broadside would bear yet. */
+export const CROSSING = { other: 0.25, wanted: 2, reach: 45, pull: 1 } as const;
+/** Within this range, m, he has crossed her stern or bow when he lies across the end of her with a broadside bearing (his report). */
+export const CROSSED_WITHIN = 250;
+/** The player's master looks at her to cross her stern or bow with the seasoned captain's plan, whatever the player's own skill (design thread, 2026-11-18). */
+export const MASTER_PLANS: Skill = 'seasoned';

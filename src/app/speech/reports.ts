@@ -194,6 +194,7 @@ export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
     }
     case 'wind': return [report('master', ship, `wind ${e.how}`)];
     case 'off beam': return mine ? [report('master', ship, `her ${e.how} of the beam`)] : [];
+    case 'crossed': return mine ? [report('master', ship, `across her ${e.end}`)] : [];
   }
 }
 

@@ -15,7 +15,7 @@ import { angleDiff } from '@futuremagic/core';
 import { goingAbout, isGunnery, isKeep, isLife, tackOf, type Keep, type Order, type SailingOrder } from '../orders';
 import {
   BACK_ABAFT, BACK_MOST, BEARS_WITHIN, CLOSEST, LAYING_SPARE, WORD_READY, CLOSING_PER_RANGE, FILL_ABAFT, HYSTERESIS, OFF_BEARING, STATION_RANGES, ENGAGE_BEYOND, LEAD_MOST, MOST_CLOSING, OFF_CLOSE, RAKE_WITHIN, READY_SIDE, SAME_SIDE, SKILL, TACK_GAIN, TACK_WAY,
-  TURN_AT, WEAR_GAIN, WOUNDED_MOST, WOUNDED_SIDE, type Skill,
+  MASTER_PLANS, TURN_AT, WEAR_GAIN, WOUNDED_MOST, WOUNDED_SIDE, type Skill,
 } from '../rules/captain';
 import { HOVE_TO_MAST, MASTER_LOOK } from '../rules/orders';
 import { CLOSE_HAULED } from '../rules/sailing';
@@ -24,6 +24,7 @@ import type { SimState } from '../state';
 import { foeOf } from '../foes';
 import { bearingDir, KNOT, STEPS_PER_SECOND, wrapBearing } from '../units';
 import { sideIndex, sideSign, sightOf, type Sight } from './sight';
+import { plan, type Crossing } from './tactics';
 
 /** A quarter turn, rad: her beam. */
 const BEAM = Math.PI / 2;
@@ -48,6 +49,8 @@ export function sailableOn(tack: number, want: number, from: number): number {
 export interface Wanted {
   readonly heading: number;
   readonly side: 0 | 1 | null;
+  /** His plan lays her main topsail aback to slow her (tactics.ts); false for the first match's captain, who keeps station by `stationOrder`'s rule. */
+  readonly slow?: boolean;
 }
 
 /** Whether he lies within her rake: near her bow or stern line, where her broadside cannot bear on him. */
@@ -92,7 +95,15 @@ function broadside(sight: Sight, range: number, rake: boolean, keepBearing: bool
 const closingFor = (now: number, range: number): number => Math.max(-MOST_CLOSING, Math.min(MOST_CLOSING, ((now - range) / range) * CLOSING_PER_RANGE));
 
 /** Where he wants her head now (see the file's head). */
-export function wantedHeading(sight: Sight, skill: Skill): Wanted {
+export function wantedHeading(sight: Sight, skill: Skill, crossing: Crossing | null = null): Wanted {
+  const fights = fightingCourse(sight, skill);
+  if (SKILL[skill].horizon === 0) return fights;
+  const planned = plan(sight, skill, fights.heading, crossing);
+  return planned.departs ? { heading: planned.heading, side: planned.side, slow: planned.slow } : fights;
+}
+
+/** The course he fights by when no manoeuvre is worth more: closing for her, a broadside laid on her at his range (see the file's head). */
+function fightingCourse(sight: Sight, skill: Skill): Wanted {
   const row = SKILL[skill], own = sight.own.sailing, now = sideIndex(sight.off);
   if (sight.range > row.range + ENGAGE_BEYOND) return { heading: closing(sight, skill), side: null };
   let best: Wanted = { heading: own.heading, side: now }, bestScore = Infinity;
@@ -139,6 +150,11 @@ export function helmOrder(sight: Sight, want: number): Order | null {
 export function stationOrder(sight: Sight, skill: Skill, wanted: Wanted): Order | null {
   const row = SKILL[skill], told = sight.own.told, ship = sight.ship, main = MASTS.indexOf(HOVE_TO_MAST);
   if (told.hove) return null;
+  if (wanted.slow !== undefined) {
+    // He plans it: topsail aback when his plan slows her, filled when it does not (never with that mast's stays shot away).
+    if (wanted.slow && !told.backed[main] && !sight.unstayed[main]) return { kind: 'back', ship, mast: HOVE_TO_MAST };
+    return !wanted.slow && told.backed[main] ? { kind: 'fill', ship } : null;
+  }
   const abaft = Math.abs(sight.off) - BEAM, station = row.range * STATION_RANGES;
   if (!told.backed[main] && !sight.unstayed[main] && wanted.side !== null && sight.range < station && abaft > BACK_ABAFT && abaft < BACK_MOST) return { kind: 'back', ship, mast: HOVE_TO_MAST };
   if (told.backed[main] && (wanted.side === null || sight.range > station * HYSTERESIS || abaft < FILL_ABAFT || abaft > BACK_MOST)) return { kind: 'fill', ship };
@@ -161,6 +177,7 @@ const MASTER_EYE: Skill = 'master';
  */
 export function keptHeading(sight: Sight, keep: Keep): number {
   if (keep.kind === 'follow') return toward(sight, 1, 0, 0);
+  if (keep.kind === 'rake' || keep.kind === 'crossbow') return plan(sight, MASTER_PLANS, fightingCourse(sight, MASTER_PLANS).heading, keep.kind === 'rake' ? 'stern' : 'bow').heading;
   return wrapBearing(sight.enemy.heading + sideSign(sideIndex(sight.off)) * closingFor(sight.range, Math.max(keep.range, CLOSEST)));
 }
 
@@ -172,7 +189,7 @@ export function keptHeading(sight: Sight, keep: Keep): number {
 export function masterOrder(state: SimState, ship: number): SailingOrder | null {
   const keep = state.ships[ship]?.told.keep;
   if (!keep || state.tick % Math.round(MASTER_LOOK * STEPS_PER_SECOND) !== 0 || foeOf(state.ships, ship) === null) return null;
-  const sight = sightOf(state, ship, MASTER_EYE);
+  const sight = sightOf(state, ship, keep.kind === 'rake' || keep.kind === 'crossbow' ? MASTER_PLANS : MASTER_EYE);
   const order = helmOrder(sight, keptHeading(sight, keep));
   return order && !isGunnery(order) && !isLife(order) && !isKeep(order) && order.kind !== 'sound' ? order : null;
 }

@@ -211,7 +211,7 @@ export function isStanding(order: Order, told: ShipOrders): boolean {
   switch (order.kind) {
     case 'sail': return told.canvas === order.canvas;
     case 'by': return told.helm.by !== 0 && !told.keep;
-    case 'follow': case 'abeam': return told.keep?.kind === order.kind;
+    case 'follow': case 'abeam': case 'rake': case 'crossbow': return told.keep?.kind === order.kind;
     case 'heave': return told.hove;
     case 'back': return told.backed[MASTS.indexOf(order.mast)] === true;
     case 'quarters': return told.quarters;

@@ -55,7 +55,7 @@ const order = (id: string, word: WordKey, o: Order, detail: WordKey | null = nul
 const plain = (kind: PlainOrder['kind'] | GunsOrder['kind'] | LifeOrder['kind'] | KeepOrder['kind'] | SoundOrder['kind']): Order => ({ kind, ship: 0 } as Order);
 
 /** The master's ring "Keep her": his standing helm orders (orders.md "The fans as built"). */
-const KEEP: readonly FanItem[] = [order('by', 'fanBy', plain('by')), order('follow', 'fanFollow', plain('follow')), order('abeam', 'fanAbeam', plain('abeam'))];
+const KEEP: readonly FanItem[] = [order('by', 'fanBy', plain('by')), order('follow', 'fanFollow', plain('follow')), order('abeam', 'fanAbeam', plain('abeam')), order('rake', 'fanRake', plain('rake')), order('crossbow', 'fanCrossBow', plain('crossbow'))];
 /** The master's ring "About": through the wind, or round before it. */
 const ABOUT: readonly FanItem[] = [order('tack', 'fanTack', plain('tack')), order('wear', 'fanWear', plain('wear'))];
 /** The first lieutenant's ring "Make sail": the three settings of sail. */

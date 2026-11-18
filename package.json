@@ -24,6 +24,7 @@
     "check:gunnery": "tsx tools/sim/gunnery.ts",
     "check:captains": "tsx tools/sim/captains.ts",
     "check:fleets": "tsx tools/sim/fleets.ts",
+    "track": "tsx tools/sim/track.ts",
     "check:first": "tsx tools/sim/first.ts",
     "plan:draw": "tsx tools/plan/draw.ts",
     "shot:sea": "node tools/shot/sea.mjs",

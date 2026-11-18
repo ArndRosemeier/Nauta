@@ -95,7 +95,7 @@ test('the order keys: each a different key, and a glass kept on G gives G up to 
 
 test('a tag shows the key that gives what it gives: the fan teaches the keys', () => {
   const keyed = (items: readonly FanItem[]): string[] => items.flatMap((i) => (i.act.kind === 'ring' ? keyed(i.act.items) : [`${i.id}:${keyOfItem(i) ?? '-'}`]));
-  assert.deepEqual(keyed(fanItems('master', UNDER_WAY, 0)), ['steer:steer', 'up:up', 'away:away', 'tack:tack', 'wear:wear', 'by:-', 'follow:-', 'abeam:-', 'heave:heave']);
+  assert.deepEqual(keyed(fanItems('master', UNDER_WAY, 0)), ['steer:steer', 'up:up', 'away:away', 'tack:tack', 'wear:wear', 'by:-', 'follow:-', 'abeam:-', 'rake:-', 'crossbow:-', 'heave:heave']);
   assert.deepEqual(keyed(fanItems('gunner', UNDER_WAY, 0)).filter((k) => !k.endsWith(':-')), ['shot-round:round', 'shot-chain:chain', 'shot-grape:grape', 'bear:fire', 'cease:cease']);
   const lieutenant = keyed(fanItems('first lieutenant', UNDER_WAY, 0));
   for (const k of ['sail-battle:battle', 'sail-plain:plain', 'sail-all:all', 'shorten:shorten', 'quarters:quarters', 'strike:-']) assert.ok(lieutenant.includes(k), k);

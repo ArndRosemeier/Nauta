@@ -676,7 +676,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Whether she is going about (a tack or wear ordered and not yet done) | `src/sim/orders.ts#goingAbout` |
 | The orders a computer captain gives in a step (from the state alone; none between his looks) | `src/sim/captain/captain.ts#captainOrders` |
 | What a computer captain knows when he looks round: his ship as reported, the enemy as seen, his judged range and bearing | `src/sim/captain/sight.ts#sightOf` |
-| Where a computer captain wants her head: closing for the weather position and her stern, a broadside at his range, away before the ships touch | `src/sim/captain/helm.ts#wantedHeading` |
+| Where a computer captain wants her head: closing for the weather position and her stern, a broadside at his range, away before the ships touch; and a planned manoeuvre when one is worth more | `src/sim/captain/helm.ts#wantedHeading` |
+| Planning a manoeuvre: the look-ahead that counts the broadsides each ship could fire along a course (bearing, loaded, raking, her reply) and picks the best, at his skill's horizon | `src/sim/captain/tactics.ts#plan` |
+| Whether a ship has made her pass across the stern or bow of the other (the master's report for "Cross her stern") | `src/sim/captain/tactics.ts#crossedAt` |
 | The master's order that brings her head toward a wanted heading (a course, full and by, a tack, or wearing round) | `src/sim/captain/helm.ts#helmOrder` |
 | The heading nearest a wanted one she can steer on a tack | `src/sim/captain/helm.ts#sailableOn` |
 | Keeping station alongside her: the main topsail aback when she drops astern, filled when she is abreast | `src/sim/captain/helm.ts#stationOrder` |

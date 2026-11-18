@@ -40,6 +40,7 @@ Stations and people are those of [ship.md](ship.md) ("Where orders are given"). 
 | | Come up a point, Bear away a point | Eleven and a quarter degrees toward or off the wind; repeated taps add up | N4 |
 | | Full and by | As close to the wind as she will lie, following the wind as it shifts | N4 |
 | | Steer for her, Keep her on the beam | Follow the enemy: head for her, or hold her abeam on the engaged side at the distance now | N5 |
+| | Cross her stern, Cross her bow | The master plans a pass across the end of her, where her broadside cannot bear and a ball rakes her, tacking or wearing as he must, and reports when it is made; always with the seasoned captain's look-ahead (40 s), whatever the player's own skill: what the player gains is choosing when. Refused without way or with no ship in sight | N7.6 |
 | | Tack, Wear | Through the wind, or round before it, onto the other tack | N4 |
 | | Heave to | Main yards aback, courses up, boom sail brailed, helm down: she stops in about a minute | N4 |
 | **The first lieutenant**, on the quarterdeck, the boatswain beside him | Sail: Battle sail, Plain sail, All sail, Shorten sail | The four settings of N3.3; "Shorten" is one step down. Reefs are the crew's own business by the wind's force | N4 |
@@ -61,7 +62,7 @@ Which side fires is never ordered: the side she bears on fires. Orders left out 
 
 ## The fans as built (confirmed 2026-11-18)
 
-- **The master:** Steer there; Come up; Bear away; About (a ring: Tack, Wear); Keep her (a ring of standing orders: Full and by, Steer for her, Her on the beam); Heave to.
+- **The master:** Steer there; Come up; Bear away; About (a ring: Tack, Wear); Keep her (a ring of standing orders: Full and by, Steer for her, Her on the beam, Cross her stern, Cross her bow); Heave to.
 - **The first lieutenant:** Make sail (a ring: battle, plain, all); Shorten; Back or Fill (one place, whichever applies); Quarters or Stand down (one place); Her life (a ring: Hands to the pumps, Fire party, Clear the wreckage); Strike (asked twice).
 - **The midshipman** asks whom the order is for, then shows that man's fan. He follows the captain on every deck and below, never aloft; from aloft the captain hails, and a hail reaches the weather deck.
 - **The carpenter:** Sound the well (he reports the water in her, an event), Plug the shot holes, Man the pumps.

@@ -105,12 +105,13 @@ export interface LifeOrder {
 export type LifeKind = LifeOrder['kind'];
 
 /**
- * The master's standing helm orders (orders.md "Keep her", N5.3b): steer for her, keep her on the beam at the range
- * now. They stand until another helm order; the master steers by them himself (captain/helm.ts `masterOrder`, the
+ * The master's standing helm orders (orders.md "Keep her", N5.3b, N7.6): steer for her, keep her on the beam at the range
+ * now, cross her stern or cross her bow (he plans the pass with captain/tactics.ts, whatever the captain's skill, and
+ * takes her across the end of her and on). They stand until another helm order; the master steers by them himself (captain/helm.ts `masterOrder`, the
  * computer captain's own steering), so she is put about or worn round as the chase needs.
  */
 export interface KeepOrder {
-  readonly kind: 'follow' | 'abeam';
+  readonly kind: 'follow' | 'abeam' | 'rake' | 'crossbow';
   readonly ship: number;
 }
 /** Sound the well: the carpenter answers with the water in her. */
@@ -133,7 +134,7 @@ const LIFE_KINDS: readonly OrderKind[] = ['pumps', 'fires', 'wreckage', 'plug', 
 export const isLife = (order: Order): order is LifeOrder => LIFE_KINDS.includes(order.kind);
 
 /** Whether an order is one of the master's standing helm orders (steer for her, her on the beam). */
-export const isKeep = (order: Order): order is KeepOrder => order.kind === 'follow' || order.kind === 'abeam';
+export const isKeep = (order: Order): order is KeepOrder => order.kind === 'follow' || order.kind === 'abeam' || order.kind === 'rake' || order.kind === 'crossbow';
 
 /** One word of the vocabulary: who takes it (docs/design/orders.md), what it does, and what more it names. */
 export interface OrderWord {
@@ -151,6 +152,8 @@ export const VOCABULARY: readonly OrderWord[] = [
   { kind: 'by', to: 'master', what: 'full and by: as close to the wind as she will lie, following it as it shifts', takes: null },
   { kind: 'follow', to: 'master', what: 'steer for her: he heads for where she will be, tacking or wearing as he must, until told another course', takes: null },
   { kind: 'abeam', to: 'master', what: 'keep her on the beam: he holds her abeam on the side she lies on, at the range now, until told another course', takes: null },
+  { kind: 'rake', to: 'master', what: 'cross her stern: he plans a pass across the end of her, broadside bearing where her guns cannot, tacking or wearing as he must, until told another course', takes: null },
+  { kind: 'crossbow', to: 'master', what: 'cross her bow: as cross her stern, across the head of her', takes: null },
   { kind: 'tack', to: 'master', what: 'through the wind onto the other tack, full and by', takes: null },
   { kind: 'wear', to: 'master', what: 'round before the wind onto the other tack, as far off the wind as she was', takes: null },
   { kind: 'heave', to: 'master', what: 'heave to: courses hauled up, boom sail brailed, main yards aback, helm down; she stops', takes: null },
@@ -187,6 +190,8 @@ const PHRASES: readonly { readonly words: string; readonly order: Partial<Order>
   { words: 'full and by', order: { kind: 'by' } },
   { words: 'steer for her', order: { kind: 'follow' } },
   { words: 'keep her on the beam', order: { kind: 'abeam' } },
+  { words: 'cross her stern', order: { kind: 'rake' } },
+  { words: 'cross her bow', order: { kind: 'crossbow' } },
   { words: 'tack', order: { kind: 'tack' } },
   { words: 'ready about', order: { kind: 'tack' } },
   { words: 'go about', order: { kind: 'tack' } },
@@ -366,7 +371,7 @@ export interface ShipOrders {
 }
 
 /** The master's standing helm order: steer for her, or keep her on the beam at `range`, m (the range when it was given). */
-export type Keep = { readonly kind: 'follow' } | { readonly kind: 'abeam'; readonly range: number };
+export type Keep = { readonly kind: 'follow' } | { readonly kind: 'rake' } | { readonly kind: 'crossbow' } | { readonly kind: 'abeam'; readonly range: number };
 
 /** What the carpenter's crew is told to do first. */
 export type CarpenterFirst = 'plug' | 'pump';
@@ -538,7 +543,7 @@ export function malformed(order: Order): string {
     case 'up': case 'away': case 'by': case 'tack': case 'wear': case 'heave': case 'shorten': case 'fill': return '';
     case 'quarters': case 'stand': case 'bear': case 'hold': case 'fire': case 'cease': return '';
     case 'pumps': case 'fires': case 'wreckage': case 'plug': case 'pumping': case 'strike': return '';
-    case 'follow': case 'abeam': case 'sound': return '';
+    case 'follow': case 'abeam': case 'rake': case 'crossbow': case 'sound': return '';
     default: return `there is no order "${(order as { kind: string }).kind}"`;
   }
 }
@@ -554,7 +559,7 @@ export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: Order
   if (isGunnery(order)) return gunnery(told, order);
   if (isLife(order)) return life(told, order, now.tick);
   if (order.kind === 'sound') return sound(told, now.water ?? 0);
-  if (isKeep(order)) return keep(told, order, now);
+  if (isKeep(order)) return keep(told, s, order, now);
   const answer = sailing(told, s, order, now);
   // A helm order of the captain's own ends a standing one (the master steers as told now).
   return !answer.refused && told.keep && HELM_KINDS.has(order.kind) ? { ...answer, told: { ...answer.told, keep: null } } : answer;
@@ -570,11 +575,13 @@ export function masterSteers(told: ShipOrders, s: Sailing, order: SailingOrder, 
 }
 
 /** Steer for her, or keep her on the beam at the range now: it stands until another helm order. Not with no enemy in sight, nor hove to. */
-function keep(told: ShipOrders, order: KeepOrder, now: OrderMoment): OrderAnswer {
+function keep(told: ShipOrders, s: Sailing, order: KeepOrder, now: OrderMoment): OrderAnswer {
   if (now.enemy === undefined || now.enemy === null) return refuse(told, 'no enemy', 'there is no ship in sight to steer by');
   if (told.hove) return refuse(told, 'hove to already', 'she is hove to: fill first');
-  if (order.kind === 'follow' && told.keep?.kind === 'follow') return refuse(told, 'keeping so already', 'he steers for her already');
-  const kept: Keep = order.kind === 'follow' ? { kind: 'follow' } : { kind: 'abeam', range: now.enemy };
+  // A pass across her is made with way on her: a ship with none cannot cross anything.
+  if ((order.kind === 'rake' || order.kind === 'crossbow') && s.ahead < NO_WAY) return refuse(told, 'no way', 'she has no way on her to cross anyone');
+  if (order.kind !== 'abeam' && told.keep?.kind === order.kind) return refuse(told, 'keeping so already', order.kind === 'follow' ? 'he steers for her already' : 'he is crossing her already');
+  const kept: Keep = order.kind === 'abeam' ? { kind: 'abeam', range: now.enemy } : order.kind === 'follow' ? { kind: 'follow' } : order.kind === 'rake' ? { kind: 'rake' } : { kind: 'crossbow' };
   return { refused: false, told: { ...told, keep: kept }, ...NOTHING_SAID };
 }
 
