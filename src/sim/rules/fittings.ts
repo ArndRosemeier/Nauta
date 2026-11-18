@@ -116,12 +116,6 @@ export const NETTINGS = { aft: -11.2, fore: 16.6, tile: 2 } as const;
  * against small shot. The netting model's material slot that is the stowed hammocks under their cloth.
  */
 export const HAMMOCK_SLOT = 'cloth';
-/**
- * The waist's nettings, where the hammocks are stowed at quarters to shelter the gun crews, m forward of the mainmast:
- * between the quarterdeck's break and the forecastle's (ship.md, "The view from the deck"). The rails of the raised
- * decks stay open at all times, so the captain's view from where he commands is never walled in.
- */
-export const HAMMOCK_WAIST = { aft: -1.3, fore: 13.9 } as const;
 
 /** Fire buckets either side of the companion (FITTINGS: the companion, -6.65..-5.62), m across. */
 export const BUCKETS = { along: -6.45, across: [0.72, 1.02] } as const;

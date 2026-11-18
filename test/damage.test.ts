@@ -19,9 +19,9 @@ import { sparParts, type Place } from '../src/sim/damage/meet.ts';
 import { battery, gunAt } from '../src/sim/guns/guns.ts';
 import { fly, type Shot, type Vec } from '../src/sim/guns/shot.ts';
 import { MUZZLE_SPEED, PATH_STEP, SHOT, type ShotKind } from '../src/sim/rules/guns.ts';
-import { HURT, PIERCE, SPLINTER_REACH, TIMBER, WHEEL_HIGH } from '../src/sim/rules/damage.ts';
+import { HAMMOCKS, HURT, PIERCE, SPLINTER_REACH, TIMBER, WHEEL_HIGH } from '../src/sim/rules/damage.ts';
 import { ON_CENTRELINE } from '../src/sim/rules/fittings.ts';
-import { weatherDeck } from '../src/sim/ship/hull.ts';
+import { sideTop, weatherDeck } from '../src/sim/ship/hull.ts';
 import { LOAD_WATERLINE, type GunKind } from '../src/sim/rules/ships.ts';
 import { toWorld } from '../src/sim/ship/motion.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
@@ -246,3 +246,18 @@ test('a ball in by her stern rakes her: it travels the length of her battery, di
   // A ball fired into her side at one gun: through the port it dismounts that gun and stops.
   assert.ok(raked.guns > square.guns && raked.men > 2 * square.men, `raking: ${raked.guns} guns, ${raked.men} men; into her side: ${square.guns} guns, ${square.men} men`);
 });
+
+test('at quarters the hammocks in the waist\'s nettings hold grape as the old bulwark did; round shot goes through them as if they were not there', () => {
+  // Across her waist over its rail, through both sides' nettings, from a little above the crew's heads down to them.
+  const along = WAIST_AT, top = sideTop(along), over = (kind: ShotKind) => straight(kind, [along, -OFF, top + HAMMOCKS_BAND], [along, OFF, top + HAMMOCKS_BAND], AT_100, kind === 'grape' ? SHOT.grape.balls : 1);
+  const at = (quarters: boolean) => ships().map((s) => ({ ...s, quarters }));
+  const spent = (r: Run) => Math.max(...r.spent.flatMap((s) => s.filter((x) => x !== GONE)));
+  const grape = { open: fire(over('grape'), CARRONADE, SEED, at(false)), stowed: fire(over('grape'), CARRONADE, SEED, at(true)) };
+  assert.ok(spent(grape.stowed) - spent(grape.open) >= HAMMOCKS.thick * 1000 * 0.99, `grape spent ${spent(grape.open)} mm open, ${spent(grape.stowed)} mm with the hammocks stowed`);
+  const round = { open: fire(over('round'), CARRONADE, SEED, at(false)), stowed: fire(over('round'), CARRONADE, SEED, at(true)) };
+  assert.deepEqual(round.stowed.events, round.open.events);
+  assert.deepEqual(round.stowed.spent, round.open.spent);
+});
+/** Over the waist's rail, in the hammocks' band, m above the top of her side; in the waist between two of its ports, m forward of the mainmast. */
+const HAMMOCKS_BAND = 0.35;
+const WAIST_AT = 5.2;

@@ -15,7 +15,8 @@
  */
 import { linearCurve, monotoneCurve, type Curve } from '../curve';
 import {
-  BODY_STATIONS, DESIGN_WATERLINE, KEEL_DEPTH, KEEL_HALF_SIDING, PROFILE, STEM, STERN, TRANSOM, DECK_CAMBER, PLANKING,
+  BODY_STATIONS, BREAKS, DESIGN_WATERLINE, KEEL_DEPTH, KEEL_HALF_SIDING, PORTS, PROFILE, STEM, STERN, TRANSOM, DECK_CAMBER, PLANKING,
+  WAIST_DRIFT,
 } from '../rules/ships';
 
 /** The grid the surface is sampled on: steps along her and up, m. */
@@ -49,8 +50,22 @@ export const HULL_FORE = Math.max(...col(STEM, 1), ALONGS[ALONGS.length - 1]!);
 export const keelBottom = (along: number): number => KEEL_BOTTOM(along);
 /** The weather deck's upper side at her side, m above the base: the sheer, rising toward bow and stern. */
 export const sheer = (along: number): number => SHEER(along);
-/** The top of her side (the plank-sheer under the rail), m above the base. */
-export const sideTop = (along: number): number => SIDE_TOP(along);
+/** Whether a place along her is in the waist, between the breaks of her raised decks. */
+export const inWaist = (along: number): boolean => along > BREAKS.quarterdeck && along < BREAKS.forecastle;
+/**
+ * How high the waist's side stands over the deck at her side, m: just over the highest edge of its ports' tops, so
+ * every port is a notch up to the rail (ship.md, "The view from the deck").
+ */
+export const WAIST_SIDE = Math.max(...PORTS.filter((p) => inWaist(p[1])).flatMap(([, along, , top, w]) => [top - SHEER(along - w / 2), top - SHEER(along + w / 2)]));
+/**
+ * The top of her side (the plank-sheer under the rail), m above the base: the draught's, but in the waist lowered to
+ * WAIST_SIDE over the deck, coming down to it from the draught's height over WAIST_DRIFT from each break.
+ */
+export function sideTop(along: number): number {
+  const drawn = SIDE_TOP(along), into = Math.min(along - BREAKS.quarterdeck, BREAKS.forecastle - along);
+  if (into <= 0) return drawn;
+  return drawn + (Math.min(drawn, SHEER(along) + WAIST_SIDE) - drawn) * Math.min(1, into / WAIST_DRIFT);
+}
 
 /** The weather deck's upper side at a place, m above the base: the sheer at her side plus the round of her beams. */
 export function weatherDeck(along: number, x: number): number {

@@ -43,6 +43,17 @@ export const DECK_CAMBER = 0.18;
 export const TOP_OF_SIDE = 6.24;
 /** The top of the rail amidships, m above the base. */
 export const RAIL_TOP = 6.52;
+/**
+ * The breaks of her raised decks (ship.md, "The view from the deck"), m forward of the mainmast: the quarterdeck runs
+ * aft from the one, the forecastle forward from the other; between them is the waist.
+ */
+export const BREAKS = { quarterdeck: -1.3, forecastle: 13.9 } as const;
+/**
+ * The waist's side, lowered so the sea is seen over its rail (N2.10): the top of her side runs just over the waist's
+ * port tops (hull.ts `sideTop`), so the rail stands about 1.1 m over the deck at her side and the ports are notches up
+ * to it. From the draught's height at each break it comes down to that over this length, m.
+ */
+export const WAIST_DRIFT = 0.6;
 /** The main wale: its lower and upper edge, m above the base (the draught's lower edge; two strakes of 9 in above it). */
 export const WALE = { lower: 4.41, upper: 4.87 } as const;
 /** A gun port of the waist: its sill and its top, m above the base, and its width, m. */
@@ -84,10 +95,10 @@ export const WATERWAY = { width: 0.28, rise: 0.11 } as const;
 /** The bulwark, m: its timbers (sided, apart), its inside and outside boards, and its rail (width, thickness). */
 export const BULWARK = { timber: 0.15, insideBoard: 0.05, outsideBoard: 0.064, railWidth: 0.3, railThick: 0.1 } as const;
 /**
- * The pin rail inside the bulwark at the main shrouds, m: its height above the deck (its top, just under the main
- * rail and clear above the ports' tops at 1.22 m), width, thickness, pins apart.
+ * The pin rail inside the bulwark, m: its height above the deck (its top, under the waist's lowered rail; its pins
+ * stand only between the ports, PIN_CLEAR_OF_PORT), width, thickness, pins apart.
  */
-export const PIN_RAIL = { height: 1.32, width: 0.16, thick: 0.08, pitch: 0.32 } as const;
+export const PIN_RAIL = { height: 0.95, width: 0.16, thick: 0.08, pitch: 0.32 } as const;
 
 /** Clear height under the weather deck's beams on the berth deck, m (the inboard profile, N2.1: 1.6 m; men stoop). */
 export const BERTH_HEADROOM = 1.6;

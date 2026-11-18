@@ -14,7 +14,7 @@ import {
   FIFE_MODELS, GUN_INBOARD, HOLD_BARRELS, HOLD_BUTTS, HOLD_PASSAGE, ON_CENTRELINE, BELFRY, MESS_TABLES, MODEL, NETTINGS, PUMPS, SKIDS,
   GEAR_CLEAR, SOLID, STERN_DAVITS, STOW_GAP, TABLE_OFF_SIDE, TABLE_TOP, type ModelName,
 } from '../rules/fittings';
-import { BERTH_HEADROOM, BODY, HOLD_FLOOR, LEAST_PASSAGE, LOAD_WATERLINE, RAILS, type Level } from '../rules/ships';
+import { BERTH_HEADROOM, BODY, BREAKS, HOLD_FLOOR, LEAST_PASSAGE, LOAD_WATERLINE, RAILS, WAIST_DRIFT, type Level } from '../rules/ships';
 import { HULL_AFT, hullHalfBreadth, sideTop, weatherDeck } from './hull';
 import { berthDeck, floorsUnder, insideBreadth, rectCentre, spacesById, type Obstacle, type Overhead, type Rect, type ShipPlan } from './plan';
 import { shipY, shipZ } from './section';
@@ -123,13 +123,15 @@ function weatherFittings(out: Furnishing[]): void {
   }
   const crownAlong = ringAlong - run * Math.cos(swing), crownOut = ringOut + run * Math.sin(swing);
   for (const s of [1, -1]) out.push(at(MODEL.anchor, 'weather', crownAlong, s * crownOut, crownUp, s * swing, -CATTED.lean));
-  // Hammock nettings along her rails, tile by tile, each turned and leaned to follow the rail.
-  for (let a = NETTINGS.aft; a + NETTINGS.tile <= NETTINGS.fore + EPSILON; a += NETTINGS.tile) {
-    const a0 = a, a1 = a + NETTINGS.tile, mid = (a0 + a1) / 2;
+  // Hammock nettings along her rails, tile by tile, each turned and leaned to follow the rail: aft of the waist, in
+  // it, and forward of it, as many whole tiles as each run holds, in its middle; none where her side comes down at a break.
+  const runs = [[NETTINGS.aft, BREAKS.quarterdeck], [BREAKS.quarterdeck + WAIST_DRIFT, BREAKS.forecastle - WAIST_DRIFT], [BREAKS.forecastle, NETTINGS.fore]] as const;
+  for (const [from, to] of runs) for (let n = Math.floor((to - from) / NETTINGS.tile + EPSILON), k = 0; k < n; k++) {
+    const a0 = (from + to - n * NETTINGS.tile) / 2 + k * NETTINGS.tile, a1 = a0 + NETTINGS.tile, mid = (a0 + a1) / 2, tile = NETTINGS.tile;
     for (const s of [1, -1]) {
       const x0 = insideBreadth(a0, sideTop(a0)), x1 = insideBreadth(a1, sideTop(a1));
       if (x0 <= 0 || x1 <= 0) continue;
-      const turn = s * Math.atan2(x1 - x0, NETTINGS.tile), lean = Math.atan2(sideTop(a1) - sideTop(a0), NETTINGS.tile);
+      const turn = s * Math.atan2(x1 - x0, tile), lean = Math.atan2(sideTop(a1) - sideTop(a0), tile);
       out.push(at(MODEL.netting, 'weather', mid, s * insideBreadth(mid, sideTop(mid)), sideTop(mid), -turn, lean));
     }
   }
@@ -306,6 +308,9 @@ function stows(plan: ShipPlan, casks: readonly (Rect & { level: Level })[]): (Re
   });
 }
 
+/** Fittings standing on her rail, whose room her side already bounds: in no one's way beyond it. */
+const ON_RAIL: ReadonlySet<ModelName> = new Set([MODEL.netting]);
+
 /** The casks, whose stows are given whole. */
 const CASKS = new Set<ModelName>([MODEL.butt, MODEL.barrel]);
 
@@ -313,11 +318,13 @@ const CASKS = new Set<ModelName>([MODEL.butt, MODEL.barrel]);
  * What every fitting on her puts in a man's way, from the one placement list (furnish) and each model's room
  * (rules/fittings.ts SOLID), by its height over the floor it stands over: under BODY.stepUp it is stepped over and
  * left out; wholly over the least headroom it is overhead; otherwise it stands in the way. Fittings hung outboard of
- * every space (the anchors, the gig) are in no one's way. The plan's obstacles and overheads (plan.ts) are these.
+ * every space (the anchors, the gig) are in no one's way, nor are those standing on her rail (the hammock nettings),
+ * where her side already bounds the walk. The plan's obstacles and overheads (plan.ts) are these.
  */
 export function fittingSolids(plan: ShipPlan, fittings: readonly Furnishing[] = furnish(plan)): FittingSolids {
   const standing: Obstacle[] = [], overhead: Overhead[] = [], casks: (Rect & { level: Level })[] = [];
   fittings.forEach((f, i) => {
+    if (ON_RAIL.has(f.model)) return;
     SOLID[f.model].forEach((p, k) => {
       const r = partRoom(f, p), { along, across } = rectCentre(r);
       const under = floorsUnder(plan, along, across).find((u) => u.space.level === f.level);

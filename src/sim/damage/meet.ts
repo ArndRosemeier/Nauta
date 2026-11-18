@@ -14,10 +14,10 @@
  */
 import { clamp, v3cross, v3dot, v3sub } from '@futuremagic/core';
 import { GUN_HIGH, MAN_REACH, STEERING_REACH, TIMBER, WHEEL_HIGH } from '../rules/damage';
-import { ON_CENTRELINE } from '../rules/fittings';
+import { MODEL, ON_CENTRELINE, SOLID } from '../rules/fittings';
 import { BODY, BULWARK, CELL, WALE, type Level } from '../rules/ships';
 import { battery } from '../guns/guns';
-import { HULL_AFT, HULL_FORE, HULL_LOW, hullBottom, hullEnds, hullHalfBreadth, sheer, sideTop, weatherDeck } from '../ship/hull';
+import { HULL_AFT, HULL_FORE, HULL_LOW, hullBottom, hullEnds, hullHalfBreadth, inWaist, sheer, sideTop, weatherDeck } from '../ship/hull';
 import { berthDeck, holds, shipPlan, type Cell } from '../ship/plan';
 import { rigPlan } from '../ship/rig';
 import { onSpar, type RigPoint } from '../ship/spars';
@@ -51,7 +51,9 @@ export interface LineMet extends Met { readonly kind: 'line'; readonly line: num
 export interface SailMet extends Met { readonly kind: 'sail'; readonly sail: number }
 /** Her steering gear: the wheel and its tiller ropes (rules/damage.ts `STEERING_REACH`). */
 export interface SteeringMet extends Met { readonly kind: 'steering' }
-export type Meeting = TimberMet | GunMet | ManMet | SparMet | LineMet | SailMet | SteeringMet;
+/** The hammocks stowed in the waist's nettings over its rail, at quarters (rules/damage.ts `HAMMOCKS`); how square on. */
+export interface HammocksMet extends Met { readonly kind: 'hammocks'; readonly cos: number }
+export type Meeting = TimberMet | GunMet | ManMet | SparMet | LineMet | SailMet | SteeringMet | HammocksMet;
 
 /** Where a man stands (his feet, m) and so his body up to BODY.height over them; null for a man not met (killed). */
 export type ManPlace = Place | null;
@@ -66,6 +68,8 @@ export interface Aboard {
   readonly gone?: readonly boolean[];
   /** Whether her steering gear is still there to be shot away. */
   readonly steering?: boolean;
+  /** Whether her hammocks are stowed in the waist's nettings (she is at quarters). Left out: they are not. */
+  readonly hammocks?: boolean;
 }
 
 /** One part of a spar between two places it can break (the rig plan's marks), and its spar. */
@@ -245,10 +249,23 @@ function sideCos(d: Place, at: Place, plumb: boolean): number {
   return Math.abs(d[0] * n[0] + d[1] * n[1] + d[2] * n[2]) / (Math.hypot(...d) * Math.hypot(...n));
 }
 
-/** The timber met where a piece crosses from zone `z0` to `z1` at `at` (d its direction), or null where it crosses none. */
-function timberAt(z0: Zone, z1: Zone, s: number, at: Place, d: Place): TimberMet[] {
+/** How high the hammocks stand stowed in a netting over the top of her side, m (the netting model's room). */
+const HAMMOCKS_HIGH = SOLID[MODEL.netting][0]!.y[1];
+
+/** Whether a place over her side's top is in the hammocks stowed in the waist's nettings, over its rail. */
+function inHammocks(along: number, h: number): boolean {
+  const top = sideTop(along);
+  return inWaist(along) && h > top + BULWARK.railThick && h <= top + HAMMOCKS_HIGH;
+}
+
+/**
+ * The timber met where a piece crosses from zone `z0` to `z1` at `at` (d its direction), or null where it crosses
+ * none; and over the waist's rail the hammocks, when they are stowed.
+ */
+function timberAt(z0: Zone, z1: Zone, s: number, at: Place, d: Place, hammocks: boolean): (TimberMet | HammocksMet)[] {
   const [along, across, h] = at, side = Math.sign(across) || 1;
   const pair = (a: Zone, b: Zone) => (z0 === a && z1 === b) || (z0 === b && z1 === a);
+  if (pair(Zone.Out, Zone.Over)) return hammocks && inHammocks(along, h) ? [{ kind: 'hammocks', s, at, cos: sideCos(d, at, true) }] : [];
   const deck = (level: 'weather' | 'berth'): TimberMet | null => {
     if (inOpening(level, along, across)) return null;
     const cell = cellBy(cellsAt('deck', side, level, along), Math.abs(across));
@@ -274,8 +291,8 @@ function timberAt(z0: Zone, z1: Zone, s: number, at: Place, d: Place): TimberMet
   return out.filter((m): m is TimberMet => m !== null);
 }
 
-/** Her timber crossed along the piece between shares s0 and s1. */
-function hullMeetings(a: Place, b: Place, s0: number, s1: number, out: Meeting[]): void {
+/** Her timber crossed along the piece between shares s0 and s1 (and her hammocks, when they are stowed). */
+function hullMeetings(a: Place, b: Place, s0: number, s1: number, hammocks: boolean, out: Meeting[]): void {
   const d: Place = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], length = Math.hypot(...d) * (s1 - s0);
   const n = Math.max(1, Math.ceil(length / MARCH));
   let sPrev = s0, zPrev = zoneOf(lerp3(a, b, s0));
@@ -288,7 +305,7 @@ function hullMeetings(a: Place, b: Place, s0: number, s1: number, out: Meeting[]
         const mid = (lo + hi) / 2, zm = zoneOf(lerp3(a, b, mid));
         if (zm === zPrev) lo = mid; else { hi = mid; zHi = zm; }
       }
-      out.push(...timberAt(zPrev, zHi, hi, lerp3(a, b, hi), d));
+      out.push(...timberAt(zPrev, zHi, hi, lerp3(a, b, hi), d, hammocks));
       // Whatever lies between that crossing and this sample is found from it on.
       if (zHi !== z) { sPrev = hi; zPrev = zHi; k--; continue; }
     }
@@ -463,7 +480,7 @@ export function meetings(a: Place, b: Place, reach: number, aboard: Aboard): Mee
   const out: Meeting[] = [];
   const inHull = clip(a, b, hull);
   if (inHull) {
-    hullMeetings(a, b, inHull[0], inHull[1], out);
+    hullMeetings(a, b, inHull[0], inHull[1], aboard.hammocks === true, out);
     gunMeetings(a, b, aboard.mounted, out);
   }
   manMeetings(a, b, aboard.men, out);

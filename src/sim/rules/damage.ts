@@ -38,6 +38,14 @@ export const TIMBER = {
   weather: PLANKING.deck * DEAL_AS_OAK + DECK_BEAM.moulded * BEAM_FILL,
   berth: PLANKING.berthDeck * DEAL_AS_OAK + BERTH_BEAM * BEAM_FILL,
 } as const;
+/**
+ * The hammocks stowed in the waist's nettings at quarters (ship.md, "The view from the deck"): the lowered waist's
+ * breastwork above its rail. Packed tight they stop grape as the old bulwark did, `thick` m of oak to it square on;
+ * round and chain shot go through as if they were not there and throw no splinters from them. A ship not at quarters
+ * has the open rail and no such shelter. Only the shot named in `stops` is held by them.
+ */
+export const HAMMOCKS = { thick: TIMBER.bulwark, stops: ['grape'] as readonly ShotKind[] } as const;
+
 /** The least cosine of a ball's meeting with timber that counts: a ball meeting it more glancingly goes through at most 1/GLANCING times its thickness (it skids off). */
 export const GLANCING = 0.25;
 
