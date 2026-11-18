@@ -378,8 +378,10 @@ function makeBelays(): Belay[] {
         }
       }
     } else {
+      // A fife rail is a level timber (N2.6's bitts): its pins stand BELAY_HEIGHT over the deck at the centreline, not over the deck's camber below each.
+      const railTop = weatherDeck(r.at, 0) + BELAY_HEIGHT;
       r.pins.forEach((across, k) => {
-        out.push({ id: `${r.id}-${k + 1}`, rail: r.id, along: r.at, across, height: weatherDeck(r.at, across) + BELAY_HEIGHT, toward: [r.toward, 0] });
+        out.push({ id: `${r.id}-${k + 1}`, rail: r.id, along: r.at, across, height: railTop, toward: [r.toward, 0] });
       });
     }
   }

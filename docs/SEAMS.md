@@ -370,3 +370,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A crew at the start, every man at his post | `src/sim/crew/crew.ts#startCrew` |
 | One step of the crew: acts become tasks, men told off by the quarter bill and sent, work done at the share of hands present, acts finished (the one owner of every man's task and place) | `src/sim/crew/crew.ts#stepCrew` |
 | The task a man has | `src/sim/crew/crew.ts#taskOf` |
+| What stands on her and the numbers that set it out (the fittings' models, guns' gear, helm, boats, anchors, nettings, casks) | `src/sim/rules/fittings.ts#MODEL` |
+| Every fitting on her, set out on her plan in ship space (plan N2.6) | `src/sim/ship/furnish.ts#furnish` |
+| Her fittings drawn as instances in her moving frame, by zone of her and level of detail | `src/render/ship/furnishings.ts#Furnishings` |
+| Something more of hers put into one of her zones, seen with it and lit by its lanterns (`ShipView.addToZone`) | `src/render/ship/shipView.ts#ShipView` |
+| One of her materials made to draw instances in her frame (they see ship space) | `src/render/ship/fitted.ts#fitted` |

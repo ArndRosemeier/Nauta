@@ -17,6 +17,10 @@ import { SeaView } from './render/seaView';
 import { makeTestBodies } from './render/testBodies';
 import { loadShip } from './render/ship/loadShip';
 import { ShipView } from './render/ship/shipView';
+import { Furnishings } from './render/ship/furnishings';
+import { loadFittings } from './render/ship/fittings';
+import { furnish } from './sim/ship/furnish';
+import { shipPlan } from './sim/ship/plan';
 import { SeaSound } from './audio/seaSound';
 import { ShipSound } from './audio/shipSound';
 import { OPEN_AIR } from './audio/acoustics';
@@ -76,6 +80,9 @@ async function start(): Promise<void> {
   if (ship && match) ship.poseFrom = (t) => match.pose(t);
   let where: Standpoint = standpoint(params.ship ?? '');
   const view = await createView(canvas, ship !== null);
+  // Her fittings (plan N2.6): drawn as instances in her frame, each zone's into that zone of her.
+  const furnished = ship ? new Furnishings(view.renderer, await loadFittings(import.meta.env.BASE_URL), furnish(shipPlan())) : null;
+  if (ship && furnished) for (const [zone, draws] of furnished.zones) ship.addToZone(zone, draws.group);
   view.camera.position.set(0, params.eye, 0);
   const startLook = params.look ?? START_LOOK;
   view.camera.rotation.set(startLook.pitch, startLook.yaw, 0);
@@ -101,7 +108,9 @@ async function start(): Promise<void> {
   await seaView.fine.warmUp(view.renderer);
   seaView.fine.run(view.renderer);
   // The sea's mesh is drawn as many tiles at once, a shader of its own: the warm-up builds it with the kinds.
-  await view.stage.warmUp([seaView.mesh]);
+  // So are her fittings' instanced draws, which three builds shaders of their own for.
+  await furnished?.ready();
+  await view.stage.warmUp([seaView.mesh, ...(furnished ? [...furnished.zones.values()].map((d) => d.group) : [])]);
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
   await view.stage.add(seaView.deep);
@@ -186,6 +195,7 @@ async function start(): Promise<void> {
         walking.swingDoors((id, angle) => ship.setDoor(id, angle));
       }
       ship.update(sea, seaTime, dt, view.camera, where, input.look, view.sun, sky.lightDirection, sky.gain, view.radPerPixel(), seaView.origin);
+      furnished?.update(ship.group, view.camera, sky.lightDirection);
       sky.below = ship.below;
       seaView.sheltered = ship.below > 0;
     } else {
@@ -213,7 +223,7 @@ async function start(): Promise<void> {
     if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;

@@ -5,7 +5,7 @@
  * shaders; her doors on their hinges; and the far ship, a coarse outside crossfaded in by distance so it never pops.
  */
 import {
-  Color, Euler, Group, Matrix4, Mesh, Quaternion, Vector2, Vector3, Vector4, type DirectionalLight, type Material, type PerspectiveCamera,
+  Color, Euler, Group, Matrix4, Mesh, Quaternion, Vector2, Vector3, Vector4, type DirectionalLight, type Material, type Object3D, type PerspectiveCamera,
 } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import type { SeaState } from '../../sim/sea/sea';
@@ -252,6 +252,22 @@ export class ShipView {
       n += (g.index?.array as Uint32Array | undefined)?.byteLength ?? 0;
     });
     return n;
+  }
+
+  /**
+   * Puts `object` (in her space) into zone `name` (zones.ts): drawn when that zone is seen, its meshes lit by the
+   * zone's lanterns and openings, and below deck only timber casting (her fittings, furnishings.ts).
+   */
+  addToZone(name: string, object: Object3D): void {
+    const zone = this.zones.get(name);
+    if (!zone) throw new Error(`she has no zone ${name}`);
+    const light = this.ranges.get(name);
+    object.traverse((o) => {
+      if (!(o as Mesh).isMesh) return;
+      o.userData.light = light;
+      o.castShadow &&= light === undefined || ((o as Mesh).material as Material).name === SHIP_WOOD.name;
+    });
+    zone.add(object);
   }
 
   /** Swings a door to `angle` rad open (0 shut). */
