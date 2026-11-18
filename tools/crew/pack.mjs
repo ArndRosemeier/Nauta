@@ -26,7 +26,7 @@ const list = (name) => {
   if (!m) throw new Error(`no ${name} list in src/app/crewLooks.ts`);
   return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
 };
-const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK_HAIR')), clips: new Set(list('PACK_CLIPS')) };
+const keep = { garment: new Set(list('PACK_GARMENTS')), hair: new Set(list('PACK_HAIR')), clips: new Set(list('PACK_CLIPS')), mocap: new Set(list('PACK_MOCAP')) };
 
 const dest = join(root, 'public/packs/human');
 const stamp = join(dest, '.selection');
@@ -37,16 +37,22 @@ if (!process.argv.includes('--force') && existsSync(stamp) && readFileSync(stamp
 }
 
 const cache = join(root, 'node_modules/.cache/actors', version);
-if (!existsSync(join(cache, 'packs/human/manifest.json'))) {
+// The library's files the crew's motion capture is (clip 'cmu 80_19' is file 80_19.bin).
+const cmuFile = (id) => `${id.replace(/^cmu /, '')}.bin`;
+const cmuDir = join(cache, 'packs/human/clips/cmu');
+const cmuWanted = ['index.json', ...[...keep.mocap].map(cmuFile)];
+const haveBody = existsSync(join(cache, 'packs/human/manifest.json')), haveCmu = cmuWanted.every((f) => existsSync(join(cmuDir, f)));
+if (!haveBody || !haveCmu) {
   mkdirSync(cache, { recursive: true });
   const url = `https://github.com/ArndRosemeier/Actors/releases/download/v${version}/actors-packs-${version}.tar.gz`;
   console.log(`downloading ${url}`);
   const res = await fetch(url);
   if (!res.ok || !res.body) throw new Error(`${url}: ${res.status}`);
   await pipeline(Readable.fromWeb(res.body), createWriteStream(join(cache, 'packs.tar.gz')));
-  // The human pack without the CMU library (most of the archive). Run inside the cache with a relative name: GNU tar
-  // reads `C:\...` as a remote host, and Windows' own tar has no --force-local.
-  execFileSync('tar', ['xzf', 'packs.tar.gz', '--exclude=packs/human/clips/cmu', 'packs/human'], { stdio: 'inherit', cwd: cache });
+  // The human pack without the CMU library (most of the archive), then the few motions the crew plays from it. Run
+  // inside the cache with a relative name: GNU tar reads `C:\...` as a remote host, and Windows' own tar has no --force-local.
+  if (!haveBody) execFileSync('tar', ['xzf', 'packs.tar.gz', '--exclude=packs/human/clips/cmu', 'packs/human'], { stdio: 'inherit', cwd: cache });
+  execFileSync('tar', ['xzf', 'packs.tar.gz', ...cmuWanted.map((f) => `packs/human/clips/cmu/${f}`)], { stdio: 'inherit', cwd: cache });
   rmSync(join(cache, 'packs.tar.gz'));
 }
 
@@ -54,6 +60,8 @@ const src = join(cache, 'packs/human');
 const manifest = JSON.parse(readFileSync(join(src, 'manifest.json'), 'utf8'));
 const role = new Map(manifest.meshes.map((m) => [m.name, m.role]));
 const missing = [...keep.garment, ...keep.hair].filter((n) => !role.has(n)).concat([...keep.clips].filter((n) => !manifest.clips.some((c) => c.name === n)));
+const library = JSON.parse(readFileSync(join(cmuDir, 'index.json'), 'utf8'));
+missing.push(...[...keep.mocap].filter((n) => !library.clips.some((c) => c.name === n)));
 if (missing.length) throw new Error(`not in the Actors ${version} pack: ${missing.join(', ')}`);
 // A garment or hairstyle the crew does not wear (its mesh and its fitting proxy share the name); brows and lashes stay.
 const dropped = (name) => {
@@ -76,8 +84,14 @@ for (const f of files) {
   copyFileSync(join(src, f), join(dest, f));
   bytes += statSync(join(dest, f)).size;
 }
-// The manifest as shipped but without the CMU library (not copied); the page narrows its catalog to what was copied
-// (src/render/crew/crewView.ts), so nothing asks for a file left out.
-writeFileSync(join(dest, 'manifest.json'), JSON.stringify({ ...manifest, clipLibraries: [] }));
+// The CMU library cut to the crew's motions: their files and an index of only them (the library's rigs kept).
+const cmu = (manifest.clipLibraries ?? []).find((l) => l.name === 'cmu');
+const cut = { ...library, clips: library.clips.filter((c) => keep.mocap.has(c.name)) };
+mkdirSync(join(dest, 'clips/cmu'), { recursive: true });
+for (const c of cut.clips) copyFileSync(join(cmuDir, c.file), join(dest, 'clips/cmu', c.file));
+writeFileSync(join(dest, 'clips/cmu/index.json'), JSON.stringify(cut));
+// The manifest as shipped, with that library; the page narrows its catalog to what was copied (src/app/crewLooks.ts
+// `packCatalog`), so nothing asks for a file left out.
+writeFileSync(join(dest, 'manifest.json'), JSON.stringify({ ...manifest, clipLibraries: cmu ? [{ ...cmu, count: cut.clips.length }] : [] }));
 writeFileSync(stamp, want);
 console.log(`public/packs/human: ${files.size} files, ${(bytes / 1e6).toFixed(0)} MB on disk (Actors ${version}); the page fetches what the crew wears`);

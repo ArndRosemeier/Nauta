@@ -307,7 +307,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A ball's place on its path a time after firing (damage traces it, the drawing flies it) | `src/sim/guns/shot.ts#pathAt` |
 | How a ship's guns stand for the drawing: run out or in, leaping back when fired, trained and elevated; her lids wanted up (N5.4a) | `src/app/gunsSeen.ts#gunsSeen` |
 | How far run out a gun stands through her recoil (the leap back on her breeching) | `src/app/gunsSeen.ts#recoilOut` |
-| What a man at a gun does and shows: his part in her crew, the motion of the drill's step, whether she is worked, strain, and the seconds since she fired (N5.4b) | `src/app/gunDrill.ts#gunWork` |
+| What a man at a gun does and shows: his part in her crew, the motion of the drill's step, whether she is worked, strain, the seconds since she fired, and how far he steps back at the report (N5.4b) | `src/app/gunDrill.ts#gunWork` |
 | Which gun a man stands to and his place in her crew | `src/sim/guns/guns.ts#servedBy` |
 | What is seen of gunfire, from the events and the shots in flight: flashes, balls along their paths, splashes where they touch the sea, strikes; a ball stopped in a ship drawn no further | `src/app/shotsSeen.ts#ShotsSeen` |
 | Her guns and port lids drawn moving: slides trained, carriages run out and in, the long sixes on their trucks, lids swung, as instances in moving frames (N5.4a) | `src/render/ship/gunsView.ts#GunsView` |

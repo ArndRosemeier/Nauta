@@ -25,6 +25,11 @@ export const partOf = (place: number): Part => (place <= LAST_CAPTAIN ? 'captain
 const LAST_CAPTAIN = 1;
 const LAST_MUZZLE = 3;
 
+/** Motion capture (crewLooks.ts `PACK_MOCAP`): the rammer's stroke, the sponge, and hauling on a tackle hand over hand. */
+const RAM = 'cmu 80_19';
+const SPONGE = 'cmu 79_44';
+const HAUL = 'cmu 62_21';
+
 /**
  * What each part plays in each step of the drill: the captain crouches behind her to lay her once she is run out, the
  * muzzle men sponge, hand the cartridge and ram, the tackle men heave her out and haul her in again. Everyone else
@@ -33,13 +38,13 @@ const LAST_MUZZLE = 3;
 export const GUN_CLIPS: Readonly<Record<DrillStep, Readonly<Record<Part, string | null>>>> = {
   housed: { captain: null, muzzle: null, tackles: null },
   loading: { captain: null, muzzle: 'pick up', tackles: 'interact' },
-  ramming: { captain: null, muzzle: 'push', tackles: null },
+  ramming: { captain: null, muzzle: RAM, tackles: null },
   loaded: { captain: null, muzzle: null, tackles: null },
-  'running-out': { captain: 'interact', muzzle: 'push', tackles: 'push' },
+  'running-out': { captain: 'interact', muzzle: 'push', tackles: HAUL },
   ready: { captain: 'crouch', muzzle: null, tackles: null },
   recoil: { captain: null, muzzle: null, tackles: null },
-  'running-in': { captain: 'interact', muzzle: 'pick up', tackles: 'pick up' },
-  sponging: { captain: null, muzzle: 'interact', tackles: null },
+  'running-in': { captain: 'interact', muzzle: 'pick up', tackles: HAUL },
+  sponging: { captain: null, muzzle: SPONGE, tackles: null },
 };
 
 /** Every motion the drill plays, for the crowd figures to bake. */
@@ -58,6 +63,8 @@ export interface GunWork {
   readonly working: boolean;
   /** Seconds since she fired (the recoil's time gone); Infinity when she has not just fired. */
   readonly sinceFired: number;
+  /** How long her recoil lasts, s. */
+  readonly recoil: number;
 }
 
 /** A ship's crew counts at her guns, once for the state (the states are kept whole between steps, so frames reuse it). */
@@ -81,6 +88,7 @@ export function gunWork(ship: SimShip, man: number, m: Man): GunWork | null {
     step: g.drill,
     working: !g.dismounted && handsOf(ship)[served.gun]! >= FEWEST_AT_GUN,
     sinceFired: g.drill === 'recoil' ? row.recoil - drillSeconds(g) : Infinity,
+    recoil: row.recoil,
   };
 }
 
@@ -89,3 +97,22 @@ export const gunClip = (w: GunWork): string | null => GUN_CLIPS[w.working || w.s
 
 /** Whether the man's work takes his strength now: ramming, running her out and in. */
 export const gunStrains = (w: GunWork): boolean => w.working && STRAINING.has(w.step);
+
+/** How far each part steps back from his gun at the report, m: the muzzle men, in her way, most; her captain, already behind her, least. */
+const STEP_BACK: Readonly<Record<Part, number>> = { captain: 0.3, muzzle: 0.7, tackles: 0.4 };
+/** The recoil's shares at which the step is out, begins to come back, and is done. */
+const STEP_OUT = 0.1;
+const STEP_HOLD = 0.45;
+const STEP_DONE = 0.9;
+const SMOOTH = 3;
+
+/**
+ * How far back from his gun a working man stands now (0 to `STEP_BACK` m, inboard): he steps clear as she fires and
+ * leaps back on her breeching, and comes forward again before she is run in. Only the drawing moves him.
+ */
+export function stepBack(w: GunWork): number {
+  if (!w.working || w.step !== 'recoil') return 0;
+  const s = w.sinceFired / w.recoil;
+  const t = s < STEP_OUT ? s / STEP_OUT : s < STEP_HOLD ? 1 : Math.max(0, (STEP_DONE - s) / (STEP_DONE - STEP_HOLD));
+  return STEP_BACK[w.part] * t * t * (SMOOTH - 2 * t);
+}

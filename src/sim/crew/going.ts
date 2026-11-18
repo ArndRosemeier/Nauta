@@ -7,7 +7,7 @@
  * every man decides from where all were before the step, so the order of the list changes nothing.
  */
 import {
-  ASIDE_RADIUS, ASIDE_STEP, CROWD_FREE, CROWD_JAM, CROWD_RADIUS, CROWD_SLOWEST, WAY_ABREAST, WAY_GAP, type Haste,
+  ASIDE_RADIUS, ASIDE_STEP, ASIDE_WAIT, CROWD_FREE, CROWD_JAM, CROWD_RADIUS, CROWD_SLOWEST, WAY_ABREAST, WAY_GAP, type Haste,
 } from '../rules/routes';
 import { bareSpot, type Spot } from '../ship/plan';
 import { STEP_SECONDS } from '../units';
@@ -25,6 +25,8 @@ export interface Going {
   readonly haste: Haste;
   /** Standing aside for the captain: to the left of his line (+1), to the right (-1), or not (0). */
   readonly aside: number;
+  /** Seconds he has stood aside for the captain in a row (ASIDE_WAIT of them and he goes on past him, keeping aside). */
+  readonly yielded: number;
   /** Seconds he has been held up on this route: queuing, giving way, at a standstill in a crowd, or with no way open. */
   readonly held: number;
   /** No way is open to where he is going: he waits where he is until something is cleared. */
@@ -50,7 +52,7 @@ export interface Whereabouts extends Spot {
 /** A man sent from one spot to another, or null where no way is open between them. */
 export function startGoing(from: Spot, to: Spot, haste: Haste, heel: number, closures: Closures, net: Network = routeNetwork()): Going | null {
   const path = findPath(from, to, { heel, haste, closures }, net);
-  return path ? { path, leg: 0, share: 0, haste, aside: 0, held: 0, stuck: false } : null;
+  return path ? { path, leg: 0, share: 0, haste, aside: 0, yielded: 0, held: 0, stuck: false } : null;
 }
 
 /** The route a man on his way follows (built from his path). */
@@ -187,9 +189,13 @@ export function stepGoings(goings: readonly (Going | null)[], s: Surroundings, d
     const me = where[i]!;
     if (leg && leg.way === null && leg.kind === 'walk') {
       const side = giveWay(goingAt({ ...g, aside: 0 }, net), s.captain, s, net);
-      if (side !== null) { out.push({ ...g, aside: side, held: g.held + dt }); return; }
-    }
-    if (g.aside) g = { ...g, aside: 0 };
+      if (side !== null) {
+        // He waits for the captain to pass, but not for ever: a captain standing at his post is gone round, a body's width off.
+        const yielded = g.yielded + dt;
+        if (yielded < ASIDE_WAIT) { out.push({ ...g, aside: side, yielded, held: g.held + dt }); return; }
+        g = { ...g, aside: side, yielded };
+      } else if (g.aside || g.yielded) g = { ...g, aside: 0, yielded: 0 };
+    } else if (g.aside || g.yielded) g = { ...g, aside: 0, yielded: 0 };
     let left = dt, share = g.share, index = g.leg, held = g.held, entered: Leg | null = null;
     while (left > 0) {
       if (!leg) break;

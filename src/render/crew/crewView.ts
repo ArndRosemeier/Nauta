@@ -236,7 +236,7 @@ export class CrewView {
   static async load(renderer: WebGPURenderer, base: string, views: readonly (ShipView | null)[], knobs: Pick<CrewKnobs, 'pool' | 'poolFull'>, other: OtherCrewAt, note: (what: string) => void): Promise<CrewView> {
     const rosters = views.map(() => brigRoster());
     note('the crews come aboard');
-    const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, clipLibraries: false, levels: [CROWD_LEVEL] });
+    const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, levels: [CROWD_LEVEL] });
     const kinds = crowdKinds(workbench.catalog, rosters);
     note(`baking ${kinds.length} kinds of men`);
     const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, ...GUN_CLIP_NAMES, LYING, WALK, 'jog', 'idle'])];

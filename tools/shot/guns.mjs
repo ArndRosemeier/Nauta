@@ -38,6 +38,8 @@ const TURN_AT = 450;
 /** To larboard: the two close within so far (m) and pass, apart again by so far, before she turns. */
 const PASSED = { close: 150, past: 220 };
 const READYING = 60;
+/** She takes her bearing on the other and steers again every so many seconds while readying. */
+const RESTEER = 5;
 /** The match runs on in steps of so many seconds while waiting, at most so long. */
 const WAIT = { step: 5, most: 900 };
 const COMPASS = 360;
@@ -165,9 +167,13 @@ if (FOE) {
     while (waited < WAIT.most && (await sail('apart')) > PASSED.close) { await sail('onward', WAIT.step, false); waited += WAIT.step; }
     while (waited < WAIT.most && (await sail('apart')) < PASSED.past) { await sail('onward', WAIT.step, false); waited += WAIT.step; }
   }
-  const abeam = Math.round(((await sail('bearingOfOther')) - SIDE * ABEAM + COMPASS) % COMPASS);
-  await say(`steer ${String(abeam).padStart(3, '0')}`);
-  await sail('onward', READYING, false);
+  // She steers to keep the other abeam through the readying, taking her bearing afresh each time (the other brig sails on, so a bearing taken once leaves her out of the guns' arc), and once more at the word.
+  const steerAbeam = async () => {
+    const abeam = Math.round(((await sail('bearingOfOther')) - SIDE * ABEAM + COMPASS) % COMPASS);
+    await say(`steer ${String(abeam).padStart(3, '0')}`);
+  };
+  for (let ready = 0; ready < READYING; ready += RESTEER) { await steerAbeam(); await sail('onward', RESTEER, false); }
+  await steerAbeam();
   console.log(`the other brig ${Math.round(await sail('apart'))} m off; fire`);
   await say('fire');
   for (const [view, dt] of FIRED) await picture(view, dt);
