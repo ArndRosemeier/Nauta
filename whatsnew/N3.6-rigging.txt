@@ -1,0 +1,2 @@
+Her whole rig is drawn now: all three masts up to the trucks, the tops and crosstrees, every yard, the bowsprit and jib-boom, and all 190 ropes with their blocks, ratlines, footropes and a coil on every belaying pin.
+Open the game with ?ship and try the new Crosstrees and 2 km off buttons; add &brace=30 to see the yards braced round, ropes and all.

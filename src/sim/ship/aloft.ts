@@ -15,11 +15,11 @@ import {
   ALOFT_STATIONS, BOWSPRIT_STEP, BOWSPRIT_WALK, CLIMB, CROSSTREES_STAVE, CROSSTREES_TIMBERS, FOOTING, FUTTOCK_UNDER_TOP,
   MAST_SPARS, MASTHEAD_SIDE, TOPGALLANT_SPREAD, TRESTLE_DEPTH, type MastName,
 } from '../rules/rig';
-import { BULWARK, MAIN_TOP, RATLINE_PITCH } from '../rules/ships';
+import { BULWARK, RATLINE_PITCH } from '../rules/ships';
 import { sideTop } from './hull';
 import { stationPlace, type CrewPlace, type ShipPlan, type Spot, type Station } from './plan';
 import { shipY, shipZ } from './section';
-import { atMark, between, distance, onSpar, point, sideLetter, SIDES, type Deadeye, type MastGeometry, type RigPoint, type Spar } from './spars';
+import { atMark, between, topHole, distance, onSpar, point, sideLetter, SIDES, type Deadeye, type MastGeometry, type RigPoint, type Spar } from './spars';
 import { nodeAt, type WalkEdge, type WalkGraph, type WalkNode } from './walk';
 
 /** A point of the rig in ship space, as the climb takes it: [x, y, z]. */
@@ -146,7 +146,7 @@ export function buildAloft(plan: ShipPlan, geometry: Readonly<Record<MastName, M
   const scratch = { x: 0, y: 0, z: 0 };
   for (const mast of ['fore', 'main'] as const) {
     const g = geometry[mast], row = MAST_SPARS[mast];
-    const hole = MAIN_TOP.hole * row.top.breadth / MAIN_TOP.breadth;
+    const hole = topHole(mast);
     const top = add({ id: `${mast}-top`, name: `${mast} top`, kind: 'top', spar: `${mast}-mast`, points: rect(g.lowerAt(g.topFloor), 0, g.topFloor, row.top.length / 2, row.top.breadth / 2), area: row.top.breadth * row.top.length - hole * hole, yard: null });
     const span = 2 * row.crosstrees;
     const cross = add({ id: `${mast}-crosstrees`, name: `${mast} topmast crosstrees`, kind: 'crosstrees', spar: `${mast}-topmast`, points: rect(g.topmastAt(g.crosstrees), 0, g.crosstrees, CROSSTREES_TIMBERS.apart / 2, row.crosstrees), area: 2 * span * CROSSTREES_TIMBERS.sided, yard: null });

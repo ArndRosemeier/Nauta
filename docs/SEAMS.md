@@ -151,10 +151,12 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The unit direction between two points | `src/render/ship/shapes.ts#direction` |
 | Rope as tubes round centre lines | `src/render/ship/rope.ts#Ropes` |
 | A rope hanging between two points | `src/render/ship/rope.ts#hanging` |
+| A line of the rig between two points, sagging across its chord | `src/render/ship/rope.ts#sagging` |
+| Which moving frames a piece of rope follows (hull, a turning spar, or between two) | `src/render/ship/rope.ts#legFollow` |
 | Her paint and the tints of her timber | `src/render/ship/looks.ts#BLACK` |
 | Loading the fittings pack made in AssetGenerator | `src/render/ship/fittings.ts#loadFittings` |
 | Placing a fitting into her solids, slot by slot | `src/render/ship/fittings.ts#place` |
-| The whole ship built: hull, decks, rooms, guns, lower rigs, the far ship, her lights and portals (N2.4) | `src/render/ship/ship.ts#buildShip` |
+| The whole ship built: hull, decks, rooms, guns, masts and rigging, the far ship, her lights and portals (N2.4, N3.6) | `src/render/ship/ship.ts#buildShip` |
 | Where the sky comes in below deck, per zone | `src/render/ship/ship.ts#skyOpenings` |
 | Building the ship in a worker at load | `src/render/ship/loadShip.ts#loadShip` |
 | Every buffer of a build, to send it without a copy | `src/render/ship/ship.ts#shipBuffers` |
@@ -181,14 +183,20 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her rooms: floors, ceiling, bulkheads, doors, ladders, lanterns | `src/render/ship/rooms.ts#buildRooms` |
 | Her damage map's layout (N6.5 writes into it) | `src/render/ship/damageMap.ts#DAMAGE_REGIONS` |
 | Where a point of a damaged surface lies in the damage map | `src/render/ship/damageMap.ts#damageTexel` |
-| Her lower rigs: masts, tops, channels, deadeyes, shrouds, ratlines, pin rails, coils | `src/render/ship/rig.ts#buildRigs` |
+| Her masts and rigging from the rig plan: spars, deadeyes, channels, every line, pins and coils (N3.6) | `src/render/ship/rig.ts#buildRigs` |
+| Her spars turned from the spar table: masts, tops, trestle and cross trees, caps, yards, bowsprit, jib-boom, boom, gaff | `src/render/ship/masts.ts#drawSpars` |
+| Every line of the rig plan drawn by its sag, with its blocks, ratlines, futtock staves, footropes and stirrups | `src/render/ship/rigging.ts#buildRigging` |
+| Her spars that turn (yards, boom, gaff) as moving frames: pivot, axis, limit | `src/render/ship/swings.ts#swingsOf` |
+| A turning spar's frame from its brace or swing angle and hoist | `src/render/ship/swings.ts#swingMatrix` |
+| A point of the rig plan in ship space | `src/render/ship/swings.ts#shipPoint` |
+| Handing the moving frames to the rope shader | `src/render/ship/shipMaterials.ts#setShipFrame` |
 | The timber's grain, pores and grime as one texture | `src/render/ship/grain.ts#makeGrainTexture` |
 | Her timber's shader: grain, planks, seams, paint, wear, grime | `src/render/ship/shipMaterials.ts#makeWoodMaterial` |
 | Her iron, copper, lantern glow and rope shaders | `src/render/ship/shipMaterials.ts#makeRopeMaterial` |
 | What her shaders read each frame (lanterns, sky openings, glow, time) | `src/render/ship/shipMaterials.ts#SHIP_INPUTS` |
 | Her half-breadth and deck height in a shader | `src/render/ship/hullNode.ts#hullAt` |
 | No water drawn inside her hull | `src/render/seaCut.ts#seaCut` |
-| The ship drawn and riding the sea, the eye carried with her, the zones seen, the far ship crossfaded, her doors swung | `src/render/ship/shipView.ts#ShipView` |
+| The ship drawn and riding the sea, the eye carried with her, the zones seen, the far ship crossfaded, her doors swung, her yards braced and hoisted and her boom and gaff swung (`setBrace`, `setHoist`; N3.3 drives them) | `src/render/ship/shipView.ts#ShipView` |
 | The sun's shadow map round her | `src/render/ship/shipView.ts#shadowingSun` |
 | Every knob that trades looks for frame time, by quality level (a package that costs frame time adds its knob here) | `src/app/quality.ts#QUALITY_LEVELS` |
 | Choosing the quality level from measured frame time in the first seconds (`?quality=` fixes one) | `src/app/quality.ts#QualityChooser` |
@@ -251,6 +259,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A point a share of the way between two points of the rig | `src/sim/ship/spars.ts#between` |
 | The distance between two points of the rig | `src/sim/ship/spars.ts#distance` |
 | Her deadeyes: channels, backstay stools, the tops' rims | `src/sim/ship/spars.ts#buildDeadeyes` |
+| The hole in a mast's top (lubber's hole), by the top's breadth | `src/sim/ship/spars.ts#topHole` |
 | Her sails: corners, what they are bent to, their shapes | `src/sim/ship/sails.ts#buildSails` |
 | A sail's area as it stands (furled, reefed, set) | `src/sim/ship/sails.ts#sailArea` |
 | The ways a sail can stand | `src/sim/ship/sails.ts#sailSettings` |

@@ -103,10 +103,10 @@ export function rod(s: Solid, a: Vector3, b: Vector3, radius: number, sides: num
 /** The unit direction from `a` to `b`. */
 export const direction = (a: Vector3, b: Vector3) => new Vector3().subVectors(b, a).normalize();
 
-/** A frame whose origin is `a` and whose y axis points to `b` (x chosen level where it can be). */
-export function frameAlong(a: Vector3, b: Vector3): Matrix4 {
+/** A frame whose origin is `a` and whose y axis points to `b`; its x axis square to `side` (by default chosen level where it can be). */
+export function frameAlong(a: Vector3, b: Vector3, along?: Vector3): Matrix4 {
   const y = direction(a, b);
-  const side = Math.abs(y.y) > 1 - NO_BEVEL ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0);
+  const side = along ?? (Math.abs(y.y) > 1 - NO_BEVEL ? new Vector3(1, 0, 0) : new Vector3(0, 1, 0));
   const x = new Vector3().crossVectors(y, side).normalize(), z = new Vector3().crossVectors(x, y);
   return new Matrix4().makeBasis(x, y, z).setPosition(a);
 }

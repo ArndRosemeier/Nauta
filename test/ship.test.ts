@@ -17,6 +17,9 @@ import { shipPlan } from '../src/sim/ship/plan.ts';
 import { hullHalfBreadth, sideTop } from '../src/sim/ship/hull.ts';
 import { outsideX } from '../src/render/ship/hullSide.ts';
 import { Vector3 } from 'three/webgpu';
+import { rigPlan } from '../src/sim/ship/rig.ts';
+import { MOST_FRAMES, shipPoint, swingMatrix, swingsOf } from '../src/render/ship/swings.ts';
+import { LINE_OFF_PIN } from '../src/render/ship/rigging.ts';
 
 /** How close a curve through the readings must come to them, m. */
 const ON_READING = 1e-9;
@@ -78,16 +81,16 @@ test('the whole ship builds: every zone, her far outside, doors, lanterns and op
   const names = new Set(SHIP.zones.map((z) => z.name));
   for (const z of zoneNames(PLAN)) assert.ok(names.has(z), `zone ${z}`);
   assert.ok(names.has(OUTSIDE));
-  const near = SHIP.zones.reduce((n, z) => n + zoneTris(z), 0), far = zoneTris(SHIP.far);
-  // One ship near and the other far must leave room in the 1.5M both may have for her fittings (N2.6) and rigging (N3.6).
-  assert.ok(near > 300000 && near < 700000, `${near} triangles near`);
-  assert.ok(far < 60000, `${far} triangles far`);
+  const near = [...SHIP.zones, ...SHIP.swings].reduce((n, z) => n + zoneTris(z), 0), far = [SHIP.far, ...SHIP.farSwings].reduce((n, z) => n + zoneTris(z), 0);
+  // One ship near and the other far, her rig drawn (N3.6), must leave room in the 1.5M both may have for her fittings (N2.6).
+  assert.ok(near > 300000 && near < 800000, `${near} triangles near`);
+  assert.ok(far < 70000, `${far} triangles far`);
   assert.ok(SHIP.doors.length > 0 && SHIP.lamps.length > 0 && SHIP.skies.length > 0 && SHIP.portals.length > 0);
   for (const l of SHIP.lamps) assert.ok(names.has(l.zone) && l.zone !== OUTSIDE, `lamp in ${l.zone}`);
 });
 
 test('nothing loose: every position finite, every normal of unit length, all of her between keel and mastheads', () => {
-  for (const z of [...SHIP.zones, SHIP.far]) {
+  for (const z of [...SHIP.zones, SHIP.far, ...SHIP.swings, ...SHIP.farSwings]) {
     for (const k of KINDS) {
       const p = attr(z[k], 'position').data, n = attr(z[k], 'normal')?.data;
       for (let i = 0; i < p.length; i += 3) {
@@ -160,4 +163,51 @@ test('from the deck a room below is drawn only through an opening; from below, r
   assert.ok(railed.seen(OUTSIDE, toClip(top.eye, 0, -1.4), open, new Vector3(...top.eye))!.size > 1);
   // An eye in none of her zones sees everything.
   assert.equal(vis.seen(null, ahead, shut), null);
+});
+
+const RIG = rigPlan(PLAN), SWINGS = swingsOf(RIG);
+
+test('her whole rig is drawn: every line of the rig plan to its pin, the ratlines, footropes and coils besides', () => {
+  const path = RIG.lines.reduce((n, l) => {
+    const pts = [l.ends[0], ...l.via, l.ends[1]];
+    return n + pts.slice(1).reduce((m, p, i) => m + Math.hypot(p.along - pts[i]!.along, p.across - pts[i]!.across, p.height - pts[i]!.height), 0);
+  }, 0);
+  assert.ok(SHIP.rope > path, `${Math.round(SHIP.rope)} m of rope laid for ${Math.round(path)} m of lines`);
+  // Every running line comes down to its pin.
+  const out = SHIP.zones.find((z) => z.name === OUTSIDE)!, pos = attr(out.ropes, 'position').data;
+  for (const l of RIG.lines.filter((x) => x.belay)) {
+    const b = PLAN.belays.find((x) => x.id === l.belay)!, x = b.across, y = shipY(b.height + LINE_OFF_PIN), z = shipZ(b.along);
+    let found = false;
+    for (let i = 0; i < pos.length && !found; i += 3) found = Math.hypot(pos[i]! - x, pos[i + 1]! - y, pos[i + 2]! - z) < PIN_REACH;
+    assert.ok(found, `${l.id} at ${l.belay}`);
+  }
+});
+/** A line reaches its pin within this, m. */
+const PIN_REACH = 0.02;
+
+test('her yards brace round and her boom and gaff swing: each in its own frame, near and far, and the ropes made fast to them follow it', () => {
+  assert.deepEqual(SWINGS.map((w) => w.id).sort(), RIG.spars.filter((s) => s.yard || s.swing !== null).map((s) => s.id).sort());
+  assert.deepEqual(SWINGS.map((w) => w.frame), SWINGS.map((_, i) => i + 1));
+  assert.ok(SWINGS.length < MOST_FRAMES);
+  for (const w of SWINGS) {
+    for (const list of [SHIP.swings, SHIP.farSwings]) assert.ok(list.find((z) => z.name === w.id) && zoneTris(list.find((z) => z.name === w.id)!) > 0, w.id);
+  }
+  // A yard braced turns about its slings, its starboard arm going aft; held at its limit; a topsail yard lowered drops onto the cap.
+  const yard = SWINGS.find((w) => w.id === 'main-yard')!, spar = RIG.spars.find((s) => s.id === 'main-yard')!;
+  const arm = shipPoint(spar.head), pivot = yard.pivot.clone();
+  assert.ok(pivot.clone().applyMatrix4(swingMatrix(yard, 0.5, 1)).distanceTo(pivot) < 1e-9);
+  assert.ok(arm.clone().applyMatrix4(swingMatrix(yard, 0.5, 1)).z > arm.z + 1, 'the starboard yardarm goes aft');
+  assert.ok(arm.clone().applyMatrix4(swingMatrix(yard, 9, 1)).distanceTo(arm.clone().applyMatrix4(swingMatrix(yard, yard.limit, 1))) < 1e-9);
+  const topsail = SWINGS.find((w) => w.id === 'main-topsail-yard')!, ts = RIG.spars.find((s) => s.id === 'main-topsail-yard')!;
+  const lowered = topsail.pivot.clone().applyMatrix4(swingMatrix(topsail, 0, 0));
+  assert.ok(Math.abs(lowered.y - topsail.pivot.y - (ts.yard!.lowered - ts.yard!.hoisted)) < 1e-6);
+  const boom = SWINGS.find((w) => w.id === 'boom')!, end = shipPoint(RIG.spars.find((s) => s.id === 'boom')!.head);
+  assert.ok(end.clone().applyMatrix4(swingMatrix(boom, 0.5, 1)).x > end.x + 1, 'the boom swings out to starboard');
+  // Every turning spar carries ropes (braces, lifts, footropes, the boom's sheet and lifts), and no rope follows a frame that is not there.
+  const out = SHIP.zones.find((z) => z.name === OUTSIDE)!, follow = attr(out.ropes, 'follow').data, used = new Set<number>();
+  for (let i = 0; i < follow.length; i += 3) {
+    used.add(follow[i]!); used.add(follow[i + 1]!);
+    assert.ok(follow[i + 2]! >= 0 && follow[i + 2]! <= 1);
+  }
+  assert.deepEqual([...used].sort((a, b) => a - b), [0, ...SWINGS.map((w) => w.frame)]);
 });

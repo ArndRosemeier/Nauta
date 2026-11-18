@@ -8,19 +8,22 @@
  * deck no sky comes in but through the hatch, so the sky's fill there falls off with the distance from it; and the
  * lantern's light is added to what it shines on, in the shader (a light of the scene's would be in every lit shader).
  */
-import { Color, DataTexture, DoubleSide, FrontSide, Matrix4, MeshBasicNodeMaterial, MeshStandardNodeMaterial, RGBAFormat, UnsignedByteType, Vector2, Vector4 } from 'three/webgpu';
+import { Color, DataTexture, DoubleSide, FloatType, FrontSide, Matrix4, MeshBasicNodeMaterial, MeshStandardNodeMaterial, NearestFilter, RGBAFormat, UnsignedByteType, Vector2, Vector4 } from 'three/webgpu';
 import {
-  Fn, Loop, abs, attribute, clamp, dot, float, floor, fract, fwidth, hash, int, length, max, min, mix, modelViewMatrix, normalGeometry,
-  normalLocal, normalize, positionGeometry, positionLocal, screenCoordinate, sin, smoothstep, step, texture, transformNormalToView,
+  Fn, Loop, abs, attribute, clamp, dot, float, floor, fract, fwidth, hash, int, ivec2, length, max, min, mix, modelViewMatrix, normalGeometry,
+  normalLocal, normalize, positionGeometry, positionLocal, screenCoordinate, sin, smoothstep, step, texture, textureLoad, transformNormalToView,
   uniform, uniformArray, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import { DECK_PLANK_LENGTH } from '../../sim/rules/ships';
 import { GRAIN_SPAN, makeGrainTexture } from './grain';
 import { DAMAGE_MAP_SIZE, DAMAGE_REGIONS, DAMAGE_TEXEL } from './damageMap';
+import { MOST_FRAMES } from './swings';
 
 /** How many lanterns and sky openings her shaders can hold. */
 export const MOST_LAMPS = 40;
 export const MOST_SKIES = 24;
+/** Rows of a moving frame (an affine 3 × 4). */
+const FRAME_ROWS = 3;
 
 /** What the ship's shaders read, written by the ship's view (shipView.ts). */
 export const SHIP_INPUTS = {
@@ -39,6 +42,27 @@ export const SHIP_INPUTS = {
   /** ...and the height of the deck they are in (ship space) and how much they let through. */
   skyKind: uniformArray(Array.from({ length: MOST_SKIES }, () => new Vector4()), 'vec4'),
 };
+
+/** Numbers per texel of the frames' texture. */
+const TEXEL = 4;
+/**
+ * Her moving frames (swings.ts) as a small float texture, a row of it per frame and a texel per row of the frame's
+ * affine matrix (ship space to ship space); frame 0, her hull, stays the identity. A texture, read texel by texel,
+ * works alike on WebGPU and WebGL 2.
+ */
+export const FRAMES_TEXTURE = new DataTexture(new Float32Array(MOST_FRAMES * FRAME_ROWS * TEXEL), FRAME_ROWS, MOST_FRAMES, RGBAFormat, FloatType);
+FRAMES_TEXTURE.magFilter = NearestFilter;
+FRAMES_TEXTURE.minFilter = NearestFilter;
+for (let f = 0; f < MOST_FRAMES; f++) setShipFrame(f, new Matrix4());
+
+/** Moving frame `frame` of hers set to `m` (ship space to ship space), for her ropes' shaders. */
+export function setShipFrame(frame: number, m: Matrix4): void {
+  if (frame >= MOST_FRAMES) return;
+  const d = FRAMES_TEXTURE.image.data, e = m.elements;
+  // Three rows of the affine matrix (three.js keeps it column by column).
+  for (let r = 0; r < FRAME_ROWS; r++) for (let c = 0; c < TEXEL; c++) d[(frame * FRAME_ROWS + r) * TEXEL + c] = e[c * TEXEL + r];
+  FRAMES_TEXTURE.needsUpdate = true;
+}
 
 /** No light ranges: the outside, under the open sky. */
 const OUTSIDE_RANGE = new Vector4(-1, -1, -1, -1);
@@ -297,25 +321,45 @@ const STRAND_EDGE = 1 / 4;
 const ROPE_PIXELS = 1.4;
 const ROUGH_HEMP = 0.88;
 const ROUGH_TAR = 0.86;
-/** Rope: tubes widened to a pixel and faded by how much of it they cover, with the lay of three strands up close. */
+/** A point (w 1) or a direction (w 0) carried by moving frame `i` (a float index). */
+function framed(i, p, w) {
+  const row = (r) => textureLoad(FRAMES_TEXTURE, ivec2(r, int(i))), q = vec4(p, w);
+  return vec3(dot(row(0), q), dot(row(1), q), dot(row(2), q));
+}
+
+/**
+ * Rope: tubes widened to a pixel and faded by how much of it they cover, with the lay of three strands up close. A
+ * rope follows the spars it is made fast to (rope.ts RopeFollow): turned rigidly with one, or its ends carried by two.
+ */
 export function makeRopeMaterial(): MeshStandardNodeMaterial {
   const m = new MeshStandardNodeMaterial({ side: FrontSide, transparent: true });
   m.name = 'ship rope';
   const I = SHIP_INPUTS;
   const r = attribute('rope', 'vec4'), along = attribute('along', 'vec3');
+  const fw = attribute('follow', 'vec3'), A = attribute('anchorA', 'vec3'), B = attribute('anchorB', 'vec3');
   const cover = varyingProperty('float', 'vRopeCover');
+  const nMoved = varyingProperty('vec3', 'vRopeNormal'), tMoved = varyingProperty('vec3', 'vRopeAlong');
   m.positionNode = Fn(() => {
-    const centre = positionGeometry, radius = r.z;
+    // Where its ends' frames carry it: rigidly with one, or by the moves of its two ends, blended along it.
+    const rigid = step(abs(fw.x.sub(fw.y)), 1 / 2);
+    const carried = positionGeometry.add(mix(framed(fw.x, A, 1).sub(A), framed(fw.y, B, 1).sub(B), fw.z));
+    const centre = mix(carried, framed(fw.x, positionGeometry, 1), rigid);
+    const t = normalize(mix(framed(fw.x, along, 0), framed(fw.y, along, 0), fw.z));
+    const n0 = mix(framed(fw.x, normalGeometry, 0), framed(fw.y, normalGeometry, 0), fw.z);
+    const n = normalize(n0.sub(t.mul(dot(n0, t))));
+    nMoved.assign(n);
+    tMoved.assign(t);
+    const radius = r.z;
     const least = length(modelViewMatrix.mul(vec4(centre, 1)).xyz).mul(I.pixel).mul(ROPE_PIXELS / 2);
     const w = max(radius, least);
     cover.assign(radius.div(w));
-    return centre.add(normalGeometry.mul(w));
+    return centre.add(n.mul(w));
   })();
   // The lay: strands wound round the rope; seen from far the grooves average out.
   const phase = r.x.mul(STRANDS).add(r.y.div(r.z.mul(2 * LAY_PER_DIAMETER)));
   const f = fract(phase).sub(1 / 2), near = float(1).sub(smoothstep(STRAND_EDGE, 1, fwidth(phase)));
   const groove = float(1).sub(f.mul(f).div(STRAND_EDGE).mul(LAY_DARK).mul(near));
-  m.normalNode = transformNormalToView(normalize(normalLocal.add(along.mul(f.mul(LAY_TILT).mul(near)))));
+  m.normalNode = transformNormalToView(normalize(nMoved.add(tMoved.mul(f.mul(LAY_TILT).mul(near)))));
   m.colorNode = mix(vec3(...HEMP), vec3(...TAR), r.w).mul(groove);
   m.roughnessNode = mix(float(ROUGH_HEMP), float(ROUGH_TAR), r.w);
   m.metalnessNode = float(0);

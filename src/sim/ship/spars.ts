@@ -99,6 +99,9 @@ export function mastGeometry(mast: MastName): MastGeometry {
   };
 }
 
+/** The square hole in a mast's top (the lubber's hole round the masthead), m a side: the main top's, scaled with the top. */
+export const topHole = (mast: MastName): number => (MAIN_TOP.hole * MAST_SPARS[mast].top.breadth) / MAIN_TOP.breadth;
+
 /** A spar from its parts. */
 function spar(id: string, name: string, kind: SparKind, mast: Spar['mast'], heel: RigPoint, head: RigPoint, diameter: number, marks: [string, number][], on: string | null, extra: Partial<Pick<Spar, 'yard' | 'swing'>> = {}): Spar {
   const length = distance(heel, head);

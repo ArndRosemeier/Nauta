@@ -38,18 +38,27 @@ export interface DoorPart {
 export class ShipParts {
   readonly zones = new Map<string, ZoneParts>();
   readonly doors: DoorPart[] = [];
+  /** The spars that turn (swings.ts), each its own solids in ship space, turned by its frame as drawn. */
+  readonly swings = new Map<string, ZoneParts>();
+
+  /** The parts of a turning spar, made on first use. */
+  swing(id: string): ZoneParts { return madeIn(this.swings, id); }
 
   /** The parts of a zone, made on first use. */
-  zone(name: string): ZoneParts {
-    let z = this.zones.get(name);
-    if (!z) { z = new ZoneParts(); this.zones.set(name, z); }
-    return z;
-  }
+  zone(name: string): ZoneParts { return madeIn(this.zones, name); }
 
   get triangles(): number {
     let n = 0;
     for (const z of this.zones.values()) n += z.triangles;
     for (const d of this.doors) n += d.wood.triangles + d.iron.triangles;
+    for (const z of this.swings.values()) n += z.triangles;
     return n;
   }
+}
+
+/** The parts under `key` in `map`, made on first use. */
+function madeIn(map: Map<string, ZoneParts>, key: string): ZoneParts {
+  let z = map.get(key);
+  if (!z) { z = new ZoneParts(); map.set(key, z); }
+  return z;
 }

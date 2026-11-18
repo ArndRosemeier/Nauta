@@ -101,6 +101,8 @@ async function start(): Promise<void> {
   await view.stage.add(seaView.deep);
   if (params.rig) await view.stage.add(makeTestBodies(startLook.yaw, params.eye));
   if (ship) await view.stage.add(ship.group);
+  // Her yards braced as the address asks (`?brace=30`), until the sailing model braces them (N3.3).
+  if (ship) for (const id of ship.swingIds) ship.setBrace(id, params.brace);
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
   const input = watchLook(canvas, walking ? params.look ?? walking.startLook : ship ? where.look : startLook, view.radPerPixel, walking ? (e) => walking.input.owns(e) : undefined);
@@ -135,7 +137,7 @@ async function start(): Promise<void> {
   showVersion(el<HTMLButtonElement>('version'));
   // Walking: the calm view, how much of his body's motion the view takes (plan N2.7).
   if (walking) showMotionSetting(el<HTMLButtonElement>('motion'), params.motion, (s) => { walking.body.strength = s; });
-  const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); };
+  const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k.ropeShadows, k.shipFarFrom); };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());
   // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want.
