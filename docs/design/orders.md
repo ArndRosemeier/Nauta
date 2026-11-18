@@ -1,6 +1,6 @@
 # Orders: how the captain commands
 
-The orders specification that package N4.4 (the order interface) is built to, with what N3.4, N4.1, N4.5, N5.3 and N6 take from it. Written by the design thread on 2026-11-18. **A proposal until Arnd agrees**; the four questions for him are at the end.
+The orders specification that package N4.4 (the order interface) is built to, with what N3.4, N4.1, N4.5, N5.3 and N6 take from it. Written by the design thread on 2026-11-18. **Agreed by Arnd on 2026-11-18** ("yes to all for this slice. Later when we expand the game more might be needed."); his answers are at the end.
 
 ## What it has to do
 
@@ -111,9 +111,11 @@ Walking keeps W, A, S, D and the mouse. Orders:
 - **N5.3** (gunnery orders): the gunner's rows, the first lieutenant's "Beat to quarters", the master's two following orders and the "Fire!" button.
 - **N6**: the carpenter's and surgeon's rows, the pumps, fire party, wreckage and striking.
 
-## Questions for Arnd
+## Arnd's answers (2026-11-18)
 
-1. **The midshipman.** Orders from anywhere on the ship go by a midshipman who runs with them, so leaving the quarterdeck costs time but never control. The alternative is that the captain must walk to within hail himself. Proposed: the midshipman.
-2. **"Steer there".** A course is given by looking where she should go and saying so, with the captain's arm seen pointing. No compass numbers. Proposed: yes, with "a point" up or off the wind for fine changes.
-3. **The "Fire!" button.** While a broadside is held for the captain's word, one large button stays on screen. It is still an order, but it is the only one given without picking a man. Proposed: yes, because timing the broadside on the roll is the heart of the fight.
-4. **No pause.** The ship and the fight go on while the fan is open. Proposed: yes, in single player too.
+Yes to all four, for this first game; more may be needed when the game grows.
+
+1. **The midshipman:** orders from anywhere on the ship go by a midshipman who runs with them.
+2. **"Steer there":** a course is given by looking where she should go, with "a point" up or off the wind for fine changes. No compass numbers.
+3. **The "Fire!" button:** while a broadside is held for the captain's word, one large button stays on screen.
+4. **No pause:** the ship and the fight go on while the fan is open, in single player too.
