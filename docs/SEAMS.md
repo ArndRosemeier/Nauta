@@ -301,3 +301,20 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Keys held as a push (WASD and arrows) | `src/app/thumbs.ts#keyPush` |
 | The walking thumb and keys on the page (the left half's floating stick) | `src/app/walkInput.ts#watchWalk` |
 | The ways across her weather deck's centreline: how wide, how often (the fife rails' places that make them: `MAIN_FIFE_AT`, `FORE_FIFE_FORE_AT`) | `src/sim/rules/ships.ts#DECK_CROSSING` |
+| How fast a man gets about the ship: his pace on each footing, smartly, stooping, the heel, a crowd, queuing on a way, standing aside (first proposals) | `src/sim/rules/routes.ts#PACE` |
+| The crew's way network on the one walk graph: the ends of every way and what each way takes to cross | `src/sim/crew/network.ts#routeNetwork` |
+| A node's floor under the blocks (which squares a body's middle may be on) | `src/sim/crew/network.ts#areaOf` |
+| The distance field across a floor to a square (cached; how far a man walks round what stands there) | `src/sim/crew/network.ts#floorField` |
+| The line a man walks across one floor, pulled tight | `src/sim/crew/network.ts#walkLine` |
+| How a low deckhead eases a man's pace | `src/sim/crew/network.ts#headroomEase` |
+| The height a man stands at on a spot of a floor or a surface aloft | `src/sim/crew/network.ts#heightAt` |
+| Whether a body may stand at a spot under the blocks | `src/sim/crew/network.ts#standable` |
+| Whether a line on a floor passes through a block | `src/sim/crew/network.ts#lineBlocked` |
+| A man's quickest route from one spot to another (the heel, his haste, what is shut) | `src/sim/crew/route.ts#findRoute` |
+| What the heel does to a man's pace on each footing, weather and lee shrouds | `src/sim/crew/route.ts#heelEase` |
+| A man's speed over a stretch, and its time | `src/sim/crew/route.ts#partSpeed` |
+| A route's time for a man alone on it | `src/sim/crew/route.ts#routeTime` |
+| Shutting and opening a way, blocking and clearing a floor (the one owner of what is shut) | `src/sim/crew/closures.ts#closeWay` |
+| Sending a man on his way | `src/sim/crew/going.ts#startGoing` |
+| One step of every man on his way (speeds, crowds, queues, the captain, rerouting) | `src/sim/crew/going.ts#stepGoings` |
+| Where a man on his way is now (spot, height, way, facing) | `src/sim/crew/going.ts#goingAt` |

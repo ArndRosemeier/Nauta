@@ -120,6 +120,56 @@
       "field": "told",
       "owner": "src/sim/orders.ts",
       "what": "what a ship has been told to do: her course or full and by, her canvas, hove to, masts aback, the acts still to be done and the orders being carried out (N3.4)"
+    },
+    {
+      "field": "waysClosed",
+      "owner": "src/sim/crew/closures.ts",
+      "what": "the ways shut on a ship: a ladder under wreckage, a jammed door, a shroud shot away (N4.2)"
+    },
+    {
+      "field": "waysBlocked",
+      "owner": "src/sim/crew/closures.ts",
+      "what": "the oblongs of a ship's floors no body can cross: a gun run in, a fallen spar (N4.2)"
+    },
+    {
+      "field": "waysSerial",
+      "owner": "src/sim/crew/closures.ts",
+      "what": "counts the changes to what is shut, so men on their way know to look again (N4.2)"
+    },
+    {
+      "field": "going",
+      "owner": "src/sim/crew/going.ts",
+      "what": "a man on his way: his route, how far along it, his haste, standing aside, held up or stuck (N4.2; its own fields are going.ts's)"
+    },
+    {
+      "field": "route",
+      "owner": "src/sim/crew/going.ts",
+      "what": "the route a man on his way follows (N4.2)"
+    },
+    {
+      "field": "leg",
+      "owner": "src/sim/crew/going.ts",
+      "what": "the leg of his route a man on his way is on (N4.2)"
+    },
+    {
+      "field": "share",
+      "owner": "src/sim/crew/going.ts",
+      "what": "how much of his leg a man on his way has behind him (N4.2)"
+    },
+    {
+      "field": "aside",
+      "owner": "src/sim/crew/going.ts",
+      "what": "a man standing aside for the captain (N4.2)"
+    },
+    {
+      "field": "held",
+      "owner": "src/sim/crew/going.ts",
+      "what": "how long a man on his way has been held up (N4.2)"
+    },
+    {
+      "field": "stuck",
+      "owner": "src/sim/crew/going.ts",
+      "what": "a man with no way open to where he is going (N4.2)"
     }
   ]
 }
