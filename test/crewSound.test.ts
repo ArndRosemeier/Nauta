@@ -101,6 +101,9 @@ test('nothing the crew makes was asked to speak: every made take says no voices,
   }
 });
 
+/** How far from the capstan the boatswain may be piping, m: the length of his walk and a little more. */
+const QUARTERDECK_REACH = 4;
+
 test('an order is piped from the boatswain as it is taken; two orders one after the other; what was given before is not piped', () => {
   const { shots } = listen([{ tick: 0, order: { kind: 'tack', ship: 0 } }, { tick: 30, order: { kind: 'tack', ship: 0 } }], 0.5);
   assert.deepEqual(calls(shots), [], 'orders already given when hearing began are not piped');
@@ -111,9 +114,9 @@ test('an order is piped from the boatswain as it is taken; two orders one after 
   assert.equal(piped[1]!.id, ORDER_CALLS.back.id);
   const after = ORDER_CALLS.sail.seconds + CALL_GAP;
   assert.ok(piped[1]!.t >= piped[0]!.t + after - 1e-9 && piped[1]!.t < piped[0]!.t + after + 2 * STEP_SECONDS, 'the second call when the first has ended');
-  // From the quarterdeck by the capstan, where the boatswain stands beside the first lieutenant: a few metres aft of the ear.
+  // From the quarterdeck by the capstan, where the boatswain walks his lane beside the first lieutenant's: a few metres from the capstan.
   const station = placeSpot('station-quarterdeck'), there = toWorld(BASE.motion.pose, station.across, 0, -station.along), at = piped[0]!.at;
-  assert.ok(Math.hypot(at[0] - there[0], at[2] - there[2]) < 1, `piped by the capstan (${at.map((v) => v.toFixed(1))})`);
+  assert.ok(Math.hypot(at[0] - there[0], at[2] - there[2]) < QUARTERDECK_REACH, `piped by the capstan (${at.map((v) => v.toFixed(1))})`);
   assert.equal(piped[0]!.bus, 'body', 'on deck, heard close');
 });
 

@@ -41,7 +41,20 @@ export interface RankRow {
    * 2026-11-18: the quarterdeck at ease holds only the wheel, the officers, the midshipman and the sentries). None: his post.
    */
   readonly idle?: readonly string[];
+  /**
+   * Two places he paces between while she is not at quarters (Arnd 2026-11-18, crew realism: an officer of the watch walks
+   * to and fro and stops to look about): he walks to the other at the end of each `PACE_SECONDS` of the match. His home
+   * is the first.
+   */
+  readonly paces?: readonly [string, string];
 }
+
+/** How long a pacing officer stays at one end before he walks to the other, s (he walks about 3 s; the rest he stands looking about). */
+export const PACE_SECONDS = 15;
+/** The seconds each pacer's round is put on from the last, so the officers do not turn together. */
+export const PACE_STAGGER = 7;
+/** The quarterdeck's two walks, one each side of the capstan and the skylight: the aft and the fore end of each (stations of rules/ships.ts). */
+export const QUARTERDECK_WALKS = { starboard: ['station-pace-s-aft', 'station-pace-s-fore'], larboard: ['station-pace-p-aft', 'station-pace-p-fore'] } as const;
 
 /** A man's skill at the ropes, by what he is (hands: an able seaman is 1). */
 const PETTY = 1.2;
@@ -60,7 +73,7 @@ const BOY = 0.4;
  */
 export const ROSTER: readonly RankRow[] = [
   { rank: 'captain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
-  { rank: 'first lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
+  { rank: 'first lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], paces: QUARTERDECK_WALKS.starboard },
   { rank: 'second lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
   { rank: 'master', count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'] },
   { rank: "master's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'], idle: ['station-bunk'] },
@@ -70,7 +83,7 @@ export const ROSTER: readonly RankRow[] = [
   { rank: 'purser', count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
   { rank: "captain's clerk", count: 1, part: 'officers', skill: IDLER, posts: ['station-quarterdeck'], idle: ['station-bunk'] },
   { rank: 'gunner', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
-  { rank: 'boatswain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'] },
+  { rank: 'boatswain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], paces: QUARTERDECK_WALKS.larboard },
   { rank: 'carpenter', count: 1, part: 'officers', skill: ABLE, posts: ['station-pumps'], idle: ['station-bunk'] },
   { rank: "boatswain's mate", count: 2, part: 'officers', skill: ABLE, posts: ['station-waist', 'pin-bow-pins-s6'], idle: ['station-bunk'] },
   { rank: "gunner's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-magazine'] },

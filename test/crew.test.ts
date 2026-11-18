@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { encode } from '../src/sim/codec.ts';
 import { openShip } from '../src/sim/crew/closures.ts';
-import { startCrew, stepCrew, taskOf, type Crew } from '../src/sim/crew/crew.ts';
+import { sameSpot, startCrew, stepCrew, taskOf, type Crew } from '../src/sim/crew/crew.ts';
 import { jobWork } from '../src/sim/crew/drill.ts';
 import { battery, handsAtGuns } from '../src/sim/guns/guns.ts';
 import { atQuartersOf, brigRoster, crewPlaces, placeSpot } from '../src/sim/crew/roster.ts';
@@ -46,6 +46,25 @@ test('the roster is the brig\'s 121, every man posted at a crew place of the pla
   const pairs = new Set(shipPlan().guns.map((g) => g.id.slice(0, -1)));
   for (const pair of pairs) assert.ok(atGuns.filter((m) => m.gun!.slice(0, -1) === pair).length >= 2, `pair ${pair} manned`);
   for (const gang of Object.values(GANGS)) for (const part of [gang.aloft, ...gang.deck]) if (part) assert.ok(roster.some((m) => m.part === part), part);
+});
+
+test('the officers of the watch pace the quarterdeck: out to the other end of their walk and back, stopping at each, while she stands by', () => {
+  const roster = brigRoster(), pacers = roster.flatMap((m, i) => (m.paces ? [i] : []));
+  assert.deepEqual(pacers.map((i) => roster[i]!.rank), ['first lieutenant', 'boatswain']);
+  let crew = startCrew(roster);
+  const seen = new Map(pacers.map((i) => [i, { ends: new Set<string>(), walked: 0, stood: 0 }]));
+  for (let tick = 0; tick < 60 * STEPS_PER_SECOND; tick++) {
+    crew = stepCrew(crew, startTold(), { tick, heel: 0, closures: openShip(), captain: null, canvas: startSail().canvas }, roster).crew;
+    for (const i of pacers) {
+      const h = crew.men[i]!, s = seen.get(i)!, m = roster[i]!;
+      if (h.going) { s.walked++; continue; }
+      s.stood++;
+      const at = h.stands ?? placeSpot(m.home), end = m.paces!.find((p) => sameSpot(at, placeSpot(p)));
+      assert.ok(end, `${m.rank} stands at an end of his walk`);
+      s.ends.add(end!);
+    }
+  }
+  for (const [i, s] of seen) assert.ok(s.ends.size === 2 && s.walked > 0 && s.stood > s.walked, `${roster[i]!.rank} paces: ${[...s.ends]}, ${s.walked} steps walking, ${s.stood} standing`);
 });
 
 test('the marines stand as ruled: two sentries aft, one at the cabin door, the rest below or in the waist; at quarters two aft, six aloft, six forward, five on the engaged side', () => {

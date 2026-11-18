@@ -28,6 +28,8 @@ export interface Man {
   readonly home: string;
   /** His bunk, where he sleeps while he stands by (his `home` is its station), or null: he is at a post. */
   readonly bunk: Bunk | null;
+  /** The two places he paces between while she is not at quarters (his `home` is the first), or null. */
+  readonly paces: readonly [string, string] | null;
 }
 
 let places: ReadonlyMap<string, CrewPlace> | null = null;
@@ -75,7 +77,7 @@ export function brigRoster(): readonly Man[] {
   const men: Man[] = [];
   let next = 0;
   // His home: the row's `idle` place in turn; a man who sleeps below has the placeholder until the bunks are shared out.
-  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null } => ({ home: row.idle ? row.idle[k % row.idle.length]! : post, bunk: null });
+  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null; paces: readonly [string, string] | null } => ({ home: row.paces ? row.paces[0] : row.idle ? row.idle[k % row.idle.length]! : post, bunk: null, paces: row.paces ?? null });
   for (const row of ROSTER) {
     for (let k = 0; k < row.count; k++) {
       if (row.posts !== 'guns') {
@@ -100,6 +102,7 @@ export function brigRoster(): readonly Man[] {
   for (const m of men) {
     placeSpot(m.post);
     placeSpot(m.home);
+    for (const place of m.paces ?? []) placeSpot(place);
     for (const side of SIDES) if (m.quarters) placeSpot(atQuartersOf(m.quarters, side));
   }
   built = deepFreeze(men);
