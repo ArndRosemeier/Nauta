@@ -2,11 +2,11 @@
  * The speech bubbles (plan N4.5), by hand, not in CI: `npm run shot:speech [-- <out dir>]` (run `npm run build`
  * first). One page of the brig under way (`?sail`), from her quarterdeck at the tablet's 1180 × 820, commanded through
  * `window.__nautaSail`: a tack (the master answers, the boatswain passes it down), an order she will not take (the first
- * lieutenant says why), the same in German, and her lookout reporting her as she opens her ports. The order panel
+ * lieutenant says why), the same in German, and the reports sheet with all that was said. The order panel
  * is hidden so the bubbles show. Fails if the page throws or no bubble shows. A few minutes on the cloud's software GPU.
  */
 import { mkdirSync } from 'node:fs';
-import { openBrowser, openGame, snap } from './browser.mjs';
+import { openBrowser, openGame, snap, TIMEOUT } from './browser.mjs';
 
 const out = process.argv[2] ?? 'shots/speech';
 mkdirSync(out, { recursive: true });
@@ -32,11 +32,17 @@ for (const language of ['en', 'de']) {
   const { page } = game;
   await page.evaluate((l) => { localStorage.setItem('nauta.settings', JSON.stringify({ language: l })); }, language);
   await page.reload();
-  await page.waitForFunction(() => window.__nautaReady === true);
+  await page.waitForFunction(() => window.__nautaReady === true, null, { timeout: TIMEOUT });
   await page.addStyleTag({ content: '#loading,#orders,#room{display:none!important}' });
   await scene(page, `${language}-tack`, ['tack']);
   await scene(page, `${language}-refused`, ['fill'], 1.6);
   if (language === 'en') await scene(page, 'en-quarters', ['beat to quarters'], 2);
+  // The reports sheet: everything said so far, newest first.
+  await page.click('#reports-button');
+  await page.waitForSelector('.reports-sheet');
+  const lines = await page.$$eval('.reports-list li', (all) => all.length);
+  if (lines === 0) problems.push(`${language}: the reports sheet is empty`);
+  await snap(page, `${out}/${language}-reports.png`);
   if (game.failed()) problems.push(`${language}: the page failed`);
   await game.context.close();
 }

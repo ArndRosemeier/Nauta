@@ -4,6 +4,7 @@
  * `G` key (or the player's own, plan N7.3) raises and lowers it and the mouse wheel draws it out and in. Pointers that are not for the view (the
  * walking thumb's, walkInput.ts) are left alone.
  */
+import { onKeyPress } from './dom';
 import type { Spyglass } from './glass';
 import { DEFAULT_SETTINGS } from './settings';
 
@@ -47,12 +48,7 @@ export function watchGlass(el: HTMLElement, button: HTMLButtonElement, glass: Sp
   el.addEventListener('pointerup', lift);
   el.addEventListener('pointercancel', lift);
   el.addEventListener('wheel', (e) => { e.preventDefault(); glass.draw(WHEEL_STEP ** (-e.deltaY / WHEEL_NOTCH)); }, { passive: false });
-  window.addEventListener('keydown', (e) => {
-    if (e.code !== key()) return;
-    // Typing an order is not looking through the glass.
-    if (e.target instanceof HTMLInputElement) return;
-    glass.toggle();
-    mark();
-  });
+  // Typing an order is not looking through the glass.
+  onKeyPress(key, () => { glass.toggle(); mark(); });
   return state;
 }

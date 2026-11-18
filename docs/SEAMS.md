@@ -457,6 +457,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Where her rudder lies in a state, for drawing it put over | `src/app/pageMatch.ts#rudderAngle` |
 | The order panel on the page (`?sail&panel`, a test tool beside the fan): buttons, compass, typed orders, answers | `src/app/orderPanel.ts#OrderPanel` |
 | Making an element of the page's own panels in one line | `src/app/dom.ts#make` |
+| A key pressed once (not held, not typing) on the page | `src/app/dom.ts#onKeyPress` |
 | The ways across her weather deck's centreline: how wide, how often (the fife rails' places that make them: `MAIN_FIFE_AT`, `FORE_FIFE_FORE_AT`) | `src/sim/rules/ships.ts#DECK_CROSSING` |
 | How fast a man gets about the ship: his pace on each footing, smartly, stooping, the heel, a crowd, queuing on a way, standing aside (first proposals) | `src/sim/rules/routes.ts#PACE` |
 | The crew's way network on the one walk graph: the ends of every way and what each way takes to cross | `src/sim/crew/network.ts#routeNetwork` |
@@ -666,3 +667,5 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The midshipman: keeps by the captain on her decks, runs with a message and gives it when he arrives | `src/app/midshipman.ts#Midshipman` |
 | The compass bearing looked along from her ("steer there") | `src/app/look.ts#lookBearing` |
 | The officers drawn (six full characters with living faces; N4.3's near pool takes over): where each is on the view, looking at the captain | `src/render/crew/officersView.ts#OfficersView` |
+| The report log: every line the men said this match, shown or not | `src/app/speech/reportLog.ts#ReportLog` |
+| The reports sheet and its tag and key | `src/app/reportsPanel.ts#ReportsPanel` |
