@@ -208,7 +208,7 @@ export class CrewWatch {
     for (const e of this.events) {
       if (e.kind === 'done') { if (PIPED_DONE.has(e.order.kind)) this.wait(CARRY_ON, CARRY_ON.gain, s.t); }
       else if (e.kind === 'short-handed') this.pipeAgain(e.order, s.t);
-      else if (e.kind !== 'refused') {
+      else if (e.kind !== 'refused' && e.kind !== 'answered') {
         for (const c of SAILED_CALLS[e.kind]) this.wait(c, c.gain, s.t);
         if (e.kind !== 'missed stays') this.bracePulls = Array.from({ length: SWING_PULLS }, (_, k) => s.t + k * SWING_PERIOD);
       }

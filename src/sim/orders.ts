@@ -227,10 +227,21 @@ export function startOrders(heading: number, canvas: CanvasName): ShipOrders {
   return { helm: { heading: wrapBearing(heading), by: 0 }, canvas, hove: false, backed: MASTS.map(() => false), acts: [], given: [], serial: 0 };
 }
 
-/** What giving an order comes to: what she has now been told, and the answer in words ('' when simply taken). */
+/**
+ * What the master says of an order he takes but must speak to (docs/design/orders.md, "Answers are events"): a course
+ * she will not lie, steered full and by instead, or one she reaches only by wearing. The code is what the phrase book
+ * (N4.5) turns into his words; the reason is those words in English for now (the order panel).
+ */
+export type AnswerCode = 'will not lie' | 'wearing round';
+
+/**
+ * What giving an order comes to: what she has now been told, the answer in words ('' when simply taken) and, for an
+ * order taken with words, its code. Refused, `told` comes back unchanged and `code` is null.
+ */
 export interface OrderAnswer {
   readonly told: ShipOrders;
   readonly reason: string;
+  readonly code: AnswerCode | null;
 }
 
 /** What an order is given against: the tick of the step, the mean wind there (its `from` is what the master judges by) and the match's force. */
@@ -269,11 +280,15 @@ function sameWork(a: Act, b: Act): boolean {
 type Changes = Partial<Pick<ShipOrders, 'helm' | 'canvas' | 'hove' | 'backed'>>;
 type NewAct = Omit<HelmAct, 'id' | 'of'> | Omit<SailAct, 'id' | 'of'> | Omit<YardsAct, 'id' | 'of'>;
 
+/** What the master says as he takes an order: nothing, or a code and its words. */
+type Said = Pick<OrderAnswer, 'reason' | 'code'>;
+const NOTHING_SAID: Said = { reason: '', code: null };
+
 /**
  * An order taken: the changes to what she is told, its acts (replacing the pending acts for the same work, and every
  * pending sail act when `resail`), and the orders left with nothing to do dropped (replaced).
  */
-function tell(told: ShipOrders, order: Order, tick: number, changes: Changes, acts: readonly NewAct[], resail: boolean, reason = ''): OrderAnswer {
+function tell(told: ShipOrders, order: Order, tick: number, changes: Changes, acts: readonly NewAct[], resail: boolean, said: Said = NOTHING_SAID): OrderAnswer {
   const id = told.serial;
   const added = acts.map((a, k) => ({ ...a, id: id + 1 + k, of: id }) as Act);
   const kept = told.acts.filter((p) => !(resail && p.kind === 'sail') && !added.some((a) => sameWork(a, p)));
@@ -281,10 +296,10 @@ function tell(told: ShipOrders, order: Order, tick: number, changes: Changes, ac
   const given = told.given.filter((g) => all.some((a) => a.of === g.id));
   // An order that leaves nothing to do (it only stops work under way) is carried out at once.
   const now = added.length > 0 ? [...given, { id, order, tick }] : given;
-  return { told: { ...told, ...changes, acts: all, given: now, serial: id + 1 + acts.length }, reason };
+  return { told: { ...told, ...changes, acts: all, given: now, serial: id + 1 + acts.length }, ...said };
 }
 
-const refuse = (told: ShipOrders, reason: string): OrderAnswer => ({ told, reason });
+const refuse = (told: ShipOrders, reason: string): OrderAnswer => ({ told, reason, code: null });
 
 /**
  * The helm told to steer `heading` (compass bearing, rad): the short way on the tack she is on, by wearing onto the
@@ -297,10 +312,10 @@ function steer(told: ShipOrders, s: Sailing, order: Order, heading: number, now:
   if (Math.abs(angleDiff(heading, from)) < CLOSE_HAULED - BY_FOLLOW) {
     const by = closeHauled(to, from);
     const reason = `she will not lie ${headingWords(heading)}: full and by on the ${TACK_NAMES[to]} tack, ${headingWords(by)}${turn ? ', wearing round' : ''}`;
-    return tell(told, order, now.tick, { helm: { heading: 0, by: to } }, [{ kind: 'helm', heading: by, turn }], false, reason);
+    return tell(told, order, now.tick, { helm: { heading: 0, by: to } }, [{ kind: 'helm', heading: by, turn }], false, { reason, code: 'will not lie' });
   }
   // Wearing for a course she can lie, the master says so too (design decision for N3), so the long way round is never a surprise.
-  const wearing = turn ? `wearing round, sir: ${headingWords(heading)} lies on the other tack` : '';
+  const wearing: Said = turn ? { reason: `wearing round, sir: ${headingWords(heading)} lies on the other tack`, code: 'wearing round' } : NOTHING_SAID;
   return tell(told, order, now.tick, { helm: { heading: wrapBearing(heading), by: 0 } }, [{ kind: 'helm', heading: wrapBearing(heading), turn }], false, wearing);
 }
 
@@ -352,7 +367,8 @@ export function malformed(order: Order): string {
 
 /**
  * An order given to a ship that has been told `told` and sails as `s`: what she is told now, and the answer in words
- * ('' when simply taken; refused, `told` comes back unchanged; a course she will not lie is answered and changed).
+ * ('' when simply taken; refused, `told` comes back unchanged; taken with words, a `code`: a course she will not lie is
+ * answered and changed, one on the other tack answered "wearing round").
  */
 export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: OrderMoment): OrderAnswer {
   const bad = malformed(order);

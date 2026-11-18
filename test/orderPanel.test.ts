@@ -53,7 +53,7 @@ function sail(match: SoloMatch, seconds: number, orders: readonly Order[] = []):
     const lines: string[] = heard = [];
     heardOf.set(match, lines);
     match.on('events', (events: readonly SimEvent[]) => {
-      for (const e of events) { const w = eventWords(e, match.state, match.ship); if (w) lines.push(w); }
+      for (const e of events) { const w = eventWords(e, match.ship); if (w) lines.push(w); }
     });
   }
   const from = heard.length, until = Math.round((simTime(match.state) + seconds) / STEP_SECONDS) * STEP_SECONDS;
@@ -118,12 +118,15 @@ test('the answers: taken with words, refused, done, and the events of her sailin
   assert.match(heard[0]!, /^00:06 steer 225: she will not lie 225: full and by on the starboard tack, \d{3}, wearing round$/);
   // What happens under sail, and a job begun with fewer hands than it needs.
   const at = 95 * 30;
-  assert.equal(eventWords({ kind: 'tacked', tick: at, ship: 0 }, m.state, 0), '01:35 she has come through the wind');
-  assert.equal(eventWords({ kind: 'wore', tick: at, ship: 0 }, m.state, 0), '01:35 she has worn round');
-  assert.equal(eventWords({ kind: 'missed stays', tick: at, ship: 0 }, m.state, 0), '01:35 she missed stays and falls back');
+  assert.equal(eventWords({ kind: 'tacked', tick: at, ship: 0 }, 0), '01:35 she has come through the wind');
+  assert.equal(eventWords({ kind: 'wore', tick: at, ship: 0 }, 0), '01:35 she has worn round');
+  assert.equal(eventWords({ kind: 'missed stays', tick: at, ship: 0 }, 0), '01:35 she missed stays and falls back');
   const short: SimEvent = { kind: 'short-handed', tick: at, ship: 0, order: button('heave'), job: 'brace' };
-  assert.equal(eventWords(short, m.state, 0), "01:35 heave to: short-handed: a mast's yards swung round");
-  assert.equal(eventWords({ ...short, ship: 1 }, m.state, 0), null);
+  assert.equal(eventWords(short, 0), "01:35 heave to: short-handed: a mast's yards swung round");
+  assert.equal(eventWords({ ...short, ship: 1 }, 0), null);
+  const answered: SimEvent = { kind: 'answered', tick: at, ship: 1, order: { kind: 'steer', ship: 1, heading: 0 }, code: 'wearing round', reason: 'wearing round, sir: 000 lies on the other tack' };
+  assert.equal(eventWords(answered, 0), null, "another ship's answer");
+  assert.equal(eventWords(answered, 1), '01:35 steer 000: wearing round, sir: 000 lies on the other tack');
 });
 
 test('standing orders are ringed, and her yards are drawn braced as she is trimmed, round the other way on the other tack', () => {
