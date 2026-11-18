@@ -1,0 +1,2 @@
+A Reports tag under the compass rose (or the R key) opens a list of everything the men have said this match, newest first, so a missed bubble can be read again.
+The tag can be hidden in the settings, on the View page; the key still opens the list.

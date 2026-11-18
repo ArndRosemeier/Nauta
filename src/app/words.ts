@@ -123,6 +123,7 @@ const EN = {
   fanPlug: 'Plug the shot holes',
   fanPumping: 'Man the pumps',
   fire: 'Fire!',
+  keyReports: 'Reports',
   pressKey: 'press a key',
   resetKeys: 'Keys as they were',
   violence: 'Violence',
@@ -156,6 +157,10 @@ const EN = {
   captainsOf: 'captains',
   titleTap: 'Tap to hear the theme',
   titleThen: 'Drag across the sky to move the sun · tap the brig to fire',
+  reports: 'Reports',
+  reportsButton: 'Reports button',
+  reportsButtonHelp: 'Opens all the men have reported; the key opens it either way',
+  noReports: 'Nothing reported yet.',
 };
 
 export type WordKey = keyof typeof EN;
@@ -277,6 +282,7 @@ const DE: Record<WordKey, string> = {
   fanPlug: 'Lecks stopfen',
   fanPumping: 'An die Pumpen',
   fire: 'Feuer!',
+  keyReports: 'Meldungen',
   pressKey: 'Taste drücken',
   resetKeys: 'Tasten wie zuvor',
   violence: 'Gewalt',
@@ -310,6 +316,10 @@ const DE: Record<WordKey, string> = {
   captainsOf: 'Kapitäne',
   titleTap: 'Tippen, um die Titelmelodie zu hören',
   titleThen: 'Über den Himmel ziehen bewegt die Sonne · die Brigg antippen, und sie feuert',
+  reports: 'Meldungen',
+  reportsButton: 'Knopf für Meldungen',
+  reportsButtonHelp: 'Öffnet alles, was die Leute gemeldet haben; die Taste öffnet es immer',
+  noReports: 'Noch nichts gemeldet.',
 };
 
 const BY_LANGUAGE: Readonly<Record<Language, Readonly<Record<WordKey, string>>>> = { en: EN, de: DE };

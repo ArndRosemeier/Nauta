@@ -132,6 +132,14 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .whatsnew-date { font-weight: 400; font-style: italic; color: var(--ivory-soft); margin-left: 10px; }
 .whatsnew-release ul { margin: 0; padding-left: 20px; }
 .whatsnew-release li { margin: 3px 0; }
+/* The reports (src/app/reportsPanel.ts): every line the men said, newest first */
+.nt-sheet.reports-sheet { width: min(620px, 100%); height: min(620px, 100%); }
+.reports-list { list-style: none; margin: 0; padding: 0; }
+.reports-list li { display: grid; grid-template-columns: 3.2em 9em minmax(0, 1fr); gap: 4px 12px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--brass-faint); font-size: 17px; }
+.reports-at { color: var(--ivory-soft); font-size: 14px; }
+.reports-rank { font: 13px/1.2 var(--title-font); letter-spacing: 0.12em; font-variant: small-caps; color: var(--brass); }
+.reports-list li.cry .reports-rank { color: var(--signal); }
+.reports-list li.cry .reports-words { font-weight: bold; }
 .rooms .room-wide { display: block; width: 100%; margin: 8px 0; text-align: left; }
 .room-row { display: flex; gap: 8px; align-items: center; }
 .room-code { flex: 1; min-width: 0; min-height: var(--target-small); padding: 0 16px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-deep); color: var(--ivory); font: 20px/1 var(--word-font); letter-spacing: 0.2em; text-transform: uppercase; -webkit-user-select: text; user-select: text; }
@@ -152,6 +160,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .nt-pill .nt-rose { width: 34px; height: 34px; }
 #settings { position: fixed; z-index: 10; left: max(14px, env(safe-area-inset-left)); top: max(14px, env(safe-area-inset-top)); }
 #settings.fresh::after { position: absolute; right: -2px; top: -2px; margin: 0; width: 12px; height: 12px; box-shadow: 0 0 0 2px var(--lacquer); }
+#reports-button { position: fixed; z-index: 10; left: max(14px, env(safe-area-inset-left)); top: calc(max(14px, env(safe-area-inset-top)) + var(--target) + 10px); }
 #room { position: fixed; left: calc(max(14px, env(safe-area-inset-left)) + var(--target) + 12px); top: max(14px, env(safe-area-inset-top)); }
 #glass-button { position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: none; min-width: 84px; }
 

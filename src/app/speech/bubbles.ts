@@ -10,7 +10,8 @@
  *   long enough. Whatever has waited past its time is dropped, never shown late.
  * - A report or cry is not said again while the same man said it lately (`REPEAT_SECONDS`): a broadside's holes are one cry.
  * - Each shows as long as it takes to read (`readSeconds`); a cry a little longer.
- * - Its words are a variant of the phrase book's line, chosen by the match's seed and never the same twice running.
+ * - Its words are a variant of the phrase book's line, chosen by the match's seed and never the same twice running,
+ *   fixed when it is said: `add` gives back what was said, for the report log, whether it is ever shown or not.
  */
 import { deriveSeed } from '@futuremagic/core';
 import type { Language } from '../settings';
@@ -55,8 +56,14 @@ export interface BubbleChange {
   readonly went: readonly Bubble[];
 }
 
-interface Waiting {
+/** A line said: who, his rank and his words. The report log keeps these. */
+export interface Said {
   readonly say: Say;
+  readonly rank: string;
+  readonly words: string;
+}
+
+interface Waiting extends Said {
   readonly chain: number;
   readonly seq: number;
   readonly due: number;
@@ -83,9 +90,10 @@ export class BubbleQueue {
   /** `seed`: the match's (the variants); `language` and `navy`: the words' (the settings; her navy). */
   constructor(private readonly seed: number, public language: Language, public navy: Navy) {}
 
-  /** What one event has the men say (reports.ts `saysOf`), at `now` s: one chain, the answer first. */
-  add(says: readonly Say[], now: number): void {
-    if (says.length === 0) return;
+  /** What one event has the men say (reports.ts `saysOf`), at `now` s: one chain, the answer first. Gives back what is said (a report said again too soon is not). */
+  add(says: readonly Say[], now: number): Said[] {
+    const out: Said[] = [];
+    if (says.length === 0) return out;
     const chain = ++this.chains;
     for (const say of says) {
       const key = `${say.ship}|${say.voice}|${say.line}`;
@@ -94,9 +102,18 @@ export class BubbleQueue {
         if (last !== undefined && now - last < REPEAT_SECONDS) continue;
         this.said.set(key, now);
       }
-      const due = now + (say.delay ?? 0);
-      this.waiting.push({ say, chain, seq: ++this.seq, due, stale: due + STALE[say.kind] });
+      const due = now + (say.delay ?? 0), said = this.words(say);
+      out.push(said);
+      this.waiting.push({ ...said, chain, seq: ++this.seq, due, stale: due + STALE[say.kind] });
     }
+    return out;
+  }
+
+  /** A line in words: the next variant of its line, in the language and the navy's turns of phrase. */
+  private words(say: Say): Said {
+    const turn = this.turns.get(say.line) ?? deriveSeed(this.seed, say.line);
+    this.turns.set(say.line, turn + 1);
+    return { say, rank: RANKS[say.voice][this.language], words: phraseWords(say.line, this.language, this.navy, turn, say.terms) };
   }
 
   /** The view at `now` s. */
@@ -145,10 +162,8 @@ export class BubbleQueue {
   }
 
   private showBubble(w: Waiting, now: number): Bubble {
-    const { say } = w, turn = this.turns.get(say.line) ?? deriveSeed(this.seed, say.line);
-    this.turns.set(say.line, turn + 1);
-    const words = phraseWords(say.line, this.language, this.navy, turn, say.terms);
-    const b: Bubble = { id: ++this.ids, say, rank: RANKS[say.voice][this.language], words, from: now, until: now + readSeconds(words, say.kind === 'cry') };
+    const { say, rank, words } = w;
+    const b: Bubble = { id: ++this.ids, say, rank, words, from: now, until: now + readSeconds(words, say.kind === 'cry') };
     this.shown.push(b);
     this.chainOf.set(b.id, w.chain);
     return b;

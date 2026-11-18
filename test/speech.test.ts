@@ -15,6 +15,7 @@ import { step, type SimEvent } from '../src/sim/step.ts';
 import { PHRASES, phraseWords, TERMS, type Line, type Term } from '../src/app/speech/phrases.ts';
 import { lookoutSays, PASS_DELAY, saysOf, whereTerm, type Say } from '../src/app/speech/reports.ts';
 import { takerOf } from '../src/app/officers.ts';
+import { ReportLog } from '../src/app/speech/reportLog.ts';
 import { BubbleQueue, MOST_SHOWN, READ_LEAST, readSeconds, REPEAT_SECONDS } from '../src/app/speech/bubbles.ts';
 
 const LANGUAGES = ['en', 'de'] as const;
@@ -143,4 +144,18 @@ test('asked what he sees, the lookout gives her bearing, her heading and her sai
   assert.deepEqual(ran.map((x) => [x.voice, x.terms?.who]), [['midshipman', 'to master']]);
   assert.match(phraseWords(ran[0]!.line, 'de', 'british', 0, ran[0]!.terms), /Steuermann/);
   assert.deepEqual(saysOf({ kind: 'sent', voice: 'master', ship: 0, order: { kind: 'tack', ship: 0 }, ask: null, via: 'hail', runner: false }, 0), [], 'hailed: the master answers when it is taken');
+});
+
+test('every line said goes to the report log, newest first, even when it is never shown', () => {
+  const q = new BubbleQueue(5, 'en', 'british'), log = new ReportLog();
+  log.record(q.add([sayOf('lookout', 'sighted', 'report', { where: 'ahead' })], 0), 30);
+  log.record(q.add(saysOf({ kind: 'taken', tick: 60, ship: 0, order: { kind: 'tack', ship: 0 } }, 0), 1), 60);
+  log.record(q.add([sayOf('lookout', 'sighted', 'report', { where: 'ahead' })], 2), 90);
+  assert.deepEqual(log.all.map((l) => [l.tick, l.rank]), [[60, 'Boatswain'], [60, 'Master'], [30, 'Lookout']], 'a report said again too soon is not logged twice');
+  assert.match(log.all[2]!.words, /dead ahead/);
+  // A report dropped stale from the view stays in the log, with the words it would have shown.
+  q.viewAt(100);
+  assert.equal(log.all.length, 3);
+  log.clear();
+  assert.equal(log.all.length, 0);
 });

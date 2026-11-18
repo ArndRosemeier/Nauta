@@ -26,11 +26,11 @@ export const SOUND_PARTS = ['all', 'sea', 'ship', 'crew', 'battle'] as const;
 export type SoundPart = (typeof SOUND_PARTS)[number];
 /**
  * The keys a player may change, each one key (its `code`); the arrows always walk as well. Walking and the glass,
- * then the orders (docs/design/orders.md "Keys"): steer there, come up and bear away a point, tack, wear, heave to,
+ * the reports sheet, then the orders (docs/design/orders.md "Keys"): steer there, come up and bear away a point, tack, wear, heave to,
  * the three settings of sail and shorten, beat to quarters, the three shot, fire (as they bear, or the word), cease
  * firing, the fan of the man looked at, the midshipman.
  */
-export const KEY_ACTIONS = ['forward', 'back', 'left', 'right', 'glass', 'steer', 'up', 'away', 'tack', 'wear', 'heave', 'battle', 'plain', 'all', 'shorten', 'quarters', 'round', 'chain', 'grape', 'fire', 'cease', 'fan', 'midshipman'] as const;
+export const KEY_ACTIONS = ['forward', 'back', 'left', 'right', 'glass', 'reports', 'steer', 'up', 'away', 'tack', 'wear', 'heave', 'battle', 'plain', 'all', 'shorten', 'quarters', 'round', 'chain', 'grape', 'fire', 'cease', 'fan', 'midshipman'] as const;
 export type KeyAction = (typeof KEY_ACTIONS)[number];
 
 export interface Settings {
@@ -52,6 +52,8 @@ export interface Settings {
   /** How long a match may last before it is drawn at nightfall, minutes (rules/end.ts `MATCH_MINUTES` by default). */
   readonly matchMinutes: number;
   readonly language: Language;
+  /** The Reports button on the view, opening the log of all the men have said (Arnd, 2026-11-18); its key opens it either way. */
+  readonly reportsButton: boolean;
 }
 
 /** The slowest and fastest a drag may turn the look, times the natural. */
@@ -76,10 +78,12 @@ export const DEFAULT_SETTINGS: Settings = {
     steer: 'KeyX', up: 'KeyZ', away: 'KeyC', tack: 'KeyT', wear: 'KeyG', heave: 'KeyH',
     battle: 'Digit1', plain: 'Digit2', all: 'Digit3', shorten: 'Digit4',
     quarters: 'KeyB', round: 'Digit7', chain: 'Digit8', grape: 'Digit9', fire: 'KeyF', cease: 'KeyV', fan: 'KeyE', midshipman: 'KeyM',
+    reports: 'KeyR',
   },
   violence: 'plain',
   matchMinutes: MATCH_MINUTES,
   language: 'en',
+  reportsButton: true,
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -109,6 +113,7 @@ export function readSettings(kept: unknown): Settings {
     violence: oneOf(k.violence, VIOLENCE_LEVELS, d.violence),
     matchMinutes: Math.round(between(k.matchMinutes, MATCH_LEAST, MATCH_MOST, d.matchMinutes) / MATCH_STEP) * MATCH_STEP,
     language: oneOf(k.language, LANGUAGES, d.language),
+    reportsButton: typeof k.reportsButton === 'boolean' ? k.reportsButton : d.reportsButton,
   };
 }
 

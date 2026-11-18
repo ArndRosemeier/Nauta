@@ -7,3 +7,11 @@ export const make = <K extends keyof HTMLElementTagNameMap>(tag: K, className: s
   e.textContent = text;
   return e;
 };
+
+/** Calls `act` when the key whose code `code()` gives is pressed: once a press (not while held), and not while typing in a field. */
+export function onKeyPress(code: () => string, act: () => void): void {
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== code() || e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    act();
+  });
+}

@@ -46,6 +46,7 @@ const KEY_WORDS: Readonly<Record<KeyAction, WordKey>> = {
   steer: 'keySteer', up: 'fanUp', away: 'fanAway', tack: 'fanTack', wear: 'fanWear', heave: 'fanHeave',
   battle: 'fanBattle', plain: 'fanPlain', all: 'fanAll', shorten: 'fanShorten',
   quarters: 'fanQuarters', round: 'fanRound', chain: 'fanChain', grape: 'fanGrape', fire: 'keyFire', cease: 'fanCease', fan: 'keyFan', midshipman: 'keyMidshipman',
+  reports: 'keyReports',
 };
 /** The first order key: the keys page starts a section "Orders" there. */
 const FIRST_ORDER_KEY: KeyAction = 'steer';
@@ -135,6 +136,7 @@ export class SettingsMenu {
         slideRow(say.fingerSpeed, say.fingerSpeedHelp, s.fingerSpeed, SPEED_LEAST, SPEED_MOST, SPEED_STEP, speedText, (v) => set({ fingerSpeed: v })),
         slideRow(say.mouseSpeed, null, s.mouseSpeed, SPEED_LEAST, SPEED_MOST, SPEED_STEP, speedText, (v) => set({ mouseSpeed: v })),
         choiceRow(say.mouseUpDown, null, [say.normal, say.inverted], s.mouseInverted ? 1 : 0, (i) => set({ mouseInverted: i === 1 })),
+        choiceRow(say.reportsButton, say.reportsButtonHelp, [say.off, say.on], s.reportsButton ? 1 : 0, (i) => set({ reportsButton: i === 1 })),
       );
     } else if (p === 'controls') {
       el.append(section(say.touch), choiceRow(say.thumb, say.thumbHelp, THUMB_WORDS.map((w) => say[w]), THUMB_SIDES.indexOf(s.thumb), (i) => set({ thumb: THUMB_SIDES[i]! })));
