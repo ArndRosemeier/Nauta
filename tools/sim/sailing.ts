@@ -179,7 +179,8 @@ const LIE_STILL = 1 * KNOT;
 /** Each scenario's time, s: a wear round, a course up, a tack, heaving to, filling, a compass point from the start. */
 const WEAR_SECONDS = 120;
 const UP_SECONDS = 60;
-const TACK_SECONDS = 90;
+/** (120 s since the crews stand by in the waist and below, PR 110: the tack waits for the hands to walk to their stations.) */
+const TACK_SECONDS = 120;
 const HOVE_SECONDS = 240;
 const FILL_SECONDS = 90;
 const POINT_SECONDS = 120;
