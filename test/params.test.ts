@@ -7,11 +7,11 @@ import { DEGREE } from '../src/sim/units.ts';
 const BRACED = 30;
 
 test('no query: WebGPU, no HUD, a morning that moves', () => {
-  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, windAsked: false, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, panel: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, glass: null, foe: null, halfSmoke: false, scars: null, down: false, menu: true });
+  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, windAsked: false, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, panel: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, glass: null, foe: null, halfSmoke: false, scars: null, casualties: null, down: false, menu: true });
 });
 
 test('the query sets the backend, the HUD, the hour, the day length, the eye and the wind', () => {
-  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, windAsked: true, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, panel: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, glass: null, foe: null, halfSmoke: false, scars: null, down: false, menu: false });
+  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, windAsked: true, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, panel: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false, crew: null, trial: false, glass: null, foe: null, halfSmoke: false, scars: null, casualties: null, down: false, menu: false });
 });
 
 test('nonsense falls back, and numbers are held to their range', () => {

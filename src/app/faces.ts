@@ -45,10 +45,12 @@ export const FACES: Readonly<Record<FaceCause, FaceRow>> = {
 };
 
 /** Jobs that strain: hauling on a fall, heaving at the pumps, cutting, lifting the wounded. */
-const STRAINING: ReadonlySet<JobName> = new Set(['brace', 'sheet', 'clew', 'hoist', 'douse', 'pump', 'cut', 'fetch', 'carry', 'tackle']);
+const STRAINING: ReadonlySet<JobName> = new Set(['brace', 'sheet', 'clew', 'hoist', 'douse', 'pump', 'cut', 'fetch', 'carry', 'tackle', 'fight']);
 /** A flinch lasts this long after shot strikes near him, s; fear and shock this long, before they set into a grim face. */
 export const FLINCH_SECONDS = 0.5;
 export const FEAR_SECONDS = 6;
+/** A man wounded but fighting on shows his pain this long, s, then a set face: only the badly hurt keep it (N6.6). */
+export const PAIN_SECONDS = 8;
 
 /** What is happening to a man now, as the simulation tells it. */
 export interface FaceWhy {
@@ -61,6 +63,8 @@ export interface FaceWhy {
   /** His ship is in a fight: at quarters, or struck already. */
   readonly fighting: boolean;
   readonly harm: Harm | null;
+  /** Seconds since his hurt first showed (Infinity: not hurt). */
+  readonly sinceHurt: number;
   /** Calling an order down the chain (his bubble passes one on). */
   readonly shouting: boolean;
   /** The fight is over: his ship won, lost, or neither (null). */
@@ -71,7 +75,7 @@ export interface FaceWhy {
 export function facesNow(w: FaceWhy): FaceCause[] {
   const out: FaceCause[] = [];
   if (w.harm === 'killed') return ['slack'];
-  if (w.harm) out.push('pain');
+  if (w.harm === 'badly' || (w.harm && w.sinceHurt < PAIN_SECONDS)) out.push('pain');
   if (w.sinceStruck < FLINCH_SECONDS) out.push('flinch');
   if (w.sinceStruck < FEAR_SECONDS) out.push('fear');
   if (w.shouting) out.push('shout');

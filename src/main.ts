@@ -56,7 +56,7 @@ import { GunsView } from './render/ship/gunsView';
 import { setFrenchFlags } from './render/ship/sailMaterial';
 import type { Navy } from './app/crewLooks';
 import { SHIPS_DRAWN, lightThrough } from './render/ship/shipMaterials';
-import { goingDown, scarsOf } from './app/scars';
+import { casualtiesOf, goingDown, scarsOf } from './app/scars';
 import { GunfireView, fallInSea } from './render/gunfire';
 import { SmokeView, useSmokeDepth } from './render/smoke';
 import { FireView } from './render/fireView';
@@ -154,6 +154,8 @@ declare global {
       other: () => { drawn: number; near: boolean; apart: number; draws: number; mine: number } | null;
       /** Seconds since a gun of ship `index` was last seen to fire (Infinity: none yet): checks catch a broadside as it comes. */
       firedAgo: (index: number) => number;
+      /** The eye put at `eye` (her space) looking `yaw` and `pitch` (rad), for checks that stand beside something (tools/shot/men.mjs). */
+      eyeAt: (eye: [number, number, number], yaw: number, pitch: number) => void;
     };
     /**
      * Walking (`?walk`), for shots: the captain pushed by the left thumb (`forward`, `strafe`: -1..1) for so many
@@ -201,7 +203,7 @@ async function start(): Promise<void> {
   let pausedAt: number | null = null, paused = 0;
   /** The match's clock, s: the page's less the pauses, or where the browser checks have run it to. The bubbles keep it too. */
   const matchClock = (): number => (pinned ?? pausedAt ?? pageSeconds()) - paused + ahead;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match)) : null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match), params.casualties === null ? undefined : (state) => casualtiesOf(state, params.casualties!)) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   const other = build && match ? new ShipView(build, 1) : null;
@@ -462,6 +464,7 @@ async function start(): Promise<void> {
       if (power !== null) glass.power = power;
     },
     other: () => (other?.group.visible ? { drawn: other.trianglesDrawn, near: other.nearDrawn, apart: Math.round(other.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null),
+    eyeAt: (eye, yaw, pitch) => { where = { name: 'check', eye, look: { yaw, pitch } }; input.look = { yaw, pitch }; },
     firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
   };
   if (match && !params.menu) {
@@ -648,7 +651,7 @@ async function start(): Promise<void> {
         crew.poolInUse = phase && !phase.pool ? 0 : startCrew.pool;
         crew.everyFrame = phase?.everyFrame ?? false;
         crew.noShadows = phase?.noShadows ?? false;
-        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds() });
+        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds(), violence: settings.now.violence });
       }
       jump = 0;
       sky.below = ship.below;

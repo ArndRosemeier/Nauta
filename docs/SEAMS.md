@@ -369,6 +369,12 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A man as a full character, looking as his crowd figure does | `src/app/crewLooks.ts#fullLook` |
 | What a man wears and his build as a key (alike men differ in colour only) | `src/app/crewLooks.ts#wearing` |
 | What a man's face shows: the causes from the simulation, the table, one frame of it | `src/app/faces.ts#FACES` |
+| What the violence setting shows at each level (blood, stains, the killed on deck or taken below, the trail) | `src/app/violence.ts#SHOWN` |
+| The blood about a man struck down (pools, drops, spatter), seeded | `src/app/violence.ts#bloodOf` |
+| A shirt colour stained toward blood, how far a hurt stains it, how much of the killed is taken below at mild | `src/app/violence.ts#stained` |
+| Blood on a ship's decks: dishes of paint written on the page, falls kept so a level change shows them all | `src/render/crew/blood.ts#Blood` |
+| A man being carried below: held between his two bearers | `src/app/crewDrawn.ts#carryOf` |
+| A stand-in for a fight's casualties (`?sail&casualties=`), to look at the men under fire | `src/app/scars.ts#casualtiesOf` |
 | The crew trial's phases and its result's lines | `src/app/crewTrial.ts#trialLines` |
 | The crew trial on the page: its button, phases, result on screen | `src/app/crewTrialRun.ts#CrewTrialRun` |
 | The crews drawn: crowd figures for both crews, the near pool handed out, men placed with their ships and animated by the knobs; the voices' men as speakers | `src/render/crew/crewView.ts#CrewView` |

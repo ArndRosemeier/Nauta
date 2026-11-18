@@ -37,7 +37,7 @@ const WAITING = 'idle';
 /** On his way: walking, or smartly at a run. */
 const WALKING = 'walk';
 const RUNNING = 'jog';
-/** Killed, or badly hurt and lying where he fell (he is carried below by others: N6.6 draws the carrying). */
+/** Killed, or badly hurt and lying where he fell (the badly hurt are carried below by others, `carriedAt`). */
 export const LYING = 'death';
 /** Clips that play once and hold their last frame. */
 export const ONCE_CLIPS = [LYING];
@@ -54,6 +54,10 @@ const FACING_OUT: ReadonlySet<string> = new Set(['pin', 'gun']);
 /** A man faces forward (a half turn from +z, which is aft). */
 const FORWARD = Math.PI;
 const QUARTER = Math.PI / 2;
+/** A man carried below is held this high above the floor, m: at his bearers' hips and hands. */
+const CARRIED_HEIGHT = 0.85;
+/** A repair's men crowd about its spot (a hole, a fire, the pumps, a wounded man): the n-th stands on the n-th clear point of the grid about it, the wounded man's own place left clear (`fetch`). */
+const OWN_PLACE: ReadonlySet<JobName> = new Set(['fetch']);
 /**
  * Men the match puts on one spot (several share a post, or a place of their task) stand around it this far apart, m:
  * the first on it, the rest on the nearest clear deck of a grid about it, along the side before inboard (men at a rail
@@ -96,6 +100,8 @@ interface At { along: number; across: number; height: number; space: string; yaw
 
 /** His spot and height in one state, which way he faces and whether he is on his way. */
 function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
+  const carried = carriedAt(ship, man);
+  if (carried) return carried;
   const hand = ship.crew.men[man]!;
   if (hand.going) {
     const w = goingAt(hand.going);
@@ -114,8 +120,36 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
   } else if (place && place.rank > 0) {
     const s = spreadAbout(at.spot, place.rank);
     along = s.along; across = s.across; height = s.height;
+  } else if (task?.at && !place) {
+    // A repair: its men crowd about its spot and face it.
+    const rank = task.hands.indexOf(man) + (OWN_PLACE.has(task.job) ? 1 : 0);
+    if (rank > 0) {
+      const s = spreadAbout(at.spot, rank);
+      along = s.along; across = s.across; height = s.height;
+    }
+    yaw = Math.atan2(at.spot.across - across, shipZ(at.spot.along) - shipZ(along));
   }
   return { along, across, height, space: at.spot.space, yaw, way: null, moving: false };
+}
+
+/** The task that carries man `man` below (his bearers are at it), or null. */
+export const carryOf = (crew: SimShip['crew'], man: number): Task | null => crew.tasks.find((t) => t.job === 'carry' && t.on === man && t.hands.length > 0) ?? null;
+
+/**
+ * Where a man carried below is: held between his two bearers (one if the other was struck), lying along their way,
+ * at their hip height, as the pair walk; null when nobody carries him. The bearers are drawn as they are (`atIn`).
+ */
+function carriedAt(ship: SimShip, man: number): At | null {
+  const task = carryOf(ship.crew, man);
+  if (!task) return null;
+  const roster = brigRoster(), [first, second] = task.hands;
+  const a = atIn(ship, first!, roster[first!]!, taskOf(ship.crew, first!));
+  const b = second !== undefined ? atIn(ship, second, roster[second]!, taskOf(ship.crew, second)) : null;
+  const both = b !== null && b.space === a.space && b.way === a.way;
+  return {
+    along: both ? (a.along + b.along) / 2 : a.along, across: both ? (a.across + b.across) / 2 : a.across,
+    height: (both ? (a.height + b.height) / 2 : a.height) + CARRIED_HEIGHT, space: a.space, yaw: a.yaw, way: a.way, moving: true,
+  };
 }
 
 /** A floor point of hers and its height. */
@@ -220,7 +254,7 @@ function clipOf(ship: SimShip, man: number, task: Task | null, at: At, seed: num
   const harm = harmOf(ship.damage, man);
   if (harm === 'killed' || harm === 'badly') return LYING;
   const hand = ship.crew.men[man]!;
-  if (at.moving) return hand.going!.haste === 'smart' ? RUNNING : WALKING;
+  if (at.moving) return task?.job === 'carry' ? JOB_CLIPS.carry : hand.going?.haste === 'smart' ? RUNNING : WALKING;
   if (task) return task.began === null ? WAITING : JOB_CLIPS[task.job];
   return STANDING_BY[seed % STANDING_BY.length]!;
 }

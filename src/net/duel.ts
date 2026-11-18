@@ -85,6 +85,8 @@ export interface DuelOptions {
   readonly setup?: MatchSetup;
   /** The wind's force of a match played alone, over its start's (the page's `?wind=`); none: the start's own. */
   readonly windForce?: number;
+  /** A match played alone starts from the state this makes of its start (the page's `?casualties=`: a stand-in to look at; never a room's). */
+  readonly start?: (state: SimState) => SimState;
   /** The clock, s (the page's `performance.now() / 1000`; tests give a fake one). */
   readonly now: () => number;
   /** A match played alone: the other ship commanded by a computer captain at this skill (plan N7.1); none: she sails on as she started. */
@@ -186,7 +188,8 @@ export class DuelSession {
       const seed = options.seed ?? SOLO_SEED;
       const start = options.setup ?? this.timed(options.alone ? aloneStart(seed, this.terms) : duelStart(seed, this.terms));
       const crewed = this.foe ? crewedBy(start, FOE_SHIP, this.foe) : start;
-      this.begin(startMatch(options.windForce === undefined ? crewed : { ...crewed, windForce: options.windForce }), [SOLO_PLAYER, null]);
+      const state = startMatch(options.windForce === undefined ? crewed : { ...crewed, windForce: options.windForce });
+      this.begin(options.start ? options.start(state) : state, [SOLO_PLAYER, null]);
       return;
     }
     this.role = 'joining';

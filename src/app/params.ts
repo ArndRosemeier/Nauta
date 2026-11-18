@@ -45,7 +45,7 @@ const SEED_MOST = 2 ** 32 - 1;
  */
 export const TOOL_SWITCHES = [
   'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'trial', 'bench', 'probe', 'netcheck', 'title', 'rig',
-  'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed', 'scars', 'down',
+  'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed', 'scars', 'casualties', 'down',
 ] as const;
 
 /** Where `?look=` turns the eye: off the sun's (the moon's) bearing, clockwise, and up from level, both rad. */
@@ -124,6 +124,8 @@ export interface Params {
   readonly menu: boolean;
   /** Both ships drawn shot about by a stand-in for a fight's damage, seeded (`?scars=3`; app/scars.ts), to look at the damage drawn (plan N6.5); null: as the match has them. */
   readonly scars: number | null;
+  /** Men of both crews struck down at the start, a stand-in (`?sail&casualties=3`; app/scars.ts `casualtiesOf`), to look at the men under fire and the violence setting (plan N6.6); null: as the match has them. */
+  readonly casualties: number | null;
   /** The other ship going down from the start, a stand-in (`?sail&down`; app/scars.ts `goingDown`), to look at a ship sinking and what floats after (plan N6.5). */
   readonly down: boolean;
 }
@@ -154,6 +156,7 @@ export function readParams(query: string): Params {
     foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
     halfSmoke: q.get('smoke') === 'half',
     scars: q.has('scars') ? Math.round(num('scars', 1, 0, SEED_MOST)) : null,
+    casualties: q.has('casualties') ? Math.round(num('casualties', 1, 0, SEED_MOST)) : null,
     down: q.has('down'),
     menu: !TOOL_SWITCHES.some((name) => q.has(name)),
   };

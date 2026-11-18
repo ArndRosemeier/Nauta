@@ -5,13 +5,15 @@
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
 import { holeCode, startDamage, type Damage } from '../sim/damage';
-import { FALLS_AT_PART, SMASHED, STOVE_IN } from '../sim/rules/damage';
+import { FALLS_AT_PART, HARMS, SMASHED, STOVE_IN } from '../sim/rules/damage';
 import { sparParts } from '../sim/damage/meet';
 import { shipPlan, type Cell } from '../sim/ship/plan';
 import { rigPlan } from '../sim/ship/rig';
 import type { ShotKind } from '../sim/rules/guns';
 import type { GunKind } from '../sim/rules/ships';
 import { toWorld, type ShipPose } from '../sim/ship/motion';
+import { brigRoster } from '../sim/crew/roster';
+import type { SimState } from '../sim/state';
 
 /** How many of each: single holes in her side, her bulwarks and her weather deck; bulwark sections smashed out; panels stove in. */
 const SCARS = { side: 24, bulwark: 8, deck: 6, smashed: 2, stove: 1 } as const;
@@ -72,4 +74,28 @@ export function goingDown(mine: ShipPose, hers: ShipPose, since: number): ShipPo
   const s = Math.max(0, since), gathered = Math.min(s, SINKS.gathers), at = toWorld(mine, SINKS.off, 0, 0);
   const fallen = (SINKS.most * gathered * gathered) / (2 * SINKS.gathers) + SINKS.most * (s - gathered);
   return { ...hers, x: at[0], z: at[2], heading: mine.heading, heave: hers.heave - fallen, pitch: hers.pitch - Math.min(SINKS.mostByHead, SINKS.byHead * s) };
+}
+
+/** Men struck down at the start (`?casualties=3`), each crew: killed, badly wounded, lightly wounded. */
+const CASUALTIES = { killed: 4, badly: 5, wounded: 7 } as const;
+
+/**
+ * A stand-in for a fight's casualties (`?sail&casualties=3`, plan N6.6): some men of both crews struck down as the
+ * simulation keeps it (damage.ts `hurt`, man × `HARMS.length` + how badly), chosen by seed, so the men under fire, the
+ * bearers carrying the badly wounded below and each violence level can be looked at without fighting a match first. The
+ * crews then do what they do for any casualty (crew/repairs.ts). Only a start: nothing in a real match is like it.
+ */
+export function casualtiesOf(state: SimState, seed: number): SimState {
+  const roster = brigRoster();
+  return {
+    ...state,
+    ships: state.ships.map((ship, i) => {
+      const rng = new Rng(deriveSeed(seed, 'casualties', i));
+      // Never the captain (the first of the roster): the player's own man is not struck.
+      const men = rng.shuffle(roster.map((_, m) => m).slice(1));
+      const harms = (['killed', 'badly', 'wounded'] as const).flatMap((harm) => Array.from({ length: CASUALTIES[harm] }, () => HARMS.indexOf(harm)));
+      const hurt = harms.map((harm, k) => men[k]! * HARMS.length + harm).sort((a, b) => a - b);
+      return { ...ship, damage: { ...ship.damage, hurt } };
+    }),
+  };
 }
