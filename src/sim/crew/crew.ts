@@ -18,15 +18,15 @@ import { bareSpot, type Spot } from '../ship/plan';
 import type { SailSetting } from '../ship/sails';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../units';
 import type { Closures } from './closures';
-import { goingAt, startGoing, stepGoings, type Going } from './going';
+import { goingAt, goingRoute, startGoing, stepGoings, type Going } from './going';
 import { heightAt, lineLength, routeNetwork } from './network';
-import { drill, type Job } from './drill';
+import { drill, jobWork, type Job } from './drill';
 import { brigRoster, placeSpot, type Man } from './roster';
 import { rigPlan } from '../ship/rig';
 
 /** One man's state, by his place in the roster. */
 export interface Hand {
-  /** Where he stands when he is not on his way: null at his post. */
+  /** Where he stands when he is not on his way: null at his post (and while on his way, which says where he set out from). */
   readonly stands: Spot | null;
   /** On his way (going.ts), or null. */
   readonly going: Going | null;
@@ -34,7 +34,7 @@ export interface Hand {
   readonly blocked: number | null;
 }
 
-/** A job being done for an act of an order. */
+/** A job being done for an act of an order (what it takes: `jobWork(task.job, task.on)`). */
 export interface Task extends Job {
   readonly id: number;
   /** The act it is for and that act's order (their ids in `ShipOrders`). */
@@ -89,13 +89,15 @@ export function startCrew(roster: readonly Man[] = brigRoster()): Crew {
 
 const sameSpot = (a: Spot, b: Spot): boolean => a.space === b.space && a.along === b.along && a.across === b.across;
 
-/** Where a man stands (his post when `stands` is null). */
-const standing = (h: Hand, m: Man): Spot => h.stands ?? placeSpot(m.post);
+/** Where a man stands (his post when `stands` is null), or set out from when on his way. */
+const standing = (h: Hand, m: Man): Spot => h.going?.path.from ?? h.stands ?? placeSpot(m.post);
 
 /** Where a man must be: the place of his task, or his post. */
 function target(i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Task>): Spot {
   const t = byMan.get(i);
-  return placeSpot(t ? t.places[t.hands.indexOf(i) % t.places.length]! : roster[i]!.post);
+  if (!t) return placeSpot(roster[i]!.post);
+  const places = jobWork(t.job, t.on).places;
+  return placeSpot(places[t.hands.indexOf(i) % places.length]!);
 }
 
 /** Whether a man is where he must be, standing. */
@@ -156,7 +158,7 @@ function syncTasks(crew: Crew, told: ShipOrders, deck: Deck): Crew {
     const piped = (given?.tick ?? deck.tick) + Math.round(PASSED[to] * STEPS_PER_SECOND);
     const jobs = drill(a, kind, deck.canvas);
     const first = tasked;
-    tasks = [...tasks, ...jobs.map((j, k) => ({ ...j, after: j.after === null ? null : first + j.after, id: first + k, act: a.id, of: a.of, piped, hands: [], toDo: j.work, began: null }))];
+    tasks = [...tasks, ...jobs.map((j, k) => ({ ...j, after: j.after === null ? null : first + j.after, id: first + k, act: a.id, of: a.of, piped, hands: [], toDo: jobWork(j.job, j.on).work, began: null }))];
     tasked += jobs.length;
   }
   return tasks === crew.tasks ? crew : { ...crew, tasks, tasked };
@@ -176,11 +178,12 @@ function manTasks(tasks: readonly Task[], men: readonly Hand[], roster: readonly
   return tasks.map((t) => {
     if (tick < t.piped) return t;
     let skill = t.hands.reduce((sum, i) => sum + roster[i]!.skill, 0);
-    if (skill >= t.need) return t;
-    const parts = new Set(t.parts), hands = [...t.hands];
+    const w = jobWork(t.job, t.on);
+    if (skill >= w.need) return t;
+    const parts = new Set(w.parts), hands = [...t.hands];
     let free = roster.flatMap((m, i) => (parts.has(m.part) && !busy.has(i) ? [{ i, at: footing(standing(men[i]!, m)) }] : []));
-    while (skill < t.need && free.length > 0) {
-      const place = footing(placeSpot(t.places[hands.length % t.places.length]!));
+    while (skill < w.need && free.length > 0) {
+      const place = footing(placeSpot(w.places[hands.length % w.places.length]!));
       let best = 0, bestFar = Infinity;
       free.forEach((f, k) => { const far = farness(f.at, place); if (far < bestFar) { best = k; bestFar = far; } });
       const { i } = free[best]!;
@@ -206,9 +209,9 @@ function sendMen(men: readonly Hand[], roster: readonly Man[], byMan: ReadonlyMa
     if (h.blocked === deck.closures.waysSerial) continue;
     let from: Spot;
     if (h.going) {
-      if (sameSpot(h.going.route.to, to)) continue;
+      if (sameSpot(h.going.path.to, to)) continue;
       // Sent elsewhere on his way: from where he is on a floor; on a way (a ladder, the shrouds) he goes on to its end first.
-      if (h.going.route.legs[h.going.leg]?.way != null) continue;
+      if (goingRoute(h.going).legs[h.going.leg]?.way != null) continue;
       from = bareSpot(goingAt({ ...h.going, aside: 0 }));
     } else {
       from = standing(h, roster[i]!);
@@ -216,7 +219,7 @@ function sendMen(men: readonly Hand[], roster: readonly Man[], byMan: ReadonlyMa
     }
     const going = startGoing(from, to, byMan.has(i) ? 'smart' : 'walk', deck.heel, deck.closures);
     sent++;
-    out[i] = going ? { stands: from, going, blocked: null } : { ...h, blocked: deck.closures.waysSerial };
+    out[i] = going ? { stands: null, going, blocked: null } : { ...h, blocked: deck.closures.waysSerial };
   }
   return out;
 }
@@ -226,15 +229,15 @@ function work(tasks: readonly Task[], men: readonly Hand[], roster: readonly Man
   const live = new Set(tasks.map((t) => t.id));
   return tasks.map((t) => {
     if (t.after !== null && live.has(t.after)) return t;
-    const skill = present(t, men, roster, byMan);
-    if (skill < FEWEST * t.need) return t;
+    const skill = present(t, men, roster, byMan), need = jobWork(t.job, t.on).need;
+    if (skill < FEWEST * need) return t;
     let began = t.began;
     if (began === null) {
       if (!t.hands.every((i) => there(men[i]!, i, roster, byMan))) return t;
       began = tick;
-      if (skill < t.need) events.push({ kind: 'short-handed', of: t.of, job: t.job });
+      if (skill < need) events.push({ kind: 'short-handed', of: t.of, job: t.job });
     }
-    return { ...t, began, toDo: t.toDo - STEP_SECONDS * Math.min(1, skill / t.need) };
+    return { ...t, began, toDo: t.toDo - STEP_SECONDS * Math.min(1, skill / need) };
   });
 }
 
@@ -256,7 +259,7 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
     if (!h.going) return h;
     const going = moved.goings[i] ?? null;
     if (going) return { ...h, going };
-    const end = h.going.route.to;
+    const end = h.going.path.to;
     return { stands: sameSpot(end, placeSpot(roster[i]!.post)) ? null : end, going: null, blocked: null };
   });
   tasks = work(tasks, men, roster, byMan, deck.tick, events);

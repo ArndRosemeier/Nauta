@@ -1,8 +1,11 @@
 /**
  * A man's route through the ship (pure, N4.2): from where he stands to where he is sent, on the one walk graph,
- * the quickest way under the ship's heel and what is shut (closures.ts). A route is plain data (it travels in the
- * state with the man going along it, going.ts): a list of legs, each a walk across one floor or surface aloft, or a
- * way taken (a ladder, a door, the shrouds, the climb onto a yard).
+ * the quickest way under the ship's heel and what is shut (closures.ts). The search gives a `Path`, small plain data
+ * that travels in the state with the man going along it (going.ts): his two ends, the corners of the network he
+ * passes and the ways he takes, and the blocks the floors were crossed round. The `Route` (a list of legs, each a
+ * walk across one floor or surface aloft, or a way taken: a ladder, a door, the shrouds, the climb onto a yard) is
+ * built from the path alone (`routeOf`), the same on every machine, and kept in a cache that is not state (N3.7:
+ * a state must fit the network's 16 KB).
  */
 import { MinHeap } from '@futuremagic/core';
 import {
@@ -10,7 +13,7 @@ import {
   type Haste, type PaceName,
 } from '../rules/routes';
 import type { Spot } from '../ship/plan';
-import type { Closures } from './closures';
+import type { Block, Closures } from './closures';
 import {
   areaOf, crossings, easeAt, heightAt, lineLength, nodeOfSpot, routeNetwork, SURFACE_PACE, walkLine, walkMetres,
   type Network, type Part, type Work,
@@ -36,6 +39,22 @@ export interface Leg {
   readonly length: number;
   readonly work: Work;
 }
+
+/**
+ * What a route is built from, plain data: where from, where to, its steps (pairs of a vertex, `END_STEP` for the end
+ * or a corner of the network, and the link taken to it, `WALK_STEP` for a walk across a node), the blocks the floors
+ * were crossed round, and the closures' serial it was found (or last checked) under.
+ */
+export interface Path {
+  readonly from: Spot;
+  readonly to: Spot;
+  readonly steps: readonly number[];
+  readonly blocks: readonly Block[];
+  readonly serial: number;
+}
+/** A path's step to its end, and a step that walks across a node instead of taking a link. */
+export const END_STEP = -1;
+export const WALK_STEP = -1;
 
 /** A route: where from, where to, its legs, and the closures' serial it was found under. */
 export interface Route {
@@ -91,8 +110,8 @@ function nodePace(net: Network, space: string): PaceName {
 }
 
 /** A walk across one node between two spots, as a leg; null if no body gets there. The floor's distance field is laid from `b`, or from `a` if `fromA` (a way's end, whose field is already made). */
-function walkLeg(net: Network, node: number, a: Spot, b: Spot, cond: Conditions, fromA: boolean): Leg | null {
-  const space = net.graph.nodes[node]!.space, blocks = cond.closures.waysBlocked;
+function walkLeg(net: Network, node: number, a: Spot, b: Spot, blocks: readonly Block[], fromA: boolean): Leg | null {
+  const space = net.graph.nodes[node]!.space;
   const surface = net.surfaces.get(space);
   let pts: Spot[] | null;
   if (surface) pts = [a, b];
@@ -127,12 +146,17 @@ function walkSeconds(net: Network, space: string, metres: number, ease: number, 
 /** How a vertex of the search was reached: by walking across a node (link -1) or by a way (its link). */
 interface Reached { readonly from: number; readonly link: number }
 
+/** Most routes the cache keeps (a crew of two ships has a few hundred on the go at most). */
+const ROUTES_KEPT = 4096;
+const built = new WeakMap<Path, Route>();
+const byText = new Map<string, Route>();
+
 /**
- * The quickest route from one spot to another under the conditions, or null when no way is open between them. Spots
+ * The quickest path from one spot to another under the conditions, or null when no way is open between them. Spots
  * are on a floor of the plan or a surface aloft; one a little off the graph (a place by a gun) is reached from the
  * nearest square a body fits (rules: SNAP_REACH).
  */
-export function findRoute(from: Spot, to: Spot, cond: Conditions, net: Network = routeNetwork()): Route | null {
+export function findPath(from: Spot, to: Spot, cond: Conditions, net: Network = routeNetwork()): Path | null {
   const blocks = cond.closures.waysBlocked, closed = new Set(cond.closures.waysClosed);
   const na = nodeOfSpot(net, from, blocks), nb = nodeOfSpot(net, to, blocks);
   if (na < 0 || nb < 0) return null;
@@ -142,50 +166,88 @@ export function findRoute(from: Spot, to: Spot, cond: Conditions, net: Network =
   const relax = (v: number, t: number, r: Reached) => { if (t < best[v]!) { best[v] = t; how[v] = r; heap.push(t, v); } };
   best[START] = 0;
   heap.push(0, START);
-  let direct: Leg | null = null;
   while (heap.size) {
     const u = heap.pop(), t = heap.lastPriority;
     if (t > best[u]!) continue;
     if (u === END) break;
     const node = u === START ? na : net.portals[u]!.node;
     if (u === START && na === nb) {
-      direct = walkLeg(net, na, from, to, cond, false);
-      if (direct) relax(END, workTime(direct.work, cond.heel, cond.haste), { from: START, link: -1 });
+      const direct = walkLeg(net, na, from, to, blocks, false);
+      if (direct) relax(END, workTime(direct.work, cond.heel, cond.haste), { from: START, link: WALK_STEP });
     }
     const ends = net.portalsOf[node]!;
     if (u === START) {
-      for (const p of ends) relax(p, walkCost(net, node, from, p, cond), { from: u, link: -1 });
+      for (const p of ends) relax(p, walkCost(net, node, from, p, cond), { from: u, link: WALK_STEP });
       continue;
     }
     const here = net.portals[u]!, across = crossings(net, node, blocks), space = net.graph.nodes[node]!.space;
     for (const p of ends) {
-      if (p !== u) relax(p, t + walkSeconds(net, space, across[here.place * ends.length + net.portals[p]!.place]!, Math.min(here.ease, net.portals[p]!.ease), cond), { from: u, link: -1 });
+      if (p !== u) relax(p, t + walkSeconds(net, space, across[here.place * ends.length + net.portals[p]!.place]!, Math.min(here.ease, net.portals[p]!.ease), cond), { from: u, link: WALK_STEP });
     }
-    if (node === nb) relax(END, t + walkCost(net, node, to, u, cond), { from: u, link: -1 });
+    if (node === nb) relax(END, t + walkCost(net, node, to, u, cond), { from: u, link: WALK_STEP });
     for (const li of net.linksFrom[u]!) {
       const l = net.links[li]!;
       if (!closed.has(l.way)) relax(l.to, t + workTime(l.work, cond.heel, cond.haste), { from: u, link: li });
     }
   }
   if (!Number.isFinite(best[END]!)) return null;
-  // Back from the end: the vertices in order, then a leg for each step.
-  const chain: { v: number; r: Reached }[] = [];
-  for (let v = END; v !== START;) { const r = how[v]!; chain.push({ v, r }); v = r.from; }
-  chain.reverse();
+  // Back from the end: the vertices in order, each with the link taken to it.
+  const steps: number[] = [];
+  for (let v = END; v !== START;) { const r = how[v]!; steps.unshift(v === END ? END_STEP : v, r.link); v = r.from; }
+  const path = { from: { ...from }, to: { ...to }, steps, blocks: blocks.map((k) => ({ ...k })), serial: cond.closures.waysSerial };
+  const legs = buildLegs(path, net);
+  if (!legs) return null;
+  built.set(path, { from: path.from, to: path.to, legs, serial: path.serial });
+  return path;
+}
+
+/** A path's legs, or null where a floor it crosses no longer lets a body through (a path is only ever built as found, so never in play). */
+function buildLegs(path: Path, net: Network): Leg[] | null {
+  const { from, to, steps, blocks } = path, na = nodeOfSpot(net, from, blocks);
   const legs: Leg[] = [];
-  for (const { v, r } of chain) {
-    if (r.link >= 0) { legs.push(wayLeg(net, r.link)); continue; }
-    const a = r.from === START ? from : net.portals[r.from]!.spot, b = v === END ? to : net.portals[v]!.spot;
+  let prev = END_STEP;
+  for (let k = 0; k < steps.length; k += 2) {
+    const v = steps[k]!, link = steps[k + 1]!;
+    const atStart = k === 0;
+    if (link !== WALK_STEP) { legs.push(wayLeg(net, link)); prev = v; continue; }
+    const a = atStart ? from : net.portals[prev]!.spot, b = v === END_STEP ? to : net.portals[v]!.spot;
+    prev = v;
     if (a.space === b.space && a.along === b.along && a.across === b.across) continue;
-    const node = r.from === START ? na : net.portals[r.from]!.node;
-    const leg = r.from === START && v === END ? direct : walkLeg(net, node, a, b, cond, v === END);
+    const node = atStart ? na : net.portals[steps[k - 2]!]!.node;
+    const leg = walkLeg(net, node, a, b, blocks, v === END_STEP && !(atStart && v === END_STEP));
     if (!leg) return null;
     const last = legs[legs.length - 1];
     // Past a way's end without taking it: one walk on.
     if (last && last.way === null && leg.way === null && last.space === leg.space) legs[legs.length - 1] = joinWalks(last, leg);
     else if (leg.length > 0) legs.push(leg);
   }
-  return { from: { ...from }, to: { ...to }, legs, serial: cond.closures.waysSerial };
+  return legs;
+}
+
+/** The route a path comes to: built from the path alone (cached, not state), so every machine has the same legs. */
+export function routeOf(path: Path, net: Network = routeNetwork()): Route {
+  const known = built.get(path);
+  if (known) return known;
+  const text = JSON.stringify(path);
+  let route = byText.get(text);
+  if (!route) {
+    route = { from: path.from, to: path.to, legs: buildLegs(path, net) ?? [], serial: path.serial };
+    if (byText.size >= ROUTES_KEPT) byText.clear();
+    byText.set(text, route);
+  }
+  built.set(path, route);
+  return route;
+}
+
+/** The quickest route from one spot to another under the conditions, or null when no way is open between them (`findPath`, built). */
+export function findRoute(from: Spot, to: Spot, cond: Conditions, net: Network = routeNetwork()): Route | null {
+  const path = findPath(from, to, cond, net);
+  return path ? routeOf(path, net) : null;
+}
+
+/** The link a way's leg takes (its place in the network's links). */
+export function linkOf(leg: Leg, net: Network = routeNetwork()): number {
+  return net.links.findIndex((l) => l.way === leg.way && l.up === leg.up);
 }
 
 /** Two walks across one node, one after the other, as one. */

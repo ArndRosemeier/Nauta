@@ -1,0 +1,1 @@
+Behind the scenes: the crew's state is smaller, so two ships' crews at work fit what one player's machine sends the other.

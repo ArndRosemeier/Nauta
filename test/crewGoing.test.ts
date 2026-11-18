@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { decode, encode } from '../src/sim/codec.ts';
 import { closeWay, openShip, openWay, type Closures } from '../src/sim/crew/closures.ts';
-import { goingAt, startGoing, stepGoings, type Going, type Surroundings } from '../src/sim/crew/going.ts';
+import { goingAt, goingRoute, startGoing, stepGoings, type Going, type Surroundings } from '../src/sim/crew/going.ts';
 import { standable, routeNetwork } from '../src/sim/crew/network.ts';
 import { routeTime } from '../src/sim/crew/route.ts';
 import { WAY_GAP } from '../src/sim/rules/routes.ts';
@@ -39,7 +39,7 @@ test('a man alone takes his route\'s time, at a walk and smartly', () => {
   for (const haste of ['walk', 'smart'] as const) {
     const g = startGoing(station('wheel'), station('main-top'), haste, 0, calm.closures)!;
     const [took] = run([g], calm);
-    assert.ok(Math.abs(took! - routeTime(g.route, 0, haste)) <= STEP_SECONDS, `${took} s against ${routeTime(g.route, 0, haste)} s`);
+    assert.ok(Math.abs(took! - routeTime(goingRoute(g), 0, haste)) <= STEP_SECONDS, `${took} s against ${routeTime(goingRoute(g), 0, haste)} s`);
   }
 });
 
@@ -61,7 +61,7 @@ test('men queue at a ladder, one at a time and a gap apart, and a crowd takes lo
   const crowd = Array.from({ length: 12 }, (_, i) => startGoing({ space: 'messdeck', along: messdeck.along + 1 + (i % 4) * 0.5, across: messdeck.across + Math.floor(i / 4) * 0.5 }, station('waist'), 'smart', 0, calm.closures));
   const took = run(crowd, calm, (gs) => {
     // Never two on the fore ladder going up closer than WAY_GAP.
-    const on = gs.flatMap((g) => { const l = g?.route.legs[g.leg]; return g && l?.way === 'fore-ladder' ? [g.share * l.length] : []; }).sort((x, y) => x - y);
+    const on = gs.flatMap((g) => { const l = g ? goingRoute(g).legs[g.leg] : undefined; return g && l?.way === 'fore-ladder' ? [g.share * l.length] : []; }).sort((x, y) => x - y);
     for (let i = 1; i < on.length; i++) assert.ok(on[i]! - on[i - 1]! >= WAY_GAP - 1e-9, `${on[i]! - on[i - 1]!} m apart`);
   });
   assert.ok(took.every(Number.isFinite), 'all got there');
@@ -79,7 +79,7 @@ test('a man walking toward the captain stands aside, and goes on once he has pas
   const wheel = station('wheel'), capstan = station(QUARTERDECK);
   const g = startGoing(capstan, wheel, 'walk', 0, calm.closures)!;
   // The captain stands on the man's line two metres along, then walks off to the side after five seconds.
-  const line = g.route.legs[0]!.line, toward = { along: line[2]! - line[0]!, across: line[3]! - line[1]! }, len = Math.hypot(toward.along, toward.across);
+  const line = goingRoute(g).legs[0]!.line, toward = { along: line[2]! - line[0]!, across: line[3]! - line[1]! }, len = Math.hypot(toward.along, toward.across);
   const captainAt: Spot = { space: 'deck', along: capstan.along + toward.along / len * 2, across: capstan.across + toward.across / len * 2 };
   const gone: Spot = { space: 'deck', along: captainAt.along, across: captainAt.across - 3 };
   let asideSeen = false;
@@ -93,16 +93,16 @@ test('a man walking toward the captain stands aside, and goes on once he has pas
     }
   });
   assert.ok(asideSeen, 'he stood aside');
-  assert.ok(took[0]! > 5 && took[0]! < 5 + routeTime(g.route, 0, 'walk'), `${took[0]} s`);
+  assert.ok(took[0]! > 5 && took[0]! < 5 + routeTime(goingRoute(g), 0, 'walk'), `${took[0]} s`);
 });
 
 test('a ladder shut ahead of a man sends him round; one shut under him he climbs to its end; a shut door leaves him waiting until it opens', () => {
   let closures: Closures = openShip();
   const g = startGoing(messdeck, station('waist'), 'walk', 0, closures)!;
-  assert.ok(g.route.legs.some((l) => l.way === 'fore-ladder'));
+  assert.ok(goingRoute(g).legs.some((l) => l.way === 'fore-ladder'));
   const ways = new Set<string>();
   const took = run([g], (t) => { if (t > 1 && !closures.waysClosed.length) closures = closeWay(closures, 'fore-ladder'); return { ...calm, closures }; }, (gs) => {
-    const l = gs[0]?.route.legs[gs[0].leg];
+    const l = (gs[0] ? goingRoute(gs[0]).legs[gs[0].leg] : undefined);
     if (l?.way) ways.add(l.way);
   });
   assert.ok(Number.isFinite(took[0]) && !ways.has('fore-ladder') && ways.has('after-ladder'), [...ways].join(' '));
@@ -111,7 +111,7 @@ test('a ladder shut ahead of a man sends him round; one shut under him he climbs
   const up = startGoing({ space: 'messdeck', along: 10, across: 0.5 }, station('waist'), 'walk', 0, onIt)!;
   const seen = new Set<string>();
   run([up], () => ({ ...calm, closures: onIt }), (gs) => {
-    const l = gs[0]?.route.legs[gs[0].leg];
+    const l = (gs[0] ? goingRoute(gs[0]).legs[gs[0].leg] : undefined);
     if (l?.way === 'fore-ladder' && !onIt.waysClosed.length) onIt = closeWay(onIt, 'fore-ladder');
     if (l?.way) seen.add(l.way);
   });

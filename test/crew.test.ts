@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { encode } from '../src/sim/codec.ts';
 import { openShip } from '../src/sim/crew/closures.ts';
 import { startCrew, stepCrew, taskOf, type Crew, type CrewEvent, type Task } from '../src/sim/crew/crew.ts';
+import { jobWork } from '../src/sim/crew/drill.ts';
 import { brigRoster, crewPlaces, type Man } from '../src/sim/crew/roster.ts';
 import { carryOut, giveOrder, startOrders, type Order, type ShipOrders } from '../src/sim/orders.ts';
 import { COMPLEMENT, FEWEST, GANGS, JOBS, ROSTER, type Part } from '../src/sim/rules/crew.ts';
@@ -111,9 +112,9 @@ test('each order done by a full crew takes the time in the table once its men ar
     assert.deepEqual(r.events, [], `${order.kind}: no job short-handed`);
     for (const { task, began, ended } of r.tasks.values()) {
       assert.ok(began !== null && ended !== null, `${order.kind}: ${task.job} began and ended`);
-      assert.ok(skillOf(task, brigRoster()) >= task.need, `${order.kind}: ${task.job} has all its hands`);
-      const seconds = (ended - began) * STEP_SECONDS;
-      assert.ok(Math.abs(seconds - task.work) <= STEP_SECONDS + 1e-9, `${order.kind}: ${task.job} worked ${seconds.toFixed(2)} s, the table says ${task.work} s`);
+      assert.ok(skillOf(task, brigRoster()) >= jobWork(task.job, task.on).need, `${order.kind}: ${task.job} has all its hands`);
+      const seconds = (ended - began) * STEP_SECONDS, table = jobWork(task.job, task.on).work;
+      assert.ok(Math.abs(seconds - table) <= STEP_SECONDS + 1e-9, `${order.kind}: ${task.job} worked ${seconds.toFixed(2)} s, the table says ${table} s`);
     }
   }
 });
@@ -144,7 +145,7 @@ test('two orders at once share the men: the later job waits for hands or starts 
   assert.ok(both.told.backed.every(Boolean) && both.sailing.backed.every(Boolean), 'both masts aback');
   const tasks = [...both.tasks.values()].sort((a, b) => a.task.id - b.task.id);
   assert.equal(tasks.length, 2);
-  assert.ok(skillOf(tasks[0]!.task, roster) >= tasks[0]!.task.need, 'the first order given is manned in full');
+  assert.ok(skillOf(tasks[0]!.task, roster) >= jobWork(tasks[0]!.task.job, tasks[0]!.task.on).need, 'the first order given is manned in full');
   assert.ok(both.events.some((e) => e.kind === 'short-handed'), 'the second starts short-handed');
   assert.ok(tasks[1]!.ended! > alone, `the main yards are round later than alone: ${(tasks[1]!.ended! * STEP_SECONDS).toFixed(1)} s against ${(alone * STEP_SECONDS).toFixed(1)} s`);
   // Freed by the first, men join the second while it works.

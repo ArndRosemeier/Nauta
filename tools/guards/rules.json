@@ -146,12 +146,12 @@
     {
       "field": "going",
       "owner": "src/sim/crew/going.ts",
-      "what": "a man on his way: his route, how far along it, his haste, standing aside, held up or stuck (N4.2; its own fields are going.ts's)"
+      "what": "a man on his way: what his route is built from, how far along it, his haste, standing aside, held up or stuck (N4.2; its own fields are going.ts's)"
     },
     {
-      "field": "route",
+      "field": "path",
       "owner": "src/sim/crew/going.ts",
-      "what": "the route a man on his way follows (N4.2)"
+      "what": "what the route of a man on his way is built from: its two ends, its links, what was shut (N4.2; the route itself is found again, not kept)"
     },
     {
       "field": "leg",
