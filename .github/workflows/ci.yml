@@ -99,6 +99,8 @@ jobs:
           GAMEHUB_URL: https://games.futuremagic.de
           GAMEHUB_KEY: ${{ vars.GAMEHUB_KEY }}
         run: node tools/guards/budget.mjs 120 180 -- npm run check:room
+      - name: The ship and the water together, under way (N2.5)
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:ship
       - uses: actions/upload-artifact@v4
         if: always()
         with:

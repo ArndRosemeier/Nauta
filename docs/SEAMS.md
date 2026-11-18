@@ -198,6 +198,21 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her half-breadth and deck height in a shader | `src/render/ship/hullNode.ts#hullAt` |
 | No water drawn inside her hull | `src/render/seaCut.ts#seaCut` |
 | The ship drawn and riding the sea, the eye carried with her, the zones seen, the far ship crossfaded, her doors swung, her yards braced and hoisted and her boom and gaff swung (`setBrace`, `setHoist`; N3.3 drives them) | `src/render/ship/shipView.ts#ShipView` |
+| A ship's water kept for her wake and spray, however she is laid: her track, her way, the churn at her side (`water`, `bow`) | `src/render/ship/shipView.ts#ShipView` |
+| Kelvin's pattern of a moving source on deep water (stationary phase, held at the cusp; the GPU's sums mirror it) | `src/render/wake.ts#kelvinAt` |
+| A speed's g/U² (the wake's wavenumber) and U²/2g (the height her waves scale with) | `src/render/wake.ts#kelvinWavenumber` |
+| The wake's tuning: her waves, bow wave, foam, strip and slick | `src/render/wake.ts#WAKE` |
+| Where she has been: her track, a point a second, with her speed and churn (what the wake is laid along) | `src/render/wake.ts#Track` |
+| The water against her side: churn at stations along her waterline, the wet line draining down, slams at her bow | `src/render/wake.ts#ChurnWatch` |
+| A ship's wake on the GPU: Kelvin waves along her track, the bow wave and her body's hollow, foam, the slick (two levels around her) | `src/render/wakeMap.ts#WakeMap` |
+| The one seam a ship's water comes into the sea's shader through: her waves' height (vertex stage) | `src/render/wakeMap.ts#wakeHeight` |
+| ...and per pixel their slope, her foam and her slick | `src/render/wakeMap.ts#wakeSurface` |
+| Handing the sea the wake map | `src/render/seaMaterial.ts#useWake` |
+| Her side wet where the sea has climbed it, draining down in streaks (her timber's and copper's shaders) | `src/render/wakeMap.ts#wetHull` |
+| The light a matte, level surface sends back (the sea's body, the deep, spray) | `src/render/seaMaterial.ts#daylight` |
+| Spray thrown from her bow when she slams and at speed: drops flown on the GPU | `src/render/spray.ts#SprayView` |
+| The spray's shader | `src/render/spray.ts#makeSprayMaterial` |
+| The ship-and-water check's pictures (sailed by a match: rail, bowsprit, astern, 50 m off, above, berth deck) | `tools/shot/ship.mjs#shipShots` |
 | The sun's shadow map round her | `src/render/ship/shipView.ts#shadowingSun` |
 | Every knob that trades looks for frame time, by quality level (a package that costs frame time adds its knob here) | `src/app/quality.ts#QUALITY_LEVELS` |
 | Choosing the quality level from measured frame time in the first seconds (`?quality=` fixes one) | `src/app/quality.ts#QualityChooser` |

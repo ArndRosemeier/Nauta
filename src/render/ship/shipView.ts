@@ -3,14 +3,20 @@
  * (sim/ship/motion.ts, stepped at the simulation's fixed rate and drawn between steps); each frame only the zones that can be seen are drawn (visibility.ts); the eye carried
  * with her; her own sun's shadow map fitted round her and turned with her; the light below deck handed to her
  * shaders; her doors on their hinges; and the far ship, a coarse outside crossfaded in by distance so it never pops.
+ *
+ * However she is laid (floating on her own, or sailed by a match), she keeps her track and watches the water at her
+ * side (render/wake.ts, plan N2.5) for the sea's wake map and the spray from her bow.
  */
 import {
   Color, Euler, Group, Matrix4, Mesh, Quaternion, Vector2, Vector3, Vector4, type DirectionalLight, type Material, type Object3D, type PerspectiveCamera,
 } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import type { SeaState } from '../../sim/sea/sea';
-import { lyingStill, poseBetween, shipOrigin, startMotion, stepMotion, type ShipMotion, type ShipPose } from '../../sim/ship/motion';
+import { lyingStill, poseBetween, shipOrigin, startMotion, stepMotion, toWorld, type ShipMotion, type ShipPose } from '../../sim/ship/motion';
 import { STEP_SECONDS } from '../../sim/units';
+import { ChurnWatch, STEM_Z, Track, type Slam, type WakeSource } from '../wake';
+import type { SprayBow } from '../spray';
+import type { ShipWater } from '../seaView';
 import { shipPlan } from '../../sim/ship/plan';
 import { LOAD_WATERLINE } from '../../sim/rules/ships';
 import type { Look } from '../../app/look';
@@ -86,6 +92,9 @@ interface Part {
   readonly fading: Material | null;
 }
 
+/** Her way through the water, m/s: ahead and to starboard (her leeway). */
+export type ShipWay = Pick<WakeSource, 'ahead' | 'leeway'>;
+
 export class ShipView {
   /** Her meshes in ship space; it goes in through `stage.add`. */
   readonly group = new Group();
@@ -98,6 +107,11 @@ export class ShipView {
   poseFrom: ((t: number) => ShipPose) | null = null;
   private motion: ShipMotion = startMotion(AT.x, AT.z, AT.heading);
   private previous: ShipMotion = this.motion;
+  /** Where she has been, and the water at her side (render/wake.ts), for her wake. */
+  private readonly track = new Track();
+  private readonly churn = new ChurnWatch();
+  /** Slams at her bow since the last frame (for the spray). */
+  readonly slams: Slam[] = [];
   /** The shared clock's time of her last step (NaN until the first frame). */
   private stepped = Number.NaN;
   private readonly origin: [number, number, number] = [0, 0, 0];
@@ -325,6 +339,9 @@ export class ShipView {
     this.time += dt;
     this.float(sea, t);
     this.moveSwings();
+    // The water at her side, whoever lays her (plan N2.5): its churn, her wet line, slams at her bow.
+    this.slams.length = 0;
+    this.churn.keepUp(this.drawn, sea, t, this.slams);
     const g = this.group;
     g.position.set(...shipOrigin(this.drawn, this.origin));
     // Pitch: bow up turns her about +x the other way (bow is -z); roll to starboard turns her about -z the other way.
@@ -392,6 +409,22 @@ export class ShipView {
       this.stepped += STEP_SECONDS;
     }
     this.drawn = poseBetween(this.previous.pose, this.motion.pose, (t - this.stepped) / STEP_SECONDS);
+  }
+
+  /** What her wake needs of her now (seaView.ts `ShipWater`), with her `way` through the water: her track, her pose, the water at her side. */
+  water(way: ShipWay): ShipWater {
+    const c = this.churn.churnNow();
+    return { track: this.track, source: { pose: this.drawn, ahead: way.ahead, leeway: way.leeway, bowChurn: c.bow, sideChurn: c.side }, churn: this.churn.lists };
+  }
+
+  /** Her bow as the spray needs it (spray.ts `SprayBow`), with her `way`: her stem at the waterline, her heading, her velocity. */
+  bow(way: ShipWay): SprayBow {
+    const p = this.drawn, fx = Math.sin(p.heading), fz = -Math.cos(p.heading);
+    return {
+      stem: toWorld(p, 0, 0, STEM_Z), fx, fz,
+      // Ahead along her heading, her leeway to starboard of it (starboard is (−fz, fx)).
+      vx: way.ahead * fx - way.leeway * fz, vz: way.ahead * fz + way.leeway * fx, speed: Math.hypot(way.ahead, way.leeway),
+    };
   }
 
   /** Near her the whole of her is drawn; over the fade's span the far ship is dithered in as she is dithered out. */

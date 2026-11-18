@@ -9,6 +9,7 @@ import { Kinds, type Kind } from '@futuremagic/stage';
 import { SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, makeDeepMaterial, makeSeaMaterial } from './seaMaterial';
 import { SOLID_ATTRIBUTES, SOLID_STRIDES } from './ship/solid';
 import { ROPE_ATTRIBUTES, ROPE_STRIDES } from './ship/rope';
+import { DROP_ATTRIBUTE, DROP_STRIDE, FLING_ATTRIBUTE, makeSprayMaterial } from './spray';
 import { makeCopperMaterial, makeGlowMaterial, makeIronMaterial, makeRopeMaterial, makeWoodMaterial } from './ship/shipMaterials';
 import { fitted } from './ship/fitted';
 
@@ -23,7 +24,9 @@ const NO_SHADOW = { cast: false, receive: false };
 export const defineKind = kinds.define.bind(kinds);
 
 /** Numbers per vertex of the game's own attributes. */
-const STRIDES: Readonly<Record<string, number>> = { [SEA_TILE_ATTRIBUTE]: SEA_TILE_STRIDE, ...SOLID_STRIDES, ...ROPE_STRIDES };
+const STRIDES: Readonly<Record<string, number>> = {
+  [SEA_TILE_ATTRIBUTE]: SEA_TILE_STRIDE, [DROP_ATTRIBUTE]: DROP_STRIDE, [FLING_ATTRIBUTE]: DROP_STRIDE, ...SOLID_STRIDES, ...ROPE_STRIDES,
+};
 
 /** Sets an attribute of the game's own kinds on the Stage's stand-in of 3 vertices (StageOptions.attribute). */
 export function standInAttribute(g: BufferGeometry, name: string): boolean {
@@ -51,6 +54,8 @@ export const TEST_BODY = defineKind('test body', ['position', 'normal', 'color']
  * drawn many at once, which three builds another shader for, so the warm-up builds the sea's own mesh too (main.ts).
  */
 export const SEA = defineKind('sea', ['position', SEA_TILE_ATTRIBUTE], makeSeaMaterial, NO_SHADOW);
+/** Spray thrown from her bow (spray.ts): quads facing the eye, flown in the vertex stage; drawn as one instanced mesh, which the warm-up builds too (main.ts). */
+export const SPRAY = defineKind('spray', ['position', DROP_ATTRIBUTE, FLING_ATTRIBUTE], makeSprayMaterial, NO_SHADOW);
 /** The deep around an eye under water (seaView.ts): a sphere about the eye in the murk's colour. */
 export const DEEP = defineKind('deep water', ['position', 'normal', 'uv'], makeDeepMaterial, NO_SHADOW);
 

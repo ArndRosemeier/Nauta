@@ -18,6 +18,7 @@ import { DECK_PLANK_LENGTH } from '../../sim/rules/ships';
 import { GRAIN_SPAN, makeGrainTexture } from './grain';
 import { DAMAGE_MAP_SIZE, DAMAGE_REGIONS, DAMAGE_TEXEL } from './damageMap';
 import { MOST_FRAMES } from './swings';
+import { wetHull } from '../wakeMap';
 
 /** How many lanterns and sky openings her shaders can hold. */
 export const MOST_LAMPS = 40;
@@ -227,8 +228,11 @@ export function makeWoodMaterial(crossfade = false): MeshStandardNodeMaterial {
   const fade = float(1).sub(smoothstep(0, SEAMS_FADE, wAcross.div(max(plank, NO_PLANKS))));
   const seam = max(seamA, seamB).mul(planked).mul(fade);
   const seamColour = mix(vec3(...PITCH), surface.mul(SEAM_UNDER_PAINT), cover);
-  m.colorNode = scorched(mix(surface, seamColour, seam), gr, sh.z);
-  m.roughnessNode = mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover)));
+  // Her outside wet where the sea has climbed it (wakeMap.ts `wetHull`); inside, dry.
+  const wet = wetHull(positionLocal, scorched(mix(surface, seamColour, seam), gr, sh.z), mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))));
+  const outside = float(1).sub(step(0, SHIP_OBJECT.light.w));
+  m.colorNode = mix(scorched(mix(surface, seamColour, seam), gr, sh.z), wet.colour, outside);
+  m.roughnessNode = mix(mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), wet.rough, outside);
   m.metalnessNode = float(0);
   const light = belowDeck(ao);
   m.aoNode = light.sky;
@@ -289,9 +293,10 @@ export function makeCopperMaterial(crossfade = false): MeshStandardNodeMaterial 
   const tarnish = clamp(g.w.mul(TARNISH).add(sheet.mul(1 - TARNISH)), 0, 1);
   const green = smoothstep(GREEN_FROM, GREEN_FROM + GREEN_SOFT, g.z);
   const metal = mix(fin.rgb, vec3(...COPPER_BROWN), tarnish);
-  m.colorNode = mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail));
+  const wet = wetHull(positionLocal, mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail)), mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2)));
+  m.colorNode = wet.colour;
   m.metalnessNode = float(1).sub(green);
-  m.roughnessNode = mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2));
+  m.roughnessNode = wet.rough;
   if (crossfade) m.maskNode = fading();
   return m;
 }
