@@ -198,7 +198,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her rooms: floors, ceiling, bulkheads, doors, ladders, lanterns | `src/render/ship/rooms.ts#buildRooms` |
 | Her damage map's layout (N6.5 writes into it) | `src/render/ship/damageMap.ts#DAMAGE_REGIONS` |
 | Where a point of a damaged surface lies in the damage map | `src/render/ship/damageMap.ts#damageTexel` |
-| The marks a ship's damage leaves on her damage map: holes inside and out, panels stove in, bulwarks and rails smashed out (N6.5) | `src/render/ship/damageMarks.ts#HullMarks` |
+| The marks a ship's damage leaves on her damage map: holes inside and out, panels stove in, bulwarks and rails smashed out, decks charred by her fires (N6.5) | `src/render/ship/damageMarks.ts#HullMarks` |
 | The holes and splits a ship's damage leaves in her sails' hole map (N6.5) | `src/render/ship/damageMarks.ts#SailMarks` |
 | One ship's damage written into her blocks of the damage maps, and whether she must draw holed | `src/render/ship/damageView.ts#DamageView` |
 | A ship's damage drawn as the match has it, her outside and sails holed once cut (N6.5) | `src/render/ship/shipView.ts#ShipView` |
@@ -312,6 +312,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The ring on a carronade's cascabel her breeching is rove through | `src/render/ship/gunPlaces.ts#cascabelRing` |
 | Gunfire drawn: muzzle flashes and first puffs, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
 | Powder smoke: poured from the ports as guns fire, drifting with the wind, swelling and thinning, lit by the day and the flashes (N5.5) | `src/render/smoke.ts#SmokeView` |
+| Fire drawn: each fire's flames on its floor and out of its vent, its black smoke, poured into the smoke's fire rings, seeded (N6.5) | `src/render/fireView.ts#FireView` |
+| Where a fire in a space of the plan is seen: its floor, its reach, the weather-deck opening it vents by | `src/render/fireView.ts#fireSeat` |
+| A fire's puff (soot or flame) put into the smoke's rings, apart from the guns' (N6.5) | `src/render/smoke.ts#SmokeView` (pourPuff) |
 | How many puffs of smoke a gun pours at a quality level, and how dense each is, so the smoke hides as much at every level | `src/render/smoke.ts#puffsPoured` |
 | Smoke drawn at half resolution behind `?smoke=half`: the scene's multisampled depth halved, the smoke drawn against it and blended over the frame by depth (N5.5 trial) | `src/render/halfSmoke.ts#HalfSmoke` |
 | Balls falling in the sea: a column of spray and white water in the nearest ship's wake map | `src/render/gunfire.ts#fallInSea` |

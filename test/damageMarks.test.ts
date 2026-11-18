@@ -8,7 +8,7 @@ import { designWaterline, sheer } from '../src/sim/ship/hull.ts';
 import { shipPlan, type Cell } from '../src/sim/ship/plan.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { shipZ } from '../src/sim/ship/section.ts';
-import { DAMAGE_MAP_SIZE, SIDE_REGIONS, damageTexel } from '../src/render/ship/damageMap.ts';
+import { DAMAGE, DAMAGE_MAP_SIZE, SIDE_REGIONS, damageTexel } from '../src/render/ship/damageMap.ts';
 import { HOLE_DARK, HOLE_LIGHT, HULL_BLOCK_ROWS, HullMarks, MARK, SailMarks, type MapBlock } from '../src/render/ship/damageMarks.ts';
 
 const W = DAMAGE_MAP_SIZE.width;
@@ -67,4 +67,22 @@ test('her sails: each hole cut where the seed puts it, a split from head to foot
   for (let y = rects[1]!.y; y < rects[1]!.y + rects[1]!.height; y++) one += cutIn(rects[1]!, y);
   assert.ok(one > 4 && one < 600, `${one} texels cut`);
   for (let y = rects[2]!.y; y < rects[2]!.y + rects[2]!.height; y++) assert.equal(cutIn(rects[2]!, y), 0);
+});
+
+test('a fire chars the deck it burns on and the one over it, from its middle out as it grows; the char stays when it is out', () => {
+  const b = block(), marks = new HullMarks(b), space = shipPlan().spaces.findIndex((s) => s.id === 'messdeck'), s = shipPlan().spaces[space]!;
+  const mid = shipZ((s.aft + s.fore) / 2), across = (s.port + s.starboard) / 2, nearEnd = shipZ(s.fore - (s.fore - s.aft) / 8);
+  const fire = (size: number) => ({ ...startDamage(), fires: [{ space, size }] });
+  assert.equal(marks.bringUpTo(fire(0.2)), true);
+  assert.equal(at(b, DAMAGE.berthDeck, mid, across, MARK.scorch), 255);
+  assert.equal(at(b, DAMAGE.weatherDeck, mid, across, MARK.scorch), 255, 'the deck over it, from below');
+  assert.equal(at(b, DAMAGE.berthDeck, nearEnd, across, MARK.scorch), 0, 'not yet to its ends');
+  marks.bringUpTo(fire(1));
+  assert.ok(at(b, DAMAGE.berthDeck, nearEnd, across, MARK.scorch) > 0, 'grown to its ends');
+  assert.equal(at(b, DAMAGE.berthDeck, shipZ(s.fore + 2), across, MARK.scorch), 0, 'none past them');
+  // Put out, and a hole plugged (her block drawn again): the char is still there.
+  const code = holeCode(plank.id, ...middle(plank), 'round', 'carronade', false);
+  marks.bringUpTo({ ...startDamage(), holes: [code] });
+  marks.bringUpTo({ ...startDamage(), holes: [code], plugged: [code] });
+  assert.equal(at(b, DAMAGE.berthDeck, mid, across, MARK.scorch), 255);
 });

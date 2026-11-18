@@ -1,6 +1,6 @@
 /**
  * A stand-in for a fight's damage (`?scars=3`, plan N6.5): her timber and canvas shot about, seeded, as a broadside or
- * two at close range would leave her, a spar gone over the side, so the damage drawn can be looked at without fighting a match first. It is made
+ * two at close range would leave her, a spar gone over the side and a fire, so the damage drawn can be looked at without fighting a match first. It is made
  * as the simulation keeps damage (damage.ts `holeCode`, `startDamage`) and only drawn: no match ever holds it.
  */
 import { Rng, deriveSeed } from '@futuremagic/core';
@@ -21,6 +21,8 @@ const SAIL_HOLES = 5;
 const SPLIT_HOLES = 30;
 /** The spar each ship has lost over her starboard side, still lying alongside: her own the fore topmast, the other's her mainmast. */
 const LOST = ['fore-topmast', 'main-mast'] as const;
+/** A fire in each: hers in the messdeck holding most of it (flames out at the fore hatch), the other's young in her cabin. */
+const BURNING = [['messdeck', 0.6], ['cabin', 0.25]] as const;
 /** One hole in this many lodged. */
 const LODGED_ONE_IN = 5;
 /** The balls the holes are made by, in turn. */
@@ -50,5 +52,7 @@ export function scarsOf(seed: number, ship: number): Damage {
   const rent = sails.map((_, i) => (i === split ? SPLIT_HOLES : Math.floor(rng.float() * (SAIL_HOLES + 1))));
   // Broken where a spar pulled over breaks, lying alongside on her starboard side (part × 2 + 1, damage.ts `alongside`).
   const part = sparParts().findIndex((p) => p.spar === LOST[ship % LOST.length]) + FALLS_AT_PART;
-  return { ...startDamage(), holes: [...new Set(holes)].sort((a, b) => a - b), rent, fallen: [part], alongside: [part * 2 + 1] };
+  const [space, size] = BURNING[ship % BURNING.length]!;
+  const fires = [{ space: shipPlan().spaces.findIndex((s) => s.id === space), size }];
+  return { ...startDamage(), holes: [...new Set(holes)].sort((a, b) => a - b), rent, fallen: [part], alongside: [part * 2 + 1], fires };
 }

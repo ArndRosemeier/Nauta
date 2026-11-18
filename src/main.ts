@@ -58,6 +58,7 @@ import { lightThrough } from './render/ship/shipMaterials';
 import { scarsOf } from './app/scars';
 import { GunfireView, fallInSea } from './render/gunfire';
 import { SmokeView, useSmokeDepth } from './render/smoke';
+import { FireView } from './render/fireView';
 import { HalfSmoke } from './render/halfSmoke';
 import { gunsSeen } from './app/gunsSeen';
 import { ShotsSeen, type Flash, type Strike } from './app/shotsSeen';
@@ -271,6 +272,8 @@ async function start(): Promise<void> {
   const fireDrawn = match ? new GunfireView(GUNFIRE.make(), SHOT_IN_FLIGHT.make()) : null;
   // Powder smoke (N5.5): poured from the ports as the guns fire, drifting with the wind.
   const smoke = match ? new SmokeView(SMOKE.make()) : null;
+  // Fire (N6.5): flames and soot where she burns, poured into the smoke's ring.
+  const burning = smoke ? new FireView(smoke) : null;
   const shots = match ? new ShotsSeen() : null;
   if (match && shots) match.on('events', (events) => shots.take(events));
   if (match && crew) match.on('events', (events) => crew.onEvents(events));
@@ -660,6 +663,12 @@ async function start(): Promise<void> {
       const bow = ship.bow(way);
       const from = [{ slams: ship.slams, bow }, ...(other && herWater ? [{ slams: other.slams, bow: other.bow(herWay) }] : [])];
       spray.show(from, windAt(wind, bow.stem[0], bow.stem[2], seaTime, gust), seaTime, dt, seaView.origin);
+    }
+    // Fire (N6.5): her fires' flames and soot, poured before the smoke is shown so they are drawn this frame.
+    if (match && burning) {
+      const mine = scarred?.[0] ?? match.state.ships[match.ship]?.damage, hers = scarred?.[1] ?? (match.other >= 0 ? match.state.ships[match.other]?.damage : undefined);
+      if (ship && mine) burning.burn(0, mine.fires, ship.drawn, seaTime);
+      if (other && hers) burning.burn(1, hers.fires, other.drawn, seaTime);
     }
     // Gunfire (N5.4a): flashes and first puffs at the muzzles, the balls in flight, splashes where they fall (spray
     // and white water on the sea), splinters where they strike.
