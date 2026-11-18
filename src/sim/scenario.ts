@@ -148,20 +148,14 @@ export const placesOf = (sc: Scenario): (Placed | null)[] => sc.ships.map((s) =>
 
 // ---- what runs ----
 
-/** Why a scenario cannot be started yet: forever (`one side`: nobody to fight), or only while a stage is unbuilt. */
-export type Limit = 'one side' | 'too close' | 'more ships' | 'same navy' | 'host ship';
+/** Why a scenario cannot be started: no one to fight (`one side`), two ships put too close, or a room with no ship of the host's. */
+export type Limit = 'one side' | 'too close' | 'host ship';
 
-/**
- * Why the simulation and the page cannot run this scenario yet, or null when they can. Stage 1 of the scenarios runs
- * what the duel runs: two ships of two sides in the two navies, you or a computer on each, or a player's seat for a
- * room; every later stage lifts one of these (docs/design/scenarios.md).
- */
+/** Why the simulation and the page cannot run this scenario, or null when they can (every scenario of two to eight ships on two sides or more runs; docs/design/scenarios.md). */
 export function limitOf(sc: Scenario): Limit | null {
   if (sidesIn(sc).length < 2) return 'one side';
   const at = sc.ships.map((s) => s.at);
   for (let i = 0; i < at.length; i++) for (let j = i + 1; j < at.length; j++) if (at[i] && at[j] && apartOnWater(at[i]!, at[j]!) < LEAST_APART) return 'too close';
-  if (sc.ships.length > LEAST_SHIPS) return 'more ships';
-  if (navyOfShip(sc, 0) === navyOfShip(sc, 1)) return 'same navy';
   if (playerShips(sc).length > 0 && youShip(sc) < 0) return 'host ship';
   return null;
 }

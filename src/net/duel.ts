@@ -32,7 +32,7 @@
 import { deriveSeed, hashString } from '@futuremagic/core';
 import type { GameHub, RoomSummary } from '../../vendor/gamehub/gamehub';
 import { captainOrders, crewedBy } from '../sim/captain/captain';
-import { sidesOfShips, skillsOf, type Scenario } from '../sim/scenario';
+import { navyOfShip, sidesOfShips, skillsOf, type Navy, type Scenario } from '../sim/scenario';
 import type { Order } from '../sim/orders';
 import type { Skill } from '../sim/rules/captain';
 import { poseBetween, type ShipPose } from '../sim/ship/motion';
@@ -243,6 +243,11 @@ export class DuelSession {
   /** Whether this is a match watched: no ship is mine, every ship is commanded by a computer captain. */
   get watched(): boolean {
     return this.skills.length > 0 && this.skills.every((k) => k !== null);
+  }
+
+  /** The navy that dresses ship `i` by the scenario the match runs; null: no scenario (a duel: the first ship's navy and the other). */
+  navyOf(i: number): Navy | null {
+    return this.scenario ? navyOfShip(this.scenario, i) : null;
   }
 
   /** How many ships a person commands: the seats of a room (a duel without a scenario has two). */

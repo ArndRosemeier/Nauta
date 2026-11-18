@@ -47,6 +47,7 @@
     "shot:men": "node tools/shot/men.mjs",
     "shot:watch": "node tools/shot/watch.mjs",
     "shot:fleet": "node tools/shot/fleet.mjs",
+    "shot:fleet-play": "node tools/shot/fleetPlay.mjs",
     "shot:scenario": "node tools/shot/scenario.mjs"
   },
   "dependencies": {

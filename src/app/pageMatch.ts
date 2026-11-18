@@ -15,6 +15,7 @@ import { MS_PER_SECOND } from '../sim/units';
 import type { Skill } from '../sim/rules/captain';
 import { DuelSession, type Drawn } from '../net/duel';
 import { navyOf, type Navy } from './crewLooks';
+import { foeOf } from '../sim/foes';
 import type { OrderSession } from './orderReport';
 import { sailsSeen } from './sailsSeen';
 
@@ -56,21 +57,22 @@ export class PageMatch implements OrderSession {
 
   /** My ship's navy, and hers: the coats and flags drawn, the words her men use. */
   get navy(): Navy {
-    return navyOf(this.ship, this.first);
+    return this.navyAt(this.ship);
   }
 
-  /** The navy ship `ship` of the match wears (the first ship's is the session's `first`; the others the opposite, until the scenario names them). */
+  /** The navy ship `ship` of the match wears: the scenario's, or in a duel the first ship's (the session's `first`) and the opposite. */
   navyAt(ship: number): Navy {
-    return navyOf(ship, this.first);
+    return this.current.navyOf(ship) ?? navyOf(ship, this.first);
   }
 
+  /** Her navy, the ship I fight. */
   get herNavy(): Navy {
-    return navyOf(1 - this.ship, this.first);
+    return this.navyAt(Math.max(0, this.other));
   }
 
-  /** The other ship, or -1 when the match has only mine. */
+  /** The ship I fight: the nearest enemy of another side, or -1 when the match has none. */
   get other(): number {
-    return this.state.ships.length > 1 ? 1 - this.ship : -1;
+    return foeOf(this.state.ships, this.ship) ?? -1;
   }
 
   get state(): SimState {

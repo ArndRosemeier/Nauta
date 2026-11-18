@@ -4,7 +4,8 @@
  * steps' events as this machine makes them), men out of the fight and spars brought down (read from her damage). Pure.
  */
 import { outOf } from '../sim/damage';
-import { winner, type LostHow } from '../sim/end';
+import { winningSide, type LostHow } from '../sim/end';
+import { foeOf } from '../sim/foes';
 import type { SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
 import { STEPS_PER_SECOND } from '../sim/units';
@@ -64,9 +65,11 @@ export class Tally {
 export function endCard(state: SimState, mine: number, tally: Tally): EndCard | null {
   const end = state.fight.end;
   if (!end) return null;
-  const won = winner(state.fight), hers = 1 - mine;
-  const ending: Ending = won === null ? { who: 'none', apart: end.apart && end.lost.every((l) => l === null) } : won === mine ? { who: 'she', how: end.lost[hers]! } : { who: 'me', how: end.lost[mine]! };
-  const order = state.ships.length > 1 ? [mine, hers] : [mine];
+  const won = winningSide(state.fight, state.ships), mySide = state.ships[mine]?.side;
+  // The ship I fought: a lost ship of another side (the one I took), else the nearest of them.
+  const others = state.ships.flatMap((s, i) => (s.side !== mySide ? [i] : [])), hers = others.find((i) => end.lost[i] !== null) ?? foeOf(state.ships, mine) ?? -1;
+  const ending: Ending = won === null ? { who: 'none', apart: end.apart && end.lost.every((l) => l === null) } : won === mySide ? { who: 'she', how: end.lost[hers] ?? 'sunk' } : { who: 'me', how: end.lost[mine] ?? 'sunk' };
+  const order = hers >= 0 ? [mine, hers] : [mine];
   const ships = order.map((i) => {
     const d = state.ships[i]!.damage;
     return { ...tally.of(i), men: outOf(d).size, spars: d.fallen.length };

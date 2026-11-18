@@ -8,7 +8,7 @@ import { DuelSession } from '../src/net/duel.ts';
 import { PageMatch } from '../src/app/pageMatch.ts';
 import { readParams } from '../src/app/params.ts';
 import { lookDir } from '../src/app/look.ts';
-import { ABOVE_WATER, BOOST, CEILING, flightSpeed, FreeCam, lookToward, SPEED_LEAST, SPEED_MOST, vantageOf, vantageOfBoth, vantageOver, type Flying } from '../src/app/freeCam.ts';
+import { ABOVE_WATER, BOOST, CEILING, camps, flightSpeed, foeHull, FreeCam, lookToward, SPEED_LEAST, SPEED_MOST, vantageOf, vantageOfAll, vantageOfBoth, vantageOver, type Flying } from '../src/app/freeCam.ts';
 import { SKILL } from '../src/sim/rules/captain.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 
@@ -165,4 +165,15 @@ test('the opening shot stands close behind the first ship, with her and the far 
     // Each within 40° of the middle of the view.
     assert.ok((forward[0] * to[0] + forward[1] * to[1] + forward[2] * to[2]) / l > Math.cos(Math.PI * 40 / 180));
   }
+});
+
+test('a fleet is watched by side: the first one\'s ships, the others, every ship; the first one\'s foe is the nearest of another side', () => {
+  const hulls = [{ x: 0, z: 0, heading: 0, side: 0 }, { x: 100, z: 0, heading: 0, side: 0 }, { x: 900, z: 0, heading: 0, side: 1 }, { x: 500, z: 0, heading: 0, side: 1 }];
+  const { first, others } = camps(hulls);
+  assert.deepEqual([first.length, others.length], [2, 2]);
+  assert.equal(foeHull(hulls), hulls[3], 'the nearest ship of the other side');
+  assert.equal(camps([hulls[0]!, hulls[1]!]).others.length, 2, 'with none of another side the others are the same ships');
+  const v = vantageOfAll(hulls), both = vantageOfBoth(hulls[0]!, hulls[2]!);
+  assert.ok(v.at[1] >= 40 && Math.hypot(v.at[0] - 375, v.at[2]) >= 200, 'high and to one side of the fleet');
+  assert.deepEqual(vantageOfAll([hulls[0]!, hulls[2]!]), both, 'two ships are seen as before');
 });

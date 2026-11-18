@@ -49,6 +49,7 @@ import { Furnishings } from './render/ship/furnishings';
 import { HammocksStowed } from './app/hammocks';
 import { Rivals, type Rival } from './app/rivals';
 import type { ShipWay } from './render/ship/shipView';
+import { lostHow } from './sim/end';
 import { LEAST_SHIPS, MOST_SHIPS, type Scenario } from './sim/scenario';
 import type { Offered } from './sim/rules/captain';
 import { loadFittings } from './render/ship/fittings';
@@ -63,7 +64,6 @@ import { SprayView } from './render/spray';
 import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
 import { setFrenchFlags } from './render/ship/sailMaterial';
-import type { Navy } from './app/crewLooks';
 import { SHIPS_DRAWN, lightThrough, setWakeSlots } from './render/ship/shipMaterials';
 import { casualtiesOf, goingDown, scarsOf } from './app/scars';
 import { GunfireView, fallInSea } from './render/gunfire';
@@ -389,7 +389,7 @@ async function start(): Promise<void> {
     (by) => { const s = settings.now; return by === 'mouse' ? { speed: s.mouseSpeed, inverted: s.mouseInverted } : { speed: s.fingerSpeed, inverted: false }; }, () => mouse.taken);
   const glassField = el('glass');
   // Watching a battle (plan N7.8): the free camera and its controls; while it is active the captain is not drawn and no order is given.
-  const hullsNow = (): Hull[] => (match ? match.state.ships.flatMap((_, i) => { const p = match.pose(i); return p ? [{ x: p.x, z: p.z, heading: p.heading }] : []; }) : []);
+  const hullsNow = (): Hull[] => (match ? match.state.ships.flatMap((_, i) => { const p = match.pose(i); return p ? [{ x: p.x, z: p.z, heading: p.heading, side: match.state.ships[i]!.side }] : []; }) : []);
   const spectator = ship && match ? new Spectator({ hulls: hullsNow, spoken: () => words(settings.now.language), push: () => stick?.push() ?? NO_PUSH, desk: () => matchMedia('(hover: hover) and (pointer: fine)').matches, orderKey: (code) => KEY_ACTIONS.some((a) => !NOT_ORDER_KEYS.includes(a) && settings.now.keys[a] === code) }) : null;
   if (spectator) window.__nautaWatch = {
     company: (to) => spectator.keepCompanyWith(to),
@@ -403,6 +403,9 @@ async function start(): Promise<void> {
       return { eye: [x, y, z], apart: hulls.map((h) => Math.hypot(h.x - x, h.z - z)), ships: hulls.map((h) => ({ x: h.x, z: h.z })) };
     },
   };
+  /** My ship was lost and the eye was let free over the rest of the fight (until the next match). */
+  let lostWatched = false;
+  match?.onChange(() => { lostWatched = false; });
   const watching = (caption: string | null) => {
     if (!spectator) return;
     if (caption === null) spectator.leaveBattle(); else input.look = spectator.begin(hullsNow(), caption);
@@ -573,13 +576,13 @@ async function start(): Promise<void> {
   // Her navy's coats and colours (menu.md, "Your navy"): the flags of both ships, his own coat and both crews' dress
   // changed when a match of the other navy begins (the warm-up built both navies' coats, so nothing compiles).
   if (match) {
-    let dressed: Navy = 'british';
+    let dressed = 'british';
     const dress = () => {
-      const navy = match.navy;
+      const navy = match.navy, all = match.state.ships.map((_, i) => match.navyAt(i)).join();
       setFrenchFlags(flagsOf(match));
-      if (navy === dressed) return;
-      dressed = navy;
-      void captain?.changeCoat(navy);
+      if (all === dressed) return;
+      if (dressed.split(',')[match.ship] !== navy) void captain?.changeCoat(navy);
+      dressed = all;
       crew?.changeNavy((i) => match.navyAt(i));
     };
     match.onChange(dress);
@@ -672,6 +675,15 @@ async function start(): Promise<void> {
       ship.sails.stand(seen?.standing ?? null, seen?.canvas ?? null);
       ship.sails.blow(windAt(wind, ship.drawn.x, ship.drawn.z, seaTime));
       if (jump > 0) ship.sails.follow(jump);
+      // My ship lost while others still fight (a fleet action): the match goes on to watch, the eye over the ships left.
+      if (spectator && match && !spectator.watching && !lostWatched) {
+        const mine = match.state.ships[match.ship], fight = match.state.fight;
+        if (mine && lostHow(mine) !== null && !fight.end && match.state.ships.some((s, i) => i !== match.ship && lostHow(s) === null)) {
+          lostWatched = true;
+          watching(words(settings.now.language).watchLost);
+          spectator.keepCompanyWith('both');
+        }
+      }
       if (spectator?.watching) {
         // Watching a battle (plan N7.8): the free eye in the world, flown by the viewer, carried along with the ships.
         const flown = spectator.eyeFor(dt, input.look, hullsNow(), (x, z) => surfaceAt(sea, x, z, seaTime).height);

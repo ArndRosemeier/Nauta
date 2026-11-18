@@ -15,6 +15,7 @@
  * (`HURRY_RANGE`), sailing lessons not yet done give way to steering for her.
  */
 import { angleDiff } from '@futuremagic/core';
+import { winningSide } from '../sim/end';
 import { sideReports } from '../sim/captain/sight';
 import { herOff, type Notice } from '../sim/notices';
 import type { Order } from '../sim/orders';
@@ -263,7 +264,7 @@ const TIPS: readonly Lesson[] = [
     id: 'wreckage', says: ['lesson.wreckage'], tap: 'first lieutenant', items: ['life', 'wreckage'], wants: plainOrder('wreckage'),
     starts: (s, m) => m.heard.has('aftermath:fell') && told(s).wreckage === null, done: (s) => told(s).wreckage !== null, most: TIP_MOST,
   },
-  { id: 'won', says: ['lesson.won', 'lesson.next'], starts: (s) => s.state.fight.end?.lost[1 - s.ship] != null && s.state.fight.end.lost[s.ship] === null },
+  { id: 'won', says: ['lesson.won', 'lesson.next'], starts: (s) => { const side = winningSide(s.state.fight, s.state.ships); return side !== null && side === s.state.ships[s.ship]?.side; } },
   { id: 'lost', says: ['lesson.lost', 'lesson.next'], starts: (s) => s.state.fight.end?.lost[s.ship] != null },
 ];
 

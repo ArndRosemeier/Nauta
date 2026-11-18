@@ -26,7 +26,7 @@ test('the presets are the old three ways to start and a fleet action', () => {
   assert.deepEqual(PRESET_NAMES.map((n) => playOf(PRESETS[n])), ['alone', 'room', 'watch', 'alone']);
   assert.deepEqual(playerShips(PRESETS.room), [1]);
   assert.equal(PRESETS.fleets.ships.length, 6);
-  assert.deepEqual(PRESET_NAMES.map((n) => limitOf(PRESETS[n])), [null, null, null, 'more ships']);
+  assert.deepEqual(PRESET_NAMES.map((n) => limitOf(PRESETS[n])), [null, null, null, null]);
 });
 
 test('ships are added on the smaller side up to eight and removed down to two', () => {
@@ -53,7 +53,7 @@ test('a navy is a side\'s, and a ship may wear another', () => {
   let sc = setNavy(DEFAULT_SCENARIO, 1, 'british');
   assert.equal(navyOfShip(sc, 1), 'british');
   assert.equal(sc.ships[1]!.navy, 'british');
-  assert.equal(limitOf(sc), 'same navy');
+  assert.equal(limitOf(sc), null, 'two ships may wear one navy');
   sc = setNavy(sc, 1, 'french');
   assert.equal(sc.ships[1]!.navy, null, 'her side\'s own navy clears the override');
   sc = setSideNavy(sc, 1, 'british');
@@ -62,9 +62,9 @@ test('a navy is a side\'s, and a ship may wear another', () => {
   assert.equal(setSide(sc, 0, 4), sc, 'there are four sides');
 });
 
-test('what cannot be run yet is named: one side, more ships, a room with no ship of the host\'s', () => {
+test('what cannot be run is named: one side, a room with no ship of the host\'s', () => {
   assert.equal(limitOf(setSide(DEFAULT_SCENARIO, 1, 0)), 'one side');
-  assert.equal(limitOf(addShip(DEFAULT_SCENARIO)), 'more ships');
+  assert.equal(limitOf(addShip(DEFAULT_SCENARIO)), null, 'a third ship runs');
   assert.equal(limitOf(setCommand(PRESETS.room, 0, { kind: 'computer', skill: 'green' })), 'host ship');
 });
 

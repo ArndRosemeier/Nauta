@@ -69,6 +69,8 @@ export interface Hull {
   readonly x: number;
   readonly z: number;
   readonly heading: number;
+  /** The side she fights for (the scenario's); none: her own. */
+  readonly side?: number;
 }
 
 /** Off a ship's starboard quarter, close and above: her whole length and rig in the picture. */
@@ -92,13 +94,38 @@ const BOTH_HEIGHT = 0.12;
 const BOTH_OFF_LEAST = 200;
 const BOTH_HEIGHT_LEAST = 40;
 
-/** A good place to see both ships at once: to one side of the line between them, high enough to see over the nearer. */
-export function vantageOfBoth(a: Hull, b: Hull): Vantage {
-  const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, dx = b.x - a.x, dz = b.z - a.z, apart = apartOnWater(a, b) || 1;
+/**
+ * A good place to see every ship at once: to one side of the line between the two farthest apart (with two ships, the
+ * line between them), high enough to see over the nearer, looking at the middle of them all.
+ */
+export function vantageOfAll(hulls: readonly Hull[]): Vantage {
+  const mx = hulls.reduce((s, h) => s + h.x, 0) / hulls.length, mz = hulls.reduce((s, h) => s + h.z, 0) / hulls.length;
+  let a = hulls[0]!, b = hulls[hulls.length - 1]!, far = apartOnWater(a, b);
+  for (const p of hulls) for (const q of hulls) if (apartOnWater(p, q) > far) { a = p; b = q; far = apartOnWater(p, q); }
+  const dx = b.x - a.x, dz = b.z - a.z, apart = far || 1;
   const off = Math.max(BOTH_OFF_LEAST, apart * BOTH_OFF), up = Math.max(BOTH_HEIGHT_LEAST, apart * BOTH_HEIGHT);
   // To the right of the line from the first ship to the second (looking along it).
   const at: Vec3 = [mx - (dz / apart) * off, up, mz + (dx / apart) * off];
   return { at, look: lookToward(at, [mx, 0, mz]) };
+}
+
+/** A good place to see both ships at once. */
+export const vantageOfBoth = (a: Hull, b: Hull): Vantage => vantageOfAll([a, b]);
+
+/** The ship the first fights: the nearest of another side (ships without a side are each their own), or the second when none is. */
+export function foeHull(hulls: readonly Hull[]): Hull | undefined {
+  const [first, ...rest] = hulls;
+  if (!first) return undefined;
+  const sideOf = (h: Hull) => h.side ?? hulls.indexOf(h);
+  const foes = rest.filter((h) => sideOf(h) !== sideOf(first)).sort((p, q) => apartOnWater(first, p) - apartOnWater(first, q));
+  return foes[0] ?? rest[0];
+}
+
+/** The ships of the first one's side, and the ships of the others (every ship if there are none). */
+export function camps(hulls: readonly Hull[]): { first: Hull[]; others: Hull[] } {
+  const sideOf = (h: Hull) => h.side ?? hulls.indexOf(h);
+  const first = hulls.filter((h) => sideOf(h) === sideOf(hulls[0]!)), others = hulls.filter((h) => sideOf(h) !== sideOf(hulls[0]!));
+  return { first, others: others.length ? others : first };
 }
 
 /** Where the over-the-shoulder shot stands: behind the ship, away from the enemy, and to the right of the line, m; and how high. */
