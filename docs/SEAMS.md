@@ -225,6 +225,11 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The water's speed along her side from her way and the sea's rise and fall against it | `src/audio/hullWater.ts#flowOf` |
 | The captain's footfalls as his body's soles come down, and on ladder treads | `src/audio/footsteps.ts#Footsteps` |
 | The brig herself heard: her sounds played, the room returned for the sea's | `src/audio/shipSound.ts#ShipSound` |
+| The crew's sound as data: the boatswain's call for each kind of order and what follows, feet, hauling, the bell, the drum (the takes: tools/sound/sounds.json; the calls' patterns: tools/sound/pipe-calls.json) | `src/audio/crewTuning.ts#ORDER_CALLS` |
+| What is heard of the crew at work, from the simulation: calls as orders are taken and carried out, feet where men run, gangs hauling, the bell, the drum | `src/audio/crewHearing.ts#CrewWatch` |
+| The ship's bell for a turn of her clock: one more strike each half hour of a watch, in pairs | `src/audio/crewHearing.ts#bellStrikes` |
+| Whether a spot of her plan is below deck | `src/audio/crewHearing.ts#belowDeck` |
+| The crew at work heard: its sounds played through the ship's engine | `src/audio/crewSound.ts#CrewSound` |
 | Plain data to bytes and back, canonical and exact (the state, orders and events as they travel and are saved) | `src/sim/codec.ts#encode` |
 | Bytes back to plain data, bit for bit | `src/sim/codec.ts#decode` |
 | A 64-bit hash of bytes, for comparing machines | `src/sim/codec.ts#hashBytes` |

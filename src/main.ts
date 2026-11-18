@@ -23,9 +23,11 @@ import { furnish } from './sim/ship/furnish';
 import { shipPlan } from './sim/ship/plan';
 import { SeaSound } from './audio/seaSound';
 import { ShipSound } from './audio/shipSound';
+import { CrewSound } from './audio/crewSound';
 import { OPEN_AIR } from './audio/acoustics';
 import { Vector3 } from 'three/webgpu';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
+import { simTime } from './sim/state';
 import { makeWind, meanWind } from './sim/wind';
 import { followWind, startSea } from './sim/sea/sea';
 import type { Look } from './app/look';
@@ -162,6 +164,10 @@ async function start(): Promise<void> {
   const sound = new SeaSound(import.meta.env.BASE_URL, MATCH_SEED);
   // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
   const shipSound = ship ? new ShipSound(sound.engine, MATCH_SEED) : null;
+  // The crew at work heard (N4.6), sailing: the boatswain's calls for the orders given, feet, hauling, the bell; on her
+  // without a match only the bell, by the page's clock.
+  const crewSound = ship ? new CrewSound(sound.engine, MATCH_SEED, match?.ship ?? 0) : null;
+  if (match && crewSound) match.on('events', (events) => crewSound.onEvents(events));
   const ear = new Vector3(), facing = new Vector3(), crown = new Vector3();
   // `?bench`: the fixed flight, measured once the quality level is chosen (plan N1.9).
   const bench = params.bench > 0 ? new BenchRun(el('bench'), params.bench, {
@@ -210,9 +216,12 @@ async function start(): Promise<void> {
     view.camera.getWorldPosition(ear);
     view.camera.getWorldDirection(facing);
     crown.copy(view.camera.up).applyQuaternion(view.camera.quaternion);
-    // Her own sound first: it gives the room the sea and the wind are heard through. She has no way on her yet (way 0).
+    // Her own sound first: it gives the room the sea and the wind are heard through. Sailing, her way is the match's.
     const body = walking?.drawnBody, soles = body ? [body.feet.L, body.feet.R] : null;
-    const room = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: where.eye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: 0 }) : OPEN_AIR;
+    const sailing = match?.state.ships[match.ship] ?? null;
+    const room = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: where.eye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: sailing?.sailing.ahead ?? 0 }) : OPEN_AIR;
+    if (ship && crewSound && match && sailing) crewSound.atWork(sailing, simTime(match.state), ship.drawn, where.eye, room);
+    else if (ship && crewSound && !still) crewSound.bellAlone(seaTime, ship.drawn, room);
     sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], room);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
