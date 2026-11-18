@@ -11,9 +11,10 @@ export const START_MINUTES = 3.5;
 /**
  * How fast the two ships close at the start, m/s together, by the wind's force: both under battle sail, heading at each
  * other with the wind abeam, over the first three minutes (measured in `check:sailing`, which fails when the sailing
- * strays from it): about 650 m in three minutes in a light breeze, 1,500 m in a strong one.
+ * strays from it): about 1,100 m in three minutes in a light breeze, 1,500 m in a strong one. Light airs are not slow
+ * (rules/sailing.ts `LIGHT_AIRS`): in force 2 to 4 she gathers way quickly, so they close faster there than in force 5.
  */
-export const START_CLOSING: Readonly<Record<number, number>> = { 2: 3.6, 3: 4.3, 4: 5.6, 5: 7.5, 6: 8.3 };
+export const START_CLOSING: Readonly<Record<number, number>> = { 2: 6.2, 3: 7.5, 4: 8.8, 5: 7.5, 6: 8.3 };
 /**
  * The way each ship has on at the start, knots: under way on a beam reach, closing. Not measured: about what battle
  * sail drives her at in a light breeze, so in a stronger wind she gathers more way in the first minute and in force 2

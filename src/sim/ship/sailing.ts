@@ -26,9 +26,10 @@
 import { angleDiff, clamp } from '@futuremagic/core';
 import {
   ADDED_MASS, AIR, BOOM_SHEET_LEAST, BRACE_RATE, CANVAS, CARRIED_UP_TO, FORE_AFT_POLAR, GYBE, HAUL, HEADSAIL_SHEET,
-  HELM_RATE, HELMSMAN, HULL_AHEAD, HULL_SIDEWAYS, HULL_TURNING, LET_FLY_ANGLE, LET_FLY_SHARE, MISSED_STAYS, REEF_AT,
+  HELM_RATE, HELMSMAN, HULL_AHEAD, GATHERING, LIGHT_AIRS, HULL_SIDEWAYS, HULL_TURNING, LET_FLY_ANGLE, LET_FLY_SHARE, MISSED_STAYS, REEF_AT,
   RUDDER, SAIL_ROLL_SLOPE, SHIVER_ANGLE, SQUARE_POLAR, START_CANVAS, TRIM_TRIES, TURN_GYRATION, TURN_SKID, WINDAGE, type CanvasName, type Polar,
 } from '../rules/sailing';
+import { beaufortForce } from '../rules/beaufort';
 import { BOOM, type MastName } from '../rules/rig';
 import { DESIGN_WATERLINE } from '../rules/ships';
 import { linearCurve, type Curve } from '../curve';
@@ -367,7 +368,7 @@ const force = { x: 0, y: 0, turn: 0, heel: 0 };
  * The wind's forces on her sails and rig. `ax`, `ay`: the air across her at her centre; each sail also feels her
  * turning (`turnRate`) and her roll (`pose`), which steady her.
  */
-function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: boolean, harm: SailingDamage): void {
+function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: boolean, harm: SailingDamage, drive: number): void {
   const b = sailingBody();
   sincos(pose.roll, sc);
   const heelCos = sc[1];
@@ -400,7 +401,8 @@ function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: 
     // Her roll swings the sail across the wind: the cloth meets the air at a changing angle and presses against the swing.
     const lever = sb.height - b.height, swing = pose.rollRate * lever;
     const steady = (AIR / 2) * area * SAIL_ROLL_SLOPE * (Math.hypot(sx, sy) + Math.abs(swing)) * swing;
-    x += fx;
+    // Light airs (rules/sailing.ts LIGHT_AIRS): a drawing sail drives her ahead the harder; its heel and leeway are the wind's.
+    x += fx > 0 ? fx * drive : fx;
     y += fy * heelCos;
     turn += sb.along * fy * heelCos;
     heel += (fy - steady) * (sb.height - HULL_SIDEWAYS.height);
@@ -409,6 +411,17 @@ function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: 
   force.y = y;
   force.turn = turn;
   force.heel = heel;
+}
+
+/** Light airs and gathering way (rules/sailing.ts `LIGHT_AIRS`, `GATHERING`), as curves, built once: by the wind's force, and by the true wind's angle off her bow. */
+interface LightAirs { readonly drive: Curve; readonly gather: Curve; readonly angle: Curve }
+let lightAirsCurves: LightAirs | null = null;
+function lightAirs(): LightAirs {
+  return (lightAirsCurves ??= {
+    drive: linearCurve(LIGHT_AIRS.force, LIGHT_AIRS.drive),
+    gather: linearCurve(GATHERING.force, GATHERING.times),
+    angle: linearCurve(LIGHT_AIRS.angle, LIGHT_AIRS.share),
+  });
 }
 
 /** The signed heading still to go, rad, the way the helmsman turns: the short way, or all the way round the way he was told. */
@@ -443,9 +456,10 @@ function hullForces(s: Sailing, harm: SailingDamage): void {
 
 /**
  * One step of the simulation's fixed length under sail, in the true wind `wind` (wind.ts `windAt` at her place),
- * lying as `pose` says (her roll and its rate, from motion.ts). Pure: `s` is not changed.
+ * lying as `pose` says (her roll and its rate, from motion.ts), in a match sailed in the wind's force `windForce` (its
+ * light airs, rules/sailing.ts `LIGHT_AIRS`; by default the force of `wind` itself). Pure: `s` is not changed.
  */
-export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind, harm: SailingDamage = UNDAMAGED): SailingStep {
+export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind, harm: SailingDamage = UNDAMAGED, windForce = beaufortForce(wind.speed)): SailingStep {
   const b = sailingBody(), dt = STEP_SECONDS, events: SailingEvent[] = [];
   // The water in her is moved with her (her masses are the dry ship's and the water's).
   const heavier = 1 + harm.flooded / b.mass;
@@ -463,12 +477,17 @@ export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind, harm: Sailin
   const inStays = bound !== s.sides[FORE] && Math.sign(eye) === turning && Math.abs(toGo) > Math.abs(eye);
   const letFly = inStays && Math.abs(ay) < air * b.letFly;
 
-  windForces(s, pose, ax, ay, letFly, harm);
+  // Light airs: her drawing sails drive her the harder the lighter the match's wind; and how quickly she gathers way in it.
+  const light = lightAirs(), off = Math.abs(angleDiff(s.heading, wind.from)) / DEGREE;
+  const drive = 1 + (light.drive(windForce) - 1) * light.angle(off), gather = light.gather(windForce);
+  windForces(s, pose, ax, ay, letFly, harm, drive);
   hullForces(s, harm);
 
   // Her way, leeway and turning, with the water moving with her (turning, her way carries her outward: the skid).
   const aheadMass = b.aheadMass * heavier, sideMass = b.sideMass * heavier;
-  const ahead = s.ahead + (dt * (force.x + TURN_SKID * sideMass * s.leeway * s.turnRate)) / aheadMass;
+  // Gathering way with some way on her, not in stays nor laid aback, she gains it the quicker (rules/sailing.ts GATHERING); she carries it as ever.
+  const gain = (dt * (force.x + TURN_SKID * sideMass * s.leeway * s.turnRate)) / aheadMass;
+  const ahead = s.ahead + (gain > 0 && s.ahead >= GATHERING.from && !inStays && !s.backed.some(Boolean) ? gain * gather : gain);
   const leeway = s.leeway + (dt * (force.y - TURN_SKID * aheadMass * s.ahead * s.turnRate)) / sideMass;
   const turnRate = s.turnRate + (dt * force.turn) / (b.turnInertia * heavier);
   const heading = wrapBearing(s.heading + turnRate * dt);

@@ -163,7 +163,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     // What her damage leads to this step: the sea in at her holes, spars falling, fire (damage.ts).
     const after = stepAftermath(s.damage, { seed: state.matchSeed, tick, t, ship: i, pose, sea, crew: crewed.crew, sailing: carried.sailing, wind: here, mended: crewed.mended });
     events.push(...after.events);
-    const sailed = stepSailing(carried.sailing, pose, here, after.sailing);
+    const sailed = stepSailing(carried.sailing, pose, here, after.sailing, state.wind.windForce);
     for (const kind of sailed.events) events.push({ kind, tick, ship: i });
     // The duel's one enemy is the other ship (design decisions for N5: she is the target).
     const enemy = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
