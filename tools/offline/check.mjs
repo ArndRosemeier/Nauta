@@ -11,10 +11,10 @@
  *   4. a file whose bytes are not the build's (a deploy half-way through) is never kept;
  *   5. `?nosw` removes the worker and everything it kept.
  *
- * Fails on any of them. About a minute; the build is the bulk of it. SHOT_TIMEOUT bounds every wait.
+ * Fails on any of them. About 40 s; the build is the bulk of it (the crew pack is left out of the site but for its manifest). SHOT_TIMEOUT bounds every wait.
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { TIMEOUT, openBrowser } from '../shot/browser.mjs';
 import { listBuild, writeWorker } from './precache.ts';
@@ -22,6 +22,8 @@ import { formatBytes } from '../../src/probe/report.ts';
 import { serveDir } from './serve.mjs';
 
 const FOLDER = '/Nauta/';
+/** The crew pack's folder in the build. */
+const PACK = 'packs/human';
 const work = join('node_modules/.cache/offline-check');
 rmSync(work, { recursive: true, force: true });
 mkdirSync(work, { recursive: true });
@@ -32,6 +34,9 @@ const check = (ok, what) => { if (!ok) failures++; console.log(`${ok ? 'ok  ' : 
 
 console.log('building the game under /Nauta/ ...');
 execFileSync('npx', ['vite', 'build', '--outDir', dir, '--emptyOutDir'], { env: { ...process.env, VITE_BASE: FOLDER }, stdio: ['ignore', 'ignore', 'inherit'] });
+// The crew pack is most of the build (1283 of 1555 files, 66 of 83 MB) and the worker's fetching it takes minutes on CI, twice in this check (the install, the fresh browser of step 4): the check keeps its manifest, which is what it looks for offline, and leaves the rest out (and the worker is made again with the shorter list).
+for (const name of readdirSync(join(dir, PACK))) if (name !== 'manifest.json') rmSync(join(dir, PACK, name), { recursive: true, force: true });
+await writeWorker(dir, 'check-1');
 const built = listBuild(dir);
 console.log(`${built.length} files, ${formatBytes(built.reduce((n, f) => n + f.bytes, 0))}`);
 
