@@ -20,7 +20,8 @@ NODE_USE_ENV_PROXY=1 node vendor/assetgenerator/packages/audio/tools/make.mjs --
   `src/audio/tuning.ts`, and played by `src/audio/seaSound.ts`; the ship's own sounds (N2.8) in `creaks.ts`,
   `counter.ts`, `hullWater.ts`, `footsteps.ts` and `acoustics.ts`, tuned in `shipTuning.ts`, played by `shipSound.ts`.
   The crew at work (N4.6) in `crewHearing.ts`, tuned in `crewTuning.ts`, played by `crewSound.ts`; the sound under
-  sail (N3.9) in `sailHearing.ts`, tuned in `sailTuning.ts`, played by `sailSound.ts`.
+  sail (N3.9) in `sailHearing.ts`, tuned in `sailTuning.ts`, played by `sailSound.ts`; gunfire (N5.6) in `gunHearing.ts`,
+  tuned in `gunTuning.ts`, played by `gunSound.ts`.
 - **The boatswain's calls are synthesised, not asked of a model**: `node tools/sound/pipe.mjs --raw <raw folder>`
   writes each call of [`pipe-calls.json`](pipe-calls.json) (two notes, glides, plain, warbled and trilled tones, in
   seconds) as a WAV into `<raw>/pipe/`, and sounds.json takes them with `from`, so make.mjs levels and encodes them
@@ -56,3 +57,9 @@ NODE_USE_ENV_PROXY=1 node vendor/assetgenerator/packages/audio/tools/make.mjs --
   creaks of a yard swung round its mast. The first rigging hum, one flogging take, the fills, the slams and the creaks
   came out nearly all below 300 Hz (a drone the iPad's speakers would not play) and were asked for again with "close
   and clear, no deep rumble"; the fills stay mostly low. A transcriber heard no speech in any take. About $0.25.
+- 2026-11-18 (N5.6, the sound of gunfire): a gun fired close by on deck (six), far off across the water (six), on the deck
+  overhead heard from below (five), a ball tearing past overhead (four), a ball plunging into the sea (five); the ringing
+  in the ears synthesised by `tools/sound/ring.mjs` (a beating 4.1 kHz whine with a little hiss, dying over six seconds;
+  `rng` and `wav` now shared with pipe.mjs in `wav.mjs`). The near take was asked for again for a brighter crack; the
+  second was no brighter and the first was kept. Far takes needed `quiet` 0.06 (their silences were noisy). A transcriber
+  heard no speech in any take. About $1.50.

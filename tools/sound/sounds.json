@@ -365,6 +365,59 @@
       "most": 3,
       "quiet": 0.03,
       "gap": 0.5
+    },
+    {
+      "id": "gun/near",
+      "kind": "calls",
+      "prompt": "The sound of six separate shots of a heavy iron cannon fired close by on the open deck of a wooden sailing warship, each one a deafening sharp cracking blast with a deep boom behind it, the gun carriage rumbling back across the oak planks, a short echo rolling off the sea, close and clear, one at a time with four seconds of complete silence between them, nothing else, no rifles, no machine guns, no thunder, no voices, no talking, no shouting, no music",
+      "count": 6,
+      "most": 3.5,
+      "quiet": 0.03,
+      "gap": 0.8
+    },
+    {
+      "id": "gun/far",
+      "kind": "calls",
+      "prompt": "The sound of six separate cannon shots fired from another sailing ship a long way off across the open sea, each a dull heavy boom that rolls and rumbles away over the water, the crack softened by distance, one at a time with four seconds of complete silence between them, nothing else, no wind, no waves, no thunder, no rifles, no voices, no talking, no shouting, no music",
+      "count": 6,
+      "most": 3.5,
+      "quiet": 0.06,
+      "gap": 0.8
+    },
+    {
+      "id": "gun/through",
+      "kind": "calls",
+      "prompt": "The sound of six separate cannon shots fired on the deck right overhead, heard from below deck inside the wooden hull of a sailing warship, each a huge heavy thump that shakes the timbers, beams groaning, loose wooden things and tin cups rattling and jumping, a fine patter of dust and grit falling, close and clear, one at a time with four seconds of complete silence between them, nothing else, no thunder, no rifles, no voices, no talking, no shouting, no music",
+      "count": 5,
+      "most": 3,
+      "quiet": 0.03,
+      "gap": 0.8
+    },
+    {
+      "id": "shot/pass",
+      "kind": "calls",
+      "prompt": "The sound of six separate cannonballs tearing through the air close overhead, each a short fierce ripping whoosh and howl that rushes in and is gone in about a second, like a heavy iron ball flying past just above the head, close and clear, one at a time with four seconds of complete silence between them, nothing else, no explosions, no bangs, no guns firing, no wind, no water, no voices, no talking, no shouting, no music",
+      "count": 4,
+      "most": 1.6,
+      "quiet": 0.03,
+      "gap": 0.8
+    },
+    {
+      "id": "shot/splash",
+      "kind": "calls",
+      "prompt": "The sound of six separate heavy iron cannonballs plunging into the open sea close by, each a sharp hard smack on the water and a deep heavy splash, a tall column of water thrown up and falling back with a hiss and a patter of spray, close and clear, one at a time with four seconds of complete silence between them, nothing else, no explosions, no guns firing, no shore, no surf, no voices, no talking, no shouting, no music",
+      "count": 5,
+      "most": 2.5,
+      "quiet": 0.05,
+      "gap": 0.8
+    },
+    {
+      "id": "gun/ring",
+      "kind": "call",
+      "from": [
+        "gun/ring.wav"
+      ],
+      "about": "Synthesised by tools/sound/ring.mjs: the ringing in the ears after a broadside fired close by, a thin high whine that wavers a little and dies away over about six seconds."
     }
   ]
 }

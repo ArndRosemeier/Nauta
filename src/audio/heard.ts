@@ -15,6 +15,8 @@ export interface PlacedShot {
   readonly gain: number;
   readonly bus: 'body' | 'world';
   readonly delay: number;
+  /** Playback rate on top of the take's own (1 when left out). */
+  readonly pitch?: number;
 }
 
 /** A bed to hold this frame, set each frame it is heard as the engine's beds are; with no place it is all round the ear. */
@@ -34,9 +36,15 @@ export interface Heard {
   readonly beds: PlacedBed[];
 }
 
+/** Empties a frame's lists, to be filled again. */
+export function clearHeard(out: Heard): void {
+  out.shots.length = 0;
+  out.beds.length = 0;
+}
+
 /** Plays a frame's sounds (nothing until sound has opened). */
 export function playHeard(e: AudioEngine, heard: Heard): void {
   if (!e.open) return;
-  for (const s of heard.shots) e.play(s.id, { at: s.at, ref: s.ref, gain: s.gain, bus: s.bus, delay: s.delay });
+  for (const s of heard.shots) e.play(s.id, { at: s.at, ref: s.ref, gain: s.gain, bus: s.bus, delay: s.delay, pitch: s.pitch ?? 1 });
   for (const b of heard.beds) e.bed(b.id, b.level, { glide: b.glide, bus: b.bus, ...(b.at ? { at: b.at, ref: b.ref } : {}) }, b.key);
 }

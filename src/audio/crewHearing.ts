@@ -30,7 +30,7 @@ import {
   NEAR_FEET, NEAR_REACH, ORDER_CALLS, PIPED_DONE, PIPE_HEIGHT, RUN_STEP, RUN_STRIDE, SAILED_CALLS, SHORT_HANDED_AGAIN,
   SHORT_HANDED_GAIN, STRIKES_A_PAIR, SWING_PERIOD, SWING_PULLS, THROUGH_DECK, WALK_GAIN, WALK_STRIDE, type PipeCall,
 } from './crewTuning';
-import type { Heard, PlacedBed, PlacedShot } from './heard';
+import { clearHeard, type Heard, type PlacedBed, type PlacedShot } from './heard';
 import type { SlapKind } from './tuning';
 
 type Vec3 = readonly [number, number, number];
@@ -145,8 +145,7 @@ export class CrewWatch {
 
   /** One frame: what of the crew is heard now. */
   listen(s: CrewScene, out: CrewHeard): CrewHeard {
-    out.shots.length = 0;
-    out.beds.length = 0;
+    clearHeard(out);
     this.takeOrders(s);
     this.takeEvents(s);
     this.pipe(s, out);

@@ -264,6 +264,13 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What is heard of her sails and rigging, from the sails as drawn and the apparent wind | `src/audio/sailHearing.ts#SailWatch` |
 | How much of a sail flogs as drawn | `src/audio/sailHearing.ts#looseShare` |
 | Her sails and rigging heard: their sounds played through the ship's engine | `src/audio/sailSound.ts#SailSound` |
+| Gunfire's sound as data: the report near, far and through her deck, shot passing and splashing, deafened (dull world, ringing), her guns' jolt (the takes: tools/sound/sounds.json; the ringing: tools/sound/ring.mjs) | `src/audio/gunTuning.ts#GUN_NEAR` |
+| What is heard of gunfire, from the fired events: reports arriving by the speed of sound, balls passing and falling near the ear, the ears' load, jolts | `src/audio/gunHearing.ts#GunWatch` |
+| Where a ball's path passes nearest a point | `src/audio/gunHearing.ts#nearestPass` |
+| A room as a deafened ear hears it | `src/audio/gunHearing.ts#deafened` |
+| Gunfire heard: its sounds played through the ship's engine, the jolts and the deafened room handed back | `src/audio/gunSound.ts#GunSound` |
+| A watch's frame emptied to be filled again | `src/audio/heard.ts#clearHeard` |
+| A frequency glided in log frequency | `src/audio/acoustics.ts#logLerp` |
 | The apparent wind's speed on a ship under way | `src/sim/ship/sailing.ts#apparentSpeed` |
 | Each sail as drawn, for the sound | `src/render/ship/sailsView.ts#SailsView` |
 | Plain data to bytes and back, canonical and exact (the state, orders and events as they travel and are saved) | `src/sim/codec.ts#encode` |
