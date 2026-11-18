@@ -647,7 +647,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Who speaks in a bubble, where his head is and his mouth moving (the drawing puts its men there; N4.5) | `src/app/speech/speakers.ts#Speakers` |
 | The compass bearing of one point from another on the water | `src/sim/units.ts#bearingTo` |
 | The water in her, t (both sides of her hold) | `src/sim/end.ts#waterIn` |
-| What her officers notice between two states (a sail sighted, her ports, a side ready, guns bearing, the water past a mark, the wind) | `src/sim/notices.ts#noticed` |
+| What her officers notice between two states (a sail sighted, her ports, a side ready, guns bearing, the water past a mark, the wind, her drawing ahead or dropping astern while kept on the beam) | `src/sim/notices.ts#noticed` |
 | The phrase book: what the men say, by line, in English and German, with variants and a French crew's turns of phrase | `src/app/speech/phrases.ts#PHRASES` |
 | A line of the phrase book in words, its terms filled | `src/app/speech/phrases.ts#phraseWords` |
 | The reports table: who says what for an event, a notice or the midshipman sent | `src/app/speech/reports.ts#saysOf` |
