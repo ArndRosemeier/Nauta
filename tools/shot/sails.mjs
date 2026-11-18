@@ -21,8 +21,11 @@ const all = process.argv.slice(3).includes('all');
 mkdirSync(out, { recursive: true });
 /** The points of sail on the port tack: degrees off the wind (`full and by` lies as close as she will). */
 const POINTS = [['close-hauled', null], ['beam', 90], ['quarter', 135], ['running', 180]];
-/** Off the wind before the tack, degrees: a little free of close-hauled. */
-const BEFORE_TACK = 75;
+/**
+ * Off the wind before the tack, degrees: free enough that the wind's own shifts (±10° in a match) do not head her, as they
+ * do at 70° to 80° (a sail goes aback until she bears away: seen in a third of the seconds at 75°, none at 85°).
+ */
+const BEFORE_TACK = 85;
 const COMPASS = 360;
 /**
  * Seconds the match runs on after an order before a picture: a canvas order takes the crew a while, a course settles; a
