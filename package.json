@@ -29,6 +29,7 @@
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
     "@futuremagic/deck": "file:vendor/assetgenerator/packages/deck",
     "@futuremagic/figure": "file:vendor/assetgenerator/packages/figure",
+    "@futuremagic/instances": "file:vendor/assetgenerator/packages/instances",
     "@futuremagic/props": "file:vendor/assetgenerator/packages/props",
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",
     "@futuremagic/stage": "file:vendor/assetgenerator/packages/stage",

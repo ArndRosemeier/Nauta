@@ -26,6 +26,11 @@ export interface SlotTarget {
   readonly paint: number;
   /** The colour to use in place of the packed one (a fitting painted to match her). */
   readonly rgb?: Finish['rgb'];
+  /**
+   * Each vertex keeps its packed colour (the spec's patterns, wear and baked shade) as its finish, instead of its
+   * slot's one colour with the shade taken out into the solids' occlusion.
+   */
+  readonly own?: boolean;
 }
 
 const p = new Vector3(), n = new Vector3();
@@ -60,9 +65,9 @@ export function place(fittings: Fittings, name: string, frame: Matrix4, slots: R
     const u = p.getComponent(along), v = p.getComponent(across);
     p.applyMatrix4(frame);
     n.fromArray(m.normals, i * XYZ).applyMatrix3(normalM).normalize();
-    const top = brightest.get(m.slots[i]!)!;
+    const top = target.own ? i : brightest.get(m.slots[i]!)!;
     const f: Finish = { rgb: target.rgb ?? [m.colors[top * XYZ]!, m.colors[top * XYZ + 1]!, m.colors[top * XYZ + 2]!], paint: target.paint, seed };
-    remap[i] = target.solid.vertex(p, n, f, u, v, lum(top) > 0 ? lum(i) / lum(top) : 1);
+    remap[i] = target.solid.vertex(p, n, f, u, v, target.own || lum(top) <= 0 ? 1 : lum(i) / lum(top));
   }
   for (let t = 0; t < m.indices.length; t += XYZ) {
     const a = m.indices[t]!, b = m.indices[t + 1]!, c = m.indices[t + 2]!;

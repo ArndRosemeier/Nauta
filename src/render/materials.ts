@@ -10,6 +10,7 @@ import { SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, makeDeepMaterial, makeSeaMaterial 
 import { SOLID_ATTRIBUTES, SOLID_STRIDES } from './ship/solid';
 import { ROPE_ATTRIBUTES, ROPE_STRIDES } from './ship/rope';
 import { makeCopperMaterial, makeGlowMaterial, makeIronMaterial, makeRopeMaterial, makeWoodMaterial } from './ship/shipMaterials';
+import { fitted } from './ship/fitted';
 
 /** Vertices of the Stage's stand-in mesh (one triangle). */
 const STAND_IN_VERTICES = 3;
@@ -71,3 +72,7 @@ export const SHIP_IRON_FADING = defineKind('ship iron fading', SOLID_ATTRIBUTES,
 export const SHIP_COPPER_FADING = defineKind('ship copper fading', SOLID_ATTRIBUTES, () => makeCopperMaterial(true), RECEIVES);
 /** Rope, standing and running: widened to a pixel far off and faded, laid in strands up close. */
 export const SHIP_ROPE = defineKind('ship rope', ROPE_ATTRIBUTES, makeRopeMaterial, SHADOWED);
+/** Her fittings' timber, iron and lights, drawn as instances in her moving frame (render/ship/furnishings.ts, plan N2.6). */
+export const FITTED_WOOD = defineKind('fitted wood', SOLID_ATTRIBUTES, () => fitted(makeWoodMaterial()), SHADOWED);
+export const FITTED_IRON = defineKind('fitted iron', SOLID_ATTRIBUTES, () => fitted(makeIronMaterial()), SHADOWED);
+export const FITTED_GLOW = defineKind('fitted glow', SOLID_ATTRIBUTES, () => fitted(makeGlowMaterial()), NO_SHADOW);
