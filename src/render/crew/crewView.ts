@@ -41,6 +41,7 @@ import {
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
 import { facesNow, stepFace } from '../../app/faces';
+import { GUN_CLIP_NAMES, gunClip, gunStrains, gunWork } from '../../app/gunDrill';
 import { VOICES, type Point3, type Speaker, type Voice } from '../../app/speech/speakers';
 import type { CrewKnobs } from '../../app/quality';
 import { pageSeconds } from '../../app/pageMatch';
@@ -188,6 +189,7 @@ export class CrewView {
   private time = 0;
   private mine = 0;
   private lastCamera: Camera | null = null;
+  private lastState: SimState | null = null;
   private readonly eye = new Vector3();
   private readonly local = new Vector3();
   private readonly world = new Vector3();
@@ -235,7 +237,7 @@ export class CrewView {
     const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, clipLibraries: false, levels: [CROWD_LEVEL] });
     const kinds = crowdKinds(workbench.catalog, rosters);
     note(`baking ${kinds.length} kinds of men`);
-    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, LYING, WALK, 'jog', 'idle'])];
+    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, ...GUN_CLIP_NAMES, LYING, WALK, 'jog', 'idle'])];
     const figures = await buildCrowdFigures(workbench, { material: createNodeCrowdFigureMaterial, builds: { ...BUILDS }, kinds, clips, once: ONCE_CLIPS, fps: BAKE_FPS });
     note('the officers come on deck');
     const pool = await NearPool.load(renderer, `${base}${PACK}`, workbench, knobs.pool, knobs.poolFull, fullLook(workbench.catalog, figureOf(0, 1, rosters[0]![1]!)));
@@ -307,6 +309,7 @@ export class CrewView {
     this.frame++;
     this.time += dt;
     this.mine = fr.mine;
+    this.lastState = fr.state.to;
     this.lastCamera = fr.camera;
     const k = fr.knobs, s = this.stats;
     s.placed = 0; s.drawn = 0;
@@ -350,6 +353,15 @@ export class CrewView {
   /** Her men now hurt, where they are drawn (her space): for the browser checks, which stand near one (tools/shot/men.mjs). */
   hurtMen(ship: number): { man: number; harm: Harm; space: string; x: number; y: number; z: number; clip: string | null; shown: boolean; seen: boolean }[] {
     return (this.byShip[ship] ?? []).flatMap((d) => (d.harm && d.placed ? [{ man: d.man, harm: d.harm, space: d.at.space, x: d.at.x, y: d.at.y, z: d.at.z, clip: d.clip, shown: d.shown, seen: d.seen }] : []));
+  }
+
+  /** Her men now at a gun with what the drill has them doing, where they are drawn (her space): for the browser checks, which stand beside a gun crew (tools/shot/guns.mjs `drill`). */
+  gunMen(ship: number): { man: number; gun: number; part: string; step: string; working: boolean; want: string | null; clip: string | null; x: number; y: number; z: number; shown: boolean; seen: boolean }[] {
+    const state = this.lastState?.ships[ship];
+    return (this.byShip[ship] ?? []).flatMap((d) => {
+      const w = state ? gunWork(state, d.man, d.m) : null;
+      return w && d.placed ? [{ man: d.man, gun: w.gun, part: w.part, step: w.step, working: w.working, want: gunClip(w), clip: d.clip, x: d.at.x, y: d.at.y, z: d.at.z, shown: d.shown, seen: d.seen }] : [];
+    });
   }
 
   /** The key of a man among both crews (the pool and the speakers know him by it). */
@@ -547,7 +559,9 @@ export class CrewView {
       // His face: from what he is doing and what has just happened to him (app/faces.ts).
       const task = taskOf(ship.crew, d.man), voice = [...this.voices].find(([, man]) => man === d.man)?.[0];
       const end = fr.state.to.fight.end, ended = !end ? null : end.lost[fr.mine] ? 'lost' : end.lost.some((l) => l !== null) ? 'won' : null;
+      const gun = gunWork(ship, d.man, d.m);
       const present = facesNow({
+        gun: gun ? { strains: gunStrains(gun), captain: gun.part === 'captain', sinceFired: gun.sinceFired } : undefined,
         job: task && task.began !== null ? task.job : null, aloft: !!d.at.way || routeNetwork().surfaces.has(d.at.space), sinceStruck: d.struck,
         fighting: ship.told.quarters, harm: d.harm, sinceHurt: fr.state.to.tick / STEPS_PER_SECOND - d.hurtAt, shouting: voice === 'boatswain' && (this.matters.get(d.man) ?? 0) > fr.now, ended,
       });

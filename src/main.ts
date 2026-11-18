@@ -64,7 +64,7 @@ import { FlotsamView } from './render/flotsam';
 import { HalfSmoke } from './render/halfSmoke';
 import { gunsSeen } from './app/gunsSeen';
 import { ShotsSeen, type Flash, type Strike } from './app/shotsSeen';
-import { battery } from './sim/guns/guns';
+import { battery, gunAt } from './sim/guns/guns';
 import { toWorld, type ShipPose } from './sim/ship/motion';
 import { shipY, shipZ } from './sim/ship/section';
 import { SeaSound } from './audio/seaSound';
@@ -156,6 +156,8 @@ declare global {
       firedAgo: (index: number) => number;
       /** The eye put at `eye` (her space) looking `yaw` and `pitch` (rad), for checks that stand beside something (tools/shot/men.mjs). */
       eyeAt: (eye: [number, number, number], yaw: number, pitch: number) => void;
+      /** Where each gun of ship `index` is in her drill now, in battery order (the drill check waits for a step). */
+      drill: (index: number) => string[];
     };
     /**
      * Walking (`?walk`), for shots: the captain pushed by the left thumb (`forward`, `strafe`: -1..1) for so many
@@ -467,6 +469,7 @@ async function start(): Promise<void> {
     },
     other: () => (other?.group.visible ? { drawn: other.trianglesDrawn, near: other.nearDrawn, apart: Math.round(other.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null),
     eyeAt: (eye, yaw, pitch) => { where = { name: 'check', eye, look: { yaw, pitch } }; input.look = { yaw, pitch }; },
+    drill: (index) => { const guns = match.state.ships[index]?.guns; return guns ? battery().map((_, g) => gunAt(guns, g).drill) : []; },
     firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
   };
   if (match && !params.menu) {

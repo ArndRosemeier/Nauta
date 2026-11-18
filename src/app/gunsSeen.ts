@@ -1,10 +1,11 @@
 /**
  * How a ship's guns stand in a match's state, for the drawing (plan N5.4a, render/ship/gunsView.ts): each gun how far
- * run out on her slide or truck, how she is trained, and whether her port's lid is wanted up. The drill decides it all
+ * run out on her slide or truck, how she is trained and elevated, and whether her port's lid is wanted up. The drill decides it all
  * (sim/guns/guns.ts); this only reads it out. Pure.
  *
  * - **Run out** (1) and **run in** (0): she stands run in while housed, loading, ramming, loaded and being sponged;
  *   running out and running in she moves by the share of the work done; ready she stands run out.
+ * - **Trained and elevated** as the gun captains lay her (`laidAt`).
  * - **Fired**, she leaps back on her breeching (`recoilOut`): most of the way in the first fifth of her recoil, then
  *   brought up by the breeching with a little rebound, and at rest run in. Drawn by the frame's clock from the instant
  *   she fired where the drawing knows it, else by her drill's work left (a step's resolution).
@@ -16,10 +17,11 @@ import type { GunKind } from '../sim/rules/ships';
 import { battery, drillSeconds, gunAt, gunRow, handWork, laidAt, type Gun } from '../sim/guns/guns';
 import type { SimShip } from '../sim/state';
 
-/** One gun as drawn: run out (0 run in .. 1 run out), trained (rad, + toward the bow), and her lid wanted up. */
+/** One gun as drawn: run out (0 run in .. 1 run out), trained (rad, + toward the bow), elevated (rad, + muzzle up), and her lid wanted up. */
 export interface GunSeen {
   readonly out: number;
   readonly train: number;
+  readonly lift: number;
   readonly lid: boolean;
 }
 
@@ -60,6 +62,6 @@ function runOutShare(g: Gun, kind: GunKind, firedFor: number): number {
 export function gunsSeen(ship: SimShip, firedFor: (gun: number) => number): GunSeen[] {
   return battery().map((place, i) => {
     const g = gunAt(ship.guns, i);
-    return { out: Math.max(0, Math.min(1, runOutShare(g, place.gun, firedFor(i)))), train: laidAt(g).train, lid: !g.dismounted && (ship.told.quarters || g.drill !== 'housed') };
+    return { out: Math.max(0, Math.min(1, runOutShare(g, place.gun, firedFor(i)))), train: laidAt(g).train, lift: laidAt(g).elevation, lid: !g.dismounted && (ship.told.quarters || g.drill !== 'housed') };
   });
 }
