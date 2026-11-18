@@ -8,10 +8,11 @@
  * The course runs in order, each lesson waiting until it is done and reminded every `REMIND_SECONDS`: welcome; look
  * about; walk to the master; the glass; make sail; full and by; tack; steer for her; she wakes, beat to quarters; hold for the word;
  * close, her on the beam; then the fight. Tips come once each, at the moment they are wanted, and take the marker
- * while their order is still to give: below and aloft, as they bear, the word when the guns first bear, the pumps, the
- * fire party, the wreckage, and the end. The other captain's ship lies hove to (`foeWaits`) until the course reaches
+ * while their order is still to give: below and aloft, as they bear, the word when the guns first bear, the wreckage,
+ * and the end. The pumps and the fire party he sends himself, once, and says so (`HELPS`, even with the lessons
+ * skipped). The other captain's ship lies hove to (`foeWaits`) until the course reaches
  * the quarters, or the ships come within `WAKE_RANGE`, or `WAKE_AFTER` has passed; once she is awake and near
- * (`HURRY_RANGE`), sailing lessons not yet done are left for the quarters.
+ * (`HURRY_RANGE`), sailing lessons not yet done give way to steering for her.
  */
 import { angleDiff } from '@futuremagic/core';
 import { sideReports } from '../sim/captain/sight';
@@ -37,8 +38,8 @@ import type { Voice } from './speech/speakers';
 export const FIRST_SEED = 1797;
 /** Its wind, Beaufort: force 3, a gentle breeze in which a brig tacks surely and a gun deck is steady. */
 export const FIRST_FORCE = 3;
-/** The other captain: the weakest (plan N7.1, "For N7.4: the green captain is the weak opponent"). */
-export const FIRST_FOE: Skill = 'green';
+/** The other captain: the first match's own, a step below green, weaker by his decisions only (design thread, 2026-11-18). */
+export const FIRST_FOE: Skill = 'raw';
 /** The hour it starts at, as the sky's clock reads: late morning, the sun high. */
 export const FIRST_HOUR = 10.5;
 
@@ -129,6 +130,8 @@ export interface Guide {
   readonly now: string;
   /** Whether it was asked for in this step (begun, or said again). */
   readonly asked: boolean;
+  /** Orders the first lieutenant gives himself in this step (`HELPS`). */
+  readonly gives: readonly Order[];
 }
 
 // ---- The lessons, as data ----
@@ -164,6 +167,14 @@ interface Lesson {
   readonly wake?: boolean;
   /** Once its order is taken it is not said again until one of these is heard (a tack: she is round, or missed stays). */
   readonly outcomes?: readonly string[];
+}
+
+/** What the first lieutenant does for a new captain unasked (design thread, 2026-11-18): an order he gives himself, and says so. */
+interface Help {
+  readonly id: string;
+  readonly says: readonly Line[];
+  readonly gives: Order;
+  readonly starts: (s: Seen, m: Memory) => boolean;
 }
 
 const sailOrder = (canvas: 'plain'): Order => ({ kind: 'sail', ship: 0, canvas });
@@ -229,8 +240,8 @@ const COURSE: readonly Lesson[] = [
   { id: 'fight', says: ['lesson.fight'], starts: (_, m) => m.heard.has('fired word'), done: () => false },
 ];
 
-/** The course's lessons a wakened enemy close by cuts short: the sailing ones, up to the quarters. */
-const QUARTERS = COURSE.findIndex((l) => l.id === 'quarters');
+/** The course's lessons a wakened enemy close by cuts short: the sailing ones, up to steering for her. */
+const FOLLOW = COURSE.findIndex((l) => l.id === 'follow');
 
 /** The tips: each once, at its moment. */
 const TIPS: readonly Lesson[] = [
@@ -243,19 +254,20 @@ const TIPS: readonly Lesson[] = [
     starts: gunsBearForWord, done: (s, m) => told(s).word || m.heard.has('taken:fire') || !waitingForWord(s.state, s.ship), most: TIP_MOST,
   },
   {
-    id: 'pumps', says: ['lesson.pumps'], tap: 'first lieutenant', items: ['life', 'pumps'], wants: plainOrder('pumps'),
-    starts: (s, m) => m.heard.has('water') && told(s).pumps === null, done: (s) => told(s).pumps !== null, most: TIP_MOST,
-  },
-  {
-    id: 'fires', says: ['lesson.fires'], tap: 'first lieutenant', items: ['life', 'fires'], wants: plainOrder('fires'),
-    starts: (s, m) => (m.heard.has('hit:fire') || m.heard.has('aftermath:fire')) && told(s).fires === null, done: (s) => told(s).fires !== null, most: TIP_MOST,
-  },
-  {
     id: 'wreckage', says: ['lesson.wreckage'], tap: 'first lieutenant', items: ['life', 'wreckage'], wants: plainOrder('wreckage'),
     starts: (s, m) => m.heard.has('aftermath:fell') && told(s).wreckage === null, done: (s) => told(s).wreckage !== null, most: TIP_MOST,
   },
   { id: 'won', says: ['lesson.won', 'lesson.next'], starts: (s) => s.state.fight.end?.lost[1 - s.ship] != null && s.state.fight.end.lost[s.ship] === null },
   { id: 'lost', says: ['lesson.lost', 'lesson.next'], starts: (s) => s.state.fight.end?.lost[s.ship] != null },
+];
+
+/**
+ * In the first match the first lieutenant sends the hands to the pumps and the fire party himself, once, and says so
+ * (whether the lessons run or were skipped): a new captain learns what they are for before he must think of them.
+ */
+const HELPS: readonly Help[] = [
+  { id: 'pumps', says: ['lesson.pumps'], gives: plainOrder('pumps'), starts: (s, m) => m.heard.has('water') && told(s).pumps === null },
+  { id: 'fires', says: ['lesson.fires'], gives: plainOrder('fires'), starts: (s, m) => (m.heard.has('hit:fire') || m.heard.has('aftermath:fire')) && told(s).fires === null },
 ];
 
 /** The keys of what of hers a step's events and notices hold, for the lessons' `heard` (her own only; the end for both). */
@@ -289,6 +301,7 @@ export class Lessons {
   private running: Running | null = null;
   private readonly tips: Running[] = [];
   private readonly tipped = new Set<string>();
+  private readonly helped = new Set<string>();
   /** Everything of hers heard since the lessons began (the tips' triggers). */
   private readonly ever = new Set<string>();
   private awake = false;
@@ -324,12 +337,19 @@ export class Lessons {
   /** One step of the match. */
   guideFor(s: Seen): Guide {
     const t = s.state.tick / STEPS_PER_SECOND, says: Say[] = [], keys = heardKeys(s.heard, s.ship);
+    for (const k of keys) this.ever.add(k);
+    const gives: Order[] = [];
+    for (const h of HELPS) {
+      if (this.helped.has(h.id) || !h.starts(s, { began: t, heard: this.ever })) continue;
+      this.helped.add(h.id);
+      gives.push({ ...h.gives, ship: s.ship });
+      for (const line of h.says) says.push(this.sayOf(null, line, s, 0));
+    }
     if (this.stopped) {
       const wake = !this.awake;
       this.awake = true;
-      return { says, tap: null, items: [], wants: null, wake, now: '', asked: false };
+      return { says, tap: null, items: [], wants: null, wake, now: '', asked: false, gives };
     }
-    for (const k of keys) this.ever.add(k);
     for (const r of [this.running, ...this.tips]) {
       if (!r) continue;
       const w = r.lesson.wants;
@@ -343,8 +363,8 @@ export class Lessons {
     const asked = new Set<Lesson>();
     const wakeNow = () => { if (!this.awake) { this.awake = wake = true; } };
     if (t >= WAKE_AFTER || shipsApart(s) <= WAKE_RANGE) wakeNow();
-    // Awake and near: the sailing lessons left give way to the quarters.
-    if (this.awake && this.course < QUARTERS && shipsApart(s) <= HURRY_RANGE) { this.course = QUARTERS; this.running = null; }
+    // Awake and near: the sailing lessons left give way to steering for her (then the quarters).
+    if (this.awake && this.course < FOLLOW && shipsApart(s) <= HURRY_RANGE) { this.course = FOLLOW; this.running = null; }
 
     // The course: the running lesson done (or passed on), the next begun when it may.
     const utter = (lesson: Lesson, lines: readonly Line[], delay = 0) => {
@@ -392,7 +412,7 @@ export class Lessons {
     }
     // The marker: a tip with an order to give first, else the course's lesson.
     const holder = [...this.tips, this.running].find((r) => r && (r.lesson.tap || r.lesson.wants))?.lesson ?? null;
-    return { says, tap: holder?.tap ?? null, items: holder?.items ?? [], wants: holder?.wants ?? null, wake, now: holder?.id ?? '', asked: !!holder && asked.has(holder) };
+    return { says, tap: holder?.tap ?? null, items: holder?.items ?? [], wants: holder?.wants ?? null, wake, now: holder?.id ?? '', asked: !!holder && asked.has(holder), gives };
   }
 
   /** A lesson not done is said again after `REMIND_SECONDS`, but not while its order could not be taken now (she is in stays, it is under way). */
@@ -413,11 +433,11 @@ export class Lessons {
    * A line of a lesson as the bubbles take it: its mouse-and-keys wording where he plays so and it has one, "tap" or
    * "click" filled in, and the glass's line naming where she lies.
    */
-  private sayOf(lesson: Lesson, line: Line, s: Seen, delay: number): Say {
+  private sayOf(lesson: Lesson | null, line: Line, s: Seen, delay: number): Say {
     const mouse = s.hands === 'mouse' || s.hands === 'dot', mouseLine = `${line}.mouse`;
     const said = mouse && mouseLine in PHRASES ? mouseLine as Line : line;
     const off = line === 'lesson.glass' ? herOff(s.state, s.ship) : null;
     const terms: Record<string, Term> = { tap: mouse ? 'click' : 'tap', Tap: mouse ? 'Click' : 'Tap', ...(off !== null ? { where: whereTerm(off) } : {}) };
-    return { voice: lesson.voice ?? 'first lieutenant', ship: s.ship, line: said, kind: 'lesson', terms, ...(delay > 0 ? { delay } : {}) };
+    return { voice: lesson?.voice ?? 'first lieutenant', ship: s.ship, line: said, kind: 'lesson', terms, ...(delay > 0 ? { delay } : {}) };
   }
 }
