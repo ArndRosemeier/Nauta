@@ -19,6 +19,8 @@ export class CrewSound {
   private readonly out: CrewHeard = { shots: [], beds: [] };
   /** She beats to quarters (N5.3 sets it with its order): the drum is heard while true. */
   drum = false;
+  /** The sandbox's day clock (game minutes since its first day began), or null: the bell strikes by the match's clock. */
+  day: number | null = null;
 
   /** `ship`: hers in the match (0 with no match: then only the bell is heard, `bellAlone`). */
   constructor(private readonly sound: Speaker, seed: number, ship = 0) {
@@ -39,13 +41,13 @@ export class CrewSound {
    * it is in (`ShipSound.aboard`'s). Decided even before sound opens, so what was ordered then is not piped late.
    */
   atWork(ship: SimShip, t: number, pose: ShipPose, eye: readonly [number, number, number], room: Room): void {
-    const heard = this.watch.listen({ ship, t, pose, ear: eye, below: room.below, drum: this.drum }, this.out);
+    const heard = this.watch.listen({ ship, t, pose, ear: eye, below: room.below, drum: this.drum, day: this.day }, this.out);
     this.play(heard);
   }
 
   /** One frame on her with no match running: only the bell, every BELL_EVERY of `t`, the page's clock (s since it started). */
   bellAlone(t: number, pose: ShipPose, room: Room): void {
-    this.play(this.watch.bellAlone({ t, pose, below: room.below }, this.out));
+    this.play(this.watch.bellAlone({ t, pose, below: room.below, day: null }, this.out));
   }
 
   private play(heard: CrewHeard): void {

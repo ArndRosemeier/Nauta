@@ -22,7 +22,8 @@ import { toWorld } from '../src/sim/ship/motion.ts';
 import { placeSpot } from '../src/sim/crew/roster.ts';
 import { startMatch, type SimShip } from '../src/sim/state.ts';
 import type { SimEvent } from '../src/sim/step.ts';
-import { DEGREE, STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
+import { DEGREE, MINUTES_PER_HOUR, SECONDS_PER_MINUTE, STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
+import { BELL_MINUTES, DAY_PACE } from '../src/sim/rules/day.ts';
 import { steadyWind } from './support/sail.ts';
 import './support/warm.ts';
 
@@ -42,7 +43,7 @@ interface Heard extends CrewShot { readonly t: number }
  * The crew given `orders` (each at its tick) and stepped for `seconds`, heard from `ear` each step with the ship's
  * match's clock starting at `from` s; every shot heard, with its time, and the beds at each step.
  */
-function listen(orders: readonly { tick: number; order: Order }[], seconds: number, o: { ear?: readonly [number, number, number]; below?: number; from?: number; drum?: boolean; extra?: (tick: number) => SimEvent[] } = {}) {
+function listen(orders: readonly { tick: number; order: Order }[], seconds: number, o: { ear?: readonly [number, number, number]; below?: number; from?: number; drum?: boolean; day?: (t: number) => number; extra?: (tick: number) => SimEvent[] } = {}) {
   const sailing = startSailing({ heading: HEADING, speed: 3 }, WIND, FORCE);
   let told = startOrders(HEADING, 'battle'), crew = startCrew();
   const watch = new CrewWatch(SEED), shots: Heard[] = [], beds: CrewHeard['beds'][] = [], out: CrewHeard = { shots: [], beds: [] };
@@ -60,7 +61,7 @@ function listen(orders: readonly { tick: number; order: Order }[], seconds: numb
     told = c.told; crew = r.crew;
     const t = (o.from ?? 0) + tick * STEP_SECONDS;
     watch.note(events);
-    watch.listen({ ship: { ...BASE, told, crew }, t, pose: BASE.motion.pose, ear: o.ear ?? QUARTERDECK, below: o.below ?? 0, drum: o.drum ?? false }, out);
+    watch.listen({ ship: { ...BASE, told, crew }, t, pose: BASE.motion.pose, ear: o.ear ?? QUARTERDECK, below: o.below ?? 0, drum: o.drum ?? false, day: o.day?.(t) ?? null }, out);
     for (const s of out.shots) shots.push({ ...s, t });
     beds.push([...out.beds]);
   }
@@ -184,8 +185,15 @@ test('the ship\'s bell: struck every five minutes of the match, one bell more ea
   const heard = listen([], 1, { from: 3 * BELL_EVERY - 1 / 2 }).shots.filter((s) => s.id === BELL.id);
   assert.equal(heard.length, 3);
   const alone = new CrewWatch(SEED), out: CrewHeard = { shots: [], beds: [] };
-  alone.bellAlone({ t: BELL_EVERY - STEP_SECONDS, pose: BASE.motion.pose, below: 0 }, out);
-  assert.equal(alone.bellAlone({ t: BELL_EVERY, pose: BASE.motion.pose, below: 0 }, out).shots.length, 1, 'with no match, by the page\'s clock');
+  alone.bellAlone({ t: BELL_EVERY - STEP_SECONDS, pose: BASE.motion.pose, below: 0, day: null }, out);
+  assert.equal(alone.bellAlone({ t: BELL_EVERY, pose: BASE.motion.pose, below: 0, day: null }, out).shots.length, 1, 'with no match, by the page\'s clock');
+});
+
+test('in the sandbox the bell strikes the day\'s watches by the day clock, and the five-minute bell is silent', () => {
+  // Started at 8:29 (a minute before two bells of the forenoon... one bell at 8:30) the day passes 8:30 half a real minute in.
+  const start = 8 * MINUTES_PER_HOUR + BELL_MINUTES - 1, heardBells = (from: number, seconds: number) => listen([], seconds, { from, day: (t) => start + (t / SECONDS_PER_MINUTE) * DAY_PACE }).shots.filter((s) => s.id === BELL.id).length;
+  assert.equal(heardBells(0, SECONDS_PER_MINUTE), 1, 'one bell at half past eight');
+  assert.equal(heardBells(BELL_EVERY - 1, 2), 0, 'not the five-minute bell: the day clock rules');
 });
 
 test('the drum is heard where the drummer stands while she beats to quarters, and not otherwise', () => {

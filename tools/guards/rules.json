@@ -110,6 +110,11 @@
       "what": "the seed every random number of a match comes from (made once by startMatch)"
     },
     {
+      "field": "dayStart",
+      "owner": "src/sim/state.ts",
+      "what": "the game minute of the day a sandbox match starts at, or null for a fight (made once by startMatch; the clock is a function of tick, day.ts)"
+    },
+    {
       "field": "wind",
       "owner": "src/sim/state.ts",
       "what": "a match's wind (made once by startMatch; its swings and gusts are a function of time)"

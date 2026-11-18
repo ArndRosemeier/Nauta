@@ -12,6 +12,7 @@ import { clamp, hash3i, hashToFloat, lerp } from '@futuremagic/core';
 import { goingAt } from '../sim/crew/going';
 import { heightAt, lineLength, routeNetwork } from '../sim/crew/network';
 import { jobWork } from '../sim/crew/drill';
+import { bellsPassed } from '../sim/day';
 import { manAt, placeAt, type Task } from '../sim/crew/crew';
 import { brigRoster } from '../sim/crew/roster';
 import type { SailingOrder } from '../sim/orders';
@@ -57,10 +58,12 @@ export interface CrewScene {
   readonly below: number;
   /** She beats to quarters (N5.3): the drum. */
   readonly drum: boolean;
+  /** The sandbox's day clock, game minutes since its first day began (sim/day.ts `dayElapsed`): the bell then strikes the day's watches; null: every BELL_EVERY of the match. */
+  readonly day: number | null;
 }
 
 /** Where and when a sound is heard: the clock, her pose, the ear's side of her decks. */
-export type Hearing = Pick<CrewScene, 't' | 'pose' | 'below'>;
+export type Hearing = Pick<CrewScene, 't' | 'pose' | 'below' | 'day'>;
 
 /** What a frame gives: the sounds to start (in `shots`) and the beds to hold (in `beds`), both cleared first. */
 export interface CrewHeard extends Heard {
@@ -91,7 +94,11 @@ export function belowDeck(space: string): boolean {
 export function bellStrikes(before: number, now: number): number[] {
   const n = Math.floor(now / BELL_EVERY);
   if (n < 1 || n === Math.floor(before / BELL_EVERY) || now < before) return [];
-  const strikes = ((n - 1) % BELLS_A_WATCH) + 1;
+  return strikeDelays(((n - 1) % BELLS_A_WATCH) + 1);
+}
+
+/** The delays of `strikes` bells struck in pairs, s from the first. */
+function strikeDelays(strikes: number): number[] {
   const out: number[] = [];
   for (let k = 0, at = 0; k < strikes; k++) {
     out.push(at);
@@ -137,6 +144,7 @@ export class CrewWatch {
   /** Pulls of the braces still to come as she comes round, s. */
   private bracePulls: number[] = [];
   private clock: number | null = null;
+  private dayClock: number | null = null;
 
   constructor(private readonly seed: number, private readonly shipIndex = 0) {}
 
@@ -282,10 +290,11 @@ export class CrewWatch {
 
   /** The bell, struck where it hangs as the match's clock passes each of its times. */
   private bell(s: Hearing, out: CrewHeard): void {
-    const was = this.clock;
+    const was = this.clock, dayWas = this.dayClock;
     this.clock = s.t;
+    this.dayClock = s.day;
     if (was === null) return;
-    const strikes = bellStrikes(was, s.t);
+    const strikes = s.day === null ? bellStrikes(was, s.t) : strikeDelays(bellsPassed(dayWas, s.day));
     if (strikes.length === 0) return;
     const fore = shipPlan().masts.find((m) => m.mast === 'fore')!;
     const spot: Spot = { space: 'deck', along: fore.along - BELL_ABAFT_FOREMAST, across: 0 };
