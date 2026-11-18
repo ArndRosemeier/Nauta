@@ -50,6 +50,32 @@ export async function openGame({ base, browser }, query, viewport, hasTouch = fa
   return { page, context, failed: () => failed };
 }
 
+/**
+ * A finger put down in the middle of a view `size` big, moved by `dx`, `dy` in steps and lifted: the same pointer
+ * events a tablet sends (the touch look).
+ */
+export async function drag(page, size, [dx, dy]) {
+  const x = size.width / 2, y = size.height / 2, steps = 8;
+  const touch = (type, px, py) => page.evaluate(([t, a, b]) => {
+    document.getElementById('view').dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: a, clientY: b, bubbles: true }));
+  }, [type, px, py]);
+  await touch('pointerdown', x, y);
+  for (let s = 1; s <= steps; s++) await touch('pointermove', x + (dx * s) / steps, y + (dy * s) / steps);
+  await touch('pointerup', x + dx, y + dy);
+}
+
+/**
+ * Waits for `n` more of the page's frames. Where the stand-in swap chain paces them (swapchain.js) each waits for the
+ * GPU, so two after a change of the view's size or a drag see the frame in flight finished and the next one, drawn at
+ * the new size and look, sent; `snap` then waits for that one.
+ */
+export async function frames(page, n = 2) {
+  await page.evaluate((count) => new Promise((done) => {
+    const next = (left) => (left ? requestAnimationFrame(() => next(left - 1)) : done());
+    next(count);
+  }), n);
+}
+
 /** The page's picture in `path`: the last frame painted first where the stand-in swap chain draws (swapchain.js). */
 export async function snap(page, path) {
   if (!process.env.SHOT_GPU) await page.evaluate(() => window.__presentWebGPU?.());

@@ -4,6 +4,11 @@
  * device is lost on the first frame ("A valid external Instance reference no longer exists"). So `getContext('webgpu')`
  * hands back a context whose current texture is a plain texture; `window.__presentWebGPU()` reads the last frame back and
  * paints it into the same canvas through its 2D context, for the screenshot. The page itself is not changed.
+ *
+ * A real swap chain holds the page back while the GPU is behind; a plain texture does not, so the page would queue
+ * frames far faster than the software GPU draws them (60 a second against one or two), and a picture taken later waits
+ * for minutes of queued frames. So `requestAnimationFrame` here calls back only once the GPU has done the work sent so
+ * far, as a swap chain would pace it.
  */
 (() => {
   if (!('gpu' in navigator)) return;
@@ -27,6 +32,18 @@
       return this.tex;
     }
   }
+  const realRequest = window.requestAnimationFrame.bind(window), realCancel = window.cancelAnimationFrame.bind(window);
+  /** Callbacks asked for, by the id handed out: the browser's own id once the GPU has caught up, or null until then. */
+  const asked = new Map();
+  let nextId = 0;
+  window.requestAnimationFrame = (callback) => {
+    const id = ++nextId, device = last?.config?.device;
+    asked.set(id, null);
+    const ask = () => { if (asked.has(id)) asked.set(id, realRequest((t) => { asked.delete(id); callback(t); })); };
+    if (device) device.queue.onSubmittedWorkDone().then(ask); else ask();
+    return id;
+  };
+  window.cancelAnimationFrame = (id) => { const real = asked.get(id); if (real) realCancel(real); asked.delete(id); };
   HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
     if (kind !== 'webgpu') return realGetContext.call(this, kind, ...rest);
     this.__standIn ??= new StandInContext(this);

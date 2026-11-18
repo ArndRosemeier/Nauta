@@ -23,6 +23,7 @@
     "check:gunnery": "tsx tools/sim/gunnery.ts",
     "plan:draw": "tsx tools/plan/draw.ts",
     "shot:sea": "node tools/shot/sea.mjs",
+    "check:shots": "node tools/shot/check.mjs",
     "walk:check": "tsx tools/walk/everywhere.ts"
   },
   "dependencies": {

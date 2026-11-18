@@ -251,6 +251,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The built game in a headless browser (for screenshots) | `tools/shot/browser.mjs#openGame` |
 | A screenshot of the game, its last WebGPU frame painted first where the software GPU cannot present (`tools/shot/swapchain.js`) | `tools/shot/browser.mjs#snap` |
 | The standard sea shots (times of day × seas × eye heights), each scene set on one page by main.ts's `window.__nautaScene` | `tools/shot/sea.mjs#seaShots` |
+| Sea shots taken on a page already loaded, a scene each | `tools/shot/sea.mjs#takeSeaShots` |
+| A finger dragged across the view (the touch look), for the browser checks | `tools/shot/browser.mjs#drag` |
+| Waiting for the page's next frames in a browser check (paced to the GPU by the stand-in swap chain) | `tools/shot/browser.mjs#frames` |
+| The sum of the slow checks against the CI job's 10 minutes | `tools/guards/budget.mjs#summary` |
 | The rig's measures: masts, yards, booms, the heights yards hang at, how far they brace (Steel's brig, estimated) | `src/sim/rules/rig.ts#MAST_SPARS` |
 | Her sails' cuts and reefs | `src/sim/rules/rig.ts#SAILS` |
 | What each kind of line is and does (standing or running, diameter, its act) | `src/sim/rules/rig.ts#LINE_KINDS` |

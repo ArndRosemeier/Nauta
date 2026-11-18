@@ -49,10 +49,12 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      # The runner's own Chrome: no Playwright browser download.
-      CHROMIUM_PATH: /usr/bin/google-chrome
     steps:
+      # Every budgeted step adds its time to BUDGET_LOG; the last step sums them against the job's 10 minutes.
+      - name: The job's start and the budget log
+        run: |
+          echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+          echo "BUDGET_LOG=$RUNNER_TEMP/budget.log" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -62,11 +64,23 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - name: The game starts and draws in a browser (desktop and a dragged tablet view)
+      # Playwright's own Chromium, not the runner's Chrome: the runner's Chrome took 98 s to ready the page where
+      # Playwright's Chromium takes 14 s on a machine as large (docs/CHECKS.md). Kept between runs.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Playwright's Chromium
         run: |
-          node tools/guards/budget.mjs 120 180 -- npm run shot -- "?hud&day=0" shots/desktop.png
-          SHOT_SIZE=1180x820 SHOT_DRAG=-300,120 node tools/guards/budget.mjs 120 180 -- npm run shot -- "?hud&day=0" shots/tablet.png
+          npx playwright install chromium
+          echo "CHROMIUM_PATH=$(node -e "import('playwright').then((p) => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
+      - run: npm run build
+      # One page load serves every picture (docs/CHECKS.md): desktop, 6 sea shots from her quarterdeck, the tablet view with a drag.
+      # SHOT_TIMEOUT: a page that never gets ready fails inside the step's 3 minutes.
+      - name: The game starts and draws in a browser (desktop, a dragged tablet view, the sea shots from her quarterdeck)
+        env:
+          SHOT_TIMEOUT: 170000
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:shots -- shots
       - name: The same orders give the same state after ten simulated minutes, in two processes and through bytes
         run: node tools/guards/budget.mjs 120 180 -- npm run check:replay
       - name: The brig sails, tacks and heels within her limits in every wind, through the sea and the gusts
@@ -75,13 +89,14 @@ jobs:
         run: node tools/guards/budget.mjs 120 180 -- npm run walk:check
       - name: Round shot fired as they bear strikes a brig about as often as the design says at 100, 200 and 400 m (N5.2)
         run: node tools/guards/budget.mjs 120 180 -- npm run check:gunnery
-      - name: The standard sea shots (times of day, seas, eye heights) within their 3 minutes
-        run: node tools/guards/budget.mjs 120 180 -- npm run shot:sea -- shots/sea
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: shots
           path: shots
+      - name: All slow checks together within the job's 10 minutes
+        if: always()
+        run: node tools/guards/budget.mjs --sum 600
 
   # The one status that says CI passed.
   check:
