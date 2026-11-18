@@ -26,6 +26,7 @@ import { give, startSail, startTold } from './support/crew.ts';
 import { musterCrew } from './support/muster.ts';
 import { STAND_BY_CLIPS, attentiveClip } from '../src/app/standBy.ts';
 import { duelSetup } from './support/match.ts';
+import { CLIMBED, crewLadder } from '../src/app/ladders.ts';
 
 const roster = brigRoster(), knobs = QUALITY_LEVELS[0]!.crew;
 const ship = startMatch(duelSetup(1805, 4)).ships[0]!;
@@ -158,6 +159,27 @@ test('making sail, men on their way walk or run and men at work play their job\'
     assert.ok(Math.abs(h.z - (a[i]!.z + b[i]!.z) / 2) < 1e-9 && Math.abs(h.x - (a[i]!.x + b[i]!.x) / 2) < 1e-9);
   });
   assert.ok(taskOf(crew, crew.tasks[0]!.hands[0]!));
+});
+
+test('a man on a ladder or the shrouds is drawn climbing, on the rungs of his way, and never runs there or aloft (Arnd 2026-11-18)', () => {
+  const sailing = startSail(), told = give(startTold(), sailing, { kind: 'sail', ship: 0, canvas: 'plain' });
+  let crew: Crew = ship.crew, climbing = 0, onWays = 0;
+  for (let tick = 0; tick < 25 * STEPS_PER_SECOND; tick++) {
+    crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas }).crew;
+    if (tick % STEPS_PER_SECOND) continue;
+    const now = { ...ship, crew };
+    for (const d of drawnAll(now, now)) {
+      if (d.way !== null || routeNetwork().surfaces.has(d.space)) assert.notEqual(d.clip, RUNNING, `no one runs on a way or aloft (${d.way ?? d.space})`);
+      if (d.way !== null) onWays++;
+      if (!d.climb) continue;
+      climbing++;
+      assert.ok(CLIMBED.has(d.climb.kind) && d.way === d.climb.kind);
+      const on = crewLadder(d.climb, d.y);
+      assert.ok(on && on.h >= 0 && on.h <= on.ladder.hi - (on.ladder.rim ? on.ladder.lo : on.ladder.floor) + 1, `${d.climb.way}: his feet are on its rungs`);
+      assert.ok(d.climbEase >= 0 && d.climbEase <= 1);
+    }
+  }
+  assert.ok(onWays > 0 && climbing > 0, 'men climb in making sail');
 });
 
 test('men are placed again less often far off and out of sight, spread evenly over the frames', () => {

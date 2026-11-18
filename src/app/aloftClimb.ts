@@ -22,6 +22,7 @@ import { pushOf } from '../sim/ship/deckWalk';
 import type { RigPlan } from '../sim/ship/rig';
 import { shipZ } from '../sim/ship/section';
 import type { Spot } from '../sim/ship/plan';
+import { ladderAt as ladderAtOf } from './ladders';
 
 /** The climber's body for the figure: his height (the hips at the figure's usual share of it, `HIP_SHARE_FIGURE`). */
 export const CLIMBER: Climber = { height: BODY.height, hipHeight: 0 };
@@ -60,10 +61,7 @@ export function walkTo(x: number, z: number, y: number, dx: number, dz: number, 
 }
 
 /** The ladder of a chain at a height, and the feet's height over its base there. */
-function ladderAt(chain: Chain, y: number): OnLadder {
-  const l = chain.rim && y > chain.rim.lo ? chain.rim : chain.bottom;
-  return { ladder: l, h: y - (l.rim ? l.lo : l.floor) };
-}
+const ladderAt = (chain: Chain, y: number): OnLadder => ladderAtOf(chain.bottom, chain.rim, y);
 
 /** The bowsprit's edge got up over from her deck beside its heel, on a side: a rim with two steps under it. */
 function bowspritEdge(rig: RigPlan, side: number, deckY: number, along?: number): Ladder {
