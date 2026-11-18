@@ -23,6 +23,16 @@ What keeps tests fast:
 - A fixture several files need is built once and frozen, not once per test.
 - A test that outgrows 2 s gets a smaller fixture or is split. It does not get a longer limit.
 
+### Keeping the suite inside its 30 s as the game grows
+
+The 30 s are for the whole game, through the last milestone, not for what exists today (design thread, 2026-11-18, after one night's packages took the suite on CI to 21 s). CI is up to twice as slow as a quiet desk, and slower again while test files run side by side. So:
+
+- **Half the limit is the working limit.** `npm test` warns when one test passes 1 s or one file 2.5 s (`testWarn`, `fileWarn`). A thread treats a warning on its own files as a failure and fixes it before merging; a test at 1.5 s on a desk is a test that fails on CI by chance.
+- **`npm test` checks rules, a slow check plays the game.** A test in `npm test` steps the simulation for at most 60 simulated seconds, and a test file for at most 5 simulated minutes in all. It proves a rule on the smallest case that shows it: one order, one gun, one hole, from a state built for the purpose. Whatever needs minutes of simulated time (heaving to until she stops, a tack from start to finish in a seaway, a crew carrying out every order, a whole fight) is a scenario in that area's slow check (`check:sailing`, `check:replay`, and one more per area as it comes), where it joins the scenarios already there and does not get a script of its own.
+- **A package's share.** A work package adds at most about 1 s of test time to the suite on a desk (the sum of its tests as the run prints them). One that needs more moves scenarios to its slow check.
+- **The suite's warning is a stop sign.** While `npm test` on CI is over its 20 s warning, nothing that adds test time merges; the first job is to bring it back under, starting with the slowest files the run lists.
+- Fixtures are built once per file and frozen (a rig plan, a ship plan, a sea), never once per test.
+
 ### Timing tests
 
 A test never asserts bare milliseconds: a CI runner is slower than the tablet and shares its cores with the other test files, so such a test fails by chance and gets flakier as the suite grows. A test that guards a cost uses `pace(work, pairs)` from `test/support/pace.ts`: the work's time as a share of a reference loop of plain sines and cosines, measured in the same rounds on the same machine. The limit is then a ratio that holds on any machine. The milliseconds themselves (a sea sample, a simulation step, a frame) are measured where they count, on the tablet, by `?bench`.

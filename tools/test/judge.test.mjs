@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { judge } from './judge.mjs';
 
-const budgets = { test: 2, file: 5, suiteWarn: 20, suiteFail: 30 };
+const budgets = { test: 2, testWarn: 1, file: 5, fileWarn: 2.5, suiteWarn: 20, suiteFail: 30 };
 const t = (file, name, seconds) => ({ file, name, seconds });
 
 test('a quick run passes and names its slowest tests, slowest first', () => {
@@ -22,6 +22,14 @@ test('a test past its own limit fails, by name, though its file is within its li
   const r = judge([t('long.test.ts', 'one long test', 2.4), t('long.test.ts', 'quick', 0.1)], 3, budgets);
   assert.equal(r.failures.length, 1);
   assert.match(r.failures[0], /long\.test\.ts: "one long test" took 2\.4 s/);
+});
+
+test('a test or a file past half its limit warns and does not fail', () => {
+  const r = judge([t('near.test.ts', 'a', 1.2), t('near.test.ts', 'b', 0.9), t('near.test.ts', 'c', 0.8)], 3, budgets);
+  assert.deepEqual(r.failures, []);
+  assert.equal(r.warnings.length, 2);
+  assert.match(r.warnings[0], /"a" took 1\.2 s/);
+  assert.match(r.warnings[1], /near\.test\.ts took 2\.9 s/);
 });
 
 test('the suite warns past its warning and fails past its budget', () => {

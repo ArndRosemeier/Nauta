@@ -15,9 +15,11 @@ export function judge(tests, wall, budgets) {
   for (const t of slowest) lines.push(`  ${t.seconds.toFixed(2)} s  ${t.file}: ${t.name}`);
   for (const t of tests) {
     if (t.name !== t.file && t.seconds > budgets.test) failures.push(`${t.file}: "${t.name}" took ${t.seconds.toFixed(1)} s, past the ${budgets.test} s one test may take`);
+    else if (t.name !== t.file && t.seconds > budgets.testWarn) warnings.push(`${t.file}: "${t.name}" took ${t.seconds.toFixed(1)} s, past the ${budgets.testWarn} s warning for one test (it fails at ${budgets.test} s, and CI is slower than a desk)`);
   }
   for (const [file, s] of [...perFile].sort((a, b) => b[1] - a[1])) {
     if (s > budgets.file) failures.push(`${file} took ${s.toFixed(1)} s, past the ${budgets.file} s a test file may take`);
+    else if (s > budgets.fileWarn) warnings.push(`${file} took ${s.toFixed(1)} s, past the ${budgets.fileWarn} s warning for one test file (it fails at ${budgets.file} s)`);
   }
   if (wall > budgets.suiteFail) failures.push(`the suite took ${wall.toFixed(1)} s, past its ${budgets.suiteFail} s budget`);
   else if (wall > budgets.suiteWarn) warnings.push(`the suite took ${wall.toFixed(1)} s, past its ${budgets.suiteWarn} s warning (it fails at ${budgets.suiteFail} s)`);
