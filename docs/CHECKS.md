@@ -8,8 +8,8 @@ The numbers live in `tools/test/budgets.json`. **Raising one needs Arnd's OK**, 
 
 | Limit | Value | What happens |
 |---|---|---|
-| One test | **2 s** | The runner stops it and it fails (`--test-timeout`). |
-| One test file | **5 s** (its tests added up) | The run fails, naming the file. |
+| One test | **2 s** | The run fails, naming the test. |
+| One test file | **5 s** (its tests added up) | The runner stops the file there (`--test-timeout`) and the run fails, naming the file. A test that hangs is stopped with its file. |
 | The whole of `npm test` | warns at **20 s**, fails at **30 s** | The run fails, on a desk as in CI. |
 | A slow check (browser, screenshots, a long simulated fight) | warns at **2 min**, fails at **3 min** each | `tools/guards/budget.mjs` around the step in CI. |
 | All slow checks together | **10 min** | The CI job's own limit. |

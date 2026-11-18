@@ -18,6 +18,12 @@ test('a file whose tests add up past its limit fails, by name', () => {
   assert.match(r.failures[0], /slow\.test\.ts took 5\.7 s/);
 });
 
+test('a test past its own limit fails, by name, though its file is within its limit', () => {
+  const r = judge([t('long.test.ts', 'one long test', 2.4), t('long.test.ts', 'quick', 0.1)], 3, budgets);
+  assert.equal(r.failures.length, 1);
+  assert.match(r.failures[0], /long\.test\.ts: "one long test" took 2\.4 s/);
+});
+
 test('the suite warns past its warning and fails past its budget', () => {
   assert.equal(judge([], 20.5, budgets).warnings.length, 1);
   assert.equal(judge([], 20.5, budgets).failures.length, 0);
