@@ -1,0 +1,2 @@
+Sails no longer pass through the masts, the tops and the crosstrees: the topsails and courses hang forward of them, over the edge of the top, at every brace and in every wind, and the boom sail stays abaft the mainmast.
+Open ?sail&ship, say "all sail", then look from the Top and Crosstrees buttons; try a tack and "full and by".

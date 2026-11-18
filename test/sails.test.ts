@@ -8,6 +8,7 @@ import { MOST_FRAMES, swingMatrix, swingsOf } from '../src/render/ship/swings.ts
 import { ROW_FLOATS, bilerp, clothAt, sailForms, sailPoints, shiftFrame } from '../src/render/ship/sailForm.ts';
 import { FLAGS, SAIL_ATLAS_SIZE, SAIL_DETAIL, buildSailGrids, sailAtlas } from '../src/render/ship/sailGrid.ts';
 import { SailsView } from '../src/render/ship/sailsView.ts';
+import { CLEAR_MARGIN } from '../src/render/ship/sailClear.ts';
 import { HANGING } from '../src/sim/rules/rig.ts';
 import { shipPoint } from '../src/render/ship/swings.ts';
 
@@ -46,8 +47,8 @@ test('a set sail has its corners where the spars carry them, and bellies along i
   write(v);
   for (const f of FORMS) {
     const row = rowOf(v, f.index), corners = [[0, 0], [1, 0], [0, 1], [1, 1]] as const;
-    // Unbraced, its corners are its rest corners (a headsail's clew swung to its sheet).
-    corners.forEach(([u, w], i) => { if (f.kind === 0 || f.sail.kind === 'boom' || i !== 1) assert.ok(clothAt(row, u, w, T).distanceTo(f.rest[i]!) < SAME, `${f.sail.id} corner ${i}`); });
+    // Unbraced, its corners are its rest corners (a headsail's clew swung to its sheet), but for the little the masts' timber pushes them (the boom sail's tack lies in the mast).
+    corners.forEach(([u, w], i) => { if (f.kind === 0 || f.sail.kind === 'boom' || i !== 1) assert.ok(clothAt(row, u, w, T).distanceTo(f.rest[i]!) < SAME + 2 * CLEAR_MARGIN, `${f.sail.id} corner ${i}`); });
     const flat = bilerp([0, 4, 8, 12].map((k) => new Vector3(row[k]!, row[k + 1]!, row[k + 2]!)), 1 / 2, 1 / 2, new Vector3());
     const mid = clothAt(row, 1 / 2, 1 / 2, T), belly = new Vector3(row[16]!, row[17]!, row[18]!);
     const off = mid.clone().sub(flat).dot(belly);

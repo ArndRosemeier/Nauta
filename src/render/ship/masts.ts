@@ -6,7 +6,10 @@
  * the gaff are drawn into their own turning frame's solid (swings.ts), so they brace and swing with the simulation.
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
-import { CAP_THICK, CROSSTREES_DEPTH, CROSSTREES_TIMBERS, MAST_RAKE, MAST_SPARS, MASTHEAD_SIDE, TRESTLE_DEPTH, type MastName } from '../../sim/rules/rig';
+import {
+  CAP_RIM, CAP_THICK, CROSSTREES_AT, CROSSTREES_DEPTH, CROSSTREES_TIMBERS, MAST_RAKE, MAST_SPARS, MASTHEAD_SIDE, TOP_CROSSTREES_DEEP, TOP_RIM, TOPMAST_TRESTLE_REACH, TRESTLE_DEPTH,
+  TRESTLE_SIDED, type MastName,
+} from '../../sim/rules/rig';
 import { MAIN_TOP, PLANKING } from '../../sim/rules/ships';
 import { onSpar, point, topHole, type MastGeometry, type RigPoint, type Spar } from '../../sim/ship/spars';
 import { sparOf, type RigPlan } from '../../sim/ship/rig';
@@ -24,17 +27,6 @@ const SPAR_SIDES = 12;
 const FAR_SIDES = 6;
 /** Iron hoops on the lower mast: how far apart, their width and thickness, m. */
 const HOOP = { pitch: 1.25, width: 0.06, thick: 0.012 } as const;
-/** A cap reaches this far beyond the masthead aft and the mast it holds forward, and either side, m. */
-const CAP_RIM = 0.08;
-/** The trestle trees under a top: their siding, m; the crosstrees across them stand this share of the top's length either side of the mast. */
-const TRESTLE_SIDED = 0.14;
-const CROSSTREES_AT = 0.33;
-/** The crosstrees' depth under a top, m (a little shallower than the trestle trees). */
-const TOP_CROSSTREES_DEEP = 0.21;
-/** A top's rim stands this high over its floor, m. */
-const TOP_RIM = 0.09;
-/** A topmast's trestle trees reach this far fore and aft of it, m. */
-const TOPMAST_TRESTLE_REACH = 0.55;
 /** A topmast is square where it stands in the trestle trees and the cap, round above, tapering to this share at its hounds; its head square at this share. */
 const TOPMAST_HOUNDS = 0.85;
 const TOPMAST_HEAD = 0.8;
