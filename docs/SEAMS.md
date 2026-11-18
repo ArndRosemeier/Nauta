@@ -118,7 +118,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The lowest height of her hull at a place along her | `src/sim/ship/hull.ts#hullBottom` |
 | Her keel's underside along her | `src/sim/ship/hull.ts#keelBottom` |
 | The sheer: the weather deck at her side along her | `src/sim/ship/hull.ts#sheer` |
-| The top of her side along her | `src/sim/ship/hull.ts#sideTop` |
+| The top of her side along her (the draught's, lowered in the waist, N2.10) | `src/sim/ship/hull.ts#sideTop` |
+| Whether a place along her is in the waist, between the breaks of her raised decks | `src/sim/ship/hull.ts#inWaist` |
 | The weather deck's height anywhere (sheer and camber) | `src/sim/ship/hull.ts#weatherDeck` |
 | The underside of the weather deck's planking | `src/sim/ship/hull.ts#weatherDeckUnderside` |
 | The draught's sloping load waterline | `src/sim/ship/hull.ts#designWaterline` |

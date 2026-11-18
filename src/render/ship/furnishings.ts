@@ -21,7 +21,8 @@ import { OUTSIDE, zoneOfSpaces, zoneUnder } from './zones';
 import { FITTED_GLOW, FITTED_IRON, FITTED_WOOD } from '../materials';
 import { place, type Fittings, type SlotTarget } from './fittings';
 import { OAK, RED } from './looks';
-import { HAMMOCK_SLOT, HAMMOCK_WAIST, MODEL } from '../../sim/rules/fittings';
+import { HAMMOCK_SLOT, MODEL } from '../../sim/rules/fittings';
+import { inWaist } from '../../sim/ship/hull';
 import { OPENINGS } from '../../sim/rules/ships';
 import { Solid } from './solid';
 import { CARRONADE_PARTS } from './gunPlaces';
@@ -181,7 +182,7 @@ export class Furnishings {
       for (const f of here) if (!models.includes(f.model)) models.push(f.model);
       const kinds = models.map((m) => drawKind(fittings, m, !outsideOnly, 0, m === MODEL.netting ? NO_HAMMOCKS : EVERY_SLOT));
       // The nettings' hammocks, a kind of their own after the zone's fittings, in the order they are stowed.
-      const nettings = here.filter((f) => f.model === MODEL.netting && -f.z > HAMMOCK_WAIST.aft && -f.z < HAMMOCK_WAIST.fore).sort((a, b) => comesUp(a) - comesUp(b) || a.x - b.x);
+      const nettings = here.filter((f) => f.model === MODEL.netting && inWaist(-f.z)).sort((a, b) => comesUp(a) - comesUp(b) || a.x - b.x);
       const hammockKind = kinds.length;
       if (nettings.length > 0) kinds.push(drawKind(fittings, MODEL.netting, !outsideOnly, 0, HAMMOCKS));
       const draws = createInstanceDraws(renderer, kinds, { frames: [this.frame], shadow: { dir: this.sunDir, reach: SHADOW_REACH }, capacity: CAPACITY });

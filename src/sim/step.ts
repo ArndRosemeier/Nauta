@@ -141,7 +141,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     if (!answer.refused && answer.told !== ship.told) ships = ships.map((s, k) => (k === i ? { ...s, told: answer.told } : s));
   }
   // The shots in flight, each ball's piece of this step traced through the ships as they lie now (damage.ts).
-  const hits = stepHits({ seed: state.matchSeed, tick, flying: state.flying, ships: ships.map((s) => ({ pose: s.motion.pose, crew: s.crew, canvas: s.sailing.canvas, guns: s.guns, damage: s.damage })) });
+  const hits = stepHits({ seed: state.matchSeed, tick, flying: state.flying, ships: ships.map((s) => ({ pose: s.motion.pose, crew: s.crew, canvas: s.sailing.canvas, guns: s.guns, damage: s.damage, quarters: s.told.quarters })) });
   events.push(...hits.events);
   ships = ships.map((s, i) => (hits.damage[i] === s.damage && hits.guns[i] === s.guns ? s : { ...s, damage: hits.damage[i]!, guns: hits.guns[i]! }));
   const sea = followWind(state.sea, { speed: wind.speed, toward: wind.toward }, t);

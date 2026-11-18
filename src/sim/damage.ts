@@ -43,7 +43,7 @@ import { battery, dismountGun, gunAt, gunCount, type Battery } from './guns/guns
 import { pathAt, type GunFired, type Shot, type Vec } from './guns/shot';
 import {
   AT_WATERLINE, AWASH_SECONDS, CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
-  MAN_AS_OAK, PIERCE, PUMP_POST, RAKING, SEEP, SMASHED, SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, WAD_RANGE, WASH, WEEP, type Harm, type HurtBy,
+  HAMMOCKS, MAN_AS_OAK, PIERCE, PUMP_POST, RAKING, SEEP, SMASHED, SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, WAD_RANGE, WASH, WEEP, type Harm, type HurtBy,
 } from './rules/damage';
 import { SHOT, type ShotKind } from './rules/guns';
 import { LOAD_WATERLINE, type GunKind } from './rules/ships';
@@ -232,6 +232,8 @@ export interface HitShip {
   readonly canvas: readonly SailSetting[];
   readonly guns: Battery;
   readonly damage: Damage;
+  /** Whether she is at quarters, her hammocks stowed in the waist's nettings. Left out: she is not. */
+  readonly quarters?: boolean;
 }
 export interface HitsOut {
   readonly flying: Flying[];
@@ -275,7 +277,10 @@ function aboardOf(s: HitShip, w: Working, roster: readonly Man[]): Aboard {
   });
   const mounted = Array.from({ length: gunCount(w.battery) }, (_, i) => !gunAt(w.battery, i).dismounted);
   const standing = standingNow(s.damage);
-  w.aboard = { men, mounted, sails: s.canvas.map((c, i) => (standing.sailDown[i] ? 0 : sailShare(c))), down: standing.down, gone: standing.gone, steering: w.steering };
+  w.aboard = {
+    men, mounted, sails: s.canvas.map((c, i) => (standing.sailDown[i] ? 0 : sailShare(c))), down: standing.down, gone: standing.gone, steering: w.steering,
+    hammocks: s.quarters === true,
+  };
   return w.aboard;
 }
 
@@ -419,6 +424,12 @@ function meet(m: Meeting, punch: number, c: MeetWith): number {
         events.push({ ...event, what: 'sail', id: m.sail });
       }
       return punch;
+    case 'hammocks': {
+      // Grape is held by them as by the old bulwark; round and chain go through as if they were not there.
+      if (!HAMMOCKS.stops.includes(c.shot)) return punch;
+      const thick = HAMMOCKS.thick / Math.max(m.cos, GLANCING);
+      return punch > thick ? punch - thick : 0;
+    }
     case 'steering':
       if (punch >= LEAST_PUNCH.line && w.steering) {
         w.steering = false;
