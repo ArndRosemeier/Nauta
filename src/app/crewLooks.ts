@@ -27,7 +27,7 @@ export const PACK_HAIR = ['hair-short02', 'hair-short03', 'hair-short-messy', 'h
 /** Clips: standing by, working, walking and running, falling (crewMotion.ts gives each man his). */
 export const PACK_CLIPS = [
   'idle', 'arms folded', 'talk', 'nod', 'lean on rail', 'call from rail', 'interact', 'pick up', 'push', 'crouch', 'repair (kneeling)',
-  'chop wood', 'walk', 'walk carrying', 'jog', 'death', 'eat or drink', 'pistol idle',
+  'chop wood', 'walk', 'walk carrying', 'jog', 'death', 'eat or drink', 'pistol idle', 'pistol aim up', 'shake head',
 ];
 
 /** Where the build serves the cut pack (`npm run packs` fills public/packs), under the page's base. */
