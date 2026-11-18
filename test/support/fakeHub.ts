@@ -36,7 +36,7 @@ export class FakeServer {
   private readonly rooms = new Map<string, Room>();
   private readonly queue: Pending[] = [];
   /** Messages sent through the server, by kind, for budget checks. */
-  readonly sent = { state: 0, delta: 0, msg: 0, stateBytes: 0, most: 0 };
+  readonly sent = { state: 0, delta: 0, msg: 0, stateBytes: 0, deltaBytes: 0, most: 0 };
 
   /** A new connection, as `connect({ app, name })` would make. */
   connect<S, D, M>(name: string): FakeClient & GameHub<S, D, M> {
@@ -101,6 +101,7 @@ export class FakeServer {
     this.sent.most = Math.max(this.sent.most, bytes);
     if (kind === 'state') { this.sent.stateBytes = Math.max(this.sent.stateBytes, bytes); room.snapshot = entry; room.deltas = []; }
     else {
+      this.sent.deltaBytes = Math.max(this.sent.deltaBytes, bytes);
       room.deltas.push(entry);
       if (room.deltas.length > HISTORY) { room.deltas = []; room.snapshot = null; this.post(c, 'need-snapshot'); }
     }
