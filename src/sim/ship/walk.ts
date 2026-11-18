@@ -11,7 +11,7 @@
  * doors are the edges, where they fit the body.
  */
 import { BODY, LEAST_HATCH, LEAST_PASSAGE, LADDER } from '../rules/ships';
-import { floorAt, insideBreadth, overheadAt, type Obstacle, type ShipPlan, type Space, type Spot, type Way } from './plan';
+import { floorAt, headroomAt, insideBreadth, type Obstacle, type ShipPlan, type Space, type Spot, type Way } from './plan';
 import { openLeaves } from './doors';
 
 /** The body a graph is made for (rules: BODY). */
@@ -74,13 +74,13 @@ const blocksOn = (plan: ShipPlan, space: Space): readonly Obstacle[] => [...plan
 
 /** Whether a body may stand at a place just beyond a space's edge: inside her sides there, under headroom, clear of what stands on the level. */
 function outsideOpen(plan: ShipPlan, space: Space, body: Body, along: number, across: number): boolean {
-  return squareOpen(blocksOn(plan, space), space, body, along, across);
+  return squareOpen(plan, blocksOn(plan, space), space, body, along, across);
 }
 
 /** Whether a body's feet may stand at a place of a space's floor. */
-function squareOpen(blocks: readonly Obstacle[], space: Space, body: Body, along: number, across: number): boolean {
+function squareOpen(plan: ShipPlan, blocks: readonly Obstacle[], space: Space, body: Body, along: number, across: number): boolean {
   const floor = floorAt(space, along, across);
-  const headroom = overheadAt(space, along, across) - floor;
+  const headroom = headroomAt(plan, space, along, across);
   if (headroom < body.leastHeadroom) return false;
   const shoulders = floor + Math.min(body.height * SHOULDERS, headroom);
   const inside = Math.min(insideBreadth(along, floor + body.height * FEET), insideBreadth(along, shoulders));
@@ -93,7 +93,7 @@ function openSquares(plan: ShipPlan, space: Space, body: Body, cols: number, row
   const open = new Uint8Array(cols * rows);
   const blocks = blocksOn(plan, space);
   for (let c = 0; c < cols; c++) {
-    for (let r = 0; r < rows; r++) open[c * rows + r] = squareOpen(blocks, space, body, alongOf(space, c), acrossOf(space, r)) ? 1 : 0;
+    for (let r = 0; r < rows; r++) open[c * rows + r] = squareOpen(plan, blocks, space, body, alongOf(space, c), acrossOf(space, r)) ? 1 : 0;
   }
   return open;
 }

@@ -13,6 +13,7 @@ import {
   PLANKING, PORT_GUNS, PORTS, RAILS, SPACES, STATIONS, WAY_STANDOFF,
   type GunKind, type Level, type OpeningKind, type SpaceRow,
 } from '../rules/ships';
+import { fittingSolids } from './furnish';
 import { HULL_AFT, HULL_FORE, hullBottom, hullHalfBreadth, sheer, sideTop, weatherDeck, weatherDeckUnderside } from './hull';
 
 /** An oblong in plan, m: along her and across her. */
@@ -54,6 +55,15 @@ export interface Opening extends Rect {
 export interface Obstacle extends Rect {
   readonly id: string;
   readonly level: Level;
+  /** A fitting standing there (furnish.ts), not a part of her build. */
+  readonly fitting?: boolean;
+}
+
+/** A fitting over a man's head on a level (furnish.ts): a boat on its chocks, the gallows' cross-piece; its underside, m above her base. */
+export interface Overhead extends Rect {
+  readonly id: string;
+  readonly level: Level;
+  readonly underside: number;
 }
 
 /** A way between two spaces: a ladder through an opening, a door in a bulkhead, or the open floor where two spaces meet without one. */
@@ -164,6 +174,8 @@ export interface ShipPlan {
   readonly spaces: readonly Space[];
   readonly openings: readonly Opening[];
   readonly obstacles: readonly Obstacle[];
+  /** What hangs over a man's head on each level (the fittings that are overhead, furnish.ts): he stoops under it. */
+  readonly overheads: readonly Overhead[];
   readonly ways: readonly Way[];
   readonly bulkheads: readonly Bulkhead[];
   readonly guns: readonly GunPlace[];
@@ -190,6 +202,13 @@ export function overheadAt(space: Space, along: number, across: number): number 
   if (space.level === 'weather') return Infinity;
   if (space.level === 'berth') return weatherDeck(along, across) - PLANKING.deck - DECK_BEAM.moulded;
   return berthDeck(along) - PLANKING.berthDeck - BERTH_BEAM;
+}
+
+/** The clear height over a space's floor at a place, m: up to the beams over it, or to a fitting hanging lower there (plan.overheads). */
+export function headroomAt(plan: ShipPlan, space: Space, along: number, across: number): number {
+  let over = overheadAt(space, along, across);
+  for (const o of plan.overheads) if (o.level === space.level && o.underside < over && holds(o, along, across)) over = o.underside;
+  return over - floorAt(space, along, across);
 }
 
 /** How far inboard of her moulded line the inside of her side is: the frames and the ceiling (the bulwark's timbers above the deck). */
@@ -483,10 +502,13 @@ export function shipPlan(): ShipPlan {
   const stations: Station[] = STATIONS.map((s) => ({ id: s.id, name: s.name, who: s.who, orders: s.orders, space: s.space, along: s.along, across: s.across }));
   const belays = makeBelays();
   const masts: MastStep[] = (Object.keys(MASTS) as ('fore' | 'main')[]).map((m) => ({ mast: m, along: MASTS[m].along, heel: MASTS[m].step }));
-  built = deepFreeze({
-    spaces, openings, obstacles: makeObstacles(openings, guns, ways, new Map(spaces.map((p) => [p.id, p]))), ways, bulkheads: makeBulkheads(spaces), guns, belays,
+  const bare: ShipPlan = {
+    spaces, openings, obstacles: makeObstacles(openings, guns, ways, new Map(spaces.map((p) => [p.id, p]))), overheads: [], ways, bulkheads: makeBulkheads(spaces), guns, belays,
     places: makePlaces(guns, belays, ways, stations), stations, masts, cells: makeCells(),
-  });
+  };
+  // What she is furnished with stands in the way where it is drawn (ship.md "Fittings are solid too"): one placement list.
+  const fitted = fittingSolids(bare);
+  built = deepFreeze({ ...bare, obstacles: [...bare.obstacles, ...fitted.standing], overheads: fitted.overhead });
   return built;
 }
 

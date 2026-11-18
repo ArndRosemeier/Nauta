@@ -13,7 +13,7 @@ import { MinHeap } from '@futuremagic/core';
 import { CROUCH, DOOR_PASS, SNAP_REACH, STOOP, type PaceName } from '../rules/routes';
 import { BODY, DOOR, LEAST_PASSAGE } from '../rules/ships';
 import type { AloftSurface, AloftWay } from '../ship/aloft';
-import { floorAt, overheadAt, shipPlan, type Space, type Spot, type Way } from '../ship/plan';
+import { floorAt, headroomAt, shipPlan, type Space, type Spot, type Way } from '../ship/plan';
 import { rigPlan, rigWalk } from '../ship/rig';
 import { WALK_CELL, type FloorGrid, type WalkGraph } from '../ship/walk';
 import type { Block } from './closures';
@@ -120,7 +120,7 @@ export function heightAt(net: Network, spot: Spot): number {
 export function easeAt(net: Network, spot: Spot): number {
   if (net.surfaces.has(spot.space)) return 1;
   const g = net.graph.grids.get(spot.space)!;
-  return headroomEase(overheadAt(g.space, spot.along, spot.across) - floorAt(g.space, spot.along, spot.across));
+  return headroomEase(headroomAt(shipPlan(), g.space, spot.along, spot.across));
 }
 
 /** What a way takes from one end to the other. */

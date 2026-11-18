@@ -2,11 +2,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { decodePack } from '@futuremagic/props';
-import { furnish, type Furnishing } from '../src/sim/ship/furnish.ts';
-import { insideBreadth, shipPlan } from '../src/sim/ship/plan.ts';
+import { fittingSolids, furnish, type Furnishing } from '../src/sim/ship/furnish.ts';
+import { floorAt, headroomAt, insideBreadth, shipPlan } from '../src/sim/ship/plan.ts';
 import { weatherDeck } from '../src/sim/ship/hull.ts';
-import { CASK, MODEL } from '../src/sim/rules/fittings.ts';
-import { BELAY_HEIGHT, LOAD_WATERLINE, RAILS } from '../src/sim/rules/ships.ts';
+import { CASK, MODEL, SKIDS, SOLID } from '../src/sim/rules/fittings.ts';
+import { BELAY_HEIGHT, BODY, LOAD_WATERLINE, RAILS } from '../src/sim/rules/ships.ts';
 
 const plan = shipPlan();
 const all = furnish(plan);
@@ -99,4 +99,46 @@ test('the casks in the hold never pass through one another', () => {
 test('the fittings pack holds every model she is furnished with', () => {
   const pack = decodePack(new Uint8Array(readFileSync(new URL('../public/ship/fittings.fmpk', import.meta.url))));
   for (const model of new Set(all.map((f) => f.model))) assert.ok(pack.has(model), model);
+});
+
+/** Models whose room in the plan leads the drawing (ship.md, "The forecastle is reached past the fore fife rail"): the fittings thread narrows the model to it. */
+const DRAWING_FOLLOWS = new Set<string>([MODEL.fifeRail]);
+/** A model's room in rules/fittings.ts SOLID matches its built bounds this closely, m. */
+const BOUNDS = 0.01;
+
+test('each fitting\'s room in the plan is its built model\'s: every part inside its bounds, and together as large', () => {
+  const pack = decodePack(new Uint8Array(readFileSync(new URL('../public/ship/fittings.fmpk', import.meta.url))));
+  for (const model of Object.values(MODEL)) {
+    const parts = SOLID[model], built = pack.get(model)!;
+    if (parts.length === 0 || DRAWING_FOLLOWS.has(model)) continue;
+    const axes = ['x', 'y', 'z'] as const;
+    axes.forEach((a, k) => {
+      for (const p of parts) assert.ok(p[a][0] >= built.min[k]! - BOUNDS && p[a][1] <= built.max[k]! + BOUNDS, `${model} ${a}: a part outside the model`);
+      assert.ok(Math.abs(Math.min(...parts.map((p) => p[a][0])) - built.min[k]!) <= BOUNDS, `${model} ${a} from`);
+      assert.ok(Math.abs(Math.max(...parts.map((p) => p[a][1])) - built.max[k]!) <= BOUNDS, `${model} ${a} to`);
+    });
+  }
+});
+
+test('what the fittings put in the way is the plan\'s: standing fittings are its obstacles, overhead ones its overheads, the low ones stepped over', () => {
+  const solids = fittingSolids(plan);
+  assert.deepEqual(plan.obstacles.filter((o) => o.fitting), solids.standing);
+  assert.deepEqual(plan.overheads, solids.overhead);
+  const standing = new Set(solids.standing.map((o) => o.id.replace(/-\d+(-\d+)?$/, '')));
+  for (const m of [MODEL.long6, MODEL.capstan, MODEL.pump, MODEL.wheel, MODEL.stove, MODEL.table, MODEL.chest, MODEL.bitts]) assert.ok(standing.has(m), `${m} stands in the way`);
+  for (const m of [MODEL.garland, MODEL.rammer, MODEL.handspike]) assert.ok(!standing.has(m) && !solids.overhead.some((o) => o.id.startsWith(m)), `${m} is stepped over`);
+  // The gallows' posts stand in the way, its cross-piece and the boats on it are overhead.
+  assert.equal(solids.standing.filter((o) => o.id.startsWith(MODEL.gallows)).length, 2 * SKIDS.gallows.length);
+  for (const m of [MODEL.cutter, MODEL.jolly]) assert.ok(solids.overhead.some((o) => o.id.startsWith(m)), `${m} is overhead`);
+  // The casks are a few stows, not one oblong a cask.
+  const stows = solids.standing.filter((o) => o.id.startsWith('stow-'));
+  assert.ok(stows.length > 0 && stows.length < of(MODEL.butt).length / 2 + of(MODEL.barrel).length / 2);
+});
+
+test('under a fitting overhead the walker stoops: the headroom there is down to its underside', () => {
+  const o = plan.overheads.find((h) => h.id.startsWith(MODEL.gallows))!, deck = plan.spaces.find((s) => s.id === 'deck')!;
+  const along = (o.aft + o.fore) / 2, across = (o.port + o.starboard) / 2 + (o.starboard - o.port) * 0.45;
+  assert.ok(Math.abs(headroomAt(plan, deck, along, across) - (o.underside - floorAt(deck, along, across))) < CLOSE);
+  assert.ok(headroomAt(plan, deck, along, across) < BODY.height, 'a man stoops under the gallows\' arms');
+  assert.equal(headroomAt(plan, deck, o.aft - 1, across), Infinity, 'under the sky beside it');
 });

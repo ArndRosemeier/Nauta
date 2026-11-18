@@ -13,7 +13,7 @@ import { BODY, DOOR } from '../rules/ships';
 import { BACK_PACE, DUCK_AHEAD, EYE_BELOW_TOP, HEAD_CLEAR, LADDER_AIM, LADDER_PRESS, LADDER_REACH, LADDER_TOUCH, SIDE_PACE, STOOP_RATE, WALK_GRIP, WALK_PACE } from '../rules/walking';
 import { heelEase } from '../crew/route';
 import { shipY, shipZ } from './section';
-import { floorAt, holds, overheadAt, spacesById, type ShipPlan, type Space, type Spot, type Way } from './plan';
+import { floorAt, holds, headroomAt, spacesById, type ShipPlan, type Space, type Spot, type Way } from './plan';
 import { nodeAt, type WalkGraph } from './walk';
 import { doorLeaves, doorPasses, leafInWay, type DoorLeaf, type Doors } from './doors';
 
@@ -106,7 +106,7 @@ export function deckGround(plan: ShipPlan, graph: WalkGraph, doors: Doors): Deck
     },
     headroom(x, z, at) {
       const along = toAlong(z), across = x, s = d.spaces.get(at.place)!;
-      const room = overheadAt(s, along, across) - floorAt(s, along, across);
+      const room = headroomAt(plan, s, along, across);
       return (d.doors.get(s.id) ?? []).some((leaf) => underDoorHead(leaf, along, across)) ? Math.min(room, DOOR.height) : room;
     },
   };
@@ -115,7 +115,7 @@ export function deckGround(plan: ShipPlan, graph: WalkGraph, doors: Doors): Deck
 /** The captain standing still at a spot of her plan. */
 export function walkerAt(plan: ShipPlan, spot: Spot): DeckWalker {
   const s = plan.spaces.find((p) => p.id === spot.space)!;
-  const room = overheadAt(s, spot.along, spot.across) - floorAt(s, spot.along, spot.across) - HEAD_CLEAR;
+  const room = headroomAt(plan, s, spot.along, spot.across) - HEAD_CLEAR;
   return standAt({ place: s.id, floor: shipY(floorAt(s, spot.along, spot.across)) }, toX(spot.across), shipZ(spot.along), Math.max(CAPTAIN_GAIT.least, Math.min(BODY.height, room)));
 }
 
