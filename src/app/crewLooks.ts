@@ -12,11 +12,16 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { CharacterCatalog, CharacterPatch } from '@actors/generator';
 
-/** Garments the crew wears, then the captain's (Actors' `navy-rn-captain` preset, see `captainLook`). */
+/**
+ * Garments the crew wears, then the captain's (Actors' `navy-rn-captain` preset, see `captainLook`), then the rest of
+ * the officers' presets (render/crew/officersView.ts: lieutenant, midshipman, boatswain, seaman).
+ */
 export const PACK_GARMENTS = [
   'briefs', 'loose-tshirt', 'longsleeve', 'wool-pants', 'newsboy-cap', 'cloth-shoes',
   'high-socks', 'buckled-shoes', 'navy-breeches', 'navy-waistcoat', 'navy-tailcoat', 'navy-lapels', 'navy-collar', 'navy-cuffs',
   'navy-buttons-officer', 'navy-stock', 'navy-epaulettes',
+  'navy-bicorne', 'navy-cockade', 'navy-buttons-single', 'navy-round-hat', 'navy-shirt', 'navy-jacket', 'navy-buttons-jacket',
+  'navy-slops', 'navy-neckerchief', 'socks',
 ];
 /** Hairstyles: men's short ones, as most seamen wore them about 1805 (the pack's queue reads as a woman's ponytail from the deck). */
 export const PACK_HAIR = ['hair-short02', 'hair-short03', 'hair-short-messy', 'hair-short-grump', 'hair-swept-back', 'hair-short-curls'];
@@ -100,10 +105,18 @@ export const CAPTAIN_UNSEEN = ['navy-bicorne', 'navy-bicorne-lace', 'navy-cockad
  * preset from Actors' catalogue; every piece of it must be in PACK_GARMENTS.
  */
 export function captainLook(catalog: Pick<CharacterCatalog, 'outfits'>): CharacterPatch {
-  const dress = catalog.outfits.find((o) => o.id === CAPTAIN_DRESS);
-  if (!dress) throw new Error(`no outfit ${CAPTAIN_DRESS} in the Actors catalogue`);
-  const missing = dress.garments.filter((g) => !PACK_GARMENTS.includes(g) && !CAPTAIN_UNSEEN.includes(g));
-  if (missing.length) throw new Error(`${CAPTAIN_DRESS} needs ${missing.join(', ')} in PACK_GARMENTS`);
-  const outfit = dress.garments.filter((g) => !CAPTAIN_UNSEEN.includes(g));
-  return { ...lookOf(CAPTAIN_SEED, 'officer', 'british'), beard: 'none', outfit, garmentColors: { ...dress.colors } };
+  return { ...navyLook(catalog, CAPTAIN_DRESS, CAPTAIN_SEED, 'officer', CAPTAIN_UNSEEN), beard: 'none' };
+}
+
+/**
+ * A man from his seed and rank (`lookOf`, a British crew), dressed in an outfit preset of Actors' navy wardrobe
+ * (`navy-rn-lieutenant`), less the pieces `unseen`. Every other piece of it must be in PACK_GARMENTS.
+ */
+export function navyLook(catalog: Pick<CharacterCatalog, 'outfits'>, preset: string, seed: number, rank: Rank, unseen: readonly string[] = []): CharacterPatch {
+  const dress = catalog.outfits.find((o) => o.id === preset);
+  if (!dress) throw new Error(`no outfit ${preset} in the Actors catalogue`);
+  const missing = dress.garments.filter((g) => !PACK_GARMENTS.includes(g) && !unseen.includes(g));
+  if (missing.length) throw new Error(`${preset} needs ${missing.join(', ')} in PACK_GARMENTS`);
+  const outfit = dress.garments.filter((g) => !unseen.includes(g));
+  return { ...lookOf(seed, rank, 'british'), outfit, garmentColors: { ...dress.colors } };
 }
