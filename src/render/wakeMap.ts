@@ -22,8 +22,11 @@
  *
  * The near level (0.5 m texels, 128 m) holds all of it; the far level (2 m texels, 512 m) the long wake. The sea's
  * shader reads the near level where it reaches and the far one beyond (`wakeHeight`, `wakeSurface`).
+ *
+ * Every ship drawn has a map of her own (plan N3.8: hers and the other captain's), each with its own inputs
+ * (`wakeInputs`); the sea's shader adds their waves and takes the most of their foam and slick.
  */
-import { HalfFloatType, LinearFilter, LinearMipmapLinearFilter, ClampToEdgeWrapping, RGBAFormat, StorageTexture, Vector4, type ComputeNode, type WebGPURenderer } from 'three/webgpu';
+import { HalfFloatType, LinearFilter, LinearMipmapLinearFilter, ClampToEdgeWrapping, Matrix4, RGBAFormat, StorageTexture, Vector4, type ComputeNode, type WebGPURenderer } from 'three/webgpu';
 import {
   Fn, If, Loop, abs, clamp, dot, exp, float, instanceIndex, int, length, max, min, mix, normalize, select, sign, smoothstep, sqrt,
   texture, textureStore, uniform, uniformArray, uvec2, vec2, vec4, cos, sin, pow,
@@ -33,7 +36,6 @@ import {
   BOW_AHEAD, CHURN_STATIONS, HALF_LENGTH, KELVIN_CUSP, KELVIN_NEAR, KELVIN_TAIL, STEM_Z, STERN_ABAFT, STERN_Z, TRACK_SLOTS, TRACK_STRIDE,
   WAKE, WATERLINE_HALF, type TrackLists,
 } from './wake';
-import { SEA_CUT } from './seaCut';
 import { hullAt } from './ship/hullNode';
 
 /** Texels along a level's side. */
@@ -88,20 +90,32 @@ const STRIP_TO = 4;
 /** The waterline's length, m. */
 const WATERLINE_LENGTH = STERN_Z - STEM_Z;
 
-/** What the passes read each frame (SeaView writes it from the ship, through `WakeMap.update`). */
-export const WAKE_INPUTS = {
-  /** Her track, newest first (wake.ts `TrackLists`), and how many points of it are filled. */
-  place: uniformArray(Array.from({ length: TRACK_SLOTS }, () => new Vector4()), 'vec4'),
-  doing: uniformArray(Array.from({ length: TRACK_SLOTS }, () => new Vector4()), 'vec4'),
-  heading: uniformArray(Array.from({ length: TRACK_SLOTS }, () => new Vector4()), 'vec4'),
-  count: uniform(0, 'int'),
-  /** Per level: its corner from the sea's origin (x, z, m), its texel (m), and 1 while it is drawn. */
-  level: uniformArray(WAKE_TEXEL.map(() => new Vector4()), 'vec4'),
-  /** The stations along her waterline, port then starboard: ship-space z, churn (m/s), wetted height (m), the waterline's ship-space y (wake.ts `ChurnWatch`). */
-  churn: uniformArray(Array.from({ length: CHURN_STATIONS * 2 }, () => new Vector4()), 'vec4'),
-  /** Her way now: speed (m/s), leeway over way, and 1 while a ship is on the water. */
-  now: uniform(new Vector4()),
-};
+/** What one ship's passes read each frame (SeaView writes it from her, through `WakeMap.update`). */
+function makeInputs() {
+  return {
+    /** Her track, newest first (wake.ts `TrackLists`), and how many points of it are filled. */
+    place: uniformArray(Array.from({ length: TRACK_SLOTS }, () => new Vector4()), 'vec4'),
+    doing: uniformArray(Array.from({ length: TRACK_SLOTS }, () => new Vector4()), 'vec4'),
+    heading: uniformArray(Array.from({ length: TRACK_SLOTS }, () => new Vector4()), 'vec4'),
+    count: uniform(0, 'int'),
+    /** Per level: its corner from the sea's origin (x, z, m), its texel (m), and 1 while it is drawn. */
+    level: uniformArray(WAKE_TEXEL.map(() => new Vector4()), 'vec4'),
+    /** The stations along her waterline, port then starboard: ship-space z, churn (m/s), wetted height (m), the waterline's ship-space y (wake.ts `ChurnWatch`). */
+    churn: uniformArray(Array.from({ length: CHURN_STATIONS * 2 }, () => new Vector4()), 'vec4'),
+    /** Her way now: speed (m/s), leeway over way, and 1 while she is on the water. */
+    now: uniform(new Vector4()),
+    /** From the sea's frame (its origin) into her ship space. */
+    toShip: uniform(new Matrix4()),
+  };
+}
+type WakeInputs = ReturnType<typeof makeInputs>;
+
+/** Each ship's inputs, by her index (0 hers, 1 the other captain's: shipMaterials.ts `SHIP_OBJECT.ship`), made when first asked for. */
+const INPUTS: WakeInputs[] = [];
+export function wakeInputs(ship: number): WakeInputs {
+  for (let i = INPUTS.length; i <= ship; i++) INPUTS.push(makeInputs());
+  return INPUTS[ship]!;
+}
 
 /** A level's texture: rgba16float, clamped at its edges, mipmapped for the pixels far off. */
 function wakeTexture(name: string): StorageTexture {
@@ -143,9 +157,9 @@ function kelvin(s, y, k0, a, kFull, kGone) {
   return out;
 }
 
-/** The water piled and drawn down close to her hull at a point of the sea (`p`, from its origin), in her own frame; and her side there. */
-function nearField(p, head, drift) {
-  const ship = SEA_CUT.toShip.mul(vec4(p.x, 0, p.y, 1));
+/** The water piled and drawn down close to her hull at a point of the sea (`p`, from its origin), in her own frame (`toShip`); and her side there. */
+function nearField(p, head, drift, toShip) {
+  const ship = toShip.mul(vec4(p.x, 0, p.y, 1));
   const half = hullAt(ship.z, ship.y).half, zeta = ship.z.sub(STEM_Z), aft = max(zeta, 0);
   // How far out from her side (ahead of her stem: from the stem).
   const out = select(zeta.lessThan(0), length(vec2(ship.x, zeta)), max(abs(ship.x).sub(half), 0));
@@ -156,12 +170,12 @@ function nearField(p, head, drift) {
   const shoulder = smoothstep(SHOULDER[0] * L, SHOULDER[1] * L, zeta).mul(float(1).sub(smoothstep(SHOULDER[2] * L, SHOULDER[3] * L, zeta)));
   const quarter = smoothstep(QUARTERS[0] * L, QUARTERS[1] * L, zeta).mul(float(1).sub(smoothstep(L, L + QUARTER_TAIL, zeta)));
   const body = head.mul(reach).mul(quarter.mul(WAKE.quarterRise).sub(shoulder.mul(WAKE.shoulderDip)));
-  return { height: bow.add(body), bow, out, zeta, side };
+  return { height: bow.add(body), bow, out, zeta, side, along: ship.z };
 }
 
-/** The stations' numbers at her side at ship-space z on `side` (−1 port, +1 starboard), between the two nearest (wake.ts `ChurnWatch`). */
-function stationAt(z, side) {
-  const C = WAKE_INPUTS.churn, z0 = C.element(0).x, z1 = C.element(CHURN_STATIONS - 1).x;
+/** The stations' numbers (`I.churn`) at her side at ship-space z on `side` (−1 port, +1 starboard), between the two nearest (wake.ts `ChurnWatch`). */
+function stationAt(I: WakeInputs, z, side) {
+  const C = I.churn, z0 = C.element(0).x, z1 = C.element(CHURN_STATIONS - 1).x;
   const f = clamp(z.sub(z0).div(z1.sub(z0)), 0, 1).mul(CHURN_STATIONS - 1);
   const i0 = int(min(f, float(CHURN_STATIONS - 2))), u = f.sub(float(i0));
   const base = select(side.lessThan(0), int(0), int(CHURN_STATIONS));
@@ -169,7 +183,7 @@ function stationAt(z, side) {
 }
 
 /** The churn at her side (m/s). */
-const churnAt = (z, side) => stationAt(z, side).y;
+const churnAt = (I: WakeInputs, z, side) => stationAt(I, z, side).y;
 
 /** Wet timber is darker and glossy. */
 const WET_DARK = 0.55;
@@ -186,19 +200,26 @@ const WET_EDGE = 0.06;
  * Her side wet from the sea (plan N2.5, "water running off"): at a point of her outside (ship space), how wet it is,
  * 0..1: up to where the water has climbed her side lately and is draining down (the stations' wet line), and her bow
  * wave at speed; ragged in streaks below the line as it runs off. `colour` and `rough` darkened and made glossy by it.
- * `on`: 0 leaves the surface dry (the other ship's: the stations watch her own side only).
+ * `ship`: whose hull it is (a node, 0 to `ships` − 1): each ship's own stations wet her.
  */
-export function wetHull(p, colour, rough, on = float(1)) {
-  const st = stationAt(p.z, sign(p.x)), speed = WAKE_INPUTS.now.x;
+export function wetHull(p, colour, rough, ship, ships: number) {
+  const pick = (f) => {
+    let v = f(wakeInputs(0));
+    for (let i = 1; i < ships; i++) v = select(ship.equal(i), f(wakeInputs(i)), v);
+    return v;
+  };
+  const st = pick((J) => stationAt(J, p.z, sign(p.x))), now = pick((J) => J.now), speed = now.x;
   const zeta = max(p.z.sub(STEM_Z), 0), bowWave = speed.mul(speed).div(2 * GRAVITY).mul(WAKE.bowRise).mul(exp(zeta.div(-WAKE.bowReach)));
   const line = st.w.add(st.z).add(bowWave);
   // Streaks: a hash per strip along her, so the edge runs down in fingers.
   const strip = p.z.mul(STREAKS).floor(), streak = sin(strip.mul(STREAK_SEED * TURN * STREAKS)).mul(HALF).add(HALF);
-  const wet = float(1).sub(smoothstep(line.sub(streak.mul(STREAK_DEPTH)), line.sub(streak.mul(STREAK_DEPTH)).add(WET_EDGE), p.y)).mul(WAKE_INPUTS.now.w).mul(on);
+  const wet = float(1).sub(smoothstep(line.sub(streak.mul(STREAK_DEPTH)), line.sub(streak.mul(STREAK_DEPTH)).add(WET_EDGE), p.y)).mul(now.w);
   return { colour: mix(colour, colour.mul(WET_DARK), wet), rough: mix(rough, float(WET_ROUGH), wet) };
 }
 
 export class WakeMap {
+  /** What her passes read (`wakeInputs` of her index). */
+  readonly inputs: WakeInputs;
   /** Per level: the surface and the trail (see the file's head). */
   readonly surface = WAKE_TEXEL.map((_, l) => wakeTexture(`wake ${l} surface`));
   readonly trail = WAKE_TEXEL.map((_, l) => wakeTexture(`wake ${l} trail`));
@@ -206,13 +227,17 @@ export class WakeMap {
   readonly passes: ComputeNode[];
   /** Levels filled each frame (a quality knob: 1 draws only the near one). */
   levels: number = WAKE_TEXEL.length;
+  /** Whether each level is drawn this frame. */
+  private readonly drawn: boolean[] = WAKE_TEXEL.map(() => false);
 
-  constructor() {
+  /** The map of ship `ship` (0 hers, 1 the other captain's). */
+  constructor(ship = 0) {
+    this.inputs = wakeInputs(ship);
     this.passes = WAKE_TEXEL.map((_, l) => this.pass(l));
   }
 
   private pass(l: number): ComputeNode {
-    const I = WAKE_INPUTS, N = WAKE_TEXELS, near = l === 0;
+    const I = this.inputs, N = WAKE_TEXELS, near = l === 0;
     return Fn(() => {
       const id = instanceIndex, ix = id.mod(N), iy = id.div(N);
       const L = I.level.element(l);
@@ -269,14 +294,14 @@ export class WakeMap {
       if (near) {
         // --- Close to her hull, in her own frame: the bow wave and the body's hollow and rise; its slope by differences.
         const nowSpeed = I.now.x, nowHead = nowSpeed.mul(nowSpeed).div(2 * GRAVITY), drift = I.now.y;
-        const here = nearField(p, nowHead, drift);
-        const dx = nearField(p.add(vec2(SLOPE_STEP, 0)), nowHead, drift).height, dz = nearField(p.add(vec2(0, SLOPE_STEP)), nowHead, drift).height;
+        const here = nearField(p, nowHead, drift, I.toShip);
+        const dx = nearField(p.add(vec2(SLOPE_STEP, 0)), nowHead, drift, I.toShip).height, dz = nearField(p.add(vec2(0, SLOPE_STEP)), nowHead, drift, I.toShip).height;
         height.addAssign(here.height);
         slope.addAssign(vec2(dx.sub(here.height), dz.sub(here.height)).div(SLOPE_STEP));
         // Foam where the bow wave breaks, and close along her side where the water works on her hull or her way drags it.
         const breaking = clamp(here.bow.sub(WAKE.bowFoamFrom).div(WAKE.bowFoamRamp), 0, 1);
         const alongHer = smoothstep(-HALF, 0, here.zeta).mul(float(1).sub(smoothstep(WATERLINE_LENGTH, WATERLINE_LENGTH + HALF, here.zeta)));
-        const ring = churnAt(SEA_CUT.toShip.mul(vec4(p.x, 0, p.y, 1)).z, here.side).mul(WAKE.ringChurn)
+        const ring = churnAt(I, here.along, here.side).mul(WAKE.ringChurn)
           .add(nowSpeed.div(WAKE.top).mul(WAKE.ringSpeed)).mul(exp(here.out.div(-WAKE.ringReach))).mul(alongHer);
         fresh.assign(max(fresh, clamp(max(breaking, ring), 0, 1)));
       } else {
@@ -294,12 +319,13 @@ export class WakeMap {
   }
 
   /**
-   * Once a frame, before the passes run: her track (`track`, laid out from the sea's origin), her way now, the
-   * stations along her waterline, and where each level lies: centred on her (`cx`, `cz`, from the sea's origin), on
-   * the lattice of its texel so the water's texels never swim. `on`: false when no ship floats here.
+   * Once a frame, before the passes run: her track (`track`, laid out from the sea's origin; null: no ship floats
+   * here), her way now, the stations along her waterline, `toShip` from the sea's frame into hers, and where each
+   * level lies: centred on her (`cx`, `cz`, from the sea's origin), on the lattice of its texel so the water's texels
+   * never swim. `near`: the eye is close enough to her for the near level (else only the far one is filled).
    */
-  update(track: TrackLists | null, speed: number, drift: number, churn: Float32Array | null, cx: number, cz: number, ox: number, oz: number): void {
-    const I = WAKE_INPUTS;
+  update(track: TrackLists | null, speed: number, drift: number, churn: Float32Array | null, toShip: Matrix4 | null, cx: number, cz: number, ox: number, oz: number, near = true): void {
+    const I = this.inputs;
     I.now.value.set(speed, drift, 0, track ? 1 : 0);
     I.count.value = track?.count ?? 0;
     if (track) {
@@ -312,11 +338,14 @@ export class WakeMap {
       }
     }
     if (churn) (I.churn.array as Vector4[]).forEach((v, i) => v.fromArray(churn, i * TRACK_STRIDE));
+    if (toShip) I.toShip.value.copy(toShip);
+    // Near her: the levels from the near one, as many as the quality level fills; far off, the far level alone.
+    WAKE_TEXEL.forEach((_, l) => { this.drawn[l] = track !== null && (near ? l < this.levels : l === WAKE_TEXEL.length - 1); });
     (I.level.array as Vector4[]).forEach((v, l) => {
       const texel = WAKE_TEXEL[l]!, side = texel * WAKE_TEXELS;
       // The lattice is the sea's absolute one: the corner snapped in world metres, then measured from the sea's origin.
       const x = Math.floor((cx + ox - side / 2) / texel) * texel - ox, z = Math.floor((cz + oz - side / 2) / texel) * texel - oz;
-      v.set(x, z, texel, track && l < this.levels ? 1 : 0);
+      v.set(x, z, texel, this.drawn[l] ? 1 : 0);
     });
   }
 
@@ -325,31 +354,48 @@ export class WakeMap {
     await renderer.compileComputeAsync(this.passes);
   }
 
-  /** Runs the passes of the levels drawn, while a ship floats here. */
+  /** Runs the passes of the levels drawn, while she floats here. */
   fill(renderer: WebGPURenderer): void {
-    if (WAKE_INPUTS.now.value.w > 0) renderer.compute(this.passes.slice(0, this.levels));
+    const run = this.passes.filter((_, l) => this.drawn[l]);
+    if (run.length) renderer.compute(run);
   }
 }
 
-/** Where a point of the sea (from its origin) lies in level `l`: its texture coordinate, and how far inside the level it is (1 inside, 0 at its edge). */
-function inLevel(l: number, calm) {
-  const L = WAKE_INPUTS.level.element(l), side = L.z.mul(WAKE_TEXELS);
+/** Where a point of the sea (from its origin) lies in level `l` of a map (`I` its inputs): its texture coordinate, and how far inside the level it is (1 inside, 0 at its edge). */
+function inLevel(I: WakeInputs, l: number, calm) {
+  const L = I.level.element(l), side = L.z.mul(WAKE_TEXELS);
   const uv = calm.sub(L.xy).div(side);
   const edge = max(abs(uv.x.sub(HALF)), abs(uv.y.sub(HALF)));
   return { uv, inside: float(1).sub(smoothstep(HALF - EDGE_FADE, HALF, edge)).mul(L.w) };
 }
 
-/** The wake's height at a point of the sea (`calm`, from its origin), for the vertex stage: the near level where it reaches, the far beyond. */
-export function wakeHeight(map: WakeMap, calm) {
-  const n = inLevel(0, calm), f = inLevel(1, calm);
+/** One map's height at a point of the sea (`calm`, from its origin): the near level where it reaches, the far beyond. */
+function mapHeight(map: WakeMap, calm) {
+  const I = map.inputs, n = inLevel(I, 0, calm), f = inLevel(I, 1, calm);
   const near = texture(map.surface[0], n.uv).level(0).x, far = texture(map.surface[1], f.uv).level(0).x;
-  return mix(far.mul(f.inside), near, n.inside).mul(WAKE_INPUTS.now.w);
+  return mix(far.mul(f.inside), near, n.inside).mul(I.now.w);
 }
 
-/** The wake at a point of the sea for the fragment stage, filtered to the pixel: its slope (x, z), fresh foam, old foam and slick. */
-export function wakeSurface(map: WakeMap, calm) {
-  const n = inLevel(0, calm), f = inLevel(1, calm);
-  const s = mix(texture(map.surface[1], f.uv).mul(f.inside), texture(map.surface[0], n.uv), n.inside).mul(WAKE_INPUTS.now.w);
-  const t = mix(texture(map.trail[1], f.uv).mul(f.inside), texture(map.trail[0], n.uv), n.inside).mul(WAKE_INPUTS.now.w);
-  return { slope: s.yz, fresh: s.w, old: t.y, slick: t.x };
+/** The wakes' height at a point of the sea (`calm`, from its origin), for the vertex stage: every ship's waves added. */
+export function wakeHeight(maps: readonly WakeMap[], calm) {
+  return maps.map((m) => mapHeight(m, calm)).reduce((a, b) => a.add(b));
+}
+
+/** One map's surface and trail at a point of the sea, filtered to the pixel. */
+function mapSurface(map: WakeMap, calm) {
+  const I = map.inputs, n = inLevel(I, 0, calm), f = inLevel(I, 1, calm);
+  const s = mix(texture(map.surface[1], f.uv).mul(f.inside), texture(map.surface[0], n.uv), n.inside).mul(I.now.w);
+  const t = mix(texture(map.trail[1], f.uv).mul(f.inside), texture(map.trail[0], n.uv), n.inside).mul(I.now.w);
+  return { s, t };
+}
+
+/**
+ * The wakes at a point of the sea for the fragment stage, filtered to the pixel: their slope (x, z) added, and the
+ * most of their fresh foam, old foam and slick.
+ */
+export function wakeSurface(maps: readonly WakeMap[], calm) {
+  const each = maps.map((m) => mapSurface(m, calm));
+  const slope = each.map((e) => e.s.yz).reduce((a, b) => a.add(b)), fresh = each.map((e) => e.s.w).reduce((a, b) => max(a, b));
+  const old = each.map((e) => e.t.y).reduce((a, b) => max(a, b)), slick = each.map((e) => e.t.x).reduce((a, b) => max(a, b));
+  return { slope, fresh, old, slick };
 }

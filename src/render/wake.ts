@@ -15,7 +15,7 @@
  *    the spray when she slams; and how high it has wetted her side, draining down after.
  */
 import { smoothstep } from '@futuremagic/core';
-import { GRAVITY, STEP_SECONDS } from '../sim/units';
+import { GRAVITY, STEP_SECONDS, apartOnWater } from '../sim/units';
 import { surfaceAt, seaSample, type SeaState } from '../sim/sea/sea';
 import { shipBody, toWorld, type ShipPose } from '../sim/ship/motion';
 import { designWaterline, hullEnds, hullHalfBreadth } from '../sim/ship/hull';
@@ -249,7 +249,7 @@ export class Track {
 
   private pointOf(src: WakeSource, t: number): TrackPoint {
     const p = src.pose, last = this.last;
-    if (last) this.run += Math.hypot(p.x - last.x, p.z - last.z);
+    if (last) this.run += apartOnWater(p, last);
     // Her heading as a direction on the water (bearing 0 north = −z), turned by her leeway.
     const fx = Math.sin(p.heading), fz = -Math.cos(p.heading), speed = Math.hypot(src.ahead, src.leeway);
     let dirX = fx, dirZ = fz;

@@ -20,6 +20,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A size in bytes as people read it | `src/probe/report.ts#formatBytes` |
 | The time budgets of `npm test` | `tools/test/judge.mjs#judge` |
 | Compass bearing to a direction on the water (0 north = -z, clockwise) | `src/sim/units.ts#bearingDir` |
+| How far apart two points are on the water (in plan) | `src/sim/units.ts#apartOnWater` |
 | Bringing a bearing into 0..2pi | `src/sim/units.ts#wrapBearing` |
 | The Beaufort scale: a force's mean wind speed | `src/sim/rules/beaufort.ts#beaufortSpeed` |
 | Making a match's wind (seed, force, bearing) | `src/sim/wind.ts#makeWind` |
@@ -206,7 +207,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her timber's shader: grain, planks, seams, paint, wear, grime | `src/render/ship/shipMaterials.ts#makeWoodMaterial` |
 | Her iron, copper, lantern glow and rope shaders | `src/render/ship/shipMaterials.ts#makeRopeMaterial` |
 | What her shaders read each frame (lanterns, sky openings, glow, time) | `src/render/ship/shipMaterials.ts#SHIP_INPUTS` |
-| Her half-breadth and deck height in a shader | `src/render/ship/hullNode.ts#hullAt` |
+| Her half-breadth and deck height in a shader (none beyond her ends) | `src/render/ship/hullNode.ts#hullAt` |
 | No water drawn inside her hull | `src/render/seaCut.ts#seaCut` |
 | The ship drawn and riding the sea, the eye carried with her, the zones seen, the far ship crossfaded, her doors swung, her yards braced and hoisted and her boom and gaff swung (`setBrace`, `setHoist`; N3.3 drives them) | `src/render/ship/shipView.ts#ShipView` |
 | A ship's water kept for her wake and spray, however she is laid: her track, her way, the churn at her side (`water`, `bow`) | `src/render/ship/shipView.ts#ShipView` |
@@ -215,11 +216,12 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The wake's tuning: her waves, bow wave, foam, strip and slick | `src/render/wake.ts#WAKE` |
 | Where she has been: her track, a point a second, with her speed and churn (what the wake is laid along) | `src/render/wake.ts#Track` |
 | The water against her side: churn at stations along her waterline, the wet line draining down, slams at her bow | `src/render/wake.ts#ChurnWatch` |
-| A ship's wake on the GPU: Kelvin waves along her track, the bow wave and her body's hollow, foam, the slick (two levels around her) | `src/render/wakeMap.ts#WakeMap` |
-| The one seam a ship's water comes into the sea's shader through: her waves' height (vertex stage) | `src/render/wakeMap.ts#wakeHeight` |
-| ...and per pixel their slope, her foam and her slick | `src/render/wakeMap.ts#wakeSurface` |
-| Handing the sea the wake map | `src/render/seaMaterial.ts#useWake` |
-| Her side wet where the sea has climbed it, draining down in streaks (her timber's and copper's shaders) | `src/render/wakeMap.ts#wetHull` |
+| A ship's wake on the GPU: Kelvin waves along her track, the bow wave and her body's hollow, foam, the slick (two levels around her; one map per ship drawn, `SeaView.wakes`) | `src/render/wakeMap.ts#WakeMap` |
+| Each ship's wake inputs, by her index (0 hers, 1 the other captain's) | `src/render/wakeMap.ts#wakeInputs` |
+| The one seam the ships' water comes into the sea's shader through: their waves' height, added (vertex stage) | `src/render/wakeMap.ts#wakeHeight` |
+| ...and per pixel their slope, and the most of their foam and slick | `src/render/wakeMap.ts#wakeSurface` |
+| Handing the sea the ships' wake maps | `src/render/seaMaterial.ts#useWake` |
+| A ship's side wet where the sea has climbed it, draining down in streaks, from her own stations (her timber's and copper's shaders, either ship) | `src/render/wakeMap.ts#wetHull` |
 | The light a matte, level surface sends back (the sea's body, the deep, spray) | `src/render/seaMaterial.ts#daylight` |
 | Spray thrown from her bow when she slams and at speed: drops flown on the GPU | `src/render/spray.ts#SprayView` |
 | The spray's shader | `src/render/spray.ts#makeSprayMaterial` |

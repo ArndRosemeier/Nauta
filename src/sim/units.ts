@@ -14,6 +14,11 @@ export function bearingDir(bearing: number): [number, number] {
   return [Math.sin(bearing), -Math.cos(bearing)];
 }
 
+/** How far apart two points are on the water (in plan: x and z, the height left out), m. */
+export function apartOnWater(a: { readonly x: number; readonly z: number }, b: { readonly x: number; readonly z: number }): number {
+  return Math.hypot(a.x - b.x, a.z - b.z);
+}
+
 /** A bearing brought into 0..2pi, so it never grows without end. */
 export function wrapBearing(bearing: number): number {
   const full = 2 * Math.PI;

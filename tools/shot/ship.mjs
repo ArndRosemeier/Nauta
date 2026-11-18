@@ -2,8 +2,9 @@
  * The ship-and-water check (plan N2.5): `npm run check:ship [-- <out dir> [all | words...]]` (run `npm run build` first).
  * The brig sailed by a match (`?sail`, the duel's start: on the beam under battle sail) in a force 6 sea, seen over
  * her side, from her bowsprit, astern along her wake, from 50 m off and from above, and from her berth deck (no water
- * inside her). One page: she sails for a while first so her wake lies behind her, then each scene is set with
- * `window.__nautaScene` (`ship=` the standpoint; the match keeps its own clock, so she sails on between pictures).
+ * inside her); last, by hand, the other brig's wake (plan N3.8) through the glass once the two have closed. One page:
+ * she sails for a while first so her wake lies behind her, then each scene is set with `window.__nautaScene` (`ship=`
+ * the standpoint; the match keeps its own clock, so she sails on between pictures).
  * CI takes three of the six (CI_SHOTS); `all` takes every one, words narrow the set (`npm run check:ship -- shots/ship
  * bow`). Writes `<out dir>/<name>.png` (default `shots/ship`).
  * The browser's switches are browser.mjs's (CHROMIUM_PATH, SHOT_GPU, SHOT_SIZE); the quality is fixed at `high`.
@@ -27,7 +28,14 @@ const SAIL_FIRST_MS = 30000;
  */
 const CI_SHOTS = ['rail', 'above', 'berth'];
 
-/** Every shot: its file name and the scene's query (a standpoint of src/app/standpoints.ts and an hour). */
+/**
+ * The other brig's picture: the match run on (in steps of so many s, at most so long) until the two have closed within
+ * `within` m (between their middles) and passed, apart again by `past`; then she is seen from above her own ship,
+ * the look turned onto her, her wake toward the eye (`power`: the glass at it, or lowered, null).
+ */
+const OTHER = { within: 100, past: 180, step: 5, most: 500, power: 3 };
+
+/** Every shot: its file name and the scene's query (a standpoint of src/app/standpoints.ts and an hour); `other`: the look turned onto the other brig once the two have closed. */
 export function shipShots() {
   return [
     { name: 'rail', query: 'ship=rail&hour=11&day=0' },
@@ -36,6 +44,7 @@ export function shipShots() {
     { name: 'off50', query: 'ship=50-m-off&hour=11&day=0' },
     { name: 'above', query: 'ship=above&hour=11&day=0' },
     { name: 'berth', query: 'ship=berth-deck&hour=11&day=0' },
+    { name: 'other', query: 'ship=above&hour=16&day=0', other: true },
   ];
 }
 
@@ -53,7 +62,21 @@ async function main() {
   await page.waitForTimeout(SAIL_FIRST_MS);
   let same = 0, before = null;
   for (const shot of shots) {
-    await page.evaluate((q) => window.__nautaScene(q), shot.query);
+    if (shot.other) {
+      // The match run on (nothing drawn meanwhile) until the two have closed; her track keeps the straight run between.
+      let waited = 0, closed = false;
+      for (; waited < OTHER.most; waited += OTHER.step) {
+        const apart = await page.evaluate(() => window.__nautaSail.apart());
+        closed ||= apart < OTHER.within;
+        if (closed && apart > OTHER.past) break;
+        await page.evaluate((s) => window.__nautaSail.onward(s, false), OTHER.step);
+      }
+      console.log(`the two closed and passed after ${waited} s more`);
+      await page.evaluate((q) => window.__nautaScene(q), shot.query);
+      await page.evaluate((p) => { window.__nautaSail.glass(p); window.__nautaSail.aimAtOther(); }, OTHER.power);
+      await page.evaluate(() => window.__nautaSail.onward(0));
+      if (!(await page.evaluate(() => window.__nautaSail.other()))) { same++; console.error('the other brig is not drawn'); }
+    } else await page.evaluate((q) => window.__nautaScene(q), shot.query);
     const file = join(outDir, `${shot.name}.png`);
     await snap(page, file);
     const now = readFileSync(file);
