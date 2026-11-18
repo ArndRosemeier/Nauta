@@ -1,0 +1,2 @@
+A second way to draw the powder smoke, for comparing on the iPad: add &smoke=half to the address (for example ?sail&smoke=half).
+It draws the smoke at half resolution and keeps the smooth edges on masts and rigging. Fire a broadside and stand in the smoke: does it look the same as without the switch, and does the game stay smooth?

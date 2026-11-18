@@ -39,7 +39,8 @@ import { SprayView } from './render/spray';
 import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
 import { GunfireView, fallInSea } from './render/gunfire';
-import { SmokeView } from './render/smoke';
+import { SmokeView, useSmokeDepth } from './render/smoke';
+import { HalfSmoke } from './render/halfSmoke';
 import { gunsSeen } from './app/gunsSeen';
 import { ShotsSeen, type Flash, type Strike } from './app/shotsSeen';
 import { battery } from './sim/guns/guns';
@@ -170,7 +171,12 @@ async function start(): Promise<void> {
   const glass = ship ? new Spyglass(MATCH_SEED, params.glass) : null;
   if (ship) ship.steadying = glass;
   let where: Standpoint = standpoint(params.ship ?? '');
-  const view = await createView(canvas, ship !== null);
+  // `?smoke=half` (N5.5 trial): the smoke drawn at half resolution against the scene's depth, the scene through the post chain.
+  const halfSmoke = params.halfSmoke && match ? new HalfSmoke() : null;
+  useSmokeDepth(halfSmoke ? halfSmoke.depth.texture : null);
+  const view = await createView(canvas, ship !== null, halfSmoke ? (colour) => halfSmoke.over(colour) : undefined);
+  if (halfSmoke && view.post) halfSmoke.readDepthOf(view.post);
+  const drawHalfSmoke = () => halfSmoke?.between(view.renderer, view.camera);
   // Her fittings (plan N2.6): drawn as instances in her frame, each zone's into that zone of her.
   const fittings = ship ? await loadFittings(import.meta.env.BASE_URL) : null;
   const furnished = ship && fittings ? new Furnishings(view.renderer, fittings, furnish(shipPlan())) : null;
@@ -232,7 +238,7 @@ async function start(): Promise<void> {
   await herGuns?.ready();
   const fittingGroups = [furnished, herFittings].flatMap((f) => (f ? [...f.zones.values()].map((d) => d.group) : []));
   const gunGroups = [guns, herGuns].flatMap((g) => (g ? [g.draws.group] : []));
-  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(fireDrawn ? [fireDrawn.bits, fireDrawn.balls] : []), ...(smoke ? [smoke.mesh] : []), ...fittingGroups, ...gunGroups]);
+  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(fireDrawn ? [fireDrawn.bits, fireDrawn.balls] : []), ...(smoke && !halfSmoke ? [smoke.mesh] : []), ...fittingGroups, ...gunGroups]);
   // The crews' shaders, a few men at each level of detail wearing between them all the crew wears, at full speed
   // behind the loading screen (docs/SHADERS.md rule 5), as MasterWorld warms its townsfolk.
   // The cap stays open (share 1) until the crews are in: before the first frame no frame frees a slot.
@@ -262,7 +268,10 @@ async function start(): Promise<void> {
   if (other) await view.stage.add(other.group);
   if (spray) await view.stage.add(spray.mesh);
   if (fireDrawn) { await view.stage.add(fireDrawn.bits); await view.stage.add(fireDrawn.balls); }
-  if (smoke) await view.stage.add(smoke.mesh);
+  if (smoke && halfSmoke && view.post) {
+    capTo(1); // its shaders are new to the cap, which no frame opens before the first
+    await halfSmoke.warm(view.renderer, view.camera, smoke.mesh, () => view.draw(drawHalfSmoke));
+  } else if (smoke) await view.stage.add(smoke.mesh);
   if (crew) {
     note.textContent = 'bringing the crews aboard';
     await view.stage.add(crew.aboard);
@@ -559,7 +568,7 @@ async function start(): Promise<void> {
     }
     sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], room, sailing && aboard ? sailing.sailing : undefined);
     view.stage.frame();
-    view.renderer.render(view.scene, view.camera);
+    view.draw(halfSmoke ? drawHalfSmoke : undefined);
     orders?.update(now);
     bench?.worked(performance.now() - now);
     trial?.measured(now, performance.now() - now, crew?.stats.ms ?? 0, view.renderer.info.render.drawCalls);

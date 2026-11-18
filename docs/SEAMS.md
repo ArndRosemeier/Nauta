@@ -292,6 +292,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Gunfire drawn: muzzle flashes and first puffs, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
 | Powder smoke: poured from the ports as guns fire, drifting with the wind, swelling and thinning, lit by the day and the flashes (N5.5) | `src/render/smoke.ts#SmokeView` |
 | How many puffs of smoke a gun pours at a quality level, and how dense each is, so the smoke hides as much at every level | `src/render/smoke.ts#puffsPoured` |
+| Smoke drawn at half resolution behind `?smoke=half`: the scene's multisampled depth halved, the smoke drawn against it and blended over the frame by depth (N5.5 trial) | `src/render/halfSmoke.ts#HalfSmoke` |
 | Balls falling in the sea: a column of spray and white water in the nearest ship's wake map | `src/render/gunfire.ts#fallInSea` |
 | Shot fallen in the sea as white water on her wake map | `src/render/wakeMap.ts#WakeMap` |
 | Something that moves on her outside (her guns and lids), drawn near and far | `src/render/ship/shipView.ts#ShipView` |

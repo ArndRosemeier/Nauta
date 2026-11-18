@@ -19,11 +19,11 @@
  */
 import { Rng } from '@futuremagic/core';
 import {
-  InstancedBufferAttribute, Vector3, Vector4, type Material, type Mesh, type MeshBasicNodeMaterial,
+  InstancedBufferAttribute, Vector3, Vector4, type Material, type Mesh, type MeshBasicNodeMaterial, type Texture,
 } from 'three/webgpu';
 import {
-  Loop, attribute, cameraViewMatrix, exp, float, int, length, max, mix, modelViewMatrix, oneMinus, saturate, select, sin, smoothstep, sqrt, uniform,
-  uniformArray, varyingProperty, vec2, vec3, vec4,
+  Loop, attribute, cameraFar, cameraNear, cameraViewMatrix, exp, float, int, ivec2, length, max, mix, modelViewMatrix, oneMinus, perspectiveDepthToViewZ,
+  saturate, screenCoordinate, select, sin, smoothstep, sqrt, textureLoad, uniform, uniformArray, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import type { Wind } from '../sim/wind';
 import type { Flash } from '../app/shotsSeen';
@@ -94,6 +94,8 @@ const SMOKE_ORDER = 12;
 const SMOKE_SEED = 1797;
 /** A long six pours a smaller cloud than a carronade (a sixth of the powder but a longer bore). */
 const LONG_SIX_SHARE = 0.6;
+/** Drawn at half resolution (`?smoke=half`): a puff's chord in front of the scene is faded over at least this (m). */
+const SOFT_LEAST = 0.5;
 /** Where each number sits. */
 const X = 0, Y = 1, Z = 2, W = 3;
 /** Every puff starts long dead, this far back, s. */
@@ -110,10 +112,19 @@ export const SMOKE_INPUTS = {
   flashes: uniformArray(Array.from({ length: MOST_FLASH_LIGHTS }, () => new Vector4(0, 0, 0, DARK)), 'vec4'),
 };
 
+/**
+ * The scene's depth at half resolution (halfSmoke.ts, `?smoke=half`), or null: the smoke drawn in the main pass at full
+ * resolution, hidden by the depth buffer. Set before the smoke's kind is made, as the sea's sky is (useSeaSky).
+ */
+let sceneDepth: Texture | null = null;
+export function useSmokeDepth(depth: Texture | null): void { sceneDepth = depth; }
+
 /** The smoke's material: quads facing the eye, flown in the vertex stage, lit there; round, lumpy and soft in the fragment stage. */
 export function makeSmokeMaterial(): MeshBasicNodeMaterial {
   const I = SMOKE_INPUTS, S = SEA_INPUTS;
   const vCorner = varyingProperty('vec2', 'vPuffCorner'), vDensity = varyingProperty('float', 'vPuffDensity');
+  const vDeep = varyingProperty('vec2', 'vPuffDeep');
+  const depth = sceneDepth;
   const vLight = varyingProperty('vec3', 'vPuffLight'), vGlow = varyingProperty('float', 'vPuffGlow'), vSunSide = varyingProperty('vec3', 'vPuffSunSide'), vSeed = varyingProperty('float', 'vPuffSeed');
   return flownMaterial('smoke', true, () => {
     const p = attribute(PUFF_ATTRIBUTE, 'vec4'), th = attribute(PUFF_THROW, 'vec4'), look = attribute(PUFF_LOOK, 'vec4');
@@ -147,6 +158,7 @@ export function makeSmokeMaterial(): MeshBasicNodeMaterial {
     vLight.assign(vec3(...FLASH_COLOUR).mul(lit).mul(FLASH_LIGHT));
     passCorner(vCorner);
     vSeed.assign(seed);
+    vDeep.assign(vec2(eye.z.negate(), radius));
     return facingEye(centre, select(alive, radius, float(0)));
   }, () => {
     // Lumps on its outline: three soft lobes at seeded places, and round inside them.
@@ -157,9 +169,16 @@ export function makeSmokeMaterial(): MeshBasicNodeMaterial {
     };
     const body = saturate(oneMinus(length(c))).mul(BODY_RAMP).min(1);
     const shape = max(body.mul(body), max(lobe(0), max(lobe(1), lobe(2))).mul(body.sqrt()));
-    const a = saturate(vDensity.mul(shape));
     // Rounded: a normal as if it were a ball facing the eye, lit on its sunward side.
     const n = vec3(c, sqrt(saturate(oneMinus(c.dot(c)))));
+    // At half resolution there is no depth buffer: the share of the ball's chord through this pixel in front of the
+    // scene's nearest surface shows, so the smoke thins softly where it meets the hull or the sea.
+    const seen = depth ? (() => {
+      const scene = perspectiveDepthToViewZ(textureLoad(depth, ivec2(screenCoordinate.xy)).x, cameraNear, cameraFar).negate();
+      const chord = vDeep.y.mul(n.z).mul(2);
+      return saturate(scene.sub(vDeep.x.sub(vDeep.y.mul(n.z))).div(max(chord, SOFT_LEAST)));
+    })() : float(1);
+    const a = saturate(vDensity.mul(shape).mul(seen));
     const shade = mix(float(SHADED), float(1), saturate(n.dot(vSunSide).mul(1 / 2).add(1 / 2)));
     // The day's light is read here: the sky's map is sampled in the fragment stage only.
     return vec4(daylight().mul(ALBEDO).mul(vGlow).add(vLight).mul(shade).mul(a), a);
