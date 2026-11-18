@@ -92,7 +92,7 @@ const FORE = 0;
 const MAIN = 1;
 
 /** Something that happened under sail in a step: through the wind (tacked), round before it (wore), or failed in a tack. */
-export type SailingEvent = 'tacked' | 'wore' | 'missed stays';
+export type SailingEvent = 'tacked' | 'wore' | 'missed stays' | 'bore away';
 
 /** One step under sail: her next state, how she moves, and what happened. */
 export interface SailingStep {
@@ -564,4 +564,14 @@ export function sailsStanding(s: Sailing, wind: Wind, harm: SailingDamage = UNDA
       shivering: area > 0 && push.sinAttack < shiver,
     };
   });
+}
+
+/**
+ * Whether any of her drawing sails would be aback with her yards braced round as the crew trims them (`braceTarget`) in
+ * the true wind `wind`: one that no trim can fill, so the helmsman bears away (orders.ts `carryOut`). Yards still swinging
+ * round, or the wind just shifted, are not counted.
+ */
+export function sailAback(s: Sailing, wind: Wind): boolean {
+  const { ax, ay } = apparent(s.heading, s.ahead, s.leeway, wind);
+  return sailsStanding({ ...s, braces: s.braces.map((_, m) => braceTarget(s, m, ax, ay)) }, wind).some((x) => x.aback);
 }

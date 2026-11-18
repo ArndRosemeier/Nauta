@@ -109,6 +109,7 @@ export const PHRASES = {
   'tacked': p(["She's about, sir.", 'Round she comes, sir. Full and by.'], ['Sie ist herum, Herr Kapitän.', 'Herum, Herr Kapitän. Hoch am Wind.']),
   'wore': p(["She's round, sir.", 'Worn round, sir.'], ['Sie ist herum, Herr Kapitän.', 'Gehalst, Herr Kapitän.']),
   'missed stays': p(['Missed stays, sir!', "She won't come round, sir! Missed stays!"], ['Wende verpatzt, Herr Kapitän!', 'Sie kommt nicht herum, Herr Kapitän!']),
+  'bore away': p(['Bearing away a point, sir, she was taken aback.', 'She was taken aback, sir: bearing away a point.'], ['Fallen ab um einen Strich, Herr Kapitän, sie wurde back gedrückt.', 'Ich falle einen Strich ab, Herr Kapitän, die Segel standen back.']),
   'wind shifts': p(["The wind's shifting, sir.", "Wind's coming round, sir."], ['Der Wind dreht, Herr Kapitän.', 'Der Wind geht herum, Herr Kapitän.']),
   'wind freshens': p(["It's freshening, sir.", "Wind's getting up, sir."], ['Es frischt auf, Herr Kapitän.', 'Der Wind nimmt zu, Herr Kapitän.']),
   'wind eases': p(["It's easing, sir.", "Wind's falling light, sir."], ['Es flaut ab, Herr Kapitän.', 'Der Wind lässt nach, Herr Kapitän.']),
