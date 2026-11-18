@@ -1,0 +1,159 @@
+/**
+ * What the order fan offers (implementation plan N4.4, docs/design/orders.md "The order fan"): for each man, at most
+ * six orders round the finger, those that make sense for him at this moment, with at most one more ring ("About"
+ * opens tack and wear, "Make sail" the settings of sail). An order he cannot carry out now is offered dim (chosen, the
+ * match refuses it and he says why, N4.5); the order he is carrying out carries a ring. The midshipman's fan offers
+ * first whom the message is for, then that man's own fan. Also: which drawn man a finger points at, and the order
+ * keys. Pure: the fan on the page is orderFan.ts.
+ */
+import type { Order, PlainOrder } from '../sim/orders';
+import type { SimState } from '../sim/state';
+import { MASTS } from '../sim/ship/sailing';
+import { isStanding, wouldRefuse } from './orderReport';
+import type { KeyAction } from './settings';
+import type { WordKey } from './words';
+import { TAKERS, type Officer, type Taker } from './officers';
+
+/** What choosing an item does. */
+export type FanAct =
+  /** Gives an order (made for ship 0; the fan puts in the captain's ship). */
+  | { readonly kind: 'order'; readonly order: Order }
+  /** Opens one more ring. */
+  | { readonly kind: 'ring'; readonly items: readonly FanItem[] }
+  /** Steer there: the captain points his arm where she is to go, and gives it where he looks. */
+  | { readonly kind: 'steer there' }
+  /** The lookout is asked what he sees (his report is a bubble, N4.5). */
+  | { readonly kind: 'look out' }
+  /** The midshipman: the message is for this man; his fan opens. */
+  | { readonly kind: 'to'; readonly who: Taker };
+
+/** One round tag of the fan: its words (a second line in small italic), and what it does. */
+export interface FanItem {
+  readonly id: string;
+  readonly word: WordKey;
+  readonly detail: WordKey | null;
+  readonly act: FanAct;
+}
+
+/** An item as shown now: dim (he would refuse it now), ringed (it is what he is carrying out). */
+export interface FanSlot {
+  readonly item: FanItem;
+  readonly dim: boolean;
+  readonly on: boolean;
+}
+
+/** The most orders a fan offers, and the most rings deep it goes (orders.md). */
+export const FAN_MOST = 6;
+export const FAN_DEPTH = 2;
+
+const order = (id: string, word: WordKey, o: Order, detail: WordKey | null = null): FanItem => ({ id, word, detail, act: { kind: 'order', order: o } });
+const plain = (kind: PlainOrder['kind']): Order => ({ kind, ship: 0 });
+
+/** The master's ring "About": through the wind, or round before it. */
+const ABOUT: readonly FanItem[] = [order('tack', 'fanTack', plain('tack')), order('wear', 'fanWear', plain('wear'))];
+/** The first lieutenant's ring "Make sail": the three settings of sail. */
+const SETTINGS: readonly FanItem[] = [
+  order('sail-battle', 'fanBattle', { kind: 'sail', ship: 0, canvas: 'battle' }),
+  order('sail-plain', 'fanPlain', { kind: 'sail', ship: 0, canvas: 'plain' }),
+  order('sail-all', 'fanAll', { kind: 'sail', ship: 0, canvas: 'all' }),
+];
+/** Back the main topsail (orders.md names the main; the fore stays an order of the panel). */
+const BACK: Order = { kind: 'back', ship: 0, mast: 'main' };
+
+/** Whether she has a mast aback or is hove to: then the first lieutenant offers "Fill" where he offered "Back". */
+function backed(state: SimState, ship: number): boolean {
+  const told = state.ships[ship]?.told;
+  return !!told && (told.hove || MASTS.some((_, m) => told.backed[m]));
+}
+
+/** The orders a man takes, as offered now (the midshipman's are the men he can carry a message to). */
+export function fanItems(who: Officer, state: SimState, ship: number): readonly FanItem[] {
+  switch (who) {
+    case 'master': return [
+      { id: 'steer', word: 'fanSteer', detail: null, act: { kind: 'steer there' } },
+      order('up', 'fanUp', plain('up'), 'fanPoint'),
+      order('away', 'fanAway', plain('away'), 'fanPoint'),
+      order('by', 'fanBy', plain('by')),
+      { id: 'about', word: 'fanAbout', detail: 'fanAboutDetail', act: { kind: 'ring', items: ABOUT } },
+      order('heave', 'fanHeave', plain('heave')),
+    ];
+    case 'first lieutenant': return [
+      { id: 'sail', word: 'fanSail', detail: null, act: { kind: 'ring', items: SETTINGS } },
+      order('shorten', 'fanShorten', plain('shorten')),
+      backed(state, ship) ? order('fill', 'fanFill', plain('fill'), 'fanFillDetail') : order('back', 'fanBack', BACK, 'fanBackDetail'),
+    ];
+    case 'lookout': return [{ id: 'look-out', word: 'fanLookOut', detail: null, act: { kind: 'look out' } }];
+    // The gunner's and the carpenter's orders come with N5.3b and N6.
+    case 'gunner': case 'carpenter': return [];
+    case 'midshipman': return TAKERS.filter((t) => fanItems(t, state, ship).length > 0).map((t) => ({ id: `to-${t}`, word: RANK_WORDS[t], detail: null, act: { kind: 'to', who: t } }));
+  }
+}
+
+/** Each man's rank in words (the fan's hub, the midshipman's choice). */
+export const RANK_WORDS: Readonly<Record<Officer, WordKey>> = {
+  master: 'rankMaster', 'first lieutenant': 'rankFirst', gunner: 'rankGunner', carpenter: 'rankCarpenter', lookout: 'rankLookout', midshipman: 'rankMidshipman',
+};
+
+/** The orders an item gives, itself or through its ring. */
+function ordersOf(item: FanItem, ship: number): Order[] {
+  const a = item.act;
+  if (a.kind === 'order') return [{ ...a.order, ship }];
+  return a.kind === 'ring' ? a.items.flatMap((i) => ordersOf(i, ship)) : [];
+}
+
+/** The items as shown now: an order dim when the match would refuse it, ringed while standing; a ring dim when all in it are, ringed when one is. */
+export function fanSlots(items: readonly FanItem[], state: SimState, ship: number): FanSlot[] {
+  const told = state.ships[ship]?.told;
+  return items.map((item) => {
+    const orders = ordersOf(item, ship);
+    if (orders.length === 0) return { item, dim: false, on: item.act.kind === 'steer there' && !!told && isStanding({ kind: 'steer', ship, heading: 0 }, told) };
+    return { item, dim: orders.every((o) => wouldRefuse(state, o)), on: !!told && orders.some((o) => isStanding(o, told)) };
+  });
+}
+
+/** The slot of a fan nearest a point, given the slots' places round the hub (px), within `reach` px of its middle; -1: none. */
+export function slotAt(places: readonly (readonly [number, number])[], x: number, y: number, reach: number): number {
+  let best = -1, nearest = reach;
+  places.forEach(([px, py], i) => {
+    const d = Math.hypot(px - x, py - y);
+    if (d <= nearest) { nearest = d; best = i; }
+  });
+  return best;
+}
+
+/** Where the slots of a fan of `n` lie round its hub, px from it: the first at the top, then clockwise. */
+export function slotPlaces(n: number, radius: number): [number, number][] {
+  return Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * 2 * Math.PI;
+    return [radius * Math.sin(a), -radius * Math.cos(a)];
+  });
+}
+
+/** A drawn man as the view shows him: who, where on the screen (px), and whether he is in view. */
+export interface ManOnScreen {
+  readonly who: Officer;
+  readonly x: number;
+  readonly y: number;
+  readonly seen: boolean;
+}
+
+/** The man nearest a point on the screen within `reach` px of him, or null. */
+export function manAt(men: readonly ManOnScreen[], x: number, y: number, reach: number): Officer | null {
+  const i = slotAt(men.map((m) => (m.seen ? [m.x, m.y] as const : [Infinity, Infinity] as const)), x, y, reach);
+  return i < 0 ? null : men[i]!.who;
+}
+
+/** What each order key does: an order to its man, or steer there where the captain looks (orders.md "Keys"). */
+export const KEY_ORDERS: Readonly<Partial<Record<KeyAction, Order | 'steer there'>>> = {
+  steer: 'steer there',
+  up: plain('up'),
+  away: plain('away'),
+  tack: plain('tack'),
+  wear: plain('wear'),
+  heave: plain('heave'),
+  battle: { kind: 'sail', ship: 0, canvas: 'battle' },
+  plain: { kind: 'sail', ship: 0, canvas: 'plain' },
+  all: { kind: 'sail', ship: 0, canvas: 'all' },
+  shorten: plain('shorten'),
+};
+

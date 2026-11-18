@@ -13,7 +13,8 @@ import { VOCABULARY, type Order } from '../src/sim/orders.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import { step, type SimEvent } from '../src/sim/step.ts';
 import { PHRASES, phraseWords, TERMS, type Line, type Term } from '../src/app/speech/phrases.ts';
-import { lookoutSays, PASS_DELAY, saysOf, takerOf, whereTerm, type Say } from '../src/app/speech/reports.ts';
+import { lookoutSays, PASS_DELAY, saysOf, whereTerm, type Say } from '../src/app/speech/reports.ts';
+import { takerOf } from '../src/app/officers.ts';
 import { BubbleQueue, MOST_SHOWN, READ_LEAST, readSeconds, REPEAT_SECONDS } from '../src/app/speech/bubbles.ts';
 
 const LANGUAGES = ['en', 'de'] as const;

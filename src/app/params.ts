@@ -81,6 +81,8 @@ export interface Params {
   readonly brace: number;
   /** Sail her by orders (`?sail`, plan N3.5): the brig under way in a match on this machine, and the order panel; with the ship of `?ship` (and `?walk` if asked). */
   readonly sail: boolean;
+  /** The working order panel of N3.5 beside the order fan (`?panel`): a test tool, with every order and the answers in words. */
+  readonly panel: boolean;
   /** Open a room for a second captain at once (`?room`, plan N3.7). */
   readonly room: boolean;
   /** Join the room with this code at once (`?join=K7Q2ZP`, the link a room shows); null: none. */
@@ -132,7 +134,7 @@ export function readParams(query: string): Params {
     bench: q.has('bench') ? num('bench', BENCH_SECONDS, BENCH_SHORTEST, BENCH_LONGEST) : 0,
     motion: q.has('motion') ? num('motion', 1, CALM_LEAST, 1) : null,
     brace: num('brace', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE,
-    sail: q.has('sail'),
+    sail: q.has('sail'), panel: q.has('panel'),
     room: q.has('room'), join: q.get('join') || null, key: q.get('key') || null, hub: q.get('hub') || null,
     seed: q.has('seed') ? Math.round(num('seed', 0, 0, SEED_MOST)) : null, netcheck: q.has('netcheck'),
     crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'), men: Math.round(num('men', CREW_SIZE, 1, CREW_SIZE)),

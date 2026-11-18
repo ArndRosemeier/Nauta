@@ -41,7 +41,13 @@ const MOTION_WORDS: readonly WordKey[] = ['motionFull', 'motionHalf', 'motionCal
 const THUMB_WORDS: readonly WordKey[] = ['left', 'right'];
 const VIOLENCE_WORDS: readonly WordKey[] = ['violenceMild', 'violencePlain', 'violenceUnsparing'];
 const LANGUAGE_WORDS: readonly WordKey[] = ['english', 'german'];
-const KEY_WORDS: Readonly<Record<KeyAction, WordKey>> = { forward: 'keyForward', back: 'keyBack', left: 'keyLeft', right: 'keyRight', glass: 'keyGlass' };
+const KEY_WORDS: Readonly<Record<KeyAction, WordKey>> = {
+  forward: 'keyForward', back: 'keyBack', left: 'keyLeft', right: 'keyRight', glass: 'keyGlass',
+  steer: 'keySteer', up: 'fanUp', away: 'fanAway', tack: 'fanTack', wear: 'fanWear', heave: 'fanHeave',
+  battle: 'fanBattle', plain: 'fanPlain', all: 'fanAll', shorten: 'fanShorten', fan: 'keyFan', midshipman: 'keyMidshipman',
+};
+/** The first order key: the keys page starts a section "Orders" there. */
+const FIRST_ORDER_KEY: KeyAction = 'steer';
 const SOUND_WORDS: Readonly<Record<SoundPart, readonly [WordKey, WordKey | null]>> = {
   all: ['soundAll', null], sea: ['soundSea', null], ship: ['soundShip', 'soundShipHelp'], crew: ['soundCrew', 'soundCrewHelp'], battle: ['soundBattle', null],
 };
@@ -133,6 +139,7 @@ export class SettingsMenu {
       el.append(section(say.touch), choiceRow(say.thumb, say.thumbHelp, THUMB_WORDS.map((w) => say[w]), THUMB_SIDES.indexOf(s.thumb), (i) => set({ thumb: THUMB_SIDES[i]! })));
       el.append(section(say.keys), make('p', 'nt-note', say.keysHelp));
       for (const a of KEY_ACTIONS) {
+        if (a === FIRST_ORDER_KEY) el.append(section(say.keysOrders));
         const cap = make('button', 'nt-key', keyName(s.keys[a]));
         cap.type = 'button';
         cap.addEventListener('click', () => this.waitForKey(a, cap, say));

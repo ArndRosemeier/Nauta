@@ -24,8 +24,12 @@ export type ThumbSide = (typeof THUMB_SIDES)[number];
 /** The sound's parts, each with its own level under the whole (`all`). */
 export const SOUND_PARTS = ['all', 'sea', 'ship', 'crew', 'battle'] as const;
 export type SoundPart = (typeof SOUND_PARTS)[number];
-/** The keys a player may change, each one key (its `code`); the arrows always walk as well. */
-export const KEY_ACTIONS = ['forward', 'back', 'left', 'right', 'glass'] as const;
+/**
+ * The keys a player may change, each one key (its `code`); the arrows always walk as well. Walking and the glass,
+ * then the orders (docs/design/orders.md "Keys"): steer there, come up and bear away a point, tack, wear, heave to,
+ * the three settings of sail and shorten, the fan of the man looked at, the midshipman.
+ */
+export const KEY_ACTIONS = ['forward', 'back', 'left', 'right', 'glass', 'steer', 'up', 'away', 'tack', 'wear', 'heave', 'battle', 'plain', 'all', 'shorten', 'fan', 'midshipman'] as const;
 export type KeyAction = (typeof KEY_ACTIONS)[number];
 
 export interface Settings {
@@ -66,7 +70,11 @@ export const DEFAULT_SETTINGS: Settings = {
   mouseSpeed: 1,
   mouseInverted: false,
   thumb: 'left',
-  keys: { forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', glass: 'KeyG' },
+  keys: {
+    forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', glass: 'KeyQ',
+    steer: 'KeyX', up: 'KeyZ', away: 'KeyC', tack: 'KeyT', wear: 'KeyG', heave: 'KeyH',
+    battle: 'Digit1', plain: 'Digit2', all: 'Digit3', shorten: 'Digit4', fan: 'KeyE', midshipman: 'KeyM',
+  },
   violence: 'plain',
   matchMinutes: MATCH_MINUTES,
   language: 'en',
@@ -95,11 +103,31 @@ export function readSettings(kept: unknown): Settings {
     mouseSpeed: between(k.mouseSpeed, SPEED_LEAST, SPEED_MOST, d.mouseSpeed),
     mouseInverted: typeof k.mouseInverted === 'boolean' ? k.mouseInverted : d.mouseInverted,
     thumb: oneOf(k.thumb, THUMB_SIDES, d.thumb),
-    keys: Object.fromEntries(KEY_ACTIONS.map((a) => [a, typeof keys[a] === 'string' && keys[a] ? keys[a] : d.keys[a]])) as Record<KeyAction, string>,
+    keys: keptKeys(keys),
     violence: oneOf(k.violence, VIOLENCE_LEVELS, d.violence),
     matchMinutes: Math.round(between(k.matchMinutes, MATCH_LEAST, MATCH_MOST, d.matchMinutes) / MATCH_STEP) * MATCH_STEP,
     language: oneOf(k.language, LANGUAGES, d.language),
   };
+}
+
+/** The glass's key before the order keys came (N4.4): G is Wear now (orders.md), so a glass kept on G moves to its new default. */
+const OLD_GLASS = 'KeyG';
+
+/**
+ * The keys kept, each action's own or its default; a build before the order keys kept no `wear`, and its glass on G
+ * gives G up to Wear. Two actions never share a key: a later one that would take a key in use keeps its default.
+ */
+function keptKeys(keys: Record<string, unknown>): Record<KeyAction, string> {
+  const d = DEFAULT_SETTINGS.keys, out = {} as Record<KeyAction, string>, used = new Set<string>();
+  const old = !('wear' in keys);
+  for (const a of KEY_ACTIONS) {
+    let k = typeof keys[a] === 'string' && keys[a] ? (keys[a] as string) : d[a];
+    if (old && a === 'glass' && k === OLD_GLASS) k = d.glass;
+    if (used.has(k)) k = d[a];
+    out[a] = k;
+    used.add(k);
+  }
+  return out;
 }
 
 /** `s` with one key given to `action`; an action that had that key before takes `action`'s old key, so no key does two things. */

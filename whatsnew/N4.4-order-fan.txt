@@ -1,0 +1,3 @@
+Give orders by tapping the men: the master at the wheel, the first lieutenant on the quarterdeck and the lookout in the main top now stand at their posts, and a tap (or a press and slide) on one opens his orders round your finger. Try ?sail&walk&foe=master, tap the master, choose About, then Tack.
+"Steer there": tap the master, choose Steer there, look where she should go and tap the brass Steer there button; your arm points the way. Come up and Bear away move her a point.
+Below deck, tap your midshipman (he follows you) and choose whom the order is for: he runs with it, and it is given when he gets there. On a keyboard: X steer there, Z and C a point, T tack, G wear, H heave to, 1 to 4 the sails, E the man you look at, M the midshipman; the spyglass moved to Q.
