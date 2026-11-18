@@ -1,0 +1,2 @@
+The fife rail just forward of the foremast is now short and close round the mast, so there is room to walk past it to the bow beside the forward guns.
+Try it with ?ship&walk and walk forward along either side of the foremast.
