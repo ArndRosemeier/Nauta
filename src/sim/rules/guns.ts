@@ -76,3 +76,96 @@ export const FEWEST_AT_GUN = 2;
 
 /** What a gun is loaded with (orders.md: the gunner's "Shot: Round, Chain, Grape"); its flight is N5.2's. */
 export type ShotKind = 'round' | 'chain' | 'grape';
+
+// ---- Shot in flight (N5.2) ----
+
+/** Speed of sound in air at sea level, m/s: a ball's drag rises steeply as it nears it. */
+export const SPEED_OF_SOUND = 340;
+
+/**
+ * A sphere's drag coefficient by its Mach number (wind-tunnel results for smooth spheres, Miller and Bailey 1979,
+ * rounded): about 0.47 slow, rising through the speed of sound to near 1 and easing after. A long six's ball leaves at
+ * Mach 1.4 and loses a third of its speed in the first 200 m; a carronade's leaves below Mach 0.7.
+ */
+export const SPHERE_DRAG: { readonly mach: readonly number[]; readonly drag: readonly number[] } = {
+  mach: [0, 0.5, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.5, 2],
+  drag: [0.47, 0.48, 0.52, 0.6, 0.72, 0.85, 0.94, 0.97, 0.96, 0.92],
+};
+
+/** Each kind's muzzle speed with round shot, m/s (design decisions for N5). */
+export const MUZZLE_SPEED: Readonly<Record<GunKind, number>> = { carronade: 230, long6: 480 };
+
+/**
+ * One kind of shot as each gun fires it: how many balls leave the muzzle, each ball's mass (kg) and diameter (m),
+ * its muzzle speed as a share of round shot's, its drag as a multiple of a sphere's (chain tumbles), the spread of the
+ * balls' directions (rad, the half-angle most of a grape round falls within) and the span a ball sweeps (m: chain's
+ * two halves and their chain whirling; 0 for a ball), and whether it skips off the water.
+ * Round: the solid ball. Chain: two half-balls joined by a fathom of chain, slower, tumbling, for her rigging out to
+ * about 250 m. Grape: nine balls in a canvas stand, scattering from the muzzle, for her men inside about 100 m.
+ */
+export interface ShotRow {
+  readonly balls: number;
+  readonly mass: Readonly<Record<GunKind, number>>;
+  readonly diameter: Readonly<Record<GunKind, number>>;
+  readonly speed: number;
+  readonly drag: number;
+  readonly spread: number;
+  readonly span: number;
+  readonly skips: boolean;
+}
+export const SHOT: Readonly<Record<ShotKind, ShotRow>> = {
+  round: { balls: 1, mass: { carronade: 14.5, long6: 2.72 }, diameter: { carronade: 0.155, long6: 0.089 }, speed: 1, drag: 1, spread: 0, span: 0, skips: true },
+  chain: { balls: 1, mass: { carronade: 14, long6: 2.6 }, diameter: { carronade: 0.155, long6: 0.089 }, speed: 0.8, drag: 4, spread: 0, span: 1.8, skips: false },
+  grape: { balls: 9, mass: { carronade: 1.5, long6: 0.3 }, diameter: { carronade: 0.071, long6: 0.042 }, speed: 0.9, drag: 1, spread: 2.5 * DEGREE, span: 0, skips: true },
+};
+
+/**
+ * Scatter (seeded; tuned so that against a brig broadside on in a force 4 sea, fired as they bear, about three round
+ * shot in four strike her hull at 100 m, half at 200 m and one in five at 400 m: design decisions for N5; checked by
+ * `npm run check:gunnery`):
+ * - DISPERSION: the spread of a gun's shot about her bore, rad (one standard deviation, up-down and side to side):
+ *   loose-fitting balls and powder. Chain wanders more (CHAIN_WANDER times).
+ * - SPEED_SPREAD: the muzzle speed's standard deviation, a share of it (the powder).
+ * - TIMING: the gun captain's error in picking his moment of the roll, s (one standard deviation, a full crew). The
+ *   barrel's aim moves with her roll, so the same error throws the shot further off the faster she rolls: it grows
+ *   with the sea. Short hands stretch it like the drill (rules above, `STRETCH`).
+ * - JUDGING: his error in judging the range he lays for, a share of it (one standard deviation).
+ */
+export const DISPERSION = 0.6 * DEGREE;
+export const CHAIN_WANDER = 2;
+export const SPEED_SPREAD = 0.02;
+export const TIMING = 0.6;
+export const JUDGING = 0.25;
+/** How often he judges the range afresh, s (his error holds meanwhile, so he lays steadily). */
+export const JUDGE_SECONDS = 10;
+
+/**
+ * The water: a ball meeting it at less than RICOCHET_ANGLE (rad) and faster than RICOCHET_SPEED (m/s) skips, keeping
+ * SKIP_KEEP of its speed along the water and leaving at SKIP_LIFT of the angle it came in at; at most SKIPS_MOST
+ * times. Otherwise it plunges and is spent. The gunners of the time counted on round shot's first grazes.
+ */
+export const RICOCHET_ANGLE = 6 * DEGREE;
+export const RICOCHET_SPEED = 100;
+export const SKIP_KEEP = 0.45;
+export const SKIP_LIFT = 1;
+export const SKIPS_MOST = 3;
+
+/** The flight is worked out every FLIGHT_STEP s (a carronade's ball moves about 4 m in one, a long six's 8 m), and a point of its path kept every PATH_STEP s; no flight lasts beyond FLIGHT_LONGEST s. */
+export const FLIGHT_STEP = 1 / 60;
+export const PATH_STEP = 0.05;
+export const FLIGHT_LONGEST = 15;
+
+/**
+ * The range table the flight is held to (round shot from her port, about 2.2 m above the water, calm, to the first
+ * graze), m, at point blank (the line of metal, about 1° up) and at 5° up. First proposals from the design's muzzle
+ * speeds: the gunnery tables of the time give a 32-pounder carronade about 300 yd at point blank, as here, but about
+ * 1,090 yd at 5°, which a 230 m/s ball cannot reach (the real charge drove it faster); kept short, the carronade is
+ * poor beyond 400 m as the design wants. The long six reaches about 1,300 m at 5°, as the tables give. Tested within
+ * RANGE_TOLERANCE, so a change of drag or speed that moves them shows.
+ */
+export const POINT_BLANK = 1 * DEGREE;
+export const RANGE_TABLE: Readonly<Record<GunKind, { readonly pointBlank: number; readonly five: number }>> = {
+  carronade: { pointBlank: 260, five: 780 },
+  long6: { pointBlank: 575, five: 1335 },
+};
+export const RANGE_TOLERANCE = 0.05;

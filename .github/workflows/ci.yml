@@ -73,6 +73,8 @@ jobs:
         run: node tools/guards/budget.mjs 120 180 -- npm run check:sailing
       - name: The captain walks every space, door and ladder of the brig in the strongest duel sea (N2.3)
         run: node tools/guards/budget.mjs 120 180 -- npm run walk:check
+      - name: Round shot fired as they bear strikes a brig about as often as the design says at 100, 200 and 400 m (N5.2)
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:gunnery
       - name: The standard sea shots (times of day, seas, eye heights) within their 3 minutes
         run: node tools/guards/budget.mjs 120 180 -- npm run shot:sea -- shots/sea
       - uses: actions/upload-artifact@v4
