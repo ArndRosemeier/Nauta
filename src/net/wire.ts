@@ -15,7 +15,7 @@ import { decodeState, encodeState, hashState, type SimState } from '../sim/state
 /** The game's id on GameHub (registered there by Arnd: `npm run apps -- add nauta`). */
 export const GAME = 'nauta';
 /** The version of this protocol; a machine never joins a room of another. Raise it when a message changes shape. */
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 /** The most players in a room: two captains, one ship each (Arnd, 2026-11-17: every player is a captain of his own ship). */
 export const MOST_PLAYERS = 2;
 /** The most orders one message may carry; the rest are dropped (a captain gives a few a minute). */
@@ -40,6 +40,10 @@ export interface Snapshot {
   readonly hash: string;
   readonly captains: Captains;
   readonly acks: readonly Ack[];
+  /** The room's match this is (duel.ts, "Rounds"); none: 0. */
+  readonly round?: number;
+  /** The players ready for the next round. */
+  readonly ready?: readonly number[];
 }
 
 /** What the host stepped since its last delta: the orders by tick, up to (not including) `tick`, the state it is at now. */
@@ -50,6 +54,10 @@ export interface Delta {
   readonly acks: readonly Ack[];
   /** Once a second: the hash of the state at `tick`, so a guest checks itself without the whole state being sent. */
   readonly hash?: string;
+  /** The room's match this is; none: 0. */
+  readonly round?: number;
+  /** The players ready for the next round. */
+  readonly ready?: readonly number[];
 }
 
 /** One order a captain gives, numbered by him (1, 2, 3...), so the host steps each once even across a change of host. */
@@ -58,8 +66,11 @@ export interface GivenOrder {
   readonly order: unknown;
 }
 
-/** A captain's orders to the host, or a guest whose hash differed asking for the host's whole state. */
-export type Intent = { readonly kind: 'orders'; readonly orders: readonly GivenOrder[] } | { readonly kind: 'resync' };
+/** A captain's orders to the host, a guest whose hash differed asking for the host's whole state, or a captain ready for the round after `round`. */
+export type Intent =
+  | { readonly kind: 'orders'; readonly orders: readonly GivenOrder[] }
+  | { readonly kind: 'resync' }
+  | { readonly kind: 'ready'; readonly round: number };
 
 /** What a room says about itself in the lobby; a machine joins only a room of its own protocol and build. */
 export interface RoomMeta {
@@ -115,8 +126,8 @@ function fromBase64(text: string): Uint8Array {
 }
 
 /** The host's state as a snapshot. */
-export function makeSnapshot(state: SimState, captains: Captains, acks: readonly Ack[]): Snapshot {
-  return { protocol: PROTOCOL, tick: state.tick, state: toBase64(encodeState(state)), hash: hashState(state), captains: [...captains], acks: [...acks] };
+export function makeSnapshot(state: SimState, captains: Captains, acks: readonly Ack[], round = 0, ready: readonly number[] = []): Snapshot {
+  return { protocol: PROTOCOL, tick: state.tick, state: toBase64(encodeState(state)), hash: hashState(state), captains: [...captains], acks: [...acks], round, ready: [...ready] };
 }
 
 /** A snapshot's state; fails on one that does not hold a state. */

@@ -20,8 +20,14 @@
  *   which steps each once (`acks`).
  *
  * Players are captains, one ship each: the room's first player has the first ship, the next the second.
+ *
+ * **Rounds** (menu.md, the waiting room and the end card): a room's match runs from the moment it is open (round 0).
+ * Once every ship has her captain and each has said he is ready (`ready`), the host begins a fresh match from the
+ * room's terms (the next round): the first when both tapped Ready in the waiting room, another when both tapped Again
+ * on the end card. Every message the host sends names its round; a guest takes the first snapshot of a later round as
+ * it is and passes over what is left of an earlier one.
  */
-import { hashString } from '@futuremagic/core';
+import { deriveSeed, hashString } from '@futuremagic/core';
 import type { GameHub, RoomSummary } from '../../vendor/gamehub/gamehub';
 import { captainOrders } from '../sim/captain/captain';
 import type { Order } from '../sim/orders';
@@ -114,6 +120,14 @@ export function roomSeed(code: string): number {
   return hashString(code.toUpperCase());
 }
 
+/** The seed of a room's match in round `round`: the room's own for the first two (the one running and the first begun), then another each round. */
+export function roundSeed(code: string, round: number): number {
+  return round <= 1 ? roomSeed(code) : deriveSeed(roomSeed(code), 'round', round) >>> 0;
+}
+
+/** The round a message of the host's names (none: an older build's, round 0). */
+const roundOf = (m: { readonly round?: unknown }): number => (Number.isInteger(m.round) ? (m.round as number) : 0);
+
 export class DuelSession {
   /** This machine's part in the match. */
   role: DuelRole;
@@ -123,6 +137,8 @@ export class DuelSession {
   drifts = 0;
   /** Steps this machine has made itself. */
   stepsMade = 0;
+  /** The room's match this is: 0 the one running since the room opened, then one more each time both captains were ready. */
+  round = 0;
 
   private readonly hub: DuelHub | null;
   private readonly now: () => number;
@@ -138,6 +154,8 @@ export class DuelSession {
   private known: SimState | null = null;
   private previous: SimState | null = null;
   private captains: (number | null)[] = [];
+  /** The players ready for the next round, as the host counts them (a guest hears them in the host's messages). */
+  private readyFor: number[] = [];
   private readonly acks = new Map<number, number>();
   // The host's: the orders waiting for the next step, those stepped since the last delta, and the clock it steps by.
   private queue: { player: number; seq: number; order: Order }[] = [];
@@ -205,6 +223,11 @@ export class DuelSession {
     return this.captains;
   }
 
+  /** The players who said they are ready for the next round. */
+  get readyPlayers(): readonly number[] {
+    return this.readyFor;
+  }
+
   /** My orders sent and not yet stepped by a host. */
   get pending(): readonly Order[] {
     return this.unstepped.map((g) => g.order as Order);
@@ -265,6 +288,19 @@ export class DuelSession {
   /** Whether the computer captain still waits for `wakeFoe`. */
   get foeWaiting(): boolean {
     return this.foeState === 'heave' || this.foeState === 'hove';
+  }
+
+  /**
+   * I am ready for the next round (the first match, or another after the end): the host counts me at once, a guest
+   * tells the host. Once every ship has her captain and all are ready, the host begins it. Alone, nothing happens.
+   */
+  ready(): void {
+    if (this.role === 'host') this.readyHost(this.me);
+    else if (this.role === 'guest' && this.hub && this.hub.host !== null) {
+      if (!this.readyFor.includes(this.me)) this.readyFor = [...this.readyFor, this.me];
+      this.hub.send({ kind: 'ready', round: this.round }, this.hub.host);
+      this.emit('change');
+    }
   }
 
   /** Runs the match up to the clock: a host steps it, a guest runs on through the host's orders. Call it every frame. */
@@ -372,7 +408,10 @@ export class DuelSession {
 
   private sendDelta(): void {
     const tick = this.state.tick;
-    const delta: Delta = { tick, log: this.stepped, captains: [...this.captains], acks: this.ackList(), ...(tick % HASH_STEPS === 0 ? { hash: hashState(this.state) } : {}) };
+    const delta: Delta = {
+      tick, log: this.stepped, captains: [...this.captains], acks: this.ackList(), round: this.round, ready: [...this.readyFor],
+      ...(tick % HASH_STEPS === 0 ? { hash: hashState(this.state) } : {}),
+    };
     this.stepped = [];
     this.hub?.sendDelta(delta);
   }
@@ -380,7 +419,7 @@ export class DuelSession {
   private sendSnapshot(): void {
     if (this.stepped.length) this.sendDelta();
     this.snapshotTick = this.state.tick;
-    this.hub?.setState(makeSnapshot(this.state, this.captains, this.ackList()));
+    this.hub?.setState(makeSnapshot(this.state, this.captains, this.ackList(), this.round, this.readyFor));
   }
 
   private ackList(): Ack[] {
@@ -391,6 +430,10 @@ export class DuelSession {
   private heedIntent(intent: Intent, from: number): void {
     const ship = this.captains.indexOf(from);
     if (ship < 0 || !intent) return;
+    if (intent.kind === 'ready') {
+      if (intent.round === this.round) this.readyHost(from);
+      return;
+    }
     if (intent.kind === 'resync') {
       if (this.state.tick - this.snapshotTick >= RESYNC_STEPS) this.sendSnapshot();
       return;
@@ -404,6 +447,26 @@ export class DuelSession {
     }
   }
 
+  /** Counts `player` ready for the next round, and begins it once every ship's captain is. */
+  private readyHost(player: number): void {
+    if (!this.readyFor.includes(player)) this.readyFor = [...this.readyFor, player];
+    if (this.captains.every((c) => c !== null && this.readyFor.includes(c))) this.nextRound();
+    else this.sendDelta();
+    this.emit('change');
+  }
+
+  /** The host begins the next round: a fresh match from the room's terms, its own seed, the same captains. */
+  private nextRound(): void {
+    // Orders waiting for the old match are passed over, but counted as stepped, so no one sends them again.
+    for (const t of this.queue) this.acks.set(t.player, Math.max(t.seq, this.acks.get(t.player) ?? 0));
+    this.queue = [];
+    this.stepped = [];
+    this.round++;
+    this.readyFor = [];
+    this.begin(startMatch(this.timed(duelStart(roundSeed(this.code, this.round), this.terms))), this.captains);
+    this.sendSnapshot();
+  }
+
   /** A start this machine begins, with the player's match length when there is one. */
   private timed(setup: MatchSetup): MatchSetup {
     return this.minutes === undefined ? setup : { ...setup, minutes: this.minutes };
@@ -415,7 +478,7 @@ export class DuelSession {
     if (!this.known) {
       const latest = this.snapshots.at(-1);
       if (latest) this.adopt(latest);
-      else this.begin(startMatch(this.timed(duelStart(roomSeed(this.code), this.terms))), [hub.you, null]);
+      else this.begin(startMatch(this.timed(duelStart(roundSeed(this.code, this.round), this.terms))), [hub.you, null]);
     }
     this.jumpIfFar(this.hostTick);
     this.catchUp(this.hostTick, Infinity);
@@ -506,13 +569,14 @@ export class DuelSession {
     while (this.log.length && this.log[0]!.tick < s.tick) this.log.shift();
     this.snapshots = this.snapshots.filter((x) => x.tick > s.tick);
     this.hostTick = Math.max(this.hostTick, s.tick);
-    this.roster(s.captains, s.acks);
+    this.roster(s.captains, s.acks, s.ready);
   }
 
-  private roster(captains: Captains, acks: readonly Ack[]): void {
-    const was = this.mine;
+  private roster(captains: Captains, acks: readonly Ack[], ready: readonly number[] | undefined): void {
+    const was = this.mine, wasReady = this.readyFor.join();
     if (Array.isArray(captains)) this.captains = captains.map((c) => (Number.isInteger(c) ? c : null));
-    if (this.mine !== was) this.emit('change');
+    if (Array.isArray(ready)) this.readyFor = ready.filter((p) => Number.isInteger(p));
+    if (this.mine !== was || this.readyFor.join() !== wasReady) this.emit('change');
     if (!Array.isArray(acks)) return;
     for (const a of acks) if (Array.isArray(a) && Number.isInteger(a[0]) && Number.isInteger(a[1])) this.acks.set(a[0], a[1]);
     const mine = this.acks.get(this.me) ?? 0;
@@ -527,7 +591,12 @@ export class DuelSession {
 
   private onSnapshot(s: Snapshot): void {
     if (!s || s.protocol !== PROTOCOL || !Number.isInteger(s.tick)) return;
-    if (!this.known || this.rebase) {
+    const round = roundOf(s);
+    if (round < this.round) return;
+    if (!this.known || this.rebase || round > this.round) {
+      this.round = round;
+      this.checks.clear();
+      this.resyncing = false;
       this.rebase = false;
       this.log = [];
       this.snapshots = [];
@@ -544,17 +613,17 @@ export class DuelSession {
       return;
     }
     this.snapshots.push(s);
-    this.roster(s.captains, s.acks);
+    this.roster(s.captains, s.acks, s.ready);
     this.hostTick = Math.max(this.hostTick, s.tick);
     if (s.tick === this.state.tick) this.check();
   }
 
   private onDelta(d: Delta): void {
-    if (!d || !Number.isInteger(d.tick) || !Array.isArray(d.log) || this.rebase || !this.known || d.tick <= this.hostTick) return;
+    if (!d || !Number.isInteger(d.tick) || !Array.isArray(d.log) || this.rebase || !this.known || roundOf(d) !== this.round || d.tick <= this.hostTick) return;
     for (const entry of d.log) if (entry.tick >= this.state.tick) this.log.push(entry);
     if (typeof d.hash === 'string' && d.tick > this.state.tick) this.checks.set(d.tick, d.hash);
     this.hostTick = d.tick;
-    this.roster(d.captains, d.acks);
+    this.roster(d.captains, d.acks, d.ready);
     this.heard(d.tick);
   }
 
@@ -588,6 +657,7 @@ export class DuelSession {
       this.emit('change');
     });
     hub.on('player-', (id) => {
+      this.readyFor = this.readyFor.filter((p) => p !== id);
       if (this.role === 'host') { this.captains = this.captains.map((c) => (c === id ? null : c)); this.sendDelta(); }
       this.emit('change');
     });
