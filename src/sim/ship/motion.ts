@@ -17,6 +17,7 @@
  * **Cost.** The water is sampled once a step on a small grid under her (`surfaceAt` is the costly part), and every
  * pressure point reads it bilinearly; one step is about 55 µs on a desktop.
  */
+import type { Frame } from '@futuremagic/deck';
 import { surfaceAt, seaSample, type SeaState } from '../sea/sea';
 import { sincos } from '../trig';
 import { GRAVITY, STEP_SECONDS } from '../units';
@@ -225,6 +226,12 @@ const rotation = new Float64Array(MATRIX);
 
 /** Where ship space's origin stands in the world at her pose (what a drawing of her is placed at). */
 export const shipOrigin = (pose: ShipPose, out: [number, number, number] = [0, 0, 0]): [number, number, number] => toWorld(pose, 0, 0, 0, out);
+
+/** Ship space's frame in the world at her pose (@futuremagic/deck's `Frame`: what walking and climbing on her read). */
+export function shipFrame(pose: ShipPose): Frame {
+  const [x, y, z] = shipOrigin(pose);
+  return { origin: { x, y, z }, rotation: poseRotation(pose) };
+}
 
 /**
  * She put on the water with her centre at (x, z) and her bow toward `heading`, still, at the draught's load waterline:

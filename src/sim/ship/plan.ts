@@ -68,6 +68,19 @@ export interface Way {
   readonly steps: number;
   /** The opening a ladder goes through. */
   readonly opening: string | null;
+  /** A ladder's line: its foot on the floor below and its head at the opening's end, m above the base (N2.3 climbs it); null for a door or an open join. */
+  readonly line: LadderLine | null;
+}
+
+/**
+ * Where a ladder stands: its foot and its head (along, across, height above the base), the way it climbs in plan,
+ * and the way one steps from its head's standing spot into the opening to go down it (unit [along, across]).
+ */
+export interface LadderLine {
+  readonly foot: readonly [number, number, number];
+  readonly head: readonly [number, number, number];
+  readonly toward: readonly [number, number];
+  readonly down: readonly [number, number];
 }
 
 /** A bulkhead between two spaces of a level: a straight wall in plan, along her (`across` fixed) or athwart her (`along` fixed). */
@@ -188,10 +201,21 @@ export function insideBreadth(along: number, h: number): number {
   return moulded > SIDE_INSIDE ? moulded - SIDE_INSIDE : 0;
 }
 
+/** Whether an oblong in plan holds a place (its edges included). */
+const spacesOf = new WeakMap<ShipPlan, ReadonlyMap<string, Space>>();
+/** Her spaces by id, made once for a plan. */
+export function spacesById(plan: ShipPlan): ReadonlyMap<string, Space> {
+  let m = spacesOf.get(plan);
+  if (!m) { m = new Map(plan.spaces.map((s) => [s.id, s])); spacesOf.set(plan, m); }
+  return m;
+}
+
+export const holds = (r: Rect, along: number, across: number): boolean => along >= r.aft && along <= r.fore && across >= r.port && across <= r.starboard;
+
 /** Every floor under a place, lowest first: the spaces whose oblong holds it (what the walker stands on, N2.3). */
 export function floorsUnder(plan: ShipPlan, along: number, across: number): { space: Space; floor: number }[] {
   return plan.spaces
-    .filter((s) => along >= s.aft && along <= s.fore && across >= s.port && across <= s.starboard)
+    .filter((s) => holds(s, along, across))
     .map((space) => ({ space, floor: floorAt(space, along, across) }))
     .sort((a, b) => a.floor - b.floor);
 }
@@ -225,8 +249,8 @@ function makeGuns(): GunPlace[] {
   return out;
 }
 
-/** Everything in the way on each level: fittings, masts' partners, openings with their coamings, guns. */
-function makeObstacles(openings: readonly Opening[], guns: readonly GunPlace[]): Obstacle[] {
+/** Everything in the way on each level: fittings, masts' partners, openings with their coamings, guns, and the ladders standing on it (N2.3: nobody walks through the low part of one). */
+function makeObstacles(openings: readonly Opening[], guns: readonly GunPlace[], ways: readonly Way[], spaces: ReadonlyMap<string, Space>): Obstacle[] {
   const out: Obstacle[] = FITTINGS.map((f) => ({ id: f.id, level: f.level, ...rect(f.aft, f.fore, f.across[0], f.across[1]) }));
   for (const o of openings) out.push({ id: o.id, level: o.level, ...rect(o.aft, o.fore, o.port, o.starboard) });
   for (const [name, m] of Object.entries(MASTS)) {
@@ -234,6 +258,15 @@ function makeObstacles(openings: readonly Opening[], guns: readonly GunPlace[]):
     for (const level of ['weather', 'berth', 'hold'] as const) out.push({ id: `${name}mast-${level}`, level, ...rect(m.along - r, m.along + r, -r, r) });
   }
   for (const g of guns) if (!g.chase) out.push({ id: `gun-${g.id}`, level: 'weather', ...g.footprint });
+  for (const w of ways) {
+    if (!w.line) continue;
+    // From its foot as far as it stands lower than the least headroom over the floor: under the rest one stoops past.
+    const { foot, head, toward } = w.line, half = w.width / 2, low = Math.min(1, BODY.leastHeadroom / (head[2] - foot[2]));
+    const end = [foot[0] + (head[0] - foot[0]) * low, foot[1] + (head[1] - foot[1]) * low];
+    const [a0, a1] = [Math.min(foot[0], end[0]!), Math.max(foot[0], end[0]!)], [c0, c1] = [Math.min(foot[1], end[1]!), Math.max(foot[1], end[1]!)];
+    const r = toward[0] !== 0 ? rect(a0, a1, foot[1] - half, foot[1] + half) : rect(foot[0] - half, foot[0] + half, c0, c1);
+    out.push({ id: `${w.id}-foot`, level: spaces.get(w.from.space)!.level, ...r });
+  }
   return out;
 }
 
@@ -251,8 +284,10 @@ function makeWays(spaces: ReadonlyMap<string, Space>, openings: ReadonlyMap<stri
     const steps = Math.max(1, Math.ceil(rise / LADDER.rise));
     // The head is stepped onto beyond the coaming at its end, or from beside the opening (`step`), just inside the end.
     let to: Spot = { space: above.id, along: headAlong + da * WAY_STANDOFF, across: headAcross + dx * WAY_STANDOFF };
+    let down: readonly [number, number] = [-da, -dx];
     if (l.step) {
       const [sa, sx] = DIRECTION[l.step];
+      down = [-sa, -sx];
       const edgeAlong = sa > 0 ? o.fore : sa < 0 ? o.aft : headAlong - da * SIDE_STEP_IN;
       const edgeAcross = sx > 0 ? o.starboard : sx < 0 ? o.port : headAcross - dx * SIDE_STEP_IN;
       to = { space: above.id, along: edgeAlong + sa * SIDE_STEP, across: edgeAcross + sx * SIDE_STEP };
@@ -263,6 +298,7 @@ function makeWays(spaces: ReadonlyMap<string, Space>, openings: ReadonlyMap<stri
       id: l.id, kind: 'ladder', opening: o.id, rise: rise / steps, steps, width: Math.min(LADDER.width, athwart), height: along,
       from: { space: below.id, along: headAlong - da * (run + WAY_STANDOFF), across: headAcross - dx * (run + WAY_STANDOFF) },
       to,
+      line: { foot: [headAlong - da * run, headAcross - dx * run, bottom], head: [headAlong, headAcross, top], toward: [da, dx], down },
     });
   }
   for (const d of DOORS) {
@@ -274,7 +310,7 @@ function makeWays(spaces: ReadonlyMap<string, Space>, openings: ReadonlyMap<stri
       : { space: s.id, along: d.along, across: d.across + (s.port >= d.across - SAME ? WAY_STANDOFF : -WAY_STANDOFF) };
     const from = offset(a), to = offset(b);
     const rise = Math.abs(floorAt(a, from.along, from.across) - floorAt(b, to.along, to.across));
-    out.push({ id: d.id, kind: 'door', opening: null, rise, steps: 0, width: DOOR.width, height: DOOR.height, from, to });
+    out.push({ id: d.id, kind: 'door', opening: null, line: null, rise, steps: 0, width: DOOR.width, height: DOOR.height, from, to });
   }
   for (const { between: [ia, ib], across } of OPEN_JOINS) {
     const a = spaces.get(ia)!, b = spaces.get(ib)!;
@@ -283,7 +319,7 @@ function makeWays(spaces: ReadonlyMap<string, Space>, openings: ReadonlyMap<stri
     const from = { space: a.id, along: at - sign * OPEN_STANDOFF, across }, to = { space: b.id, along: at + sign * OPEN_STANDOFF, across };
     const width = Math.min(a.starboard, b.starboard) - Math.max(a.port, b.port);
     const rise = Math.abs(floorAt(a, from.along, across) - floorAt(b, to.along, across));
-    out.push({ id: `${ia}-${ib}`, kind: 'open', opening: null, rise, steps: 0, width, height: Infinity, from, to });
+    out.push({ id: `${ia}-${ib}`, kind: 'open', opening: null, line: null, rise, steps: 0, width, height: Infinity, from, to });
   }
   return out;
 }
@@ -441,7 +477,7 @@ export function shipPlan(): ShipPlan {
   const belays = makeBelays();
   const masts: MastStep[] = (Object.keys(MASTS) as ('fore' | 'main')[]).map((m) => ({ mast: m, along: MASTS[m].along, heel: MASTS[m].step }));
   built = deepFreeze({
-    spaces, openings, obstacles: makeObstacles(openings, guns), ways, bulkheads: makeBulkheads(spaces), guns, belays,
+    spaces, openings, obstacles: makeObstacles(openings, guns, ways, new Map(spaces.map((p) => [p.id, p]))), ways, bulkheads: makeBulkheads(spaces), guns, belays,
     places: makePlaces(guns, belays, ways, stations), stations, masts, cells: makeCells(),
   });
   return built;

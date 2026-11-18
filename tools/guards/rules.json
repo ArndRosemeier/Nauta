@@ -100,6 +100,21 @@
       "field": "sailing",
       "owner": "src/sim/ship/sailing.ts",
       "what": "how a ship sails: her heading, way, leeway, helm, what the helmsman steers, her canvas and her yards (N3.3)"
+    },
+    {
+      "field": "swing",
+      "owner": "src/sim/ship/doors.ts",
+      "what": "how far open each of her doors is"
+    },
+    {
+      "field": "walker",
+      "owner": "src/app/captain.ts",
+      "what": "the captain's body on her decks"
+    },
+    {
+      "field": "doors",
+      "owner": "src/app/captain.ts",
+      "what": "her doors as the captain has swung them"
     }
   ]
 }

@@ -10,6 +10,7 @@ import {
 } from '../../sim/rules/ships';
 import { weatherDeck } from '../../sim/ship/hull';
 import { berthDeck, floorAt, type Space } from '../../sim/ship/plan';
+import { doorHinge } from '../../sim/ship/doors';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { box, direction, sheet } from './shapes';
 import { Solid } from './solid';
@@ -40,8 +41,6 @@ const COAMING_BELOW_THICK = 0.1;
 const LANTERN = { below: 0.16, flame: 0.14, height: 0.436 } as const;
 /** The ways a ladder can climb, in plan: [along, across]. */
 const DIRECTION: Readonly<Record<Toward, readonly [number, number]>> = { aft: [-1, 0], fore: [1, 0], port: [0, -1], starboard: [0, 1] };
-/** A quarter turn, rad. */
-const QUARTER = Math.PI / 2;
 
 /** What is over a space: the underside of the deck above (m above the base) at a place. */
 function overhead(s: Space, along: number, across: number): number {
@@ -232,18 +231,22 @@ function buildLadders(ctx: DeckContext): void {
   }
 }
 
-/** Every door: a panel of upright boards with two ledges and a latch, hinged at one side of its doorway, and shut. */
+/** Every door: a panel of upright boards with two ledges and a latch, hinged at one jamb of its doorway (doors.ts), and shut. */
 function buildDoors(ctx: DeckContext): void {
   const { plan, parts, zones } = ctx;
   for (const d of DOORS) {
     const a = plan.spaces.find((x) => x.id === d.between[0])!, b = plan.spaces.find((x) => x.id === d.between[1])!;
-    const athwart = doorAthwart(a, b), floor = Math.max(floorAt(a, d.along, d.across), floorAt(b, d.along, d.across));
+    const floor = Math.max(floorAt(a, d.along, d.across), floorAt(b, d.along, d.across));
     const wood = new Solid(), iron = new Solid(), w = DOOR.width, h = DOOR.height;
     box(wood, new Matrix4().makeTranslation(w / 2, h / 2, 0), [w, h, DOOR_PANEL.thick], { ...BUFF, plank: BULKHEAD_BOARD }, SMALL_BEVEL, 1);
     for (const f of LEDGES) for (const s of [-1, 1]) box(wood, new Matrix4().makeTranslation(w / 2, h * f, s * (DOOR_PANEL.thick + DOOR_PANEL.ledge) / 2), [w - CASING, DOOR_PANEL.ledgeWidth, DOOR_PANEL.ledge], OAK, SMALL_BEVEL, 0);
     for (const s of [-1, 1]) box(iron, new Matrix4().makeTranslation(w - CASING, h / 2, s * (DOOR_PANEL.thick / 2 + DOOR_PANEL.latch / 2)), [DOOR_PANEL.latch, DOOR_PANEL.latch * 2, DOOR_PANEL.latch], IRON, SMALL_BEVEL / 2, 1);
-    const hinge: [number, number, number] = athwart ? [d.across - w / 2, shipY(floor), shipZ(d.along)] : [d.across, shipY(floor), shipZ(d.along - w / 2)];
-    parts.doors.push({ id: d.id, wood, iron, hinge, shut: athwart ? 0 : QUARTER, opens: 1, zones: [zones.get(a.id)!, zones.get(b.id)!] });
+    // Hinged and swung by the door rule (doors.ts), on the face of its casing toward the space it opens into: shut it
+    // lies against the casing, swung right back along the bulkhead's face.
+    const leaf = doorHinge(plan, d.id), off = (CASING + DOOR_PANEL.thick) / 2;
+    const hinge: [number, number, number] = [leaf.hinge[1] + leaf.toward[1] * off, shipY(floor), shipZ(leaf.hinge[0] + leaf.toward[0] * off)];
+    // The panel runs along its +x from the hinge; a turn θ about +y takes +x to (cos θ, -sin θ) in (x, z), and z is -along.
+    parts.doors.push({ id: d.id, wood, iron, hinge, shut: Math.atan2(leaf.shut[0], leaf.shut[1]), opens: leaf.opens, zones: [zones.get(a.id)!, zones.get(b.id)!] });
   }
 }
 

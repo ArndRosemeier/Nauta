@@ -49,6 +49,10 @@
       /* ?bench (src/app/benchRun.ts): the frame times and memory, large enough to read off a tablet, clear of the HUD. */
       #bench { position: fixed; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); max-width: calc(100% - 20px); display: none; margin: 0; padding: 10px 14px; border-radius: 10px; background: #0b1a2acc; white-space: pre-wrap; font: 15px/1.45 ui-monospace, monospace; -webkit-user-select: text; user-select: text; }
       #bench button { margin-top: 8px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #f2c14e; background: none; color: #f2c14e; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; }
+      /* Walking (src/app/walkInput.ts): the left thumb's stick, a ring where it lands and a knob that follows it. */
+      #stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid #ffffff40; background: #0b1a2a33; pointer-events: none; display: none; }
+      #stick.on { display: block; }
+      #stick .knob { position: absolute; left: 34px; top: 34px; width: 44px; height: 44px; border-radius: 50%; background: #e8eef499; }
     </style>
   </head>
   <body>

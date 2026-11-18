@@ -1,6 +1,6 @@
 /**
  * What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?sea=gale`, `?yaw=70&pitch=-10`,
- * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`). Pure: it takes the query string.
+ * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`). Pure: it takes the query string.
  */
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
@@ -64,6 +64,8 @@ export interface Params {
   readonly toLight: LookAtLight | null;
   /** Fly the bench's path and show the frame times and memory, for this many seconds (`?bench`, `?bench=30`); 0: no bench. */
   readonly bench: number;
+  /** Walk her decks with two thumbs (`?walk`, plan N2.3), from the plan's station named (`?walk=surgeon`; empty: the quarterdeck); null: no walking. */
+  readonly walk: string | null;
 }
 
 export function readParams(query: string): Params {
@@ -76,7 +78,7 @@ export function readParams(query: string): Params {
   return {
     forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
     dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
-    ship: q.get('ship') ?? q.get('slice'), quality: q.get('quality'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(force),
+    ship: q.get('ship') ?? q.get('slice'), quality: q.get('quality'), walk: q.get('walk'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(force),
     look: q.has('yaw') || q.has('pitch')
       ? { yaw: num('yaw', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE, pitch: num('pitch', 0, -PITCH_LIMIT / DEGREE, PITCH_LIMIT / DEGREE) * DEGREE }
       : null,

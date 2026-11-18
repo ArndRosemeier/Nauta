@@ -252,3 +252,29 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A station's crew place | `src/sim/ship/plan.ts#stationPlace` |
 | Freezing a plan built once | `src/sim/ship/plan.ts#deepFreeze` |
 | The rig's drawings (sail plan, rigging plan) | `tools/plan/draw.ts#sailPlan` |
+| What of the rig stands on her decks in a body's way (the bowsprit's inboard part), from the spar data | `src/sim/ship/rig.ts#rigObstacles` |
+| Her spaces by id | `src/sim/ship/plan.ts#spacesById` |
+| Whether a place lies in an oblong of the plan (a space, an obstacle) | `src/sim/ship/plan.ts#holds` |
+| Her pose as the shared walker's frame (`@futuremagic/deck` Frame: origin and rotation) | `src/sim/ship/motion.ts#shipFrame` |
+| Her doors' leaves: which space each opens into, which jamb it hangs on, how far it swings (the door rule) | `src/sim/ship/doors.ts#doorLeaves` |
+| One door's leaf by id (the drawing hangs its door by it) | `src/sim/ship/doors.ts#doorHinge` |
+| Doors swinging open as the captain comes near and shut when he has gone | `src/sim/ship/doors.ts#stepDoors` |
+| A door's angle open, rad, for drawing | `src/sim/ship/doors.ts#doorAngle` |
+| Whether a door lets a body through now | `src/sim/ship/doors.ts#doorPasses` |
+| Where a leaf is in a body's way (swinging, or where it stands open) | `src/sim/ship/doors.ts#leafInWay` |
+| Where open leaves stand, as obstacles the walk graph keeps clear of | `src/sim/ship/doors.ts#openLeaves` |
+| Her floors as the walker stands on them: the walk graph, open joins, doorways when open, headroom under beams and door heads | `src/sim/ship/deckWalk.ts#deckGround` |
+| One step of the captain on her decks (pace, sliding, stooping, guided into a doorway) | `src/sim/ship/deckWalk.ts#stepWalker` |
+| The captain standing still at a spot of her plan | `src/sim/ship/deckWalk.ts#walkerAt` |
+| A walker's spot on her plan | `src/sim/ship/deckWalk.ts#spotOf` |
+| A walking intent as a push across her plan | `src/sim/ship/deckWalk.ts#pushOf` |
+| Whether he stands at a ladder pushing into it (and goes up or down) | `src/sim/ship/deckWalk.ts#ladderOffered` |
+| Under a door's head (headroom there is the door's height) | `src/sim/ship/deckWalk.ts#underDoorHead` |
+| The captain's eye on her decks | `src/sim/ship/deckWalk.ts#eyeOf` |
+| How the captain walks (paces, grip, stooping) | `src/sim/rules/walking.ts#WALK_PACE` |
+| The forces a duel is fought in | `src/sim/rules/wind.ts#DUEL_FORCES` |
+| The captain aboard: walking, climbing her ladders as a seen figure, her doors | `src/app/captain.ts#Captain` |
+| Walking her decks on the page (`?walk`): thumbs to captain to standpoint and doors | `src/app/walking.ts#Walking` |
+| The walking thumb's stick as a push | `src/app/thumbs.ts#stickPush` |
+| Keys held as a push (WASD and arrows) | `src/app/thumbs.ts#keyPush` |
+| The walking thumb and keys on the page (the left half's floating stick) | `src/app/walkInput.ts#watchWalk` |

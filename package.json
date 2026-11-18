@@ -21,11 +21,13 @@
     "check:replay": "tsx tools/sim/replay.ts",
     "check:sailing": "tsx tools/sim/sailing.ts",
     "plan:draw": "tsx tools/plan/draw.ts",
-    "shot:sea": "node tools/shot/sea.mjs"
+    "shot:sea": "node tools/shot/sea.mjs",
+    "walk:check": "tsx tools/walk/everywhere.ts"
   },
   "dependencies": {
     "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
+    "@futuremagic/deck": "file:vendor/assetgenerator/packages/deck",
     "@futuremagic/figure": "file:vendor/assetgenerator/packages/figure",
     "@futuremagic/props": "file:vendor/assetgenerator/packages/props",
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",

@@ -11,7 +11,8 @@
  * doors are the edges, where they fit the body.
  */
 import { BODY, LEAST_HATCH, LEAST_PASSAGE, LADDER } from '../rules/ships';
-import { floorAt, insideBreadth, overheadAt, type ShipPlan, type Space, type Spot, type Way } from './plan';
+import { floorAt, insideBreadth, overheadAt, type Obstacle, type ShipPlan, type Space, type Spot, type Way } from './plan';
+import { openLeaves } from './doors';
 
 /** The body a graph is made for (rules: BODY). */
 export interface Body {
@@ -68,13 +69,16 @@ export interface WalkGraph {
 const alongOf = (s: Space, c: number) => s.aft + (c + 1 / 2) * WALK_CELL;
 const acrossOf = (s: Space, r: number) => s.port + (r + 1 / 2) * WALK_CELL;
 
+/** What stands on a space's level: the plan's obstacles, and her doors' leaves where they stand open (doors.ts). */
+const blocksOn = (plan: ShipPlan, space: Space): readonly Obstacle[] => [...plan.obstacles, ...openLeaves(plan)].filter((o) => o.level === space.level);
+
 /** Whether a body may stand at a place just beyond a space's edge: inside her sides there, under headroom, clear of what stands on the level. */
 function outsideOpen(plan: ShipPlan, space: Space, body: Body, along: number, across: number): boolean {
-  return squareOpen(plan.obstacles.filter((o) => o.level === space.level), space, body, along, across);
+  return squareOpen(blocksOn(plan, space), space, body, along, across);
 }
 
 /** Whether a body's feet may stand at a place of a space's floor. */
-function squareOpen(blocks: ShipPlan['obstacles'], space: Space, body: Body, along: number, across: number): boolean {
+function squareOpen(blocks: readonly Obstacle[], space: Space, body: Body, along: number, across: number): boolean {
   const floor = floorAt(space, along, across);
   const headroom = overheadAt(space, along, across) - floor;
   if (headroom < body.leastHeadroom) return false;
@@ -87,7 +91,7 @@ function squareOpen(blocks: ShipPlan['obstacles'], space: Space, body: Body, alo
 /** Where a body's feet may stand on a space's floor: inside her sides, under headroom, clear of what stands on the level. */
 function openSquares(plan: ShipPlan, space: Space, body: Body, cols: number, rows: number): Uint8Array {
   const open = new Uint8Array(cols * rows);
-  const blocks = plan.obstacles.filter((o) => o.level === space.level);
+  const blocks = blocksOn(plan, space);
   for (let c = 0; c < cols; c++) {
     for (let r = 0; r < rows; r++) open[c * rows + r] = squareOpen(blocks, space, body, alongOf(space, c), acrossOf(space, r)) ? 1 : 0;
   }
@@ -159,8 +163,10 @@ export function nodeAt(graph: WalkGraph, spot: Spot): number {
   if (aloft !== undefined) return aloft;
   const g = graph.grids.get(spot.space);
   if (!g) return -1;
-  const c = Math.floor((spot.along - g.space.aft) / WALK_CELL), r = Math.floor((spot.across - g.space.port) / WALK_CELL);
-  if (c < 0 || c >= g.cols || r < 0 || r >= g.rows) return -1;
+  const sp = g.space;
+  if (spot.along < sp.aft || spot.along > sp.fore || spot.across < sp.port || spot.across > sp.starboard) return -1;
+  // The grid is whole squares: a spot of the space past its last square's edge counts as that square.
+  const c = Math.min(g.cols - 1, Math.floor((spot.along - sp.aft) / WALK_CELL)), r = Math.min(g.rows - 1, Math.floor((spot.across - sp.port) / WALK_CELL));
   return g.node[c * g.rows + r]!;
 }
 

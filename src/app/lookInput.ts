@@ -9,13 +9,16 @@ export interface LookInput {
   look: Look;
 }
 
-/** `radPerPixel`: the view's vertical angle over its height now (it changes when the window does). */
-export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => number): LookInput {
+/**
+ * `radPerPixel`: the view's vertical angle over its height now (it changes when the window does). `leave`: pointers
+ * that are not for looking (the walking thumb's, walkInput.ts).
+ */
+export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => number, leave: (e: PointerEvent) => boolean = () => false): LookInput {
   const state = { look: start };
   /** The pointer that is dragging (the first one down), and where it was last. */
   let id: number | null = null, x = 0, y = 0;
   el.addEventListener('pointerdown', (e) => {
-    if (id !== null) return;
+    if (id !== null || leave(e)) return;
     id = e.pointerId; x = e.clientX; y = e.clientY;
     // Keeps the drag when the finger leaves the view. A pointer already gone (lifted in the same instant) cannot be held.
     try { el.setPointerCapture(e.pointerId); } catch { /* the drag still works inside the view */ }
