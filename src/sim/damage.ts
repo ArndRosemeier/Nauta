@@ -33,7 +33,7 @@
  * through her, for the drawing (N6.5: holes, splinters, the captain staggered) and the sound (N6.8).
  */
 import { deriveSeed, Rng } from '@futuremagic/core';
-import { fallsDue, sparUnder, standingOf, wreckOf, type Standing, type Wreck } from './damage/fall';
+import { fallsDue, inDanger, sparOfPart, sparUnder, standingOf, wreckOf, type Standing, type Wreck } from './damage/fall';
 import { atHand, burnt, kindled, spaceAt, type Fire } from './damage/fire';
 import { flowed, founderTonnes, inflow, loadOf, lyingOf, pumped } from './damage/flood';
 import { meetings, nearHer, plankingPlace, type Aboard, type Meeting, type Place, type TimberPart } from './damage/meet';
@@ -42,7 +42,7 @@ import { brigRoster, type Man } from './crew/roster';
 import { battery, dismountGun, gunAt, gunCount, type Battery } from './guns/guns';
 import { pathAt, type GunFired, type Shot, type Vec } from './guns/shot';
 import {
-  AT_WATERLINE, AWASH_SECONDS, CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
+  ABACK_FALLS, AT_WATERLINE, AWASH_SECONDS, CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
   HAMMOCKS, MAN_AS_OAK, PIERCE, PUMP_POST, RAKING, SEEP, SMASHED, SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, WAD_RANGE, WASH, WEEP, type Harm, type HurtBy,
 } from './rules/damage';
 import { SHOT, type ShotKind } from './rules/guns';
@@ -53,7 +53,8 @@ import { shipPlan, type Cell } from './ship/plan';
 import { rigPlan } from './ship/rig';
 import { apparentAt, MASTS, sailsStanding, UNDAMAGED, type Sailing, type SailingDamage } from './ship/sailing';
 import { sailShare, type SailSetting } from './ship/sails';
-import { STEP_SECONDS } from './units';
+import { beaufortForce } from './rules/beaufort';
+import { STEP_SECONDS, STEPS_PER_SECOND } from './units';
 import type { Wind } from './wind';
 
 /** What has been done to a ship (her `SimShip.damage`; changed only here). Plain whole numbers, kept small for the state. */
@@ -82,6 +83,11 @@ export interface Damage {
   readonly blownUp: boolean;
   /** The holes the carpenter's crew has plugged (their `holes` numbers), ascending: the sea only weeps in at them (rules/damage.ts `WEEP`). */
   readonly plugged: readonly number[];
+  /**
+   * Her spars in danger (damage/fall.ts `inDanger`: stays gone, aback), each as the part it would break at and the tick
+   * it came into danger, ascending by part: one still so `ABACK_FALLS` later falls.
+   */
+  readonly danger: readonly (readonly [part: number, since: number])[];
 }
 
 /** A shot on its way: the ship and gun (battery place) that fired it and the tick, and how much of its punch each ball has spent (mm of oak; `GONE` once it is stopped or in the sea). */
@@ -116,13 +122,13 @@ export interface Hit {
   readonly cause?: HurtBy;
 }
 
-/** What followed from her damage in a step, as an event (N6.2): a spar fell (with all it carried, over a side), a man aloft was thrown down with it, fire spread to a space or was put out in one, her magazine went up. */
+/** What followed from her damage in a step, as an event (N6.2): a spar came into danger (its stays gone, aback: the master cries it) or fell (with all it carried, over a side), a man aloft was thrown down with it, fire spread to a space or was put out in one, her magazine went up. */
 export interface Aftermath {
   readonly kind: 'aftermath';
   readonly tick: number;
   readonly ship: number;
-  readonly what: 'fell' | 'man' | 'fire' | 'out' | 'blew up';
-  /** The part a spar broke at (`sparParts` place), the man, the space (the plan's place); -1 for her magazine. */
+  readonly what: 'danger' | 'fell' | 'man' | 'fire' | 'out' | 'blew up';
+  /** The part a spar broke at or would break at (`sparParts` place), the man, the space (the plan's place); -1 for her magazine. */
   readonly id: number;
   /** The side a spar went over (-1 larboard, 1 starboard). */
   readonly side?: -1 | 1;
@@ -133,7 +139,7 @@ export interface Aftermath {
 export function startDamage(): Damage {
   return {
     holes: [], cut: [], wounds: [], rent: rigPlan().sails.map(() => 0), hurt: [],
-    flooded: [0, 0], fallen: [], alongside: [], fires: [], steering: true, blownUp: false, plugged: [],
+    flooded: [0, 0], fallen: [], alongside: [], fires: [], steering: true, blownUp: false, plugged: [], danger: [],
   };
 }
 
@@ -632,16 +638,23 @@ export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly 
     if (flooded[0] !== larboard || flooded[1] !== starboard) next = { ...next, flooded };
   }
 
-  // Spars falling.
+  // Spars in danger, and falling.
   let standing: Standing | null = null;
   if (d.wounds.length > 0 || d.cut.length > 0) {
     standing = standingNow(d);
     const { ay } = apparentAt(input.sailing, input.wind);
     let aback: boolean[] | null = null;
-    const falls = fallsDue(standing, d.wounds, {
-      across: ay,
-      aback: (mast) => (aback ??= abackMasts(input.sailing, input.wind, standing!))[mast]!,
-    });
+    const rigWind = { across: ay, aback: (mast: number) => (aback ??= abackMasts(input.sailing, input.wind, standing!))[mast]! };
+    const was = new Map(d.danger), limit = Math.round(abackFalls(input.wind.speed) * STEPS_PER_SECOND);
+    const danger = inDanger(standing, rigWind).map((f) => [f.part, was.get(f.part) ?? tick] as const);
+    // One cry for a mast: its lowest spar newly in danger (a topmast's stays go with the lower mast's).
+    const cried = new Set<string>();
+    for (const [part, since] of danger) {
+      const mast = rigPlan().spars[sparOfPart(part)]!.mast;
+      if (since === tick && !cried.has(mast)) { cried.add(mast); events.push({ kind: 'aftermath', tick, ship, what: 'danger', id: part }); }
+    }
+    const overdue = danger.flatMap(([part, since]) => (tick - since >= limit ? [part] : []));
+    const falls = fallsDue(standing, d.wounds, rigWind, overdue);
     if (falls.length > 0) {
       const fallen = [...d.fallen, ...falls.map((f) => f.part)].sort((p, q) => p - q);
       const alongside = [...d.alongside, ...falls.map((f) => f.part * 2 + (f.side > 0 ? 1 : 0))].sort((p, q) => p - q);
@@ -651,7 +664,9 @@ export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly 
       next = { ...next, fallen, alongside, hurt };
       standing = after;
     }
-  }
+    const standingDanger = danger.filter(([part]) => !standing!.down[sparOfPart(part)]);
+    if (!sameDanger(standingDanger, d.danger)) next = { ...next, danger: standingDanger };
+  } else if (d.danger.length > 0) next = { ...next, danger: [] };
 
   // Fire.
   if (d.fires.length > 0 && !d.blownUp) {
@@ -680,6 +695,17 @@ function sailingDamage(d: Damage, standing: Standing | null): SailingDamage {
   const st = standing ?? standingNow(d);
   return { draws: st.draws, steered: d.steering, wrecks: wrecks(d.alongside), flooded: d.flooded[0] + d.flooded[1] };
 }
+
+/** How long a spar in danger stands, s, in a wind of `speed` m/s (rules/damage.ts `ABACK_FALLS`). */
+function abackFalls(speed: number): number {
+  const { seconds, force } = ABACK_FALLS;
+  const u = Math.min(1, Math.max(0, (beaufortForce(speed) - force[0]) / (force[1] - force[0])));
+  return seconds[0] + (seconds[1] - seconds[0]) * u;
+}
+
+/** Whether two lists of spars in danger are the same. */
+const sameDanger = (a: Damage['danger'], b: Damage['danger']): boolean =>
+  a.length === b.length && a.every(([part, since], k) => part === b[k]![0] && since === b[k]![1]);
 
 /** Whether each mast's square sails are aback now (fore, main). */
 function abackMasts(sailing: Sailing, wind: Wind, standing: Standing): boolean[] {

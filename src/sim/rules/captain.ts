@@ -53,6 +53,12 @@ export interface SkillRow {
   readonly fireAt: number;
   /** He has the carpenter's crew plug first once this many holes let the sea in (0: never). */
   readonly plugAt: number;
+  /**
+   * A spar in danger (its stays shot away, its mast aback; the master cries it), he fills or bears away this many
+   * seconds after the cry, at his next look (design thread 2026-11-18: the master at once, the green one late or not at
+   * all; it falls after about 20 s still aback, rules/damage.ts `ABACK_FALLS`).
+   */
+  readonly saveMast: number;
   /** Beaten by the rule, he fights on this many seconds before he asks to strike, while it may still serve him (N7.5a: green at once; never once she is going down). */
   readonly strikeAfter: number;
   /**
@@ -79,19 +85,19 @@ export const SKILL: Readonly<Record<Skill, SkillRow>> = {
    */
   raw: {
     look: 40, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
-    grape: 0, roundAt: 'rigging', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 80, fireAt: 0.3, plugAt: 0, strikeAfter: 0, drill: 1,
+    grape: 0, roundAt: 'rigging', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 80, fireAt: 0.3, plugAt: 0, saveMast: Infinity, strikeAfter: 0, drill: 1,
   },
   green: {
     look: 8, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
-    grape: 0, roundAt: 'hull', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.14, plugAt: 0, strikeAfter: 0, drill: 0.95,
+    grape: 0, roundAt: 'hull', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.14, plugAt: 0, saveMast: 20, strikeAfter: 0, drill: 0.95,
   },
   seasoned: {
     look: 4, judgeRange: 0.12, judgeBearing: 2 * DEGREE, range: 110, gauge: 150, rake: 0.5, lead: 0.5, quarters: 1500, open: 500,
-    grape: 50, roundAt: 'hull', chain: false, word: false, keepBearing: true, plainBeyond: 1200, pumpsAt: 10, fireAt: 0, plugAt: 0, strikeAfter: 10, drill: 1,
+    grape: 50, roundAt: 'hull', chain: false, word: false, keepBearing: true, plainBeyond: 1200, pumpsAt: 10, fireAt: 0, plugAt: 0, saveMast: 5, strikeAfter: 10, drill: 1,
   },
   master: {
     look: 2, judgeRange: 0.05, judgeBearing: 1 * DEGREE, range: 90, gauge: 250, rake: 1, lead: 1, quarters: Infinity, open: 400,
-    grape: 60, roundAt: 'hull', chain: true, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, strikeAfter: 20, drill: 1.05,
+    grape: 60, roundAt: 'hull', chain: true, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, saveMast: 0, strikeAfter: 20, drill: 1.05,
   },
 };
 
@@ -114,6 +120,8 @@ export const CLOSEST = 45;
  */
 export const CLOSING_PER_RANGE = 45 * DEGREE;
 export const MOST_CLOSING = 60 * DEGREE;
+/** Saving a mast in danger, he bears away no farther than this off the wind, rad: her sails fill long before. */
+export const BEAR_AWAY_MOST = 135 * DEGREE;
 /** A course changed by less than this is not worth an order, rad: the helmsman's yaw in a seaway is about as much. */
 export const TURN_AT = 6 * DEGREE;
 /** Steering for a course, he keeps this far off close-hauled, rad, so the sails stay full. */

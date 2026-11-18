@@ -11,6 +11,8 @@
  *   captain fighting on a little first (`strikeAfter`, N7.5a); he gives it again when asked back, `STRIKE_AGAIN` seconds later.
  * - **Her life:** hands to the pumps once the water passes his mark, a fire party at the first fire (a green captain
  *   waits until it has taken hold), the wreckage cut away, the carpenter's crew plugging first when holes let the sea in.
+ * - **Her masts:** a spar in danger (its stays shot away, its mast aback; design thread 2026-11-18), he fills or bears
+ *   away when his level sees to it (`saveMast`: the master at once, the green one late), and steers by nothing else that look.
  * - **The guns:** beat to quarters inside his range for it; round shot at her hull, grape at her deck close in, chain at
  *   her rigging (a master, when she holds the weather position, until he is at his range); open fire inside his range, cease beyond it, so the
  *   guns stand loaded for when it counts. A master holds the side for his word and gives it each step it is due, as
@@ -20,12 +22,13 @@
  *
  * An order she would refuse is not given (a dry run of `giveOrder` against what she has been told by then).
  */
-import { giveOrder, type Order, type OrderMoment, type ShipOrders } from '../orders';
+import { giveOrder, goingAbout, type Order, type OrderMoment, type ShipOrders } from '../orders';
 import { founderTonnes } from '../damage/flood';
 import { ASK_AGAIN, BEATEN } from '../rules/end';
 import type { AimName, ShotKind } from '../rules/guns';
+import { angleDiff } from '@futuremagic/core';
 import {
-  CHAIN_INSIDE, HYSTERESIS, PLAIN_UP_TO, SKILL, STRIKE_AGAIN, WINDWARD_OF, WORD_READY, WORD_STILL, WORD_STILL_RATE,
+  BEAR_AWAY_MOST, CHAIN_INSIDE, HYSTERESIS, PLAIN_UP_TO, SKILL, STRIKE_AGAIN, WINDWARD_OF, WORD_READY, WORD_STILL, WORD_STILL_RATE,
   type Skill, type SkillRow,
 } from '../rules/captain';
 import type { MatchSetup, SimState } from '../state';
@@ -64,6 +67,24 @@ function lifeOrders(sight: Sight, row: SkillRow): Order[] {
   if (told.wreckage === null && sight.wreckage > 0) out.push({ kind: 'wreckage', ship });
   if (row.plugAt > 0 && told.carpenter !== 'plug' && sight.leaks >= row.plugAt) out.push({ kind: 'plug', ship });
   return out;
+}
+
+/**
+/** Whether a spar has been in danger long enough for his level to see to it (`saveMast`). */
+const saving = (sight: Sight, row: SkillRow): boolean => sight.dangerFor !== null && sight.dangerFor >= row.saveMast;
+
+/**
+ * Saving a mast in danger: fill, if a mast is laid aback or she is hove
+ * to; else bear away a point once the helm is over for the last (the points add up while she is still aback), no
+ * farther than `BEAR_AWAY_MOST` off the wind.
+ */
+function saveOrder(sight: Sight): Order | null {
+  const told = sight.own.told, ship = sight.ship, s = sight.own.sailing;
+  if (told.hove || told.backed.some(Boolean) || s.backed.some(Boolean)) return { kind: 'fill', ship };
+  // In stays her fore yards are kept aback to bring her round: she fills soonest by coming round.
+  if (goingAbout(told) || s.steer.turn !== 0) return null;
+  const helmOver = !told.acts.some((a) => a.kind === 'helm'), off = Math.abs(angleDiff(s.heading, sight.windFrom));
+  return helmOver && off < BEAR_AWAY_MOST ? { kind: 'away', ship } : null;
 }
 
 /** The shot he wants loaded: grape close in, chain at a ship holding the weather position while closing to his range (a master), round shot else; each kept a fifth beyond its range. */
@@ -131,8 +152,12 @@ export function captainOrders(state: SimState, ship: number, skill: Skill): Orde
   const wanted: (Order | null)[] = [strikeOrder(sight, row, look)];
   if (look) {
     wanted.push(...lifeOrders(sight, row), ...gunOrders(sight, row), canvasOrder(sight, row));
-    const want = wantedHeading(sight, skill);
-    wanted.push(helmOrder(sight, want.heading), stationOrder(sight, skill, want));
+    // Saving a mast comes before where he wants her head: the helm waits until she is out of danger.
+    if (saving(sight, row)) wanted.push(saveOrder(sight));
+    else {
+      const want = wantedHeading(sight, skill);
+      wanted.push(helmOrder(sight, want.heading), stationOrder(sight, skill, want));
+    }
   }
   if (word && wordDue(sight)) wanted.push({ kind: 'fire', ship });
   return taken(sight, wanted);

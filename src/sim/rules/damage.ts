@@ -203,15 +203,23 @@ export const AWASH_SECONDS = 60;
  * A spar breaks at a part with STRUCK_DOWN wounds (design decisions for N6), and goes over its lee side with all it
  * carries. A spar goes too when more than SUPPORT_LOST of the standing lines holding it on its weather side are gone
  * (its shrouds and backstays: cut, or made fast to a spar that is down) and the wind is on that side at FALL_WIND or
- * more (m/s, across her); or when that share of its stays is gone and its mast's square sails are aback (the wind on
- * their fore side presses it aft). Pulled over, a mast breaks at the part above where it is held (`FALLS_AT_PART` of its
- * parts, damage/meet.ts `sparParts`): a lower mast at her partners (the deck), a topmast at the cap, the bowsprit at
- * the stem.
+ * more (m/s, across her). When that share of its stays is gone while its mast's square sails are aback (the wind on
+ * their fore side presses it aft), it is in danger and the master cries it; it goes only if it is still so after
+ * `ABACK_FALLS` (design thread 2026-11-18: no single shot dismasts her at once). Pulled over, a mast breaks at the part
+ * above where it is held (`FALLS_AT_PART` of its parts, damage/meet.ts `sparParts`): a lower mast at her partners (the
+ * deck), a topmast at the cap, the bowsprit at the stem.
  */
 export const STRUCK_DOWN = 3;
 export const SUPPORT_LOST = 0.5;
 export const FALL_WIND = 3;
 export const FALLS_AT_PART = 1;
+/**
+ * A spar in danger (its stays gone, its mast aback) falls once it has been so this long, s: `seconds[0]` in a wind of
+ * force `force[0]` or less, `seconds[1]` at `force[1]` or more, straight between by the force (design thread
+ * 2026-11-18: about 20 s, sooner the stronger the wind). Filled or borne away in time, it stands until the stay is
+ * spliced, and comes into danger afresh each time it is aback again.
+ */
+export const ABACK_FALLS = { seconds: [30, 10], force: [3, 8] } as const;
 /**
  * What falls drags alongside, held by its rigging until it is cut away (N6.3): a drag on her where it lies, at her side
  * by its mast, kN for each (m/s)² of the water past it, by the kind of each spar that fell (with its sails and rigging
