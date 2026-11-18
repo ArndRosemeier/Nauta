@@ -1,0 +1,1 @@
+Behind the scenes: the automatic browser check is now two shorter checks, the game's start and the sea shots, so neither runs out of time on the build server.

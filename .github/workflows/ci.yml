@@ -75,12 +75,16 @@ jobs:
           npx playwright install chromium
           echo "CHROMIUM_PATH=$(node -e "import('playwright').then((p) => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
       - run: npm run build
-      # One page load serves every picture (docs/CHECKS.md): desktop, 6 sea shots from her quarterdeck, the tablet view with a drag.
+      # Two browser checks, each on its own page load (docs/CHECKS.md): together on one page they took 130 to 200 s.
       # SHOT_TIMEOUT: a page that never gets ready fails inside the step's 3 minutes.
-      - name: The game starts and draws in a browser (desktop, a dragged tablet view, the sea shots from her quarterdeck)
+      - name: The game starts and draws in a browser (desktop, and a dragged tablet view)
         env:
           SHOT_TIMEOUT: 170000
-        run: node tools/guards/budget.mjs 120 180 -- npm run check:shots -- shots
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:shots -- shots start
+      - name: The sea from her quarterdeck at every time of day and in every sea
+        env:
+          SHOT_TIMEOUT: 170000
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:shots -- shots sea
       - name: The same orders give the same state after ten simulated minutes, in two processes and through bytes
         run: node tools/guards/budget.mjs 120 180 -- npm run check:replay
       - name: The brig sails, tacks and heels within her limits in every wind, through the sea and the gusts
