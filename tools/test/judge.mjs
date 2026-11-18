@@ -2,8 +2,9 @@
 
 /**
  * `tests`: { file, name, seconds }[]; `wall`: the whole run, seconds. Returns the lines to print and whether the
- * run is over a budget: a file past its limit, or the suite past its own (one test's limit is the runner's
- * `--test-timeout`, which stops and fails the test itself).
+ * run is over a budget: a test past its limit, a file past its own (its tests added up), or the suite past its own.
+ * The runner's `--test-timeout` is the file's limit: Node holds a test file's own process to that timeout, so it
+ * cannot be one test's limit without also being the file's. A test that hangs is stopped when its file is.
  */
 export function judge(tests, wall, budgets) {
   const lines = [], failures = [], warnings = [];
@@ -12,6 +13,9 @@ export function judge(tests, wall, budgets) {
   const slowest = [...tests].sort((a, b) => b.seconds - a.seconds).slice(0, 5);
   lines.push('slowest tests:');
   for (const t of slowest) lines.push(`  ${t.seconds.toFixed(2)} s  ${t.file}: ${t.name}`);
+  for (const t of tests) {
+    if (t.name !== t.file && t.seconds > budgets.test) failures.push(`${t.file}: "${t.name}" took ${t.seconds.toFixed(1)} s, past the ${budgets.test} s one test may take`);
+  }
   for (const [file, s] of [...perFile].sort((a, b) => b[1] - a[1])) {
     if (s > budgets.file) failures.push(`${file} took ${s.toFixed(1)} s, past the ${budgets.file} s a test file may take`);
   }

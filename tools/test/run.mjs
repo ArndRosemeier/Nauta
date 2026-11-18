@@ -1,6 +1,6 @@
 /**
  * `npm test`: every test file under Node's test runner, held to the time budgets of tools/test/budgets.json
- * (docs/CHECKS.md). A test past its limit is stopped and fails; a file or the whole suite past theirs fails the run,
+ * (docs/CHECKS.md). A test, a file or the whole suite past its limit fails the run (a file is stopped at its limit),
  * here as in CI. `npm test -- test/look.test.ts` runs the files given (the suite budget still holds).
  */
 import { spawn } from 'node:child_process';
@@ -19,7 +19,7 @@ const tmp = mkdtempSync(path.join(os.tmpdir(), 'nauta-test-'));
 const times = path.join(tmp, 'times.json');
 const t0 = performance.now();
 const code = await new Promise((done) => spawn(process.execPath, [
-  '--import', 'tsx', '--test', `--test-timeout=${budgets.test * 1000}`,
+  '--import', 'tsx', '--test', `--test-timeout=${budgets.file * 1000}`,
   '--test-reporter=./tools/test/reporter.mjs', '--test-reporter-destination=stdout', ...files,
 ], { stdio: 'inherit', env: { ...process.env, NAUTA_TEST_TIMES: times } }).on('close', done));
 const wall = (performance.now() - t0) / 1000;
