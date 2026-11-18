@@ -68,6 +68,8 @@ const CLOCK_EASE = 0.05;
 export const SOLO_SEED = 1805;
 /** The ship a computer captain commands in a match played alone: the other one. */
 const FOE_SHIP = 1;
+/** The ship of the first computer captain in a match watched. */
+const FIRST_SHIP = 0;
 /** The player id a match played alone gives its one captain. */
 const SOLO_PLAYER = 0;
 
@@ -97,6 +99,11 @@ export interface DuelOptions {
   readonly terms?: StartTerms;
   /** A match played alone with her alone at sea, no enemy (menu.md, "Walk the ship"). */
   readonly alone?: boolean;
+  /**
+   * A match watched (the spectator's, plan N7.8): both ships commanded by computer captains at these skills, the first
+   * ship's and the second's, and no captain of mine at all. It takes the place of `foe`.
+   */
+  readonly watch?: { readonly first: Skill; readonly second: Skill };
   /**
    * A match played alone against `foe`: his ship lies hove to and he gives no orders until `wakeFoe()`; then she fills
    * and he commands her (the first match, plan N7.4: she waits while the first lieutenant teaches sailing).
@@ -147,6 +154,8 @@ export class DuelSession {
   private readonly build: string;
   /** The computer captain of the other ship of a match played alone, or null. */
   private readonly foe: Skill | null;
+  /** The computer captain of the first ship, in a match watched (`watch`); null: the first ship is a player's. */
+  private readonly first: Skill | null;
   private foeState: FoeState;
   /** The length of a match this machine starts, minutes, or undefined for the rules' own. */
   private readonly minutes: number | undefined;
@@ -179,7 +188,8 @@ export class DuelSession {
     this.hub = options.hub ?? null;
     this.now = options.now;
     this.build = options.build;
-    this.foe = options.foe ?? null;
+    this.foe = options.watch?.second ?? options.foe ?? null;
+    this.first = options.watch?.first ?? null;
     this.foeState = options.foeWaits ? 'heave' : 'awake';
     this.minutes = options.minutes;
     this.terms = options.terms ?? {};
@@ -187,9 +197,10 @@ export class DuelSession {
       this.role = 'solo';
       const seed = options.seed ?? SOLO_SEED;
       const start = options.setup ?? this.timed(options.alone ? aloneStart(seed, this.terms) : duelStart(seed, this.terms));
-      const crewed = this.foe ? crewedBy(start, FOE_SHIP, this.foe) : start;
+      const second = this.foe ? crewedBy(start, FOE_SHIP, this.foe) : start;
+      const crewed = this.first ? crewedBy(second, FIRST_SHIP, this.first) : second;
       const state = startMatch(options.windForce === undefined ? crewed : { ...crewed, windForce: options.windForce });
-      this.begin(options.start ? options.start(state) : state, [SOLO_PLAYER, null]);
+      this.begin(options.start ? options.start(state) : state, this.first ? [null, null] : [SOLO_PLAYER, null]);
       return;
     }
     this.role = 'joining';
@@ -209,6 +220,11 @@ export class DuelSession {
   /** My ship (the one I captain), by her place in the state's ships; -1 while I have none. */
   get mine(): number {
     return this.captains.indexOf(this.me);
+  }
+
+  /** Whether this is a match watched: no ship is mine, both are commanded by computer captains (`watch`). */
+  get watched(): boolean {
+    return this.first !== null;
   }
 
   /** Whether the match is there to draw. */
@@ -403,6 +419,7 @@ export class DuelSession {
     const orders = taken.map((t) => t.order);
     // Played alone against a computer captain, his orders are stepped with the player's (sim/captain).
     if (this.foe && this.role === 'solo') orders.push(...this.foeOrders(this.foe));
+    if (this.first && this.role === 'solo') orders.push(...captainOrders(this.state, FIRST_SHIP, this.first));
     if (orders.length) this.stepped.push({ tick, orders });
     this.advance(orders);
     if (!this.hub) { this.stepped = []; return; }

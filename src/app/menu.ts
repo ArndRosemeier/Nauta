@@ -32,6 +32,7 @@ import {
 } from './terms';
 import { openWhatsNew, unseenVersion, versionLabel } from './whatsNew';
 import { openControls, showControlsOnce } from './controlsCard';
+import { watchCaption } from './spectator';
 import { words, type WordKey } from './words';
 import { LANGUAGES } from './settings';
 import { oneOf } from './kept';
@@ -61,6 +62,9 @@ const NAVY_WORDS: Readonly<Record<Navy, WordKey>> = { british: 'british', french
 const WIND_WORDS: Readonly<Record<WindChoice, WordKey>> = { drawn: 'asItComes', light: 'windLight', fresh: 'windFresh', strong: 'windStrong' };
 const HOUR_WORDS: Readonly<Record<HourChoice, WordKey>> = { drawn: 'asItComes', dawn: 'dawn', day: 'day', dusk: 'dusk', moon: 'moonlight' };
 const MEET_WORDS: Readonly<Record<Meeting, WordKey>> = { even: 'meetEven', weather: 'meetWeather', lee: 'meetLee' };
+/** How the ships meet in a battle watched: the first (British) ship holds the weather position, or the second. */
+const WATCH_MEET_WORDS: Readonly<Record<Meeting, WordKey>> = { even: 'meetEven', weather: 'watchMeetWeather', lee: 'watchMeetLee' };
+const WATCH_ENDING_WORDS: Readonly<Record<LostHow, WordKey>> = { struck: 'watchStruck', sunk: 'watchSank', burnt: 'watchBurnt', 'blew up': 'watchBlewUp', 'broke off': 'watchBrokeOff' };
 const ENDING_WORDS: Readonly<Record<'she' | 'me', Readonly<Record<LostHow, WordKey>>>> = {
   she: { struck: 'sheStruck', sunk: 'sheSank', burnt: 'sheBurnt', 'blew up': 'sheBlewUp', 'broke off': 'sheBrokeOff' },
   me: { struck: 'youStruck', sunk: 'youSank', burnt: 'youBurnt', 'blew up': 'youBlewUp', 'broke off': 'youBrokeOff' },
@@ -87,6 +91,8 @@ export interface MenuHooks {
   pause(on: boolean): void;
   /** The first lieutenant's lessons (plan N7.4) begin in this session, or end (null: any other match). */
   firstCommand(session: DuelSession | null): void;
+  /** A battle is watched from a free camera (plan N7.8) from this match on, `caption` saying who fights, or no longer (null: any other match). */
+  watching(caption: string | null): void;
 }
 
 /** What is played now. */
@@ -95,6 +101,7 @@ type Playing =
   | { readonly kind: 'walk' }
   | { readonly kind: 'first' }
   | { readonly kind: 'alone'; readonly terms: MatchTerms; readonly seed: number }
+  | { readonly kind: 'watch'; readonly terms: MatchTerms; readonly seed: number }
   | { readonly kind: 'duel'; readonly session: DuelSession };
 
 export class Menu {
@@ -161,6 +168,7 @@ export class Menu {
     this.playing = playing;
     this.h.match.useSession(s, firstNavy);
     this.h.firstCommand(playing.kind === 'first' ? s : null);
+    this.h.watching(playing.kind === 'watch' ? watchCaption(this.wordsNow, playing.terms.skillBritish, playing.terms.skillFrench) : null);
   }
 
   /** Her alone at sea on a quiet morning, hove to: the sea behind the main screen. */
@@ -215,6 +223,7 @@ export class Menu {
       choice('hostDuel', 'hostDuelHelp', () => this.setup('host'));
       choice('joinDuel', 'joinDuelHelp', () => this.joinScreen());
       choice('walkShip', 'walkShipHelp', () => this.sail('walk'));
+      choice('watchBattle', 'watchBattleHelp', () => this.setup('watch'));
       const news = menuButton(unseenVersion() ? 'nt-link fresh' : 'nt-link', `Nauta ${versionLabel} · ${say.whatsNew}`, () => openWhatsNew(say, () => news.classList.remove('fresh')));
       // A newer version of the game is installed and waits: one tap restarts on it (offline/register.ts), never in the middle of a match.
       const update = this.h.offline.updateReady ? menuButton('nt-link fresh', say.updateReady, () => this.h.offline.restart()) : null;
@@ -231,8 +240,8 @@ export class Menu {
     drawScreen();
   }
 
-  /** The match setup (alone or hosting): every line with its default, one tap on the button at its foot starts. */
-  private setup(kind: 'alone' | 'host'): void {
+  /** The match setup (alone, hosting, or a battle to watch): every line with its default, one tap on the button at its foot starts. */
+  private setup(kind: 'alone' | 'host' | 'watch'): void {
     this.screen.hidden = true;
     const drawScreen = () => {
       const say = this.wordsNow, t = this.terms;
@@ -246,16 +255,22 @@ export class Menu {
       seed.placeholder = say.newEach;
       seed.value = t.seed === null ? '' : String(t.seed);
       seed.addEventListener('change', () => { this.setTerms({ seed: readSeed(seed.value) }); seed.value = this.terms.seed === null ? '' : String(this.terms.seed); });
+      const skillRow = (name: WordKey, now: Offered, set: (s: Offered) => void) => pick(name, null, SKILLS, (s) => say[SKILL_WORDS[s]], now, set);
+      const watch = kind === 'watch';
       sheet.body.append(
-        navy,
-        ...(kind === 'alone' ? [pick('otherCaptain', null, SKILLS, (s) => say[SKILL_WORDS[s]], t.foe, (foe) => this.setTerms({ foe }))] : []),
+        ...(watch ? [] : [navy]),
+        ...(kind === 'alone' ? [skillRow('otherCaptain', t.foe, (foe) => this.setTerms({ foe }))] : []),
+        ...(watch ? [skillRow('britishCaptain', t.skillBritish, (skillBritish) => this.setTerms({ skillBritish })), skillRow('frenchCaptain', t.skillFrench, (skillFrench) => this.setTerms({ skillFrench }))] : []),
         pick('wind', 'windHelp', WIND_CHOICE_NAMES, (w) => say[WIND_WORDS[w]], t.wind, (wind) => this.setTerms({ wind })),
         pick('hour', 'hourHelp', HOURS, (h) => say[HOUR_WORDS[h]], t.hour, (hour) => this.setTerms({ hour })),
-        pick('meet', 'meetHelp', MEETINGS, (m) => say[MEET_WORDS[m]], t.meet, (meet) => this.setTerms({ meet })),
+        pick('meet', watch ? null : 'meetHelp', MEETINGS, (m) => say[(watch ? WATCH_MEET_WORDS : MEET_WORDS)[m]], t.meet, (meet) => this.setTerms({ meet })),
         pick('matchLength', 'matchLengthHelp', LENGTHS, (m) => lengthWords(m, say), t.minutes, (minutes) => this.setTerms({ minutes })),
         row(say.seed, say.seedHelp, seed),
       );
-      const go = menuButton('nt-button menu-go', kind === 'alone' ? say.beatToQuarters : say.openTheRoom, () => { this.setTerms({ seed: readSeed(seed.value) }); if (kind === 'alone') this.sail('alone'); else void this.host(); });
+      const go = menuButton('nt-button menu-go', kind === 'alone' ? say.beatToQuarters : kind === 'watch' ? say.beginTheBattle : say.openTheRoom, () => {
+        this.setTerms({ seed: readSeed(seed.value) });
+        if (kind === 'host') void this.host(); else this.sail(kind);
+      });
       const back = menuButton('nt-link', say.back, () => this.main());
       const foot = make('div', 'menu-sheet-foot');
       foot.append(back, go);
@@ -281,14 +296,17 @@ export class Menu {
 
   /**
    * A match played alone from the terms (the seed typed, or a new one; `fresh`: a new one all the same): against a computer captain, or (`walk`) her
-   * alone at sea with the terms' wind and hour, no enemy and no limit.
+   * alone at sea with the terms' wind and hour, no enemy and no limit; or (`watch`) a battle of two computer captains, the British ship's and the
+   * French ship's, none of the ships mine, the British the first (plan N7.8).
    */
-  private sail(kind: 'alone' | 'walk', fresh = false): void {
+  private sail(kind: 'alone' | 'walk' | 'watch', fresh = false): void {
     const t = this.terms, seed = (fresh ? null : t.seed) ?? newSeed(Date.now(), this.seeds++);
     const s = kind === 'alone'
       ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), foe: t.foe, minutes: matchMinutes(t) })
-      : new DuelSession({ build: this.h.build, now: this.h.now, seed, alone: true, terms: startTerms(t), minutes: QUIET_MINUTES });
-    this.run(s, kind === 'alone' ? { kind, terms: t, seed } : { kind });
+      : kind === 'watch'
+        ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), watch: { first: t.skillBritish, second: t.skillFrench }, minutes: matchMinutes(t) })
+        : new DuelSession({ build: this.h.build, now: this.h.now, seed, alone: true, terms: startTerms(t), minutes: QUIET_MINUTES });
+    this.run(s, kind === 'walk' ? { kind } : { kind, terms: t, seed }, kind === 'watch' ? 'british' : undefined);
     this.h.sky(hourOf(t.hour, seed), MATCH_DAY_MINUTES);
     this.aboard();
   }
@@ -432,8 +450,9 @@ export class Menu {
       const resume = menuButton('nt-button menu-go', say.resume, () => { this.closeSheet(); this.h.pause(false); this.redraw = () => {}; });
       const settings = menuButton('nt-button', say.settings, () => this.h.settingsMenu.open());
       const controls = menuButton('nt-button', say.controlsShow, () => openControls(this.h.settings));
-      let asked = p.kind === 'walk';
-      const leave = menuButton('nt-button', p.kind === 'walk' ? say.leaveWalk : say.leaveMatch, () => {
+      const plain = p.kind === 'walk' || p.kind === 'watch';
+      let asked = plain;
+      const leave = menuButton('nt-button', plain ? say.leaveWalk : say.leaveMatch, () => {
         if (!asked) { asked = true; leave.textContent = say.leaveSure; leave.classList.add('on'); return; }
         this.leaveMatch();
       });
@@ -470,13 +489,13 @@ export class Menu {
   private endScreen(): void {
     const p = this.playing, found = endCard(this.h.match.state, this.h.match.ship, this.tally);
     if (!found || p.kind === 'quiet' || p.kind === 'walk') return;
-    const card = found;
+    const card = found, watching = p.kind === 'watch';
     const drawScreen = () => {
       const say = this.wordsNow;
-      const sheet = this.open('menu-end', say[resultWord(card.ending)], () => { this.redraw = () => {}; });
+      const sheet = this.open('menu-end', say[watching ? watchResultWord(card.ending) : resultWord(card.ending)], () => { this.redraw = () => {}; });
       const table = make('table', 'menu-numbers');
       const head = make('tr', '');
-      head.append(make('th', '', ''), make('th', '', say.yours), ...(card.ships.length > 1 ? [make('th', '', say.hers)] : []));
+      head.append(make('th', '', ''), make('th', '', watching ? say.british : say.yours), ...(card.ships.length > 1 ? [make('th', '', watching ? say.french : say.hers)] : []));
       table.append(head);
       const line = (name: WordKey, of: (n: (typeof card.ships)[number]) => number) => {
         const tr = make('tr', '');
@@ -489,7 +508,7 @@ export class Menu {
       line('sparsDown', (n) => n.spars);
       const her = make('p', 'room-say');
       const again = menuButton('nt-button menu-go', say.again, () => {
-        if (p.kind === 'alone') this.sail('alone', true);
+        if (p.kind === 'alone' || p.kind === 'watch') this.sail(p.kind, true);
         else if (p.kind === 'first') this.first();
         else if (p.kind === 'duel') { p.session.ready(); look(); }
       });
@@ -508,8 +527,8 @@ export class Menu {
       const foot = make('div', 'menu-sheet-foot');
       foot.append(back, again);
       sheet.body.append(
-        make('p', 'menu-ending', endingWords(card.ending, say)),
-        make('p', 'room-say', `${say.foughtFor} ${minutesAndSeconds(card.seconds)}${p.kind === 'alone' ? ` · ${say.seed} ${p.seed}` : ''}`),
+        make('p', 'menu-ending', watching ? watchEndingWords(card.ending, say) : endingWords(card.ending, say)),
+        make('p', 'room-say', `${say.foughtFor} ${minutesAndSeconds(card.seconds)}${p.kind === 'alone' || watching ? ` · ${say.seed} ${p.seed}` : ''}`),
         table,
         ...(p.kind === 'duel' ? [her] : []),
         foot,
@@ -540,6 +559,17 @@ function resultWord(e: Ending): WordKey {
 function endingWords(e: Ending, say: Say): string {
   if (e.who === 'none') return e.apart ? say.sailedApart : say.parted;
   return say[ENDING_WORDS[e.who][e.how] ?? 'parted'];
+}
+
+/** The end card's title for a battle watched: whose victory (the British ship is the first, the match's `me`), or drawn. */
+function watchResultWord(e: Ending): WordKey {
+  return e.who === 'she' ? 'britishWins' : e.who === 'me' ? 'frenchWins' : 'drawn';
+}
+
+/** How a battle watched ended, in words: which ship was lost and how, or that they parted. */
+function watchEndingWords(e: Ending, say: Say): string {
+  if (e.who === 'none') return e.apart ? say.watchSailedApart : say.watchParted;
+  return say[WATCH_ENDING_WORDS[e.how] ?? 'watchParted'].replace('{ship}', e.who === 'she' ? say.frenchShip : say.britishShip);
 }
 
 /** Seconds as `m:ss`. */

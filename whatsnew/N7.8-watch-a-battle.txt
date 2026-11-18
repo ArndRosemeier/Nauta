@@ -1,0 +1,2 @@
+New on the main screen: "Watch a battle". Pick a captain for each ship and fly the camera anywhere: close to a hull or high over both.
+Move with the left thumb (or WASD), look with the right (or the mouse), climb with the arrows at the right (Space and C); buttons at the foot take you to the British ship, the French ship or a view of both. `?watch` starts one at once.

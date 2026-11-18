@@ -88,10 +88,11 @@ export class PageMatch implements OrderSession {
   /**
    * Runs `s` from now on, as soon as its match has begun and it has a ship for me: a guest starts from the room's state
    * of before he came, and the host seats him a moment later, so the view never shows the host's ship as his. `first`:
-   * the first ship's navy in it (the match setup's, menu.md).
+   * the first ship's navy in it (the match setup's, menu.md). A match watched has no ship of mine (`DuelSession.watched`):
+   * the page draws it from outside, through `ship` 0 and the other.
    */
   useSession(s: DuelSession, first: Navy = 'british'): void {
-    const ready = () => s.started && s.mine >= 0;
+    const ready = () => s.started && (s.mine >= 0 || s.watched);
     const swap = () => {
       if (!ready() || this.current === s) return;
       this.first = first;

@@ -40,6 +40,9 @@ export interface MatchTerms {
   readonly navy: Navy;
   /** The other captain's skill, a match played alone. */
   readonly foe: Offered;
+  /** The two computer captains' skills in a battle watched (plan N7.8): the British ship's and the French ship's. */
+  readonly skillBritish: Offered;
+  readonly skillFrench: Offered;
   readonly wind: WindChoice;
   readonly hour: HourChoice;
   readonly meet: Meeting;
@@ -49,7 +52,7 @@ export interface MatchTerms {
   readonly seed: number | null;
 }
 
-export const DEFAULT_TERMS: MatchTerms = { navy: 'british', foe: 'seasoned', wind: 'drawn', hour: 'drawn', meet: 'even', minutes: MATCH_MINUTES, seed: null };
+export const DEFAULT_TERMS: MatchTerms = { navy: 'british', foe: 'seasoned', skillBritish: 'seasoned', skillFrench: 'seasoned', wind: 'drawn', hour: 'drawn', meet: 'even', minutes: MATCH_MINUTES, seed: null };
 
 
 /** Terms from whatever was kept: each field missing or wrong takes its default. */
@@ -58,6 +61,8 @@ export function readTerms(kept: unknown): MatchTerms {
   return {
     navy: oneOf(k.navy, NAVIES, d.navy),
     foe: oneOf(k.foe, SKILLS, d.foe),
+    skillBritish: oneOf(k.skillBritish, SKILLS, d.skillBritish),
+    skillFrench: oneOf(k.skillFrench, SKILLS, d.skillFrench),
     wind: oneOf(k.wind, WIND_CHOICE_NAMES, d.wind),
     hour: oneOf(k.hour, HOURS, d.hour),
     meet: oneOf(k.meet, MEETINGS, d.meet),
