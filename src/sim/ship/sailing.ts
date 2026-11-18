@@ -27,7 +27,7 @@ import { angleDiff, clamp } from '@futuremagic/core';
 import {
   ADDED_MASS, AIR, BOOM_SHEET_LEAST, BRACE_RATE, CANVAS, CARRIED_UP_TO, FORE_AFT_POLAR, GYBE, HAUL, HEADSAIL_SHEET,
   HELM_RATE, HELMSMAN, HULL_AHEAD, HULL_SIDEWAYS, HULL_TURNING, LET_FLY_ANGLE, LET_FLY_SHARE, MISSED_STAYS, REEF_AT,
-  RUDDER, SAIL_ROLL_SLOPE, SHIVER_ANGLE, SQUARE_POLAR, TRIM_TRIES, TURN_GYRATION, TURN_SKID, WINDAGE, type CanvasName, type Polar,
+  RUDDER, SAIL_ROLL_SLOPE, SHIVER_ANGLE, SQUARE_POLAR, START_CANVAS, TRIM_TRIES, TURN_GYRATION, TURN_SKID, WINDAGE, type CanvasName, type Polar,
 } from '../rules/sailing';
 import { BOOM, type MastName } from '../rules/rig';
 import { DESIGN_WATERLINE } from '../rules/ships';
@@ -200,7 +200,7 @@ export function startSailing(start: SailingStart, wind: Wind, force: number): Sa
   const side = ay < 0 ? 1 : -1;
   const s: Sailing = {
     heading, turnRate: 0, ahead, leeway: 0, helm: 0, steer: { heading, turn: 0 },
-    canvas: canvasFor(start.canvas ?? 'battle', force), braces: [0, 0], sides: [side, side], backed: [false, false],
+    canvas: canvasFor(start.canvas ?? START_CANVAS, force), braces: [0, 0], sides: [side, side], backed: [false, false],
   };
   return { ...s, braces: MASTS.map((_, m) => braceTarget(s, m, ax, ay)) };
 }
@@ -210,9 +210,9 @@ export function steerTo(s: Sailing, heading: number, turn: number): Sailing {
   return { ...s, steer: { heading: wrapBearing(heading), turn: Math.sign(turn) } };
 }
 
-/** Her canvas set as named, reefed for a wind of `force`. Taken at once until the crew sets sail (N4). */
-export function setCanvas(s: Sailing, name: CanvasName, force: number): Sailing {
-  return { ...s, canvas: canvasFor(name, force) };
+/** One sail (by its place in rigPlan().sails) set as `setting`: furled, or set with its reefs. The orders (orders.ts) set a canvas sail by sail. */
+export function setSail(s: Sailing, sail: number, setting: SailSetting): Sailing {
+  return { ...s, canvas: s.canvas.map((c, i) => (i === sail ? { set: setting.set, reefs: setting.set ? setting.reefs : 0 } : c)) };
 }
 
 /** One mast's yards laid aback (or filled again). */

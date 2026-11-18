@@ -150,6 +150,8 @@ export const CLOSE_HAULED = 67.5 * DEGREE;
  * the guns and fire. Plain sail adds the courses and topgallants; all sail sets every sail she has.
  */
 export type CanvasName = 'bare' | 'battle' | 'plain' | 'all';
+/** The canvas a ship starts a match under (design decision for N3: both under battle sail). */
+export const START_CANVAS: CanvasName = 'battle';
 export const CANVAS: Readonly<Record<CanvasName, readonly string[]>> = {
   bare: [],
   battle: ['fore-topsail', 'main-topsail', 'jib', 'fore-topmast-staysail', 'boom-sail'],

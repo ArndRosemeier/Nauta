@@ -1,0 +1,3 @@
+Behind the scenes: the brig now takes a captain's sailing orders: steer a course, come up or bear away a point, full and by, tack, wear, heave to, battle, plain or all sail, shorten sail, back a topsail and fill.
+Each order takes its time, like a crew carrying it out, and an order she cannot do is answered with the reason ("she has no way on her").
+Nothing to try yet: the buttons to give these orders come next.

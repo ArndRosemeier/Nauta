@@ -115,6 +115,11 @@
       "field": "doors",
       "owner": "src/app/captain.ts",
       "what": "her doors as the captain has swung them"
+    },
+    {
+      "field": "told",
+      "owner": "src/sim/orders.ts",
+      "what": "what a ship has been told to do: her course or full and by, her canvas, hove to, masts aback, the acts still to be done and the orders being carried out (N3.4)"
     }
   ]
 }

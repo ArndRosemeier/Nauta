@@ -9,17 +9,20 @@
 import { deriveSeed } from '@futuremagic/core';
 import { decode, encode, hashBytes } from './codec';
 import { startSea, type SeaState } from './sea/sea';
+import { startOrders, type ShipOrders } from './orders';
 import { startMotion, type ShipMotion } from './ship/motion';
 import { startSailing, type Sailing } from './ship/sailing';
-import type { CanvasName } from './rules/sailing';
+import { START_CANVAS, type CanvasName } from './rules/sailing';
 import { STEPS_PER_SECOND } from './units';
 import { makeWind, meanWind, windAt, type WindState } from './wind';
 
-/** One ship of the match: how she lies on the water (motion.ts owns it), and how she sails (sailing.ts owns it). */
+/** One ship of the match: how she lies on the water (motion.ts owns it), how she sails (sailing.ts) and what she has been told (orders.ts). */
 export interface SimShip {
   readonly motion: ShipMotion;
   /** Her heading, way, helm, canvas and yards: the sailing model's state. */
   readonly sailing: Sailing;
+  /** What she has been told to do and what of it the crew has still to do (orders.ts owns it). */
+  readonly told: ShipOrders;
 }
 
 /** The whole match. Changed only by `step` (and made by `startMatch`); rules.json `owners` names each field's owner. */
@@ -75,6 +78,7 @@ export function startMatch(setup: MatchSetup): SimState {
     ships: setup.ships.map((s) => ({
       motion: startMotion(s.x, s.z, s.heading),
       sailing: startSailing(s, windAt(wind, s.x, s.z, 0), setup.windForce),
+      told: startOrders(s.heading, s.canvas ?? START_CANVAS),
     })),
   };
 }
