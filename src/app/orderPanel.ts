@@ -15,7 +15,9 @@ const PANEL_EVERY_MS = 250;
 /** The answers kept on the panel, newest last. */
 const HEARD_LINES = 6;
 /** Who the buttons' groups are for, in the order shown. */
-const GROUPS = ['master', 'first lieutenant'] as const;
+const GROUPS = ['master', 'first lieutenant', 'gunner'] as const;
+/** Each group's heading. */
+const GROUP_NAMES: Readonly<Record<(typeof GROUPS)[number], string>> = { master: 'Master', 'first lieutenant': 'First lieutenant', gunner: 'Gunner' };
 
 export class OrderPanel {
   private readonly status = make('pre', 'orders-status');
@@ -23,6 +25,8 @@ export class OrderPanel {
   private readonly lines: string[] = [];
   private readonly buttons: { readonly el: HTMLButtonElement; readonly order: Order }[] = [];
   private shown = -Infinity;
+  private last = '';
+  private repeats = 0;
 
   constructor(private readonly session: OrderSession) {
     const panel = make('aside', 'open');
@@ -39,7 +43,7 @@ export class OrderPanel {
     const all = orderButtons();
     for (const to of GROUPS) {
       const group = make('div', 'orders-group');
-      group.append(make('span', 'orders-to', to === 'master' ? 'Master' : 'First lieutenant'));
+      group.append(make('span', 'orders-to', GROUP_NAMES[to]));
       for (const b of all.filter((x) => x.to === to)) this.buttons.push({ el: group.appendChild(this.orderButton(b.label, b.order)), order: b.order });
       body.append(group);
     }
@@ -73,9 +77,15 @@ export class OrderPanel {
     this.hear(`› ${words}`);
   }
 
+  /** A line heard; the same words again (a broadside, gun after gun) are counted on the last line instead. */
   private hear(line: string): void {
-    this.lines.push(line);
-    if (this.lines.length > HEARD_LINES) this.lines.shift();
+    if (line === this.last) this.lines[this.lines.length - 1] = `${line} (×${++this.repeats})`;
+    else {
+      this.last = line;
+      this.repeats = 1;
+      this.lines.push(line);
+      if (this.lines.length > HEARD_LINES) this.lines.shift();
+    }
     this.heard.textContent = this.lines.join('\n');
   }
 

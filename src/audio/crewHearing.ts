@@ -14,7 +14,7 @@ import { heightAt, lineLength, routeNetwork } from '../sim/crew/network';
 import { jobWork } from '../sim/crew/drill';
 import type { Hand, Task } from '../sim/crew/crew';
 import { brigRoster, placeSpot } from '../sim/crew/roster';
-import type { Order } from '../sim/orders';
+import type { SailingOrder } from '../sim/orders';
 import { toWorld, type ShipPose } from '../sim/ship/motion';
 import { shipPlan, spacesById, type Spot } from '../sim/ship/plan';
 import { MASTS } from '../sim/ship/sailing';
@@ -197,7 +197,7 @@ export class CrewWatch {
     for (const e of this.events) {
       if (e.kind === 'done') { if (PIPED_DONE.has(e.order.kind)) this.wait(CARRY_ON, CARRY_ON.gain, s.t); }
       else if (e.kind === 'short-handed') this.pipeAgain(e.order, s.t);
-      else if (e.kind !== 'refused' && e.kind !== 'answered') {
+      else if (e.kind === 'tacked' || e.kind === 'wore' || e.kind === 'missed stays') {
         for (const c of SAILED_CALLS[e.kind]) this.wait(c, c.gain, s.t);
         if (e.kind !== 'missed stays') this.bracePulls = Array.from({ length: SWING_PULLS }, (_, k) => s.t + k * SWING_PERIOD);
       }
@@ -206,7 +206,7 @@ export class CrewWatch {
   }
 
   /** Too few hands: the order's call once more, a little quieter, at most once in a while for each kind. */
-  private pipeAgain(order: Order, t: number): void {
+  private pipeAgain(order: SailingOrder, t: number): void {
     const last = this.again.get(order.kind);
     if (last !== undefined && t - last < SHORT_HANDED_AGAIN) return;
     this.again.set(order.kind, t);

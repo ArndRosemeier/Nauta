@@ -10,7 +10,9 @@ import { angleDiff } from '@futuremagic/core';
 import { giveOrder, headingWords, orderWords, VOCABULARY, type Order, type ShipOrders } from '../sim/orders';
 import type { MastName } from '../sim/rules/rig';
 import { JOBS } from '../sim/rules/crew';
+import { AIM_HEIGHT, SHOT, type AimName, type ShotKind } from '../sim/rules/guns';
 import { CLOSE_HAULED } from '../sim/rules/sailing';
+import { gunAt, gunCount, type Battery } from '../sim/guns/guns';
 import { rigPlan } from '../sim/ship/rig';
 import { MASTS } from '../sim/ship/sailing';
 import { simTime, type SimState } from '../sim/state';
@@ -36,12 +38,14 @@ export interface OrderButton {
 /** The canvas settings an order names, in the order the buttons show them. */
 const SETTINGS = ['battle', 'plain', 'all'] as const;
 
-/** Every order of the vocabulary as buttons, a course apart (the compass gives those): a canvas and a mast make one button each. */
+/** Every order of the vocabulary as buttons, a course apart (the compass gives those): a canvas, a mast, a shot and an aim make one button each. */
 export function orderButtons(): OrderButton[] {
   return VOCABULARY.flatMap((w): OrderButton[] => {
     const orders: Order[] = w.takes === 'canvas' ? SETTINGS.map((canvas) => ({ kind: 'sail', ship: 0, canvas }))
       : w.takes === 'mast' ? MASTS.map((mast: MastName) => ({ kind: 'back', ship: 0, mast }))
-        : w.takes === 'heading' ? [] : [{ kind: w.kind, ship: 0 } as Order];
+        : w.takes === 'shot' ? (Object.keys(SHOT) as ShotKind[]).map((shot) => ({ kind: 'shot', ship: 0, shot }))
+          : w.takes === 'aim' ? (Object.keys(AIM_HEIGHT) as AimName[]).map((at) => ({ kind: 'aim', ship: 0, at }))
+            : w.takes === 'heading' ? [] : [{ kind: w.kind, ship: 0 } as Order];
     return orders.map((order) => ({ order, label: orderWords(order), to: w.to }));
   });
 }
@@ -98,7 +102,20 @@ export function shipLines(state: SimState, ship: number): string[] {
     `Heading ${bearingWords(sail.heading)} · ${way} · told: ${helmWords(s.told)}`,
     `Wind from ${bearingWords(wind.from)}, force ${state.wind.windForce} · ${pointOfSail(sail.heading, wind.from)}`,
     [`${s.told.canvas === 'bare' ? 'bare poles' : `${s.told.canvas} sail`}${s.told.hove ? ', hove to' : ''}`, ...aback].join(' · '),
+    gunsLine(s.told, s.guns),
   ];
+}
+
+/** How each way of firing reads on the panel. */
+const FIRING_WORDS: Readonly<Record<ShipOrders['firing'], string>> = { cease: 'not firing', bear: 'firing as they bear', hold: 'held for your word' };
+
+/** Her guns in a line: secured, or at quarters with the shot, the aim, how they fire and how many stand ready. */
+function gunsLine(told: ShipOrders, guns: Battery): string {
+  const all = Array.from({ length: gunCount(guns) }, (_, i) => gunAt(guns, i)).filter((g) => !g.dismounted);
+  const ready = all.filter((g) => g.drill === 'ready').length;
+  if (!told.quarters) return `Guns secured${ready ? `, ${ready} still run out` : ''}`;
+  const firing = told.word ? 'firing on your word' : FIRING_WORDS[told.firing];
+  return `At quarters · ${told.shot} shot at her ${told.aim} · ${firing} · ${ready} of ${all.length} guns ready`;
 }
 
 /** What one timed act of an order is, in words. */
@@ -134,7 +151,7 @@ export function clockWords(tick: number): string {
   return `${pad(Math.floor(seconds / SECONDS_PER_MINUTE))}:${pad(seconds % SECONDS_PER_MINUTE)}`;
 }
 
-/** What an event of my ship says on the panel, or null when it is not about her: an order refused is crossed, one taken with words gives the master's answer. */
+/** What an event of my ship says on the panel, or null when it is not about her: an order refused is crossed, one taken with words gives the master's answer; the enemy's guns are heard too. */
 export function eventWords(e: SimEvent, ship: number): string | null {
   const at = clockWords(e.tick);
   switch (e.kind) {
@@ -145,12 +162,14 @@ export function eventWords(e: SimEvent, ship: number): string | null {
     case 'wore': return e.ship === ship ? `${at} she has worn round` : null;
     case 'missed stays': return e.ship === ship ? `${at} she missed stays and falls back` : null;
     case 'short-handed': return e.ship === ship ? `${at} ${orderWords(e.order)}: short-handed: ${jobWords(e.job)}` : null;
+    // A gun fired, hers or the enemy's: a broadside is a run of the same words (the panel counts them).
+    case 'fired': return `${at} ${e.ship === ship ? 'our guns fire' : 'she fires'} ${e.fired.shot} shot`;
   }
 }
 
 /**
  * Whether a button's order is standing now (the ring of the order fan: "what did I tell him"): the canvas ordered,
- * full and by, hove to, a mast told aback.
+ * full and by, hove to, a mast told aback; at quarters or not, the shot, the aim, how her guns fire, the word.
  */
 export function isStanding(order: Order, told: ShipOrders): boolean {
   switch (order.kind) {
@@ -158,6 +177,12 @@ export function isStanding(order: Order, told: ShipOrders): boolean {
     case 'by': return told.helm.by !== 0;
     case 'heave': return told.hove;
     case 'back': return told.backed[MASTS.indexOf(order.mast)] === true;
+    case 'quarters': return told.quarters;
+    case 'stand': return !told.quarters;
+    case 'shot': return told.shot === order.shot;
+    case 'aim': return told.aim === order.at;
+    case 'bear': case 'hold': case 'cease': return told.quarters && told.firing === order.kind;
+    case 'fire': return told.word;
     default: return told.given.some((g) => g.order.kind === order.kind);
   }
 }
@@ -167,5 +192,5 @@ export function wouldRefuse(state: SimState, order: Order): boolean {
   const s = state.ships[order.ship];
   if (!s) return true;
   const answer = giveOrder(s.told, s.sailing, order, { tick: state.tick, wind: meanWind(state.wind, simTime(state)), force: state.wind.windForce });
-  return answer.told === s.told;
+  return answer.refused;
 }

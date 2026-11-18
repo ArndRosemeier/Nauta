@@ -69,13 +69,16 @@ const FRAME = 0.1;
 const button = (kind: Order['kind']) => orderButtons().find((b) => b.order.kind === kind)!.order;
 const she = (m: SoloMatch) => m.state.ships[0]!.sailing;
 
-test('the buttons give every order of the vocabulary, each canvas and mast its own, courses from the compass', () => {
+test('the buttons give every order of the vocabulary, each canvas, mast, shot and aim its own, courses from the compass', () => {
   const buttons = orderButtons();
   const kinds = new Set([...buttons.map((b) => b.order.kind), 'steer']);
   assert.deepEqual([...kinds].sort(), VOCABULARY.map((w) => w.kind).sort());
   assert.deepEqual(buttons.filter((b) => b.order.kind === 'sail').map((b) => b.label), ['battle sail', 'plain sail', 'all sail']);
   assert.deepEqual(buttons.filter((b) => b.order.kind === 'back').map((b) => b.label), ['back the fore topsail', 'back the main topsail']);
-  assert.ok(buttons.every((b) => b.to === 'master' || b.to === 'first lieutenant'));
+  assert.deepEqual(buttons.filter((b) => b.to === 'gunner').map((b) => b.label), [
+    'round shot', 'chain shot', 'grape shot', 'aim at the hull', 'aim at the rigging', 'aim at the deck', 'fire as they bear', 'hold for my word', 'fire', 'cease firing',
+  ]);
+  assert.deepEqual(buttons.filter((b) => b.to === 'first lieutenant').map((b) => b.label).slice(-2), ['beat to quarters', 'stand down']);
   assert.deepEqual(STEER_POINTS.map((_, i) => Math.round(steerPoint(i) / DEGREE)), [0, 45, 90, 135, 180, 225, 270, 315]);
 });
 
@@ -121,7 +124,7 @@ test('the answers: taken with words, refused, done, and the events of her sailin
   assert.equal(eventWords({ kind: 'tacked', tick: at, ship: 0 }, 0), '01:35 she has come through the wind');
   assert.equal(eventWords({ kind: 'wore', tick: at, ship: 0 }, 0), '01:35 she has worn round');
   assert.equal(eventWords({ kind: 'missed stays', tick: at, ship: 0 }, 0), '01:35 she missed stays and falls back');
-  const short: SimEvent = { kind: 'short-handed', tick: at, ship: 0, order: button('heave'), job: 'brace' };
+  const short = { kind: 'short-handed', tick: at, ship: 0, order: { kind: 'heave', ship: 0 }, job: 'brace' } as const;
   assert.equal(eventWords(short, 0), "01:35 heave to: short-handed: a mast's yards swung round");
   assert.equal(eventWords({ ...short, ship: 1 }, 0), null);
   const answered: SimEvent = { kind: 'answered', tick: at, ship: 1, order: { kind: 'steer', ship: 1, heading: 0 }, code: 'wearing round', reason: 'wearing round, sir: 000 lies on the other tack' };

@@ -7,6 +7,7 @@
  */
 import type { Order } from '../sim/orders';
 import type { ShipPose } from '../sim/ship/motion';
+import { warmGunnery } from '../sim/guns/gunnery';
 import { rigPlan } from '../sim/ship/rig';
 import type { SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
@@ -29,6 +30,8 @@ export class PageMatch implements OrderSession {
 
   /** `windForce`: the address's wind (`?wind=`), over the start's own; null: the start's. */
   constructor(build: string, seed: number | null, now = pageSeconds, windForce: number | null = null) {
+    // The guns' laying tables built now, while the page loads, so no step of the match pays for them.
+    warmGunnery();
     this.current = this.attach(new DuelSession({ build, now, seed: seed ?? undefined, windForce: windForce ?? undefined }));
     this.drawnNow = this.current.drawn();
     setInterval(() => this.current.pump(), PUMP_MS);

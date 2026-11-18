@@ -168,9 +168,10 @@ export const FEWEST = 0.25;
 /**
  * How an order travels (docs/design/orders.md, "How an order travels"): the man it is given to hears it and passes it
  * on; the master tells the helmsman, the first lieutenant has the boatswain pipe the hands. Seconds from the order to
- * the men being told off, by who takes it (orders.ts VOCABULARY's `to`).
+ * the men being told off, by who takes it (orders.ts VOCABULARY's `to`). The gunner's orders take none of the
+ * sailing drill's hands (guns/gunnery.ts has the gun crews carry them out); his time is the first lieutenant's.
  */
-export const PASSED: Readonly<Record<'master' | 'first lieutenant', number>> = { master: 1, 'first lieutenant': 2 };
+export const PASSED: Readonly<Record<'master' | 'first lieutenant' | 'gunner', number>> = { master: 1, 'first lieutenant': 2, gunner: 2 };
 
 /**
  * Choosing the men: the nearest free man of the parts a job is for goes first. Nearness is the distance in plan plus

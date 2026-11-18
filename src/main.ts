@@ -33,6 +33,7 @@ import { SPRAY } from './render/materials';
 import { SeaSound } from './audio/seaSound';
 import { ShipSound } from './audio/shipSound';
 import { CrewSound } from './audio/crewSound';
+import { beatingToQuarters } from './sim/guns/gunnery';
 import { SailSound } from './audio/sailSound';
 import { OPEN_AIR } from './audio/acoustics';
 import { CrewView } from './render/crew/crewView';
@@ -444,6 +445,7 @@ async function start(): Promise<void> {
     const body = walking?.drawnBody, soles = body ? [body.feet.L, body.feet.R] : null;
     const sailing = match?.state.ships[match.ship] ?? null;
     const room = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: where.eye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: sailing?.sailing.ahead ?? 0 }) : OPEN_AIR;
+    if (crewSound && match) { const mine = match.state.ships[match.ship]; crewSound.drum = !!mine && beatingToQuarters(mine.told, mine.guns); }
     if (ship && crewSound && match && sailing) crewSound.atWork(sailing, simTime(match.state), ship.drawn, where.eye, room);
     else if (ship && crewSound && !still) crewSound.bellAlone(seaTime, ship.drawn, room);
     // Her sails and rigging (N3.9): the rigging by the wind she feels aloft, the canvas as it is drawn; the wind on the

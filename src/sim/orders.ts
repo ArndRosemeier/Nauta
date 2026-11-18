@@ -23,6 +23,7 @@
  */
 import { angleDiff } from '@futuremagic/core';
 import { BY_FOLLOW, HOVE_TO_CHECK, HOVE_TO_IN, HOVE_TO_MAST, NO_WAY, POINT } from './rules/orders';
+import { AIM_HEIGHT, SHOT, type AimName, type ShotKind } from './rules/guns';
 import type { MastName } from './rules/rig';
 import { CLOSE_HAULED, type CanvasName } from './rules/sailing';
 import { rigPlan } from './ship/rig';
@@ -57,16 +58,46 @@ export interface BackOrder {
   readonly ship: number;
   readonly mast: MastName;
 }
+/** The sailing orders (N3.4): the master's and the first lieutenant's for her course and canvas, carried out by the hands. */
+export type SailingOrder = SteerOrder | PlainOrder | SailOrder | BackOrder;
+export type SailingKind = SailingOrder['kind'];
+
+/** The gunnery orders that name nothing more: beat to quarters, stand down, fire as they bear, hold for my word, the word (fire), cease firing. */
+export interface GunsOrder {
+  readonly kind: 'quarters' | 'stand' | 'bear' | 'hold' | 'fire' | 'cease';
+  readonly ship: number;
+}
+/** The shot of the next loading. */
+export interface ShotOrder {
+  readonly kind: 'shot';
+  readonly ship: number;
+  readonly shot: ShotKind;
+}
+/** Where the gun captains lay their guns on her. */
+export interface AimOrder {
+  readonly kind: 'aim';
+  readonly ship: number;
+  readonly at: AimName;
+}
+/** The gunnery orders (N5.3a): the first lieutenant's quarters and the gunner's rows; they take no hands of the sailing drill. */
+export type GunneryOrder = GunsOrder | ShotOrder | AimOrder;
+export type GunneryKind = GunneryOrder['kind'];
+
 /** An order to one ship, named by her place in `SimState.ships`. Plain data, sent between machines as it is. */
-export type Order = SteerOrder | PlainOrder | SailOrder | BackOrder;
+export type Order = SailingOrder | GunneryOrder;
 export type OrderKind = Order['kind'];
+
+/** The kinds of the gunnery orders. */
+const GUNNERY_KINDS: readonly OrderKind[] = ['quarters', 'stand', 'shot', 'aim', 'bear', 'hold', 'fire', 'cease'];
+/** Whether an order is one of the gunnery orders. */
+export const isGunnery = (order: Order): order is GunneryOrder => GUNNERY_KINDS.includes(order.kind);
 
 /** One word of the vocabulary: who takes it (docs/design/orders.md), what it does, and what more it names. */
 export interface OrderWord {
   readonly kind: OrderKind;
-  readonly to: 'master' | 'first lieutenant';
+  readonly to: 'master' | 'first lieutenant' | 'gunner';
   readonly what: string;
-  readonly takes: 'heading' | 'canvas' | 'mast' | null;
+  readonly takes: 'heading' | 'canvas' | 'mast' | 'shot' | 'aim' | null;
 }
 
 /** The sailing vocabulary, as data: what the panel (N3.5) and the order fan (N4.4) offer. */
@@ -82,6 +113,14 @@ export const VOCABULARY: readonly OrderWord[] = [
   { kind: 'shorten', to: 'first lieutenant', what: 'shorten sail one step: all, plain, battle, bare poles', takes: null },
   { kind: 'back', to: 'first lieutenant', what: "lay one mast's yards aback to check her way", takes: 'mast' },
   { kind: 'fill', to: 'first lieutenant', what: 'let every sail draw again; hove to, she makes her canvas again', takes: null },
+  { kind: 'quarters', to: 'first lieutenant', what: 'beat to quarters: the guns cast loose, loaded and run out; a ship not at quarters cannot fire', takes: null },
+  { kind: 'stand', to: 'first lieutenant', what: 'stand down: the guns run in, loaded as they are', takes: null },
+  { kind: 'shot', to: 'gunner', what: 'the shot of the next loading: round, chain or grape; guns already loaded fire what they hold', takes: 'shot' },
+  { kind: 'aim', to: 'gunner', what: 'where the gun captains lay their guns on her: hull, rigging or deck', takes: 'aim' },
+  { kind: 'bear', to: 'gunner', what: 'fire as they bear: each gun fires when the roll brings her laying onto the enemy, and keeps firing', takes: null },
+  { kind: 'hold', to: 'gunner', what: "hold for my word: the loaded side waits for the captain's word", takes: null },
+  { kind: 'fire', to: 'gunner', what: "the captain's word: the held side fires now, rippling down her side", takes: null },
+  { kind: 'cease', to: 'gunner', what: 'cease firing: the guns finish loading and stand ready', takes: null },
 ];
 
 /** The words each order is given by, the first for each its own (`orderWords`); fixed parts of the order beside them. */
@@ -107,6 +146,20 @@ const PHRASES: readonly { readonly words: string; readonly order: Partial<Order>
   { words: 'back the fore topsail', order: { kind: 'back', mast: 'fore' } },
   { words: 'fill', order: { kind: 'fill' } },
   { words: 'let draw', order: { kind: 'fill' } },
+  { words: 'beat to quarters', order: { kind: 'quarters' } },
+  { words: 'clear for action', order: { kind: 'quarters' } },
+  { words: 'stand down', order: { kind: 'stand' } },
+  { words: 'round shot', order: { kind: 'shot', shot: 'round' } },
+  { words: 'chain shot', order: { kind: 'shot', shot: 'chain' } },
+  { words: 'grape shot', order: { kind: 'shot', shot: 'grape' } },
+  { words: 'aim at the hull', order: { kind: 'aim', at: 'hull' } },
+  { words: 'aim at the rigging', order: { kind: 'aim', at: 'rigging' } },
+  { words: 'aim at the deck', order: { kind: 'aim', at: 'deck' } },
+  { words: 'fire as they bear', order: { kind: 'bear' } },
+  { words: 'hold for my word', order: { kind: 'hold' } },
+  { words: 'fire', order: { kind: 'fire' } },
+  { words: 'cease firing', order: { kind: 'cease' } },
+  { words: 'cease fire', order: { kind: 'cease' } },
 ];
 
 /** Words left out when an order is read ("come up a point, sir" is "come up"; "back the main" is "back main"). */
@@ -201,9 +254,12 @@ export type Act = HelmAct | SailAct | YardsAct;
 /** An order being carried out: as given (or as the master changed it), with the tick it was given in. */
 export interface Given {
   readonly id: number;
-  readonly order: Order;
+  readonly order: SailingOrder;
   readonly tick: number;
 }
+
+/** How her guns are told to fire (the gunner's rows): not at all ("cease firing"), each as she bears, or held for the captain's word. */
+export type FireMode = 'cease' | 'bear' | 'hold';
 
 /** What a ship has been told: plain data in `SimShip.told`, changed only here. Masts are listed fore, main (`MASTS`). */
 export interface ShipOrders {
@@ -220,11 +276,26 @@ export interface ShipOrders {
   readonly given: readonly Given[];
   /** The id the next order or act gets. */
   readonly serial: number;
+  /** At quarters: her guns cast loose, loaded and run out (only then may she fire). */
+  readonly quarters: boolean;
+  /** The shot of the next loading, where the gun captains lay on her, and how her guns fire. */
+  readonly shot: ShotKind;
+  readonly aim: AimName;
+  readonly firing: FireMode;
+  /** The captain's word given, her held side firing down its length until every gun that could has fired (guns/gunnery.ts says when, `wordSpent`). */
+  readonly word: boolean;
 }
+
+/** What her guns load and lay on until told otherwise: round shot at her hull. */
+const START_SHOT: ShotKind = 'round';
+const START_AIM: AimName = 'hull';
 
 /** A ship's orders at the start: steering her heading under the canvas she starts with, nothing aback, nothing to do. */
 export function startOrders(heading: number, canvas: CanvasName): ShipOrders {
-  return { helm: { heading: wrapBearing(heading), by: 0 }, canvas, hove: false, backed: MASTS.map(() => false), acts: [], given: [], serial: 0 };
+  return {
+    helm: { heading: wrapBearing(heading), by: 0 }, canvas, hove: false, backed: MASTS.map(() => false), acts: [], given: [], serial: 0,
+    quarters: false, shot: START_SHOT, aim: START_AIM, firing: 'cease', word: false,
+  };
 }
 
 /**
@@ -234,15 +305,19 @@ export function startOrders(heading: number, canvas: CanvasName): ShipOrders {
  */
 export type AnswerCode = 'will not lie' | 'wearing round';
 
+/** Why an order is refused, as a code for the phrase book (N4.5): the reason gives it in English for now. */
+export type RefusalCode =
+  | 'no such order' | 'no ship' | 'full and by already' | 'no way' | 'in stays' | 'hove to already' | 'canvas already'
+  | 'carries it already' | 'bare poles' | 'aback already' | 'drawing' | 'not at quarters' | 'at quarters already'
+  | 'loading it already' | 'laid there already' | 'firing so already' | 'not held' | 'word given' | 'not firing';
+
 /**
- * What giving an order comes to: what she has now been told, the answer in words ('' when simply taken) and, for an
- * order taken with words, its code. Refused, `told` comes back unchanged and `code` is null.
+ * What giving an order comes to: what she has now been told, the answer in words ('' when simply taken) and its code:
+ * taken (`code` null, or an `AnswerCode` when taken with words), or refused (`told` comes back unchanged).
  */
-export interface OrderAnswer {
-  readonly told: ShipOrders;
-  readonly reason: string;
-  readonly code: AnswerCode | null;
-}
+export type OrderAnswer =
+  | { readonly refused: false; readonly told: ShipOrders; readonly reason: string; readonly code: AnswerCode | null }
+  | { readonly refused: true; readonly told: ShipOrders; readonly reason: string; readonly code: RefusalCode };
 
 /** What an order is given against: the tick of the step, the mean wind there (its `from` is what the master judges by) and the match's force. */
 export interface OrderMoment {
@@ -281,14 +356,17 @@ type Changes = Partial<Pick<ShipOrders, 'helm' | 'canvas' | 'hove' | 'backed'>>;
 type NewAct = Omit<HelmAct, 'id' | 'of'> | Omit<SailAct, 'id' | 'of'> | Omit<YardsAct, 'id' | 'of'>;
 
 /** What the master says as he takes an order: nothing, or a code and its words. */
-type Said = Pick<OrderAnswer, 'reason' | 'code'>;
+interface Said {
+  readonly reason: string;
+  readonly code: AnswerCode | null;
+}
 const NOTHING_SAID: Said = { reason: '', code: null };
 
 /**
  * An order taken: the changes to what she is told, its acts (replacing the pending acts for the same work, and every
  * pending sail act when `resail`), and the orders left with nothing to do dropped (replaced).
  */
-function tell(told: ShipOrders, order: Order, tick: number, changes: Changes, acts: readonly NewAct[], resail: boolean, said: Said = NOTHING_SAID): OrderAnswer {
+function tell(told: ShipOrders, order: SailingOrder, tick: number, changes: Changes, acts: readonly NewAct[], resail: boolean, said: Said = NOTHING_SAID): OrderAnswer {
   const id = told.serial;
   const added = acts.map((a, k) => ({ ...a, id: id + 1 + k, of: id }) as Act);
   const kept = told.acts.filter((p) => !(resail && p.kind === 'sail') && !added.some((a) => sameWork(a, p)));
@@ -296,17 +374,17 @@ function tell(told: ShipOrders, order: Order, tick: number, changes: Changes, ac
   const given = told.given.filter((g) => all.some((a) => a.of === g.id));
   // An order that leaves nothing to do (it only stops work under way) is carried out at once.
   const now = added.length > 0 ? [...given, { id, order, tick }] : given;
-  return { told: { ...told, ...changes, acts: all, given: now, serial: id + 1 + acts.length }, ...said };
+  return { refused: false, told: { ...told, ...changes, acts: all, given: now, serial: id + 1 + acts.length }, ...said };
 }
 
-const refuse = (told: ShipOrders, reason: string): OrderAnswer => ({ told, reason, code: null });
+const refuse = (told: ShipOrders, code: RefusalCode, reason: string): OrderAnswer => ({ refused: true, told, reason, code });
 
 /**
  * The helm told to steer `heading` (compass bearing, rad): the short way on the tack she is on, by wearing onto the
  * other, and then the master answers "wearing round" (taken, with words). Closer than close-hauled, the master answers
  * that she will not lie it and steers full and by on the nearer tack instead (design decisions for N3).
  */
-function steer(told: ShipOrders, s: Sailing, order: Order, heading: number, now: OrderMoment): OrderAnswer {
+function steer(told: ShipOrders, s: Sailing, order: SailingOrder, heading: number, now: OrderMoment): OrderAnswer {
   const from = now.wind.from, tack = tackOf(s.heading, from, s.sides[0]!), to = tackOf(heading, from, tack);
   const turn = to === tack ? 0 : -tack;
   if (Math.abs(angleDiff(heading, from)) < CLOSE_HAULED - BY_FOLLOW) {
@@ -341,10 +419,10 @@ function sailActs(now: readonly SailSetting[], target: readonly SailSetting[]): 
 const SHORTER: Readonly<Record<CanvasName, CanvasName | null>> = { all: 'plain', plain: 'battle', battle: 'bare', bare: null };
 
 /** A canvas ordered: sail by sail from how her sails stand now, refused when nothing would change. */
-function makeSail(told: ShipOrders, s: Sailing, order: Order, canvas: CanvasName, now: OrderMoment): OrderAnswer {
+function makeSail(told: ShipOrders, s: Sailing, order: SailingOrder, canvas: CanvasName, now: OrderMoment): OrderAnswer {
   const acts = sailActs(s.canvas, canvasTarget(canvas, now.force, told.hove));
   const pending = told.acts.some((a) => a.kind === 'sail');
-  if (acts.length === 0 && !pending) return refuse(told, `in this wind ${canvas === 'bare' ? 'bare poles are' : `${canvas} sail is`} what she carries already`);
+  if (acts.length === 0 && !pending) return refuse(told, 'carries it already', `in this wind ${canvas === 'bare' ? 'bare poles are' : `${canvas} sail is`} what she carries already`);
   return tell(told, order, now.tick, { canvas }, acts, true);
 }
 
@@ -361,7 +439,10 @@ export function malformed(order: Order): string {
     case 'steer': return Number.isFinite(order.heading) ? '' : 'the course is not a number';
     case 'sail': return Object.hasOwn(SHORTER, order.canvas) && (order.canvas as CanvasName) !== 'bare' ? '' : `there is no "${order.canvas} sail" (battle, plain, all)`;
     case 'back': return MASTS.includes(order.mast) ? '' : `there is no mast "${order.mast}" (${MASTS.join(', ')})`;
+    case 'shot': return Object.hasOwn(SHOT, order.shot) ? '' : `there is no "${order.shot} shot" (round, chain, grape)`;
+    case 'aim': return Object.hasOwn(AIM_HEIGHT, order.at) ? '' : `there is no aiming at her "${order.at}" (hull, rigging, deck)`;
     case 'up': case 'away': case 'by': case 'tack': case 'wear': case 'heave': case 'shorten': case 'fill': return '';
+    case 'quarters': case 'stand': case 'bear': case 'hold': case 'fire': case 'cease': return '';
     default: return `there is no order "${(order as { kind: string }).kind}"`;
   }
 }
@@ -373,31 +454,32 @@ export function malformed(order: Order): string {
  */
 export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: OrderMoment): OrderAnswer {
   const bad = malformed(order);
-  if (bad) return refuse(told, bad);
+  if (bad) return refuse(told, 'no such order', bad);
+  if (isGunnery(order)) return gunnery(told, order);
   const from = now.wind.from, tack = tackOf(s.heading, from, s.sides[0]!), base = toldHeading(told.helm, from);
   const baseTack = tackOf(base, from, tack);
   switch (order.kind) {
     case 'steer': return steer(told, s, order, order.heading, now);
     case 'up':
-      if (told.helm.by) return refuse(told, 'she is full and by: as close to the wind as she will lie');
+      if (told.helm.by) return refuse(told, 'full and by already', 'she is full and by: as close to the wind as she will lie');
       return steer(told, s, order, base + baseTack * POINT, now);
     case 'away': return steer(told, s, order, base - baseTack * POINT, now);
     case 'by':
-      if (told.helm.by === tack) return refuse(told, `she is full and by on the ${TACK_NAMES[tack]} tack already`);
+      if (told.helm.by === tack) return refuse(told, 'full and by already', `she is full and by on the ${TACK_NAMES[tack]} tack already`);
       return tell(told, order, now.tick, { helm: { heading: 0, by: tack } }, [{ kind: 'helm', heading: closeHauled(tack, from), turn: 0 }], false);
     case 'tack': {
-      if (s.ahead < NO_WAY) return refuse(told, 'she has no way on her');
-      if (inStays(told, s, from)) return refuse(told, 'she is in stays: not until she is round');
+      if (s.ahead < NO_WAY) return refuse(told, 'no way', 'she has no way on her');
+      if (inStays(told, s, from)) return refuse(told, 'in stays', 'she is in stays: not until she is round');
       return tell(told, order, now.tick, { helm: { heading: 0, by: -tack } }, [{ kind: 'helm', heading: closeHauled(-tack, from), turn: tack }], false);
     }
     case 'wear': {
-      if (s.ahead < NO_WAY) return refuse(told, 'she has no way on her');
+      if (s.ahead < NO_WAY) return refuse(told, 'no way', 'she has no way on her');
       const mirror = wrapBearing(2 * from - base), close = Math.abs(angleDiff(mirror, from)) < CLOSE_HAULED || told.helm.by !== 0;
       const helm = close ? { heading: 0, by: -tack } : { heading: mirror, by: 0 };
       return tell(told, order, now.tick, { helm }, [{ kind: 'helm', heading: toldHeading(helm, from), turn: -tack }], false);
     }
     case 'heave': {
-      if (told.hove) return refuse(told, 'she is hove to already');
+      if (told.hove) return refuse(told, 'hove to already', 'she is hove to already');
       const mast = MASTS.indexOf(HOVE_TO_MAST), heading = closeHauled(tack, from);
       const acts: NewAct[] = [
         { kind: 'helm', heading, turn: 0 },
@@ -407,19 +489,19 @@ export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: Order
       ];
       return tell(told, order, now.tick, { helm: { heading: 0, by: tack }, hove: true, backed: told.backed.map((b, m) => b || m === mast) }, acts, true);
     }
-    case 'sail': return told.canvas === order.canvas ? refuse(told, `she is under ${order.canvas} sail already`) : makeSail(told, s, order, order.canvas, now);
+    case 'sail': return told.canvas === order.canvas ? refuse(told, 'canvas already', `she is under ${order.canvas} sail already`) : makeSail(told, s, order, order.canvas, now);
     case 'shorten': {
       const next = SHORTER[told.canvas];
-      return next ? makeSail(told, s, order, next, now) : refuse(told, 'she is under bare poles');
+      return next ? makeSail(told, s, order, next, now) : refuse(told, 'bare poles', 'she is under bare poles');
     }
     case 'back': {
       const mast = MASTS.indexOf(order.mast);
-      if (told.backed[mast]) return refuse(told, `the ${order.mast} topsail is aback already`);
+      if (told.backed[mast]) return refuse(told, 'aback already', `the ${order.mast} topsail is aback already`);
       return tell(told, order, now.tick, { backed: told.backed.map((b, m) => b || m === mast) }, [{ kind: 'yards', mast, aback: true }], false);
     }
     case 'fill': {
       const aback = MASTS.map((_, m) => told.backed[m]! || s.backed[m]!);
-      if (!told.hove && !aback.some(Boolean)) return refuse(told, 'every sail is drawing');
+      if (!told.hove && !aback.some(Boolean)) return refuse(told, 'drawing', 'every sail is drawing');
       const acts: NewAct[] = aback.flatMap((b, mast) => (b ? [{ kind: 'yards' as const, mast, aback: false }] : []));
       if (!told.hove) return tell(told, order, now.tick, { backed: told.backed.map(() => false) }, acts, false);
       // Hove to: her canvas made again as ordered, and full and by on the tack she lies on.
@@ -430,11 +512,46 @@ export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: Order
   }
 }
 
+/** The firing orders need her at quarters (orders.md: "a ship not at quarters cannot fire"). */
+const NOT_AT_QUARTERS = 'she is not at quarters';
+/** How each way of firing is said when it stands already. */
+const FIRING_SO: Readonly<Record<FireMode, string>> = { cease: 'the guns are not firing', bear: 'the guns are firing as they bear already', hold: 'the guns are held for your word already' };
+
+/**
+ * A gunnery order (N5.3a): taken at once, as what her guns are told (guns/gunnery.ts has the crews carry it out), or
+ * refused. They take none of the sailing drill's hands.
+ */
+function gunnery(told: ShipOrders, order: GunneryOrder): OrderAnswer {
+  const take = (changes: Partial<Pick<ShipOrders, 'quarters' | 'shot' | 'aim' | 'firing' | 'word'>>): OrderAnswer => ({ refused: false, told: { ...told, ...changes }, ...NOTHING_SAID });
+  switch (order.kind) {
+    case 'quarters': return told.quarters ? refuse(told, 'at quarters already', 'she is at quarters already') : take({ quarters: true });
+    case 'stand': return told.quarters ? take({ quarters: false, firing: 'cease', word: false }) : refuse(told, 'not at quarters', NOT_AT_QUARTERS);
+    case 'shot': return told.shot === order.shot ? refuse(told, 'loading it already', `the guns load ${order.shot} shot already`) : take({ shot: order.shot });
+    case 'aim': return told.aim === order.at ? refuse(told, 'laid there already', `the guns are laid on her ${order.at} already`) : take({ aim: order.at });
+    case 'fire':
+      if (!told.quarters) return refuse(told, 'not at quarters', NOT_AT_QUARTERS);
+      if (told.firing !== 'hold') return refuse(told, 'not held', 'the guns are not held for your word');
+      return told.word ? refuse(told, 'word given', 'the broadside is firing') : take({ word: true });
+    default: {
+      // Fire as they bear, hold for my word, cease firing.
+      const mode: FireMode = order.kind;
+      if (!told.quarters) return refuse(told, 'not at quarters', NOT_AT_QUARTERS);
+      if (told.firing === mode) return refuse(told, mode === 'cease' ? 'not firing' : 'firing so already', FIRING_SO[mode]);
+      return take({ firing: mode, word: false });
+    }
+  }
+}
+
+/** What she is told once the captain's word has been carried out: every gun that could fire on it has fired (guns/gunnery.ts). */
+export function wordSpent(told: ShipOrders): ShipOrders {
+  return told.word ? { ...told, word: false } : told;
+}
+
 /** One step of carrying out: what she is still told, how she sails after the acts done now, and the orders now done. */
 export interface CarriedOut {
   readonly told: ShipOrders;
   readonly sailing: Sailing;
-  readonly done: readonly Order[];
+  readonly done: readonly SailingOrder[];
 }
 
 /** One act done to her sailing (the sailing model's own calls). */
@@ -455,7 +572,7 @@ export function carryOut(told: ShipOrders, s: Sailing, finished: readonly number
   let sailing = s;
   const due = told.acts.filter((a) => finished.includes(a.id));
   let next = told;
-  const done: Order[] = [];
+  const done: SailingOrder[] = [];
   if (due.length > 0) {
     for (const a of due) sailing = act(sailing, a);
     const acts = told.acts.filter((a) => !finished.includes(a.id));

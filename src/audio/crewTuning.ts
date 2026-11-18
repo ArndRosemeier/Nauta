@@ -7,7 +7,7 @@
  * Levels are amplitudes (0..1) like tuning.ts's: every call and step peaks at −3 dBFS and every bed is levelled to
  * −24 dBFS RMS when made, so the gains here set the mix. All first proposals, judged by ear on the iPad.
  */
-import type { OrderKind } from '../sim/orders';
+import type { SailingKind } from '../sim/orders';
 import type { JobName } from '../sim/rules/crew';
 import type { SailingEvent } from '../sim/ship/sailing';
 import type { SlapKind } from './tuning';
@@ -32,7 +32,7 @@ const call = (name: string, seconds: number, gain = PIPE_GAIN): PipeCall => ({ i
  * as they are one row of the orders table and none needs hands. Tack and wear are all-hands calls (the general call
  * first), sail settings rise (Hoist), shortening falls (Lower), backing a topsail is Haul at the braces, filling Heave Round.
  */
-export const ORDER_CALLS: Readonly<Record<OrderKind, PipeCall>> = {
+export const ORDER_CALLS: Readonly<Record<SailingKind, PipeCall>> = {
   steer: call('helm', 0.94, PIPE_GAIN / 2),
   up: call('helm', 0.94, PIPE_GAIN / 2),
   away: call('helm', 0.94, PIPE_GAIN / 2),
@@ -60,7 +60,7 @@ export const SAILED_CALLS: Readonly<Record<SailingEvent, readonly PipeCall[]>> =
  * The orders whose end is piped (Carry On): those that took the hands. A course is the helmsman's alone; a tack or a
  * wear is done when the helm is over, but she is not round until she has tacked or worn, and that is piped then.
  */
-export const PIPED_DONE: ReadonlySet<OrderKind> = new Set<OrderKind>(['heave', 'sail', 'shorten', 'back', 'fill']);
+export const PIPED_DONE: ReadonlySet<SailingKind> = new Set<SailingKind>(['heave', 'sail', 'shorten', 'back', 'fill']);
 
 /** One call after another, never over each other: this much silence between, s. */
 export const CALL_GAP = 0.35;
