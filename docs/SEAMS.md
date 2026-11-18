@@ -204,6 +204,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A ship's damage drawn as the match has it, her outside and sails holed once cut (N6.5) | `src/render/ship/shipView.ts#ShipView` |
 | The daylight seen through a shot hole from inside her | `src/render/ship/shipMaterials.ts#lightThrough` |
 | A stand-in for a fight's damage to look at (`?scars=3`) | `src/app/scars.ts#scarsOf` |
+| A stand-in for the other ship going down off her beam, to look at (`?sail&down`) | `src/app/scars.ts#goingDown` |
+| The water in her drawn: one surface level with the world out to the inside of her sides (N6.5) | `src/render/ship/waterInside.ts#WaterInside`, `waterSurface` |
+| What floats after a ship goes down: whether she has, and her loose wood coming up and drifting (N6.5) | `src/render/flotsam.ts#FlotsamView`, `goneDown` |
 | Her masts and rigging from the rig plan: spars, deadeyes, channels, every line, pins and coils (N3.6) | `src/render/ship/rig.ts#buildRigs` |
 | Her spars turned from the spar table: masts, tops, trestle and cross trees, caps, yards, bowsprit, jib-boom, boom, gaff | `src/render/ship/masts.ts#drawSpars` |
 | Every line of the rig plan drawn by its sag, with its blocks, ratlines, futtock staves, footropes and stirrups | `src/render/ship/rigging.ts#buildRigging` |

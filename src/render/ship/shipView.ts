@@ -31,6 +31,7 @@ import {
 } from '../materials';
 import type { Damage } from '../../sim/damage';
 import { standingOf } from '../../sim/damage/fall';
+import { lyingOf } from '../../sim/damage/flood';
 import { DamageView } from './damageView';
 import type { QualityKnobs } from '../../app/quality';
 import { SailsView } from './sailsView';
@@ -39,6 +40,7 @@ import { SEA_CUT } from '../seaCut';
 import { MOST_LAMPS, MOST_SKIES, SHIP_INPUTS, setShipFrame } from './shipMaterials';
 import { rigPlan } from '../../sim/ship/rig';
 import { sparFramesOf, swingMatrix, swingsOf, type Swing } from './swings';
+import { WaterInside } from './waterInside';
 import { cutAtSide, driftedOff, fallShape, keptIndex, takeFallen, wreckMatrix, type FallShape } from './wreck';
 import { RUDDER_ID, rudderMatrix } from './stern';
 import type { Kind } from '@futuremagic/stage';
@@ -81,6 +83,8 @@ const FADE_FROM = 130;
 const FADE_SPAN = 0.3;
 /** Beyond this distance from her middle no room inside her is drawn, m (no opening of hers shows anything at that range). */
 const INSIDE_REACH = 60;
+/** The room the water in her lies in is found this far over its surface, m. */
+const WATER_ROOM = 0.1;
 /** A door counts as open, and its doorway as a portal, from this angle on, rad. */
 const DOOR_OPEN = 0.05;
 /**
@@ -191,6 +195,10 @@ export class ShipView {
   private holed = { hull: false, sails: false };
   /** Her spars gone over the side, by the part each broke at; what each spar is carried by (the first fall that took it); her outside meshes' packed vertices and the triangles taken out of them. */
   private readonly wrecks = new Map<number, Wreck>();
+  /** The water in her (plan N6.5), and the zone the eye was last in (its lanterns light the water seen from there). */
+  private readonly flood = new WaterInside();
+  private eyeZone: string | null = null;
+  private readonly up = new Vector3();
   private damageSeen = false;
   private readonly carried = new Map<string, { matrix: Matrix4; ropes: Matrix4; off: boolean }>();
   private readonly packedOf = new Map<Mesh, Packed>();
@@ -307,6 +315,7 @@ export class ShipView {
     const rng = new Rng(FLICKER_SEED);
     this.phases = [rng.float() * TURN, rng.float() * TURN];
     if (own) SEA_CUT.on.value = 1;
+    this.group.add(this.flood.mesh);
     this.group.traverse((o) => { o.userData.ship = index; });
   }
 
@@ -440,6 +449,7 @@ export class ShipView {
    */
   showDamage(d: Damage | null): void {
     if (d) this.showFalls(d);
+    this.showWater(d);
     const shown = this.marks.marksFor(d, this.sailsGone(d));
     const toKind = (parts: readonly Part[], from: Kind, to: Kind) => {
       for (const p of parts) if (p.plain === from.make()) p.plain = to.make();
@@ -447,6 +457,18 @@ export class ShipView {
     if (shown.hullCut && !this.holed.hull) { this.holed.hull = true; toKind(this.outside, SHIP_WOOD, SHIP_WOOD_HOLED); }
     if (shown.sailsCut && !this.holed.sails) { this.holed.sails = true; toKind(this.outside, SHIP_SAILS, SHIP_SAILS_HOLED); }
   }
+  /**
+   * The water in her (plan N6.5): level with the world as she heels, lit by the lanterns of the room the eye is in
+   * below, or of the room where it lies.
+   */
+  private showWater(d: Damage | null): void {
+    const tonnes = d ? d.flooded[0] + d.flooded[1] : 0;
+    this.flood.show(tonnes, this.up.set(0, 1, 0).transformDirection(this.inverse));
+    if (!this.flood.mesh.visible) return;
+    const lie = lyingOf(tonnes), below = this.eyeZone !== null && this.eyeZone !== OUTSIDE ? this.eyeZone : zoneAt(this.plan, this.spaceZones, lie.along, 0, lie.level + WATER_ROOM);
+    this.flood.mesh.userData.light = below !== null ? this.ranges.get(below) : undefined;
+  }
+
 
   /** Her sails that went over the side with a spar, once every wreck has come to lie (they are drawn on their yards as they fall). */
   private sailsGone(d: Damage | null): readonly boolean[] {
@@ -638,6 +660,7 @@ export class ShipView {
     const eyeShip = camera.position.clone().applyMatrix4(this.inverse);
     const zone = zoneAt(this.plan, this.spaceZones, -eyeShip.z, eyeShip.x, eyeShip.y + LOAD_WATERLINE);
     this.below = zone !== null && zone !== OUTSIDE ? 1 : 0;
+    this.eyeZone = zone;
     const distance = camera.position.distanceTo(g.position) / this.zoom;
     this.toClip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(g.matrixWorld);
     const seen = distance > INSIDE_REACH ? new Set([OUTSIDE]) : this.visibility.seen(zone, this.toClip, (id) => (this.doors.get(id)?.angle ?? 0) > DOOR_OPEN, eyeShip);

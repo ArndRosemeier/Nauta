@@ -1,0 +1,3 @@
+Water coming in now shows below: it rises in her hold and stays level as she rolls.
+A ship that founders is seen settling by the head and going under, and her planks, casks and gratings come up and drift where she sank.
+To see it, open ?sail&down: the other brig goes down off your starboard beam. ?sail&scars=3 shows water in your own hold.

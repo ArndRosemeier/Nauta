@@ -5,9 +5,11 @@
  * cut and smashed out, sails holed and one split), her waist (the bulwarks cut from inside, holes in her deck) and her
  * berth deck (daylight through her side and the deck over it). Then her sails, holed and one split, under all sail
  * from 50 m off (`?sail`, run on as the sails check does), and on that page her fire (the stand-in's, below in her
- * messdeck): from 50 m off, her waist and her berth deck. Each picture is `<out dir>/<standpoint>.png`,
- * `<out dir>/sails.png` and `<out dir>/fire-<standpoint>.png`. It fails if a page throws or does not report ready; what the pictures show is judged by eye.
- * About 4 minutes in the cloud.
+ * messdeck): from 50 m off, her waist and her berth deck, and the water in her hold. Last the other brig going down
+ * off her beam (`?sail&down`) and what floats after, from her quarterdeck. Each picture is
+ * `<out dir>/<standpoint>.png`, `<out dir>/sails.png`, `<out dir>/fire-<standpoint>.png` and
+ * `<out dir>/going-down-<s>s.png`. It fails if a page throws or does not report ready; what the pictures show is judged
+ * by eye. About 6 minutes in the cloud.
  */
 import { mkdirSync } from 'node:fs';
 import { frames, openBrowser, openGame, shotSize, snap } from './browser.mjs';
@@ -30,7 +32,9 @@ for (const name of VIEWS) {
 }
 await game.context.close();
 /** Where her fire is looked at from. */
-const FIRE_VIEWS = ['50 m off', 'Waist', 'Berth deck'];
+const FIRE_VIEWS = ['50 m off', 'Waist', 'Berth deck', 'Hold'];
+/** The other ship going down off her beam (`?down`), looked at from her quarterdeck these many seconds after she began. */
+const GOING_DOWN = [5, 25, 45, 90];
 /** Seconds run on to draw each of them. */
 const LOOK_ON = 0.5;
 /** Seconds her crew takes to set all sail, as the sails check waits (sails.mjs `SETTLE.canvas`). */
@@ -50,6 +54,17 @@ for (const name of FIRE_VIEWS) {
   await snap(sailing.page, path);
   console.log(path);
 }
-const failed = game.failed() || sailing.failed();
+// The other brig going down off her beam (the stand-in, `?down`), and what floats after.
+const down = await openGame(served, '?sail&down&hud&quality=high&wind=4', { width, height });
+let ran = 0;
+for (const at of GOING_DOWN) {
+  await down.page.evaluate((s) => window.__nautaSail.onward(s, false), at - ran);
+  ran = at;
+  await down.page.evaluate((q) => window.__nautaScene(q), 'ship=quarterdeck&yaw=-90&pitch=-3');
+  const path = `${out}/going-down-${at}s.png`;
+  await snap(down.page, path);
+  console.log(path);
+}
+const failed = game.failed() || sailing.failed() || down.failed();
 await served.close();
 process.exit(failed ? 1 : 0);
