@@ -377,7 +377,7 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
   const idle = told.acts.filter((a) => !c.tasks.some((t) => t.act === a.id)).map((a) => a.id);
   // Nothing to do and every man at home (unless she is at quarters: then the gun crews stand to their posts).
   const paceDue = deck.quarters === undefined && roster.some((m, i) => m.paces && !c.men[i]!.going && !sameSpot(standing(c.men[i]!, m), placeSpot(pacePlace(m.paces, i, deck.tick))));
-  if (c.tasks.length === 0 && deck.quarters === undefined && !paceDue && c.men.every((h) => h.going === null && h.stands === null)) return { crew: c, done: idle, events: [], sails: [], mended: [] };
+  if (c.tasks.length === 0 && deck.quarters === undefined && !paceDue && c.men.every((h, i) => h.going === null && (h.stands === null || roster[i]!.paces !== null))) return { crew: c, done: idle, events: [], sails: [], mended: [] };
   const events: CrewEvent[] = [];
   let tasks = manTasks(c.tasks, c.men, roster, deck.tick, out);
   const byMan = new Map(tasks.flatMap((t) => t.hands.map((i) => [i, t] as const)));
