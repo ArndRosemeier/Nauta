@@ -22,14 +22,14 @@
  * as it shifts. When she misses stays the master bears away on the old tack (`heard`), and that is then her course.
  */
 import { angleDiff } from '@futuremagic/core';
-import { BY_FOLLOW, HOVE_TO_CHECK, HOVE_TO_IN, HOVE_TO_MAST, NO_WAY, POINT } from './rules/orders';
+import { BEAR_AWAY, BY_FOLLOW, HOVE_TO_CHECK, HOVE_TO_IN, HOVE_TO_MAST, NO_WAY, POINT } from './rules/orders';
 import { AIM_HEIGHT, SHOT, type AimName, type ShotKind } from './rules/guns';
 import type { MastName } from './rules/rig';
 import type { OrderTaker } from './rules/crew';
 import { ASK_AGAIN } from './rules/end';
 import { CLOSE_HAULED, type CanvasName } from './rules/sailing';
 import { rigPlan } from './ship/rig';
-import { canvasFor, layAback, MASTS, setSail, steerTo, type Sailing, type SailingEvent } from './ship/sailing';
+import { canvasFor, layAback, MASTS, sailAback, setSail, steerTo, type Sailing, type SailingEvent } from './ship/sailing';
 import { sailShare, type SailSetting } from './ship/sails';
 import { STEPS_PER_SECOND, wrapBearing } from './units';
 import type { Wind } from './wind';
@@ -692,6 +692,8 @@ export interface CarriedOut {
   readonly told: ShipOrders;
   readonly sailing: Sailing;
   readonly done: readonly SailingOrder[];
+  /** The helmsman bore away this step because a sail was aback (`bearAway`): the master says so. */
+  readonly bore: boolean;
 }
 
 /** One act done to her sailing (the sailing model's own calls). */
@@ -725,7 +727,28 @@ export function carryOut(told: ShipOrders, s: Sailing, finished: readonly number
     const heading = closeHauled(next.helm.by, wind.from);
     if (Math.abs(angleDiff(sailing.steer.heading, heading)) > BY_FOLLOW) sailing = steerTo(sailing, heading, sailing.steer.turn);
   }
-  return { told: next, sailing, done };
+  const away = bearAway(next, sailing, wind);
+  if (away !== null) {
+    sailing = steerTo(sailing, away, 0);
+    next = { ...next, helm: { heading: away, by: 0 } };
+  }
+  return { told: next, sailing, done, bore: away !== null };
+}
+
+/**
+ * Under a steer order (a compass course) and settled on it, with a sail aback that no order of hers laid so: the
+ * heading a little further off the wind that fills every sail, at most `BEAR_AWAY.most` further (the helmsman takes a
+ * point at a time, then holds it); null if none is aback or the helm is not his to take (full and by, a tack or a
+ * wear, heaving to, the yards swung or the helm put over by the crew, still turning to the course, no order given yet). Never through the wind.
+ */
+function bearAway(told: ShipOrders, s: Sailing, wind: Wind): number | null {
+  if (told.serial === 0 || told.helm.by || told.hove || goingAbout(told) || s.backed.some(Boolean)) return null;
+  if (Math.abs(angleDiff(s.heading, s.steer.heading)) > BEAR_AWAY.settled || Math.abs(s.turnRate) > BEAR_AWAY.still) return null;
+  if (told.acts.some((a) => a.kind === 'helm' || a.kind === 'yards') || !sailAback(s, wind)) return null;
+  const off = -(Math.sign(angleDiff(s.heading, wind.from)) || 1);
+  let by = BEAR_AWAY.step;
+  while (by < BEAR_AWAY.most && sailAback({ ...s, heading: wrapBearing(s.heading + off * by) }, wind)) by += BEAR_AWAY.step;
+  return wrapBearing(s.heading + off * Math.min(by + BEAR_AWAY.margin, BEAR_AWAY.most));
 }
 
 /**

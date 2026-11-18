@@ -140,6 +140,8 @@ export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
     case 'tacked': case 'wore': case 'missed stays':
       if (mine) return [e.kind === 'missed stays' ? cry('master', ship, e.kind) : report('master', ship, e.kind)];
       return hers ? [report('lookout', ship, `her ${e.kind}`)] : [];
+    // The helmsman bore away a point: the master says it once (his own ship only; the lookout does not see a helm).
+    case 'bore away': return mine ? [report('master', ship, e.kind)] : [];
     case 'done':
       if (!hers) return [];
       if (e.order.kind === 'sail') return [report('lookout', ship, 'her makes sail')];

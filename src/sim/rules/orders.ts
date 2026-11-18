@@ -24,6 +24,15 @@ export const NO_WAY = 0.5 * KNOT;
 export const BY_FOLLOW = 1 * DEGREE;
 
 /**
+ * Under a steer order (a compass course) the helmsman bears away by himself when a shift of the wind heads her and a
+ * sail goes aback (design thread 2026-11-18): by the least number of `step` rad that fills every sail, and `margin`
+ * more so that her gathering way does not bring them aback again, up to `most` (a point); then that is his course (he does not come back up unasked), and the master says so once. Never
+ * through the wind, and not while she is still turning to the ordered heading (within `settled` of it and turning slower than `still`, rad/s).
+ * Only once the captain has given an order: a match as it starts (and the speed table's, tools/sim/sailing.ts) holds her heading.
+ */
+export const BEAR_AWAY = { step: 1 * DEGREE, most: POINT, margin: 2 * DEGREE, settled: 2 * DEGREE, still: 2 * DEGREE } as const;
+
+/**
  * Heaving to (design decision for N3: "heave to" is one order and she stops within about a minute). The sails taken
  * in, by rules/rig.ts id: the courses hauled up, the boom sail brailed and the headsails and staysails hauled down, so
  * nothing drives her on but the topsails. The helm is put down (full and by), and both topsails are laid aback: her way comes off as fast as the canvas can take it (the main yards alone would leave

@@ -61,8 +61,8 @@ export const CARRY_ON = call('carry-on', 0.75, PIPE_GAIN * 0.6);
 /** The watches change (the sandbox's day): Relieve the watch, piped by the boatswain as the bell strikes. */
 export const WATCH_CALL = call('watch', 1.65);
 
-/** What each sailing event of hers is piped with, in turn: come round, the yards are swung and the men carry on; missed stays, all stop. */
-export const SAILED_CALLS: Readonly<Record<SailingEvent, readonly PipeCall[]>> = { tacked: [HAUL_CALL, CARRY_ON], wore: [HAUL_CALL, CARRY_ON], 'missed stays': [STILL_CALL] };
+/** What each sailing event of hers is piped with, in turn: come round, the yards are swung and the men carry on; missed stays, all stop; bearing away is the helmsman's alone, no call. */
+export const SAILED_CALLS: Readonly<Record<SailingEvent, readonly PipeCall[]>> = { tacked: [HAUL_CALL, CARRY_ON], wore: [HAUL_CALL, CARRY_ON], 'missed stays': [STILL_CALL], 'bore away': [] };
 
 /**
  * The orders whose end is piped (Carry On): those that took the hands. A course is the helmsman's alone; a tack or a
