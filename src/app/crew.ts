@@ -13,7 +13,7 @@ import { Rng, deriveSeed } from '@futuremagic/core';
 import { berthDeck, floorAt, insideBreadth, shipPlan, spacesById, type CrewPlace, type ShipPlan, type Space } from '../sim/ship/plan';
 import { shipY, shipZ } from '../sim/ship/section';
 import { sheer } from '../sim/ship/hull';
-import type { Navy, Rank } from './crewLooks';
+import { navyOf, type Navy, type Rank } from './crewLooks';
 
 /** Men in a crew in the trial (implementation plan N4.0: two crews of 120, a brig's company). */
 export const CREW_SIZE = 120;
@@ -96,7 +96,7 @@ export function musterCrews(twinAboard: boolean, plan: ShipPlan = shipPlan()): M
   const used = new Set<string>(), usedBerth = new Set<number>(), berth = berthPlaces(plan), men: Man[] = [];
   for (const crew of [0, 1] as const) {
     const r = new Rng(deriveSeed(CREW_SEED, 'crew', crew));
-    const navy: Navy = crew === 0 ? 'british' : 'french';
+    const navy: Navy = navyOf(crew);
     // The other crew on its own deck takes the same places as hers; aboard hers, the free ones.
     if (crew === 1 && !twinAboard) { used.clear(); usedBerth.clear(); }
     const free = (kind: CrewPlace['kind'], ok: (p: CrewPlace) => boolean = () => true) => plan.places.filter((p) => p.kind === kind && p.space === 'deck' && !used.has(p.id) && ok(p));

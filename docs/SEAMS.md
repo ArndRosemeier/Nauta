@@ -635,3 +635,17 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The walking keys from one key a direction (arrows always walk) | `src/app/thumbs.ts#walkKeys` |
 | The interface's look: colours, type, the sheet, buttons, choices, sliders (every panel's CSS) | `src/ui/nauta.css` |
 | Who speaks in a bubble, where his head is and his mouth moving (the drawing puts its men there; N4.5) | `src/app/speech/speakers.ts#Speakers` |
+| The compass bearing of one point from another on the water | `src/sim/units.ts#bearingTo` |
+| The water in her, t (both sides of her hold) | `src/sim/end.ts#waterIn` |
+| What her officers notice between two states (a sail sighted, her ports, a side ready, guns bearing, the water past a mark, the wind) | `src/sim/notices.ts#noticed` |
+| The phrase book: what the men say, by line, in English and German, with variants and a French crew's turns of phrase | `src/app/speech/phrases.ts#PHRASES` |
+| A line of the phrase book in words, its terms filled | `src/app/speech/phrases.ts#phraseWords` |
+| The reports table: who says what for an event, a notice or the midshipman sent | `src/app/speech/reports.ts#saysOf` |
+| Who takes an order (for his answer) | `src/app/speech/reports.ts#takerOf` |
+| Which bubbles are on the view and for how long (four at most, cries first, nothing late) | `src/app/speech/bubbles.ts#BubbleQueue` |
+| How long a bubble takes to read | `src/app/speech/bubbles.ts#readSeconds` |
+| The bubbles drawn over the men, or at the screen's edge | `src/app/bubbleLayer.ts#BubbleLayer` |
+| The match's events and notices to the bubbles, on the page | `src/app/speaking.ts#Speech` |
+| An Actors man as a speaker: his head for the bubble, his mouth with the words, his look to the captain | `src/render/speech/characterSpeaker.ts#characterSpeaker` |
+| Faceless stand-ins at the stations for the men not yet drawn | `src/render/speech/standIns.ts#standIns` |
+| A ship's navy in the duel | `src/app/crewLooks.ts#navyOf` |

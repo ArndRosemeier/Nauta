@@ -36,6 +36,8 @@ export const packCatalog = (c: CharacterCatalog): CharacterCatalog => ({
 export type Rank = 'officer' | 'marine' | 'seaman';
 /** The two navies of a duel: the player's and the enemy's. */
 export type Navy = 'british' | 'french';
+/** A ship's navy in the duel: the first ship British, the other French. */
+export const navyOf = (ship: number): Navy => (ship === 0 ? 'british' : 'french');
 
 /** Colours of the dress (sRGB hex) by navy: the coat or shirt of each rank, the trousers, and the seamen's slops. */
 const COLOURS: Readonly<Record<Navy, { officer: string; marine: string; whites: string; slops: readonly string[]; shirts: readonly string[] }>> = {

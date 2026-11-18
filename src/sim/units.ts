@@ -19,6 +19,11 @@ export function apartOnWater(a: { readonly x: number; readonly z: number }, b: {
   return Math.hypot(a.x - b.x, a.z - b.z);
 }
 
+/** The compass bearing of `b` seen from `a` on the water, rad (-pi..pi: wrap it for 0..2pi). */
+export function bearingTo(a: { readonly x: number; readonly z: number }, b: { readonly x: number; readonly z: number }): number {
+  return Math.atan2(b.x - a.x, -(b.z - a.z));
+}
+
 /** A bearing brought into 0..2pi, so it never grows without end. */
 export function wrapBearing(bearing: number): number {
   const full = 2 * Math.PI;

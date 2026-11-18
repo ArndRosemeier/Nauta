@@ -57,7 +57,7 @@ export function startFight(ships: number, minutes: number = MATCH_MINUTES): Figh
 }
 
 /** The water in her, t. */
-const water = (d: Damage): number => d.flooded[0] + d.flooded[1];
+export const waterIn = (d: Damage): number => d.flooded[0] + d.flooded[1];
 
 /** The spaces below her weather deck (plan places) and the room by the magazine. */
 let below: { readonly spaces: ReadonlySet<number>; readonly room: number } | null = null;
@@ -79,7 +79,7 @@ export function burntOut(d: Damage): boolean {
 export function lostHow(ship: SimShip): LostHow | null {
   const d = ship.damage;
   if (d.blownUp) return 'blew up';
-  if (water(d) >= founderTonnes()) return 'sunk';
+  if (waterIn(d) >= founderTonnes()) return 'sunk';
   if (burntOut(d)) return 'burnt';
   return ship.told.struck ? 'struck' : null;
 }
@@ -102,7 +102,7 @@ function crewsAble(ship: SimShip): number {
 export function beaten(ship: SimShip, was: Damage): boolean {
   const d = ship.damage;
   if (outOf(d).size >= BEATEN.out * COMPLEMENT) return true;
-  if (water(d) > BEATEN.water * founderTonnes() && water(d) > water(was)) return true;
+  if (waterIn(d) > BEATEN.water * founderTonnes() && waterIn(d) > waterIn(was)) return true;
   const sails = standingNow(d).draws.every((x) => x === 0);
   return sails && crewsAble(ship) < BEATEN.crews;
 }

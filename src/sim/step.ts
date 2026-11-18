@@ -32,7 +32,7 @@ import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
-export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit | Aftermath | FightEvent;
+export type SimEvent = OrderRefused | OrderTaken | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit | Aftermath | FightEvent;
 
 /** An order the ship could not take: why, as a code (the phrase book, N4.5, words it) and in English for now. */
 export interface OrderRefused {
@@ -42,6 +42,14 @@ export interface OrderRefused {
   readonly order: Order;
   readonly code: RefusalCode;
   readonly reason: string;
+}
+
+/** An order taken as it was given, without words to say of it: the man addressed answers "Aye aye, sir" (the phrase book, N4.5). */
+export interface OrderTaken {
+  readonly kind: 'taken';
+  readonly tick: number;
+  readonly ship: number;
+  readonly order: Order;
 }
 
 /**
@@ -108,6 +116,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     const answer = giveOrder(ship.told, ship.sailing, order, { tick, wind, force: state.wind.windForce });
     if (answer.refused) events.push({ kind: 'refused', tick, order, code: answer.code, reason: answer.reason });
     else if (answer.code) events.push({ kind: 'answered', tick, ship: order.ship, order, code: answer.code, reason: answer.reason });
+    else events.push({ kind: 'taken', tick, ship: order.ship, order });
     if (answer.told !== ship.told) ships = ships.map((s, i) => (i === order.ship ? { ...s, told: answer.told } : s));
   }
   // The shots in flight, each ball's piece of this step traced through the ships as they lie now (damage.ts).
