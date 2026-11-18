@@ -563,6 +563,35 @@ export class DuelSession {
     this.emit('change');
   }
 
+  /** Everyone in the room, in the order they came (mine too): id and name; a match alone has me. */
+  get people(): readonly { readonly id: number; readonly name: string }[] {
+    if (!this.hub) return [{ id: SOLO_PLAYER, name: '' }];
+    const others = this.hub.players.filter((p) => p.id !== this.hub!.you);
+    return [...(this.hub.you !== null ? [{ id: this.hub.you, name: '' }] : []), ...others];
+  }
+
+  /** The seats of the room: each ship a person commands, her side (none: her own) and navy (none: a duel's) and who sits in her now. */
+  get seatList(): readonly { readonly ship: number; readonly side: number | null; readonly navy: Navy | null; readonly captain: number | null }[] {
+    return this.captains.flatMap((captain, ship) => (this.skills[ship] == null ? [{ ship, side: this.sides?.[ship] ?? null, navy: this.navyOf(ship), captain }] : []));
+  }
+
+  /**
+   * The host seats `player` in ship `ship` (a ship a person commands), or empties her (null). A player seated elsewhere
+   * leaves that seat to whoever sat in this one. Only while no one is ready for the round: the host's waiting room.
+   * Whether it was done.
+   */
+  assign(ship: number, player: number | null): boolean {
+    if (this.role !== 'host' || this.readyFor.length > 0 || !this.captains.some((_, k) => k === ship) || this.skills[ship] != null) return false;
+    if (player !== null && !this.people.some((p) => p.id === player)) return false;
+    const from = player === null ? -1 : this.captains.indexOf(player), occupant = this.captains[ship] ?? null, next = [...this.captains];
+    next[ship] = player;
+    if (from >= 0 && from !== ship) next[from] = occupant;
+    this.captains = next;
+    this.sendSnapshot();
+    this.emit('change');
+    return true;
+  }
+
   /** Gives a player who has no ship the first ship a person commands that has no captain. */
   private seat(player: number): void {
     if (this.captains.includes(player)) return;

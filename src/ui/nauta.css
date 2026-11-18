@@ -142,6 +142,9 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .reports-list li.cry .reports-words { font-weight: bold; }
 .rooms .room-wide { display: block; width: 100%; margin: 8px 0; text-align: left; }
 .room-row { display: flex; gap: 8px; align-items: center; }
+.room-seats { display: grid; gap: 8px; }
+.room-seat { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.room-seat .room-about { flex: 1; }
 .room-code { flex: 1; min-width: 0; min-height: var(--target-small); padding: 0 16px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-deep); color: var(--ivory); font: 20px/1 var(--word-font); letter-spacing: 0.2em; text-transform: uppercase; -webkit-user-select: text; user-select: text; }
 .room-link { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 13px; -webkit-user-select: text; user-select: text; }
 .room-big { font: 400 44px/1.1 var(--title-font); letter-spacing: 0.25em; margin: 12px 0; color: var(--brass); -webkit-user-select: text; user-select: text; }
