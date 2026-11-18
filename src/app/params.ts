@@ -1,6 +1,6 @@
 /**
  * What the page's address asks for (`?hud&hour=17`, `?eye=30&wind=6`, `?sea=gale`, `?yaw=70&pitch=-10`,
- * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`). Pure: it takes the query string.
+ * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`). Pure: it takes the query string.
  */
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
@@ -69,6 +69,8 @@ export interface Params {
   readonly motion: number | null;
   /** Her yards braced round, the boom and gaff swung with them (`?brace=30`, degrees: + the starboard yardarms aft), rad; until the sailing model (N3.3) braces them. */
   readonly brace: number;
+  /** Sail her by orders (`?sail`, plan N3.5): the brig under way in a match on this machine, and the order panel; with the ship of `?ship` (and `?walk` if asked). */
+  readonly sail: boolean;
 }
 
 export function readParams(query: string): Params {
@@ -89,6 +91,7 @@ export function readParams(query: string): Params {
     bench: q.has('bench') ? num('bench', BENCH_SECONDS, BENCH_SHORTEST, BENCH_LONGEST) : 0,
     motion: q.has('motion') ? num('motion', 1, CALM_LEAST, 1) : null,
     brace: num('brace', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE,
+    sail: q.has('sail'),
   };
 }
 

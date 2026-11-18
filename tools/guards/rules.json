@@ -8,6 +8,8 @@
     "src/app/params.ts",
     "src/app/standpoints.ts",
     "src/app/quality.ts",
+    "src/app/orderReport.ts",
+    "src/app/soloMatch.ts",
     "src/probe/report.ts",
     "src/probe/waves.ts",
     "src/audio/ambience.ts",

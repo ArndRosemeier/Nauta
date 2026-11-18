@@ -51,6 +51,24 @@
       #bench button { margin-top: 8px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #f2c14e; background: none; color: #f2c14e; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; }
       /* Walking: the calm view's button (src/app/motionSetting.ts), top right, clear of the HUD and the walking thumb's half. */
       #motion { position: fixed; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); display: none; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #ffffff33; background: #0b1a2a99; color: #e8eef4cc; font: 13px/1 system-ui, sans-serif; touch-action: manipulation; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+      /* ?sail (src/app/orderPanel.ts): the order panel, a working tool until the order fan; folds to its title with one tap. */
+      #orders { position: fixed; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); width: min(420px, calc(100% - 20px)); max-height: calc(100% - 90px); display: flex; flex-direction: column; border-radius: 12px; background: #0b1a2acc; border: 1px solid #ffffff26; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); overflow: hidden; }
+      #orders:not(.open) { width: auto; }
+      #orders:not(.open) .orders-body { display: none; }
+      .orders-head { min-height: 44px; padding: 0 16px; border: 0; background: none; color: #f2c14e; font: 600 15px/1 system-ui, sans-serif; text-align: left; touch-action: manipulation; }
+      .orders-body { overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 10px 10px; }
+      .orders-status, .orders-heard { margin: 0 0 8px; white-space: pre-wrap; font: 13px/1.4 ui-monospace, monospace; }
+      .orders-heard { color: #f2d48e; min-height: 1.4em; }
+      .orders-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+      .orders-to { width: 100%; font: 12px/1.2 system-ui, sans-serif; opacity: 0.7; }
+      .orders-button { min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 22px; border: 1px solid #ffffff40; background: #18324acc; color: #e8eef4; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; }
+      .orders-button:active { background: #2a4d6e; }
+      .orders-compass .orders-button { padding: 0; }
+      .orders-button.on { border-color: #f2c14e; color: #f2c14e; }
+      .orders-button.dim { opacity: 0.45; }
+      .orders-typed { display: flex; gap: 6px; margin-top: 8px; }
+      .orders-input { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 22px; border: 1px solid #ffffff40; background: #0b1a2a; color: #e8eef4; font: 16px/1 system-ui, sans-serif; -webkit-user-select: text; user-select: text; }
+      #orders.under-motion { top: calc(max(10px, env(safe-area-inset-top)) + 54px); max-height: calc(100% - 144px); }
       /* Walking (src/app/walkInput.ts): the left thumb's stick, a ring where it lands and a knob that follows it. */
       #stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid #ffffff40; background: #0b1a2a33; pointer-events: none; display: none; }
       #stick.on { display: block; }

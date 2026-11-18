@@ -288,8 +288,8 @@ const refuse = (told: ShipOrders, reason: string): OrderAnswer => ({ told, reaso
 
 /**
  * The helm told to steer `heading` (compass bearing, rad): the short way on the tack she is on, by wearing onto the
- * other. Closer than close-hauled, the master answers that she will not lie it and steers full and by on the nearer
- * tack instead (design decision for N3).
+ * other, and then the master answers "wearing round" (taken, with words). Closer than close-hauled, the master answers
+ * that she will not lie it and steers full and by on the nearer tack instead (design decisions for N3).
  */
 function steer(told: ShipOrders, s: Sailing, order: Order, heading: number, now: OrderMoment): OrderAnswer {
   const from = now.wind.from, tack = tackOf(s.heading, from, s.sides[0]!), to = tackOf(heading, from, tack);
@@ -299,7 +299,9 @@ function steer(told: ShipOrders, s: Sailing, order: Order, heading: number, now:
     const reason = `she will not lie ${headingWords(heading)}: full and by on the ${TACK_NAMES[to]} tack, ${headingWords(by)}${turn ? ', wearing round' : ''}`;
     return tell(told, order, now.tick, { helm: { heading: 0, by: to } }, [{ kind: 'helm', heading: by, turn }], false, reason);
   }
-  return tell(told, order, now.tick, { helm: { heading: wrapBearing(heading), by: 0 } }, [{ kind: 'helm', heading: wrapBearing(heading), turn }], false);
+  // Wearing for a course she can lie, the master says so too (design decision for N3), so the long way round is never a surprise.
+  const wearing = turn ? `wearing round, sir: ${headingWords(heading)} lies on the other tack` : '';
+  return tell(told, order, now.tick, { helm: { heading: wrapBearing(heading), by: 0 } }, [{ kind: 'helm', heading: wrapBearing(heading), turn }], false, wearing);
 }
 
 /** The sails the canvas `name` sets in a wind of `force` (hove to: the courses and boom sail kept in). */
