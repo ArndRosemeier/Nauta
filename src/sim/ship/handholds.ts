@@ -6,7 +6,7 @@
  * Ship space (section.ts): x across her (+ starboard), y up from her load waterline, z aft.
  */
 import { BODY, BULWARK, DECK_BEAM } from '../rules/ships';
-import { ARM_REACH, HOLD_HIGHEST, HOLD_LOWEST, SHOULDER_SHARE } from '../rules/body';
+import { ARM_REACH, HOLD_HIGHEST, HOLD_LOWEST, LEAN_OUT, SHOULDER_SHARE } from '../rules/body';
 import { sideTop } from './hull';
 import { insideBreadth, overheadAt, spacesById, type ShipPlan, type Space } from './plan';
 import { shipY, shipZ } from './section';
@@ -30,6 +30,27 @@ function candidates(space: Space, along: number, across: number): Handhold[] {
   // The beam overhead nearest him (her beams stand a beam's spacing apart, from her mainmast's station).
   const beam = Math.round(along / DECK_BEAM.spacing) * DECK_BEAM.spacing;
   return [{ point: [across, shipY(overheadAt(space, beam, across)), shipZ(beam)], kind: 'beam' }];
+}
+
+/** The rail he may lean out over (plan N2.11): its side (+1 starboard), the eye's place leaning out to the full (ship space), and his hold on it. */
+export interface RailToLean {
+  readonly side: number;
+  readonly eye: readonly [number, number, number];
+  readonly hold: Handhold;
+}
+
+/**
+ * The rail he may lean out over standing at (along, across) in `space`, or null: on her weather deck, within
+ * LEAN_OUT.within of the rail's inside. Leaning out to the full his eye is LEAN_OUT.reach outboard of it and
+ * LEAN_OUT.overRail over its top.
+ */
+export function railToLean(plan: ShipPlan, spaceId: string, along: number, across: number): RailToLean | null {
+  const space = spacesById(plan).get(spaceId);
+  if (!space || space.level !== 'weather') return null;
+  const side = across >= 0 ? 1 : -1, top = sideTop(along), inside = insideBreadth(along, top);
+  if (inside <= 0 || inside - Math.abs(across) > LEAN_OUT.within) return null;
+  const rail = top + BULWARK.railThick;
+  return { side, eye: [side * (inside + LEAN_OUT.reach), shipY(rail + LEAN_OUT.overRail), shipZ(along)], hold: { point: [side * inside, shipY(rail), shipZ(along)], kind: 'rail' } };
 }
 
 /**

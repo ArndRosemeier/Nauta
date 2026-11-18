@@ -15,6 +15,9 @@
  *   (sim/ship/handholds.ts) a hand takes it, and he goes more with her, steadier.
  * - **A blow staggers him** (`jolt`): his lean is thrown, his feet step to catch it.
  * - **He stoops forward** under low beams (the walker lowers him; his eye comes forward as he bends).
+ * - **He leans out over her rail** (plan N2.11) when he pushes toward it standing by it: his hands on the rail, he
+ *   turns to it and bends out over it until his eye is over the water beside her (sim/ship/handholds.ts `railToLean`).
+ *   The calm view leaves this to him: it is his own doing.
  * - **The calm view** (`strength`, one setting) takes from all of it down to nearly still: the head held level and the
  *   eye kept over his feet.
  *
@@ -24,13 +27,13 @@
 import { directionToLocal, upInFrame, type Vec3 } from '@futuremagic/deck';
 import { pointVelocity, shipFrame, type ShipPose } from '../sim/ship/motion';
 import { paceOf, type DeckWalker } from '../sim/ship/deckWalk';
-import type { Handhold } from '../sim/ship/handholds';
+import type { Handhold, RailToLean } from '../sim/ship/handholds';
 import { BODY } from '../sim/rules/ships';
 import { EYE_BELOW_TOP } from '../sim/rules/walking';
 import { GRAVITY } from '../sim/units';
 import {
   CADENCE, CADENCE_PER_PACE, CATCH_KEEP, HIP_RATE, HIP_SHARE, HOLD_LEAN_DAMPING, HOLD_LEAN_RATE, HOLD_LEAN_SHARE, HOLD_OFF,
-  HOLD_ON, HOLD_PACE, JOLT_PUSH, LADDER_BLEND_RATE, LEAN_DAMPING, LEAN_RATE, LEAN_SHARE, LEG_SLACK, MOST_DIP, MOST_LEAN, MOTION_START,
+  HOLD_ON, HOLD_PACE, JOLT_PUSH, LADDER_BLEND_RATE, LEAN_OUT, LEAN_DAMPING, LEAN_RATE, LEAN_SHARE, LEG_SLACK, MOST_DIP, MOST_LEAN, MOTION_START,
   STANCE_HALF, STANCE_WIDEN, STANDING_PACE, STEP_LIFT, STEP_QUICKEST, STEP_SECONDS, STEP_TRIGGER, STOOP_FORWARD, SWING_SECONDS, SWING_SHARE,
   TURN_RATE, WALK_LEAN, WEIGHT_HEIGHT,
 } from '../sim/rules/body';
@@ -50,6 +53,8 @@ export interface BodyInput {
   readonly onLadder: boolean;
   /** The look's yaw on her (his body turns to it). */
   readonly yaw: number;
+  /** The rail he pushes toward, standing by it, to lean out over it; null: he does not. */
+  readonly leanOver?: RailToLean | null;
 }
 
 export type FootSide = 'L' | 'R';
@@ -122,6 +127,9 @@ export class CaptainBody {
   private grip: { side: FootSide; at: Handhold } | null = null;
   private ladderW = 0;
   private eyeRoom = 1;
+  /** How far he leans out over a rail (0..1), and the rail (the last one he leant over, while he comes back). */
+  private outW = 0;
+  private over: RailToLean | null = null;
   private readonly lastV: [number, number] = [0, 0];
   private readonly lastDeck: [number, number, number] = [0, 0, 0];
   private readonly push: [number, number, number] = [0, 0, 0];
@@ -158,7 +166,11 @@ export class CaptainBody {
     const felt: [number, number] = clampTilt(gx / gy, gz / gy);
     const pace = paceOf(w);
     this.ladderW += ((input.onLadder ? 1 : 0) - this.ladderW) * ease(LADDER_BLEND_RATE, dt);
-    this.holdOn(felt, pace, dt, input.onLadder);
+    const leaning = !input.onLadder && !!input.leanOver;
+    if (leaning) this.over = input.leanOver!;
+    this.outW += ((leaning ? 1 : 0) - this.outW) * ease(LEAN_OUT.rate, dt);
+    if (!leaning && this.outW < LET_GO) { this.outW = 0; this.over = null; }
+    this.holdOn(felt, pace, dt, input.onLadder, leaning ? input.leanOver!.hold : null);
 
     // His lean follows the felt vertical, a share of the way, as a spring.
     const hold = Math.max(this.holdW, this.ladderW);
@@ -172,8 +184,9 @@ export class CaptainBody {
     }
     this.tilt = clampTilt(this.tilt[0], this.tilt[1]);
 
-    // His body turns to his look; his feet step round with it.
-    this.yaw += wrap(input.yaw - this.yaw) * ease(TURN_RATE, dt);
+    // His body turns to his look (leaning out, to the rail); his feet step round with it.
+    const out = smoothstep(this.outW), toward = this.over ? -this.over.side * Math.PI / 2 : input.yaw;
+    this.yaw += wrap(input.yaw + wrap(toward - input.yaw) * out - this.yaw) * ease(TURN_RATE, dt);
     this.stepFeet(w, want, pace, dt);
 
     // His hips: over his feet and his lean, as high as his legs reach to his planted feet.
@@ -200,6 +213,13 @@ export class CaptainBody {
     const ox = (this.tilt[0] * eyeTop + fx * stoop * STOOP_FORWARD) * body, oz = (this.tilt[1] * eyeTop + fz * stoop * STOOP_FORWARD) * body;
     const room = this.roomFor(w, ox, oz, dt), shown = body * room;
     const eye: [number, number, number] = [input.eye[0] + ox * room, input.eye[1] - dip * body, input.eye[2] + oz * room];
+    // Leaning out: the eye goes out over the rail, his middle staying where he stands; his back bends as far as it reaches.
+    let bendOut = 0;
+    if (this.over && out > 0) {
+      const t = this.over.eye, from = Math.abs(eye[0]);
+      for (let i = 0; i < 2; i++) eye[i]! += (t[i]! - eye[i]!) * out;
+      bendOut = Math.abs(Math.abs(eye[0]) - from);
+    }
 
     // The head: held as his body leans, the calm view holding it level (gravity's up).
     const n = Math.hypot(this.tilt[0], 1, this.tilt[1]);
@@ -214,7 +234,7 @@ export class CaptainBody {
       feet: { L: this.sole('L', w.floor), R: this.sole('R', w.floor) },
       hold: this.holdW > 0 && this.grip ? { ...this.grip, w: this.holdW } : null,
       stoop,
-      lean: [this.tilt[0] * shown, this.tilt[1] * shown], bend: stoop * STOOP_FORWARD * shown,
+      lean: [this.tilt[0] * shown, this.tilt[1] * shown], bend: stoop * STOOP_FORWARD * shown + bendOut,
     };
   }
 
@@ -225,12 +245,12 @@ export class CaptainBody {
     return [f.x, floor + STEP_LIFT * Math.sin(Math.PI * f.t), f.z];
   }
 
-  /** Takes hold of a rail or a beam in a heavy sea, lets go when it eases, he walks on or nothing is in reach. */
-  private holdOn(felt: [number, number], pace: number, dt: number, onLadder: boolean): void {
+  /** Takes hold of a rail or a beam in a heavy sea, lets go when it eases, he walks on or nothing is in reach; leaning out over a rail (`rail`), its rail. */
+  private holdOn(felt: [number, number], pace: number, dt: number, onLadder: boolean, rail: Handhold | null): void {
     this.swing2 += (felt[0] * felt[0] + felt[1] * felt[1] - this.swing2) * ease(1 / SWING_SECONDS, dt);
     const swing = Math.sqrt(this.swing2);
     const wants = !onLadder && pace <= HOLD_PACE && swing >= (this.grip ? HOLD_OFF : HOLD_ON);
-    const at = wants ? this.world.handhold() : null;
+    const at = rail ?? (wants ? this.world.handhold() : null);
     if (at) {
       // The hand on the side of him the hold is on.
       const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw), side: FootSide = (at.point[0] - this.feetMiddle(0)) * rx + (at.point[2] - this.feetMiddle(1)) * rz >= 0 ? 'R' : 'L';

@@ -455,6 +455,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | How fast a walker goes over her deck | `src/sim/ship/deckWalk.ts#paceOf` |
 | The body's tuning: lean and balance, legs and stance, cadence, holding on, the calm view's steps | `src/sim/rules/body.ts#LEAN_SHARE` |
 | What a hand can hold where he stands (her rail on deck, the beam overhead below) | `src/sim/ship/handholds.ts#handholdNear` |
+| Which rail he can lean out over where he stands, and where his eye goes then (plan N2.11) | `src/sim/ship/handholds.ts#railToLean` |
 | What a hand can hold aloft (the shrouds over a top or the crosstrees) | `src/sim/ship/handholds.ts#handholdAloft` |
 | How fast a point of her moves in the world from her heave, pitch and roll (what feet on her deck feel) | `src/sim/ship/motion.ts#pointVelocity` |
 | The walking thumb's stick as a push | `src/app/thumbs.ts#stickPush` |
