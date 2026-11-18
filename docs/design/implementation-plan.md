@@ -296,7 +296,9 @@ You give every sailing order from the deck and watch the men do it.
 
 **Gate G4 (Arnd, on the iPad):** sail her through a tack and a change of sail by look and tap; the deck is alive and never idle; the bubbles read well and feel of the period; frame budget met with both crews in sight.
 
-**Open design questions for N4:** the orders specification (stations, lists, keys, the look of the menu); bubble style and the phrase book; dress by navy and rank; how much the men show mood.
+**The orders specification** is [orders.md](orders.md) (design thread, 2026-11-18, a proposal until Arnd agrees): the three ways to give an order, the fan, who takes which order, how an order travels, the reports, the bubbles and the keys. N3.4, N4.1, N4.4, N4.5 and N5.3 read it first.
+
+**Open design questions for N4:** Arnd's four answers in orders.md (the midshipman, "Steer there", the "Fire!" button, no pause); the phrase book's words; dress by navy and rank; how much the men show mood.
 
 ---
 
