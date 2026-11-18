@@ -37,6 +37,11 @@ export class SkyView extends SkyRig {
     this.renderer.toneMappingExposure *= 1 + (BELOW_EXPOSURE - 1) * this.below;
   }
 
+  /** The strength lit materials take the sky's environment map at (the scene's environment intensity the rig sets). */
+  get skyStrength(): number {
+    return this.scene.environmentIntensity;
+  }
+
   /** The clock as `14:05`. */
   get clock(): string {
     const m = Math.floor(this.hour * MINUTES_PER_HOUR);

@@ -6,7 +6,7 @@
 import { Float32BufferAttribute, MeshStandardNodeMaterial, type BufferGeometry, type Material } from 'three/webgpu';
 import { makeSkyNode } from '@futuremagic/sky/node';
 import { Kinds, type Kind } from '@futuremagic/stage';
-import { SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, makeSeaMaterial } from './seaMaterial';
+import { SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, makeDeepMaterial, makeSeaMaterial } from './seaMaterial';
 import { SOLID_ATTRIBUTES, SOLID_STRIDES } from './ship/solid';
 import { ROPE_ATTRIBUTES, ROPE_STRIDES } from './ship/rope';
 import { makeCopperMaterial, makeGlowMaterial, makeIronMaterial, makeRopeMaterial, makeWoodMaterial } from './ship/shipMaterials';
@@ -50,6 +50,8 @@ export const TEST_BODY = defineKind('test body', ['position', 'normal', 'color']
  * drawn many at once, which three builds another shader for, so the warm-up builds the sea's own mesh too (main.ts).
  */
 export const SEA = defineKind('sea', ['position', SEA_TILE_ATTRIBUTE], makeSeaMaterial, NO_SHADOW);
+/** The deep around an eye under water (seaView.ts): a sphere about the eye in the murk's colour. */
+export const DEEP = defineKind('deep water', ['position', 'normal', 'uv'], makeDeepMaterial, NO_SHADOW);
 
 /** Casts the sun's shadow and receives it. */
 const SHADOWED = { cast: true, receive: true };

@@ -25,6 +25,7 @@
     "@futuremagic/props": "file:vendor/assetgenerator/packages/props",
     "@futuremagic/sky": "file:vendor/assetgenerator/packages/sky",
     "@futuremagic/stage": "file:vendor/assetgenerator/packages/stage",
+    "@futuremagic/texgen": "file:vendor/assetgenerator/packages/texgen",
     "three": "^0.186.1"
   },
   "devDependencies": {

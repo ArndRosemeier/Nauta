@@ -1,5 +1,6 @@
-/** What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?probe`, `?rig`, `?slice=below`). Pure: it takes the query string. */
-import { HOURS_PER_DAY } from '../sim/units';
+/** What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?yaw=70&pitch=-10`, `?probe`, `?rig`, `?slice=below`). Pure: it takes the query string. */
+import { DEGREE, HOURS_PER_DAY } from '../sim/units';
+import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
 
 /** The hour a game starts at when the address names none: a clear morning. */
@@ -10,9 +11,11 @@ const DAY_MINUTES = 24;
 const DAY_MINUTES_MAX = 100000;
 /** The captain's eye above the calm sea when the address names none, m (a brig's quarterdeck; the ship comes with N2). */
 const EYE_HEIGHT = 4.5;
-/** The lowest and highest eye the address may ask for, m: just over the water to high above a masthead. */
-const EYE_LOWEST = 0.5;
+/** The lowest and highest eye the address may ask for, m: a diver's depth (the view from under the water) to high above a masthead. */
+const EYE_LOWEST = -40;
 const EYE_HIGHEST = 200;
+/** Half a turn, degrees: the yaw the address may ask for runs from minus this to this. */
+const HALF_TURN_DEGREES = 180;
 /** The wind's force on the Beaufort scale when the address names none: a moderate breeze, a duel's weather. */
 const WIND_FORCE = 4;
 
@@ -33,6 +36,8 @@ export interface Params {
   readonly wind: number;
   /** Show the light rig's test bodies ahead of the captain (`?rig`, plan N1.5). */
   readonly rig: boolean;
+  /** Where the captain looks at the start (`?yaw=70&pitch=-10`, degrees: yaw to the left of north, pitch up); null for the game's own start. */
+  readonly look: Look | null;
   /** Stand on the slice of her waist (`?slice`, plan N2.0), at the standpoint named (`?slice=below`; empty: the first). */
   readonly slice: string | null;
 }
@@ -47,5 +52,8 @@ export function readParams(query: string): Params {
     forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
     dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
     slice: q.get('slice'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(num('wind', WIND_FORCE, 0, WIND_PRESETS.length - 1)),
+    look: q.has('yaw') || q.has('pitch')
+      ? { yaw: num('yaw', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE, pitch: num('pitch', 0, -PITCH_LIMIT / DEGREE, PITCH_LIMIT / DEGREE) * DEGREE }
+      : null,
   };
 }

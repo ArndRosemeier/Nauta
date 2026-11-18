@@ -53,7 +53,8 @@ async function start(): Promise<void> {
   let where: Standpoint = standpoint(params.slice ?? '');
   const view = await createView(canvas, params.forceWebGL, ship !== null);
   view.camera.position.set(0, params.eye, 0);
-  view.camera.rotation.set(START_LOOK.pitch, START_LOOK.yaw, 0);
+  const startLook = params.look ?? START_LOOK;
+  view.camera.rotation.set(startLook.pitch, startLook.yaw, 0);
   // The sky and its light (environment map, the sun's colour node) before the warm-up: they are part of every lit shader's key.
   const sky = new SkyView(view.renderer, view.scene, view.sun, view.hemi, params.hour, params.dayMinutes);
   sky.update(0, null);
@@ -61,15 +62,18 @@ async function start(): Promise<void> {
   // The sea keeps the wind it is given, so it gets a copy of the mean wind, never the one `meanWind` writes into.
   const wind = makeWind(MATCH_SEED, params.wind, WIND_FROM), blowing = meanWind(wind, 0);
   let seaTime = 0, sea = startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
-  const seaView = new SeaView();
-  seaView.show(sea, seaTime, view.camera, sky.light, sky.gain);
+  const seaView = new SeaView(sky);
+  seaView.show(sea, wind, blowing.speed, seaTime, 0, view.camera, sky);
   // The sea's mesh is drawn as many tiles at once, a shader of its own: the warm-up builds it with the kinds.
   await view.stage.warmUp([seaView.mesh]);
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
-  if (params.rig) await view.stage.add(makeTestBodies(START_LOOK.yaw, params.eye));
+  await view.stage.add(seaView.deep);
+  if (params.rig) await view.stage.add(makeTestBodies(startLook.yaw, params.eye));
   if (ship) await view.stage.add(ship.group);
-  const input = watchLook(canvas, ship ? where.look : START_LOOK, view.radPerPixel);
+  // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
+  sky.redrawEnvironment();
+  const input = watchLook(canvas, ship ? where.look : startLook, view.radPerPixel);
   if (ship) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
@@ -84,12 +88,13 @@ async function start(): Promise<void> {
     if (ship) {
       ship.update(sea, seaTime, dt, view.camera, where, input.look, view.sun, sky.lightDirection, sky.gain, view.radPerPixel(), seaView.origin);
       sky.below = ship.below;
+      seaView.sheltered = ship.below > 0;
     } else {
       view.camera.rotation.set(input.look.pitch, input.look.yaw, 0);
       view.sun.position.copy(view.sun.target.position).addScaledVector(sky.lightDirection, SUN_DISTANCE);
     }
     sky.update(dt, view.camera);
-    seaView.show(sea, seaTime, view.camera, sky.light, sky.gain);
+    seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
     frames++;
