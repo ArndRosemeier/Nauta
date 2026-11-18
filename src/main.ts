@@ -33,6 +33,7 @@ import { sailsSeen } from './app/sailsSeen';
 import { PageMatch, pageSeconds, rudderAngle, sparAngles } from './app/pageMatch';
 import { RoomPanel } from './app/roomPanel';
 import { Menu } from './app/menu';
+import { FirstCommand } from './app/firstCommand';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
@@ -457,6 +458,11 @@ async function start(): Promise<void> {
   const sound = new SeaSound(pageEngine(), MATCH_SEED);
   // The plain address: the menu over the live view (plan N7.2, docs/design/menu.md); it chooses every match the page runs.
   let skyMinutes = sky.dayMinutes;
+  // Your first command (plan N7.4): the first lieutenant's lessons over the match the menu starts for it.
+  const first = params.menu && match && speech ? new FirstCommand({
+    speech, fan, myShip: () => match.ship, captain: captainSpot, yaw: () => input.look.yaw, glassUp: () => glass?.up ?? false, glassButton,
+    officersSeen: () => officers?.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) ?? [], wording: () => words(settings.now.language),
+  }) : null;
   const menu = params.menu && match ? new Menu({
     params, build: VERSION, settings, settingsMenu, match, now: matchClock, engine: sound.engine,
     sky: (hour, dayMinutes) => { sky.hour = hour; sky.dayMinutes = skyMinutes = dayMinutes; },
@@ -465,6 +471,7 @@ async function start(): Promise<void> {
       else if (!on && pausedAt !== null) { paused += pageSeconds() - pausedAt; pausedAt = null; }
       sky.dayMinutes = on ? 0 : skyMinutes;
     },
+    firstCommand: (session) => { if (session) first?.start(session); else first?.stop(); },
   }) : null;
   // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
   // Each part of the sound at the player's level (plan N7.3): the whole is the engine's master volume.
@@ -596,6 +603,7 @@ async function start(): Promise<void> {
     }
     sky.update(dt, view.camera);
     speech?.drawBubbles(view.camera);
+    first?.frame();
     // Each ship's way through the water, as her match sails her; her wake and spray follow it (N2.5, N3.8).
     const mine = match?.state.ships[match.ship]?.sailing, hers = match && match.other >= 0 ? match.state.ships[match.other]?.sailing : undefined;
     way.ahead = mine?.ahead ?? 0; way.leeway = mine?.leeway ?? 0;

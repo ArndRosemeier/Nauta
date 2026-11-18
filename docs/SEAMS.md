@@ -629,6 +629,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Whether an order is a standing helm order | `src/sim/orders.ts#isKeep` |
 | The computer captain's three levels of skill and the tactics they share | `src/sim/rules/captain.ts#SKILL` |
 | A match played alone against a computer captain (`?foe=`) | `src/net/duel.ts#DuelOptions` |
+| The computer captain waiting hove to until the first match wakes him (`foeWaits`, `DuelSession.wakeFoe`) | `src/net/duel.ts#DuelSession` |
 | The player's settings: what they are, defaults, bounds, read back from what the device kept (N7.3) | `src/app/settings.ts#readSettings` |
 | Giving an action a key without two actions sharing one | `src/app/settings.ts#withKey` |
 | Keeping the settings on the device and telling the page of every change (the address's for one visit) | `src/app/settingsStore.ts#SettingsStore` |
@@ -669,6 +670,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Whether her guns wait for the captain's word (the Fire! button shows) | `src/app/fanOrders.ts#waitingForWord` |
 | Which drawn man a finger points at on the view | `src/app/fanOrders.ts#manAt` |
 | The order fan on the page: tap or press a man, the midshipman, the keys, steer there; the captain's arm | `src/app/orderFan.ts#OrderFan` |
+| The drawn officer of a rank among the men on the view | `src/app/fanOrders.ts#manOnScreen` |
+| The first match: its settings, the first lieutenant's course of lessons and tips, what each asks and when it is done (pure) | `src/app/lessons.ts#Lessons` |
+| What of hers is heard, as the lessons key it | `src/app/lessons.ts#heardKeys` |
+| The first match on the page: the lessons said, the man to tap ringed, the fan's orders lit, Skip | `src/app/firstCommand.ts#FirstCommand` |
 | The midshipman: keeps by the captain on her decks, runs with a message and gives it when he arrives | `src/app/midshipman.ts#Midshipman` |
 | The compass bearing looked along from her ("steer there") | `src/app/look.ts#lookBearing` |
 | The officers drawn (six full characters with living faces; N4.3's near pool takes over): where each is on the view, looking at the captain | `src/render/crew/officersView.ts#OfficersView` |

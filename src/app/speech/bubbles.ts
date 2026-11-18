@@ -28,14 +28,16 @@ const READ_FIND = 1.2;
 const READ_PER_WORD = 0.32;
 export const READ_LEAST = 2.2;
 const READ_MOST = 6;
+/** A lesson (plan N7.4) is read more slowly, being new: this long at most, s. */
+const READ_LESSON_MOST = 9;
 /** A cry stays this much longer, s. */
 const CRY_MORE = 1;
 /** How long a bubble may wait to be shown, s, by its kind: an answer late is no answer; a report keeps a while. */
-const STALE: Readonly<Record<SayKind, number>> = { answer: 3, pass: 3, report: 8, cry: 5 };
+const STALE: Readonly<Record<SayKind, number>> = { answer: 3, pass: 3, lesson: 20, report: 8, cry: 5 };
 /** Seconds within which the same man does not say the same report or cry again. */
 export const REPEAT_SECONDS = 25;
-/** The order bubbles wait in when several are due: a cry first, then answers (newest first), passes, reports. */
-const RANK_OF_KIND: Readonly<Record<SayKind, number>> = { cry: 0, answer: 1, pass: 2, report: 3 };
+/** The order bubbles wait in when several are due: a cry first, then answers (newest first), passes, lessons, reports. */
+const RANK_OF_KIND: Readonly<Record<SayKind, number>> = { cry: 0, answer: 1, pass: 2, lesson: 3, report: 4 };
 
 /** A bubble on the view. */
 export interface Bubble {
@@ -70,10 +72,10 @@ interface Waiting extends Said {
   readonly stale: number;
 }
 
-/** The seconds a bubble of `words` shows, a cry's longer. */
-export function readSeconds(words: string, cry: boolean): number {
+/** The seconds a bubble of `words` shows, a cry's longer; a lesson's may run longer than any other's. */
+export function readSeconds(words: string, cry: boolean, lesson = false): number {
   const n = words.split(/\s+/).filter(Boolean).length;
-  return Math.min(READ_MOST, Math.max(READ_LEAST, READ_FIND + n * READ_PER_WORD)) + (cry ? CRY_MORE : 0);
+  return Math.min(lesson ? READ_LESSON_MOST : READ_MOST, Math.max(READ_LEAST, READ_FIND + n * READ_PER_WORD)) + (cry ? CRY_MORE : 0);
 }
 
 /** The bubbles of one crew: what is said is added as it is raised, and each frame's `viewAt` says what is on the view. */
@@ -163,7 +165,7 @@ export class BubbleQueue {
 
   private showBubble(w: Waiting, now: number): Bubble {
     const { say, rank, words } = w;
-    const b: Bubble = { id: ++this.ids, say, rank, words, from: now, until: now + readSeconds(words, say.kind === 'cry') };
+    const b: Bubble = { id: ++this.ids, say, rank, words, from: now, until: now + readSeconds(words, say.kind === 'cry', say.kind === 'lesson') };
     this.shown.push(b);
     this.chainOf.set(b.id, w.chain);
     return b;

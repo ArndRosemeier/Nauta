@@ -7,13 +7,15 @@
  */
 import type { Camera } from 'three';
 import { noticed } from '../sim/notices';
+import type { Notice } from '../sim/notices';
 import type { SimState } from '../sim/state';
+import type { SimEvent } from '../sim/step';
 import { BubbleLayer } from './bubbleLayer';
 import { navyOf } from './crewLooks';
 import type { OrderSession } from './orderReport';
 import type { Language } from './settings';
 import { BubbleQueue } from './speech/bubbles';
-import { lookoutSays, saysOf, type Sent } from './speech/reports';
+import { lookoutSays, saysOf, type Say, type Sent } from './speech/reports';
 import { ReportLog } from './speech/reportLog';
 import { Speakers } from './speech/speakers';
 
@@ -27,6 +29,8 @@ export class Speech {
   private last: SimState;
   /** Whether a step of this match has been heard yet (the lookout's first look round). */
   private looked = false;
+  /** Who hears each step's events and notices after the men have spoken of them (the first match's lessons, N7.4). */
+  private readonly hearers = new Set<(heard: readonly (SimEvent | Notice)[], state: SimState) => void>();
 
   /** `clock`: the match's clock, s (the page's, or a browser check's: bubbles then wait on its jumps, not on slow frames). */
   constructor(parent: HTMLElement, private readonly match: OrderSession, language: Language, private readonly clock: () => number) {
@@ -41,8 +45,21 @@ export class Speech {
       if (next) this.looked = true;
       this.last = now;
       this.queue.navy = navyOf(ship);
-      for (const e of [...events, ...notices]) this.log.record(this.queue.add(saysOf(e, ship), t), now.tick);
+      const heard = [...events, ...notices];
+      for (const e of heard) this.log.record(this.queue.add(saysOf(e, ship), t), now.tick);
+      for (const fn of this.hearers) fn(heard, now);
     });
+  }
+
+  /** `fn` hears each step's events and what her officers noticed in it, after the men have spoken; gives back how to stop. */
+  onHeard(fn: (heard: readonly (SimEvent | Notice)[], state: SimState) => void): () => void {
+    this.hearers.add(fn);
+    return () => this.hearers.delete(fn);
+  }
+
+  /** Lines the page has a man say (the first match's lessons): into the bubbles and the report log. */
+  speak(says: readonly Say[]): void {
+    if (says.length > 0) this.log.record(this.queue.add(says, this.clock()), this.match.state.tick);
   }
 
   /** The words' language (the settings). */

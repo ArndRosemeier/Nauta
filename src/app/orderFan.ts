@@ -14,7 +14,7 @@ import type { Closures } from '../sim/crew/closures';
 import type { Spot } from '../sim/ship/plan';
 import { make } from './dom';
 import { makeButton } from './button';
-import { FAN_MOST, KEY_ORDERS, RANK_WORDS, waitingForWord, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem, type FanSlot, type ManOnScreen } from './fanOrders';
+import { FAN_MOST, KEY_ORDERS, RANK_WORDS, waitingForWord, fanItems, fanSlots, manAt, manOnScreen, slotAt, slotPlaces, type FanItem, type FanSlot, type ManOnScreen } from './fanOrders';
 import { inVoice, postOf, takerOf, type Officer, type Taker } from './officers';
 import type { Midshipman, Message } from './midshipman';
 import type { OrderSession } from './orderReport';
@@ -117,6 +117,8 @@ export class OrderFan {
   private pointFor = 0;
   private hailFor = 0;
   private readonly heard = new Set<(s: Sent) => void>();
+  /** The orders a lesson of the first match points to (N7.4): their tags, and the large "Fire!", carry a brass mark. */
+  private guided: readonly string[] = [];
 
   constructor(private readonly view: HTMLElement, private readonly page: FanPage) {
     this.thumb.append(this.fire, this.steer);
@@ -172,7 +174,7 @@ export class OrderFan {
    * shown then, or why not.
    */
   openForCheck(who: Officer, choose: readonly string[] = []): string {
-    const r = this.view.getBoundingClientRect(), man = this.page.men().find((m) => m.who === who);
+    const r = this.view.getBoundingClientRect(), man = manOnScreen(this.page.men(), who);
     const x = man?.seen ? r.left + man.x : window.innerWidth / 2, y = man?.seen ? r.top + man.y : window.innerHeight / 2;
     this.close();
     if (!this.openFor(who, x, y)) return `the ${who} has no orders now`;
@@ -182,6 +184,16 @@ export class OrderFan {
       this.choose(this.slots[i]!.item);
     }
     return this.open ? this.slots.map((s) => `${s.item.id}${s.dim ? ' (dim)' : ''}${s.on ? ' (on)' : ''}`).join(', ') : 'closed';
+  }
+
+  /**
+   * The first match's lesson (N7.4) points to these items of the fan (a ring's id and an order's; 'fire': the large
+   * "Fire!"): each carries a brass mark wherever it shows. None: no mark.
+   */
+  guide(ids: readonly string[], fire: boolean): void {
+    this.guided = ids;
+    this.fire.classList.toggle('lesson', fire);
+    this.tags.forEach((tag, i) => tag.classList.toggle('lesson', ids.includes(this.slots[i]?.item.id ?? '')));
   }
 
   /** For the checks: the tag of an item shown as under the finger. */
@@ -403,7 +415,7 @@ export class OrderFan {
     this.root.append(this.hub);
     const shown = o.items.slice(0, FAN_MOST), places = slotPlaces(shown.length, RING);
     this.tags = shown.map((item, i) => {
-      const tag = make('button', 'nt-fan-tag');
+      const tag = make('button', this.guided.includes(item.id) ? 'nt-fan-tag lesson' : 'nt-fan-tag');
       tag.type = 'button';
       tag.append(make('span', '', say[item.word]));
       if (item.detail) tag.append(make('small', '', say[item.detail]));

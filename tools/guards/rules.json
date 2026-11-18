@@ -18,6 +18,7 @@
     "src/app/speech",
     "src/app/officers.ts",
     "src/app/fanOrders.ts",
+    "src/app/lessons.ts",
     "src/app/midshipman.ts",
     "src/app/pageMatch.ts",
     "src/app/glass.ts",
