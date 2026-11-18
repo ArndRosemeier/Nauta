@@ -58,12 +58,16 @@ const SHADOWED = { cast: true, receive: true };
 /** Receives the sun's shadow only (it lies where nothing it would shade is seen). */
 const RECEIVES = { cast: false, receive: true };
 /** The ship's timber, bare and painted: all of it one mesh, one draw (render/ship/shipMaterials.ts). */
-export const SHIP_WOOD = defineKind('ship wood', SOLID_ATTRIBUTES, makeWoodMaterial, SHADOWED);
+export const SHIP_WOOD = defineKind('ship wood', SOLID_ATTRIBUTES, () => makeWoodMaterial(), SHADOWED);
 /** Her iron: guns, hoops, chain plates, bolts, the lantern's tin. */
-export const SHIP_IRON = defineKind('ship iron', SOLID_ATTRIBUTES, makeIronMaterial, SHADOWED);
+export const SHIP_IRON = defineKind('ship iron', SOLID_ATTRIBUTES, () => makeIronMaterial(), SHADOWED);
 /** The copper sheathing below her waterline. */
-export const SHIP_COPPER = defineKind('ship copper', SOLID_ATTRIBUTES, makeCopperMaterial, RECEIVES);
+export const SHIP_COPPER = defineKind('ship copper', SOLID_ATTRIBUTES, () => makeCopperMaterial(), RECEIVES);
 /** The lantern's horn and candle, lit from within. */
 export const SHIP_GLOW = defineKind('ship glow', SOLID_ATTRIBUTES, makeGlowMaterial, NO_SHADOW);
+/** Her timber, iron and copper as a crossfade between levels of detail draws them: dithered by each mesh's share (shipView.ts). */
+export const SHIP_WOOD_FADING = defineKind('ship wood fading', SOLID_ATTRIBUTES, () => makeWoodMaterial(true), SHADOWED);
+export const SHIP_IRON_FADING = defineKind('ship iron fading', SOLID_ATTRIBUTES, () => makeIronMaterial(true), SHADOWED);
+export const SHIP_COPPER_FADING = defineKind('ship copper fading', SOLID_ATTRIBUTES, () => makeCopperMaterial(true), RECEIVES);
 /** Rope, standing and running: widened to a pixel far off and faded, laid in strands up close. */
 export const SHIP_ROPE = defineKind('ship rope', ROPE_ATTRIBUTES, makeRopeMaterial, SHADOWED);

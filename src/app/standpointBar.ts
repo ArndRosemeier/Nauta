@@ -1,6 +1,7 @@
 /**
- * The slice's standpoints as a row of buttons at the foot of the screen (plan N2.0): a finger moves the eye to the
- * waist, behind a gun, up by the shrouds, below on the berth deck, into the main top, or into a boat alongside.
+ * Her standpoints as a row of buttons at the foot of the screen (plan N2.0, N2.4): a finger moves the eye to the
+ * quarterdeck, the waist, behind a gun, the bow, the main top, the berth deck, the captain's cabin, the hold, a boat
+ * alongside, or out to 50 m and 500 m off.
  */
 import { STANDPOINTS, type Standpoint } from './standpoints';
 

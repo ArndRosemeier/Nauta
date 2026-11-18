@@ -1,34 +1,29 @@
 /**
- * The slice's part of her rig (plan N2.0): the lower mainmast with its top, the main channels with their deadeyes
- * and chain plates, the shrouds with their lanyards and ratlines, the pin rails inside the bulwarks with their pins,
- * and the lines belayed there, each with its coil hanging on the pin. The whole rig comes with N3.6 from the rig plan.
+ * Her lower rig as the slice built it (plan N2.0), for both masts on the whole ship (N2.4): each lower mast with its
+ * top, the channels with their deadeyes and chain plates, the shrouds with their lanyards and ratlines, the pin rails
+ * inside the bulwarks with their pins, and the lines belayed there, each with its coil hanging on the pin. The whole
+ * rig, its spars above the tops and every line, comes with N3.6 from the rig plan (N3.2).
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import {
-  BULWARK, CHAIN_PLATE_FOOT, PORT, DEADEYE, DECK_AT_SIDE, MAIN_CHANNEL, MAIN_MAST, MAIN_SHROUDS, MAIN_TOP, PIN_RAIL, PLANKING,
-  RATLINE_PITCH, ROPE,
+  CHAIN_PLATE_FOOT, DEADEYE, FORE_MAST, FORE_SHROUDS, FORE_TOP, MAIN_CHANNEL, MAIN_MAST, MAIN_SHROUDS, MAIN_TOP, MASTS, PIN_RAIL,
+  PLANKING, PORTS, RAILS, RATLINE_PITCH, ROPE,
 } from '../../sim/rules/ships';
-import { deckY, halfBreadth, shipY, shipZ } from '../../sim/ship/section';
-import { box, lathe, rod } from './shapes';
-import type { Solid } from './solid';
-import { Ropes, hanging, straight } from './rope';
-import { BLACK, IRON, MAST, OAK, RED, TAR } from './looks';
+import { hullHalfBreadth, sheer, sideTop, weatherDeck } from '../../sim/ship/hull';
+import { shipY, shipZ } from '../../sim/ship/section';
+import { box, lathe, rod, direction } from './shapes';
+import { hanging, straight } from './rope';
+import { BLACK, IRON, MAST, OAK, RED } from './looks';
 import { place, type Fittings } from './fittings';
+import type { ZoneParts } from './parts';
+import { bulwarkInside } from './hullSide';
 
-export interface RigParts {
-  /** The masthead's middle where the shrouds go round it, ship space. */
-  readonly masthead: Vector3;
-}
 
 /** The mast's sides when turned. */
 const MAST_SIDES = 24;
 /** Iron hoops on the lower mast: how far apart, their width and thickness, m. */
 const HOOP = { pitch: 1.25, width: 0.06, thick: 0.012 } as const;
-/** The mast coat at the partners: how high it reaches up the mast and how far out on the partners, m. */
-const COAT = { up: 0.28, out: 0.14 } as const;
-/** The coat's shoulder, where its slope eases: up from its foot and out from the mast, m. */
-const COAT_SHOULDER = { up: 0.09, out: 0.07 } as const;
 /** The masthead is square above the hounds: its side, m, and the cap on top (thick, long fore and aft). */
 const MASTHEAD_SIDE = 0.36;
 const CAP = { thick: 0.22, length: 1.05, breadth: 0.52 } as const;
@@ -67,10 +62,12 @@ const COIL = { loops: 11, drop: 0.58, width: 0.13, spread: 0.0065, points: 18 } 
 const COIL_VARY = { drop: 0.1, width: 0.2 } as const;
 /** Every how many pins carries a line. */
 const LINE_EVERY = 2;
-/** The pin rail's first pin is this far forward of the channel's after end, m. */
-const PIN_START = 0.15;
 /** A pin stands at least this far beside a port's side, m. */
 const PORT_CLEAR = 0.1;
+/** The channel reaches this far abaft the aftmost shroud and forward of the foremost, m (the main channel on the draught). */
+const CHANNEL_BEYOND = { aft: 0.28, fore: 0.36 } as const;
+/** The pin rail runs this far beyond its first and last pin, m. */
+const RAIL_BEYOND = 0.15;
 /** The belaying pin's collar sits on the rail: its foot is this far below the rail's top, m (the pack's pin: 0.205). */
 const PIN_FOOT_BELOW = 0.205;
 /** Where a belayed line leaves its pin, m above the rail's top. */
@@ -91,61 +88,83 @@ const BOLT = { sides: 8, radius: 0.022 } as const;
 const TARRED = 1;
 const HEMP = 0.15;
 
-/** Options the slice gives: where it ends, the berth deck's height, the partners round the mast. */
-export interface RigOptions {
-  readonly zFore: number;
-  readonly zAft: number;
-  readonly berthY: number;
-  readonly partners: number;
-  readonly partnersRise: number;
-  /** The ports' middles inside the slice, ship-space z. */
-  readonly ports: readonly number[];
+/** A mast's lower rig: where it stands, its sizes, its top, its shrouds' deadeyes and its pin rail. */
+interface MastRig {
+  readonly along: number;
+  readonly mast: { readonly step: number; readonly length: number; readonly partners: number; readonly hounds: number; readonly head: number };
+  readonly top: { readonly breadth: number; readonly length: number; readonly thick: number; readonly hole: number };
+  readonly shrouds: readonly number[];
+  readonly rail: string;
+}
+const RIGS: readonly MastRig[] = [
+  { along: MASTS.main.along, mast: MAIN_MAST, top: MAIN_TOP, shrouds: MAIN_SHROUDS, rail: 'main-pins' },
+  { along: MASTS.fore.along, mast: FORE_MAST, top: FORE_TOP, shrouds: FORE_SHROUDS, rail: 'fore-pins' },
+];
+
+/** Her channels' upper side at a place, m above the base: as far below the top of her side as the main channel stands on the draught. */
+function channelTop(along: number): number {
+  const main = (MAIN_SHROUDS[0]! + MAIN_SHROUDS[MAIN_SHROUDS.length - 1]!) / 2;
+  return sideTop(along) - (sideTop(main) - MAIN_CHANNEL.top);
 }
 
-export function buildRig(fittings: Fittings, wood: Solid, iron: Solid, ropes: Ropes, o: RigOptions): RigParts {
-  // --- The lower mainmast, from the berth deck up through the partners to the hounds, then the square masthead and its cap.
-  const deck = deckY(0);
-  const hounds = shipY(MAIN_MAST.step + MAIN_MAST.length - MAIN_MAST.head), headTop = shipY(MAIN_MAST.step + MAIN_MAST.length);
-  const r0 = MAIN_MAST.partners / 2, r1 = MAIN_MAST.hounds / 2;
-  const radiusAt = (y: number) => r0 + (r1 - r0) * Math.max(0, (y - deck) / (hounds - deck));
-  lathe(wood, new Matrix4(), [[0, o.berthY], [r0, o.berthY], [r0, deck], [r1, hounds], [0, hounds]], MAST_SIDES, MAST);
-  box(wood, new Matrix4().makeTranslation(0, (hounds + headTop) / 2, 0), [MASTHEAD_SIDE, headTop - hounds, MASTHEAD_SIDE], BLACK, BEVEL, 1);
-  box(wood, new Matrix4().makeTranslation(0, headTop - CAP.thick / 2, -CAP.length / 2 + MASTHEAD_SIDE / 2), [CAP.breadth, CAP.thick, CAP.length], BLACK, BEVEL, 2);
-  for (let y = deck + HOOP.pitch; y < hounds - HOOP.pitch / 2; y += HOOP.pitch) {
-    const r = radiusAt(y) + HOOP.thick;
-    lathe(iron, new Matrix4().makeTranslation(0, y, 0), [[r - HOOP.thick, -HOOP.width / 2], [r, -HOOP.width / 2], [r, HOOP.width / 2], [r - HOOP.thick, HOOP.width / 2]], MAST_SIDES, IRON);
+/** Both lower rigs. The masts below the weather deck are drawn in the zones they pass through (`below`). */
+export function buildRigs(fittings: Fittings, out: ZoneParts, below: (along: number, h: number) => ZoneParts | null, far = false): void {
+  RIGS.forEach((r, k) => buildRig(fittings, out, below, r, k, far));
+}
+
+/** One lower rig; `far`: the far ship's, without what cannot be told apart from off her (hoops, lanyards, ratlines, the pin rail). */
+function buildRig(fittings: Fittings, out: ZoneParts, below: (along: number, h: number) => ZoneParts | null, r: MastRig, index: number, far: boolean): void {
+  const { wood, iron, ropes } = out;
+  const zc = shipZ(r.along), deckH = weatherDeck(r.along, 0), deck = shipY(deckH);
+  // --- The lower mast: from its step up through the decks to the hounds, then the square masthead and its cap.
+  const hounds = shipY(r.mast.step + r.mast.length - r.mast.head), headTop = shipY(r.mast.step + r.mast.length);
+  const r0 = r.mast.partners / 2, r1 = r.mast.hounds / 2, heel = shipY(r.mast.step);
+  const at = new Matrix4().makeTranslation(0, 0, zc);
+  lathe(wood, at, [[0, deck], [r0, deck], [r1, hounds], [0, hounds]], MAST_SIDES, MAST);
+  // Below the deck the mast stands in the rooms it passes through.
+  const levels = [heel, shipY(deckH - PLANKING.deck)];
+  const mid = below(r.along, (r.mast.step + deckH) / 2);
+  const low = below(r.along, r.mast.step + PLANKING.deck);
+  for (const [z, y0, y1] of [[mid, (levels[0]! + levels[1]!) / 2, levels[1]!], [low, levels[0]!, (levels[0]! + levels[1]!) / 2]] as const) {
+    if (z) lathe(z.wood, at, [[0, y0], [r0, y0], [r0, y1], [0, y1]], MAST_SIDES, MAST);
   }
-  // The partners: a raised square of oak round the mast, and the tarred canvas coat that keeps the water out.
-  box(wood, new Matrix4().makeTranslation(0, deck + o.partnersRise / 2 - PLANKING.deck / 2, 0), [o.partners, o.partnersRise + PLANKING.deck, o.partners], OAK, BEVEL, 0);
-  lathe(wood, new Matrix4(), [[r0 + COAT.out, deck + o.partnersRise], [r0 + COAT_SHOULDER.out, deck + o.partnersRise + COAT_SHOULDER.up], [r0, deck + o.partnersRise + COAT.up]], MAST_SIDES, TAR);
+  box(wood, new Matrix4().makeTranslation(0, (hounds + headTop) / 2, zc), [MASTHEAD_SIDE, headTop - hounds, MASTHEAD_SIDE], BLACK, BEVEL, 1);
+  box(wood, new Matrix4().makeTranslation(0, headTop - CAP.thick / 2, zc - CAP.length / 2 + MASTHEAD_SIDE / 2), [CAP.breadth, CAP.thick, CAP.length], BLACK, BEVEL, 2);
+  const radiusAt = (y: number) => r0 + (r1 - r0) * Math.max(0, (y - deck) / (hounds - deck));
+  for (let y = deck + HOOP.pitch; !far && y < hounds - HOOP.pitch / 2; y += HOOP.pitch) {
+    const rr = radiusAt(y) + HOOP.thick;
+    lathe(iron, new Matrix4().makeTranslation(0, y, zc), [[rr - HOOP.thick, -HOOP.width / 2], [rr, -HOOP.width / 2], [rr, HOOP.width / 2], [rr - HOOP.thick, HOOP.width / 2]], MAST_SIDES, IRON);
+  }
 
   // --- The top: trestle trees along her either side of the masthead, crosstrees across, the platform with its hole and rim.
-  const tt = hounds + TRESTLE.deep / 2;
-  for (const s of [1, -1]) box(wood, new Matrix4().makeTranslation(s * (MASTHEAD_SIDE + TRESTLE.sided) / 2, tt, 0), [TRESTLE.sided, TRESTLE.deep, MAIN_TOP.length], OAK, BEVEL, 2);
-  for (const z of [-CROSSTREES.at, CROSSTREES.at]) box(wood, new Matrix4().makeTranslation(0, tt, z), [MAIN_TOP.breadth, CROSSTREES.deep, TRESTLE.sided], OAK, BEVEL, 0);
-  const plat = hounds + TRESTLE.deep + MAIN_TOP.thick / 2, hole = MAIN_TOP.hole / 2;
-  const side = (MAIN_TOP.breadth / 2 - hole);
+  const T = r.top, tt = hounds + TRESTLE.deep / 2;
+  for (const s of [1, -1]) box(wood, new Matrix4().makeTranslation(s * (MASTHEAD_SIDE + TRESTLE.sided) / 2, tt, zc), [TRESTLE.sided, TRESTLE.deep, T.length], OAK, BEVEL, 2);
+  for (const z of [-CROSSTREES.at, CROSSTREES.at]) box(wood, new Matrix4().makeTranslation(0, tt, zc + z), [T.breadth, CROSSTREES.deep, TRESTLE.sided], OAK, BEVEL, 0);
+  const plat = hounds + TRESTLE.deep + T.thick / 2, hole = T.hole / 2, wing = T.breadth / 2 - hole;
   for (const s of [1, -1]) {
-    box(wood, new Matrix4().makeTranslation(s * (hole + side / 2), plat, 0), [side, MAIN_TOP.thick, MAIN_TOP.length], BLACK, SMALL_BEVEL, 2);
-    box(wood, new Matrix4().makeTranslation(0, plat, s * (hole + (MAIN_TOP.length / 2 - hole) / 2)), [2 * hole, MAIN_TOP.thick, MAIN_TOP.length / 2 - hole], BLACK, SMALL_BEVEL, 0);
-    box(wood, new Matrix4().makeTranslation(s * MAIN_TOP.breadth / 2, plat + TOP_RIM / 2, 0), [TRESTLE.sided, MAIN_TOP.thick + TOP_RIM, MAIN_TOP.length], BLACK, SMALL_BEVEL, 2);
+    box(wood, new Matrix4().makeTranslation(s * (hole + wing / 2), plat, zc), [wing, T.thick, T.length], BLACK, SMALL_BEVEL, 2);
+    box(wood, new Matrix4().makeTranslation(0, plat, zc + s * (hole + (T.length / 2 - hole) / 2)), [2 * hole, T.thick, T.length / 2 - hole], BLACK, SMALL_BEVEL, 0);
+    box(wood, new Matrix4().makeTranslation(s * T.breadth / 2, plat + TOP_RIM / 2, zc), [TRESTLE.sided, T.thick + TOP_RIM, T.length], BLACK, SMALL_BEVEL, 2);
   }
-  const masthead = new Vector3(0, hounds + TRESTLE.deep / 2, 0);
+  const masthead = new Vector3(0, hounds + TRESTLE.deep / 2, zc);
 
   // --- Each side: the channel, its deadeyes and chain plates, the shrouds, lanyards and ratlines, the pin rail and its lines.
-  const rng = new Rng(COIL_SEED);
+  const rng = new Rng(COIL_SEED + index);
+  const chAft = r.shrouds[0]! - CHANNEL_BEYOND.aft, chFore = r.shrouds[r.shrouds.length - 1]! + CHANNEL_BEYOND.fore;
   for (const s of [1, -1]) {
-    const chH = MAIN_CHANNEL.top - MAIN_CHANNEL.thick / 2;
-    const outside = halfBreadth(chH) + PLANKING.side;
-    const chZ0 = Math.max(o.zFore, shipZ(MAIN_CHANNEL.fore)), chZ1 = Math.min(o.zAft, shipZ(MAIN_CHANNEL.aft));
-    box(wood, new Matrix4().makeTranslation(s * (outside + MAIN_CHANNEL.width / 2), shipY(chH), (chZ0 + chZ1) / 2), [MAIN_CHANNEL.width, MAIN_CHANNEL.thick, chZ1 - chZ0], BLACK, BEVEL, 2);
+    const chMid = (chAft + chFore) / 2, chTop = channelTop(chMid), chH = chTop - MAIN_CHANNEL.thick / 2;
+    const outsideAt = (a: number) => hullHalfBreadth(a, Math.min(chH, sideTop(a))) + PLANKING.side;
+    // The channel follows her side: a timber from her planking out, its outer edge straight.
+    const outer = Math.max(outsideAt(chAft), outsideAt(chFore), outsideAt(chMid)) + MAIN_CHANNEL.width;
+    const inner = Math.min(outsideAt(chAft), outsideAt(chFore), outsideAt(chMid));
+    box(wood, new Matrix4().makeTranslation(s * (inner + outer) / 2, shipY(chH), shipZ(chMid)), [outer - inner, MAIN_CHANNEL.thick, chFore - chAft], BLACK, BEVEL, 2);
     const shrouds: { foot: Vector3; top: Vector3 }[] = [];
-    MAIN_SHROUDS.forEach((fwd, k) => {
+    r.shrouds.forEach((fwd, k) => {
       const z = shipZ(fwd);
-      const lower = new Vector3(s * (outside + MAIN_CHANNEL.width - DEADEYE_SEAT.in), shipY(MAIN_CHANNEL.top) + DEADEYE_SEAT.up, z);
+      const lower = new Vector3(s * (outer - DEADEYE_SEAT.in), shipY(channelTop(chMid)) + DEADEYE_SEAT.up, z);
       // The shrouds go round the masthead in pairs, the foremost lowest.
-      const top = new Vector3(s * (MASTHEAD_SIDE / 2 + ROPE.shroud / 2), masthead.y + Math.floor(k / 2) * EYE_STACK, (k % 2 === 0 ? -1 : 1) * EYE_FORE_AFT);
-      const dir = new Vector3().subVectors(top, lower).normalize();
+      const top = new Vector3(s * (MASTHEAD_SIDE / 2 + ROPE.shroud / 2), masthead.y + Math.floor(k / 2) * EYE_STACK, zc + (k % 2 === 0 ? -1 : 1) * EYE_FORE_AFT);
+      const dir = direction(lower, top);
       const upper = lower.clone().addScaledVector(dir, DEADEYE.apart);
       // The deadeyes' faces lie in the plane of the shroud and her length.
       const n = new Vector3().crossVectors(dir, new Vector3(0, 0, 1)).normalize();
@@ -153,59 +172,59 @@ export function buildRig(fittings: Fittings, wood: Solid, iron: Solid, ropes: Ro
       // Both with the same X, so the holes on one side line up; the upper turned over (its single hole points down).
       const frameAt = (c: Vector3, flip: number) => new Matrix4().makeBasis(b, n.clone().multiplyScalar(flip), dir.clone().multiplyScalar(-flip)).setPosition(c);
       const lowFrame = frameAt(lower, 1), upFrame = frameAt(upper, -1);
-      place(fittings, 'prop_deadeye', lowFrame, { wood: { solid: wood, paint: 1 }, hole: { solid: wood, paint: 1 } }, k);
-      place(fittings, 'prop_deadeye', upFrame, { wood: { solid: wood, paint: 1 }, hole: { solid: wood, paint: 1 } }, k + MAIN_SHROUDS.length);
+      for (const [m, seed] of [[lowFrame, k], [upFrame, k + r.shrouds.length]] as const) {
+        // From off her a deadeye is a dark block in the shroud.
+        if (far) box(wood, m, [DEADEYE.diameter, DEADEYE.thick, DEADEYE.diameter], BLACK, 0, 0);
+        else place(fittings, 'prop_deadeye', m, { wood: { solid: wood, paint: 1 }, hole: { solid: wood, paint: 1 } }, seed);
+      }
       // The lanyard: its holes in the pack's model space (one at the top, two below), reeved up and down between the deadeyes.
       const holes = HOLE_ANGLES.map((a) => new Vector3(HOLE_RADIUS * Math.cos(a), 0, -HOLE_RADIUS * Math.sin(a)));
       // sideOf 1 is the outboard face (along n) of either deadeye.
       const face = (m: Matrix4, flip: number, h: Vector3, sideOf: number) => h.clone().setY(flip * sideOf * DEADEYE.thick / 2).applyMatrix4(m);
       const L = holes.map((h) => (sideOf: number) => face(lowFrame, 1, h, sideOf)), U = holes.map((h) => (sideOf: number) => face(upFrame, -1, h, sideOf));
-      for (let i = 0; i < holes.length; i++) ropes.line(straight(U[i]!(1), L[i]!(1)), ROPE.lanyard / 2, TARRED);
-      for (let i = 0; i < holes.length - 1; i++) ropes.line(straight(L[i]!(-1), U[i + 1]!(-1)), ROPE.lanyard / 2, TARRED);
+      for (let i = 0; i < holes.length && !far; i++) ropes.line(straight(U[i]!(1), L[i]!(1)), ROPE.lanyard / 2, TARRED);
+      for (let i = 0; i < holes.length - 1 && !far; i++) ropes.line(straight(L[i]!(-1), U[i + 1]!(-1)), ROPE.lanyard / 2, TARRED);
       // The chain plate: an iron strap from under the lower deadeye down her side to its bolt through the wale.
-      const footY = shipY(CHAIN_PLATE_FOOT), footX = s * (halfBreadth(CHAIN_PLATE_FOOT) + PLANKING.wale + CHAIN_PLATE.thick);
+      const plateFoot = CHAIN_PLATE_FOOT + (sheer(fwd) - sheer(MAIN_SHROUDS[0]!));
+      const footY = shipY(plateFoot), footX = s * (hullHalfBreadth(fwd, plateFoot) + PLANKING.wale + CHAIN_PLATE.thick);
       const strapTop = lower.clone().addScaledVector(dir, -DEADEYE.diameter / 2);
       const foot = new Vector3(footX, footY, z - dir.z * (strapTop.y - footY) / Math.max(dir.y, SMALL_BEVEL));
-      // Where the slice's end cuts the strap, it ends there like everything else.
-      const cut = foot.z > o.zAft ? (o.zAft - strapTop.z) / (foot.z - strapTop.z) : 1;
-      for (const p of straight(strapTop, foot.clone().lerpVectors(strapTop, foot, cut), PLATE_STEPS).slice(1)) rod(iron, strapTop, p, CHAIN_PLATE.width / 2, BOLT.sides / 2, IRON);
-      if (cut === 1) rod(iron, foot.clone().setX(footX - s * CHAIN_PLATE.thick), foot.clone().setX(footX + s * CHAIN_PLATE.thick), BOLT.radius, BOLT.sides, IRON);
+      for (const p of straight(strapTop, foot, PLATE_STEPS).slice(1)) rod(iron, strapTop, p, CHAIN_PLATE.width / 2, BOLT.sides / 2, IRON);
+      rod(iron, foot.clone().setX(footX - s * CHAIN_PLATE.thick), foot.clone().setX(footX + s * CHAIN_PLATE.thick), BOLT.radius, BOLT.sides, IRON);
       // The shroud itself, from round the upper deadeye to the masthead.
       const start = upper.clone().addScaledVector(dir, DEADEYE.diameter / 2);
       ropes.line(straight(start, top, 2), ROPE.shroud / 2, TARRED);
       shrouds.push({ foot: start, top });
     });
     // Ratlines across the shrouds, a man's step apart, each sagging a little between two shrouds.
-    const low = Math.max(...shrouds.map((r) => r.foot.y)) + RATLINE_FROM, high = masthead.y - RATLINE_TO;
-    const atY = (r: { foot: Vector3; top: Vector3 }, y: number) => new Vector3().lerpVectors(r.foot, r.top, (y - r.foot.y) / (r.top.y - r.foot.y));
-    for (let y = low; y < high; y += RATLINE_PITCH) {
+    const lowR = Math.max(...shrouds.map((q) => q.foot.y)) + RATLINE_FROM, high = masthead.y - RATLINE_TO;
+    const atY = (q: { foot: Vector3; top: Vector3 }, y: number) => new Vector3().lerpVectors(q.foot, q.top, (y - q.foot.y) / (q.top.y - q.foot.y));
+    for (let y = lowR; !far && y < high; y += RATLINE_PITCH) {
       for (let k = 0; k < shrouds.length - 1; k++) ropes.line(hanging(atY(shrouds[k]!, y), atY(shrouds[k + 1]!, y), RATLINE_SAG, 2), ROPE.ratline / 2, TARRED);
     }
 
     // The pin rail inside the bulwark along the shrouds, its pins, and the lines belayed on them.
-    const thick = PLANKING.side + BULWARK.timber + BULWARK.insideBoard;
-    const railH = DECK_AT_SIDE + PIN_RAIL.height;
-    const inX = halfBreadth(railH) + PLANKING.side - thick;
-    const railX = s * (inX - PIN_RAIL.width / 2);
-    const rz0 = Math.max(o.zFore, shipZ(MAIN_SHROUDS[MAIN_SHROUDS.length - 1]!) - PIN_START), rz1 = Math.min(o.zAft, shipZ(MAIN_SHROUDS[0]!) + PIN_START);
-    box(wood, new Matrix4().makeTranslation(railX, shipY(railH) - PIN_RAIL.thick / 2, (rz0 + rz1) / 2), [PIN_RAIL.width, PIN_RAIL.thick, rz1 - rz0], RED, SMALL_BEVEL, 2);
-    const count = Math.floor((rz1 - rz0) / PIN_RAIL.pitch);
-    for (let i = 0; i <= count; i++) {
-      const z = rz0 + (rz1 - rz0 - count * PIN_RAIL.pitch) / 2 + i * PIN_RAIL.pitch;
+    const rail = RAILS.find((x) => x.id === r.rail);
+    if (far || !rail || rail.kind !== 'pin rail') continue;
+    const pins = Array.from({ length: Math.floor((rail.fore - rail.aft) / PIN_RAIL.pitch) + 1 }, (_, k) => rail.aft + k * PIN_RAIL.pitch);
+    const railAt = (a: number) => sheer(a) + PIN_RAIL.height;
+    const railX = (a: number) => s * (bulwarkInside(a, railAt(a)) - PIN_RAIL.width / 2);
+    const from = rail.aft - RAIL_BEYOND, to = rail.fore + RAIL_BEYOND, railMid = (from + to) / 2;
+    box(wood, new Matrix4().makeTranslation(railX(railMid), shipY(railAt(railMid)) - PIN_RAIL.thick / 2, shipZ(railMid)), [PIN_RAIL.width, PIN_RAIL.thick, to - from], RED, SMALL_BEVEL, 2);
+    pins.forEach((a, i) => {
       // No pin over a port: its coil would hang across the gun.
-      if (o.ports.some((p) => Math.abs(z - p) < PORT.width / 2 + PORT_CLEAR)) continue;
-      const pinTop = shipY(railH);
-      place(fittings, 'prop_belaying_pin', new Matrix4().makeTranslation(railX, pinTop - PIN_FOOT_BELOW, z), { wood: { solid: wood, paint: 1 } }, i);
-      if (i % LINE_EVERY !== 0) continue;
+      if (PORTS.some(([, along, , , w]) => Math.abs(a - along) < w / 2 + PORT_CLEAR)) return;
+      const z = shipZ(a), x = railX(railMid), pinTop = shipY(railAt(railMid));
+      place(fittings, 'prop_belaying_pin', new Matrix4().makeTranslation(x, pinTop - PIN_FOOT_BELOW, z), { wood: { solid: wood, paint: 1 } }, i);
+      if (i % LINE_EVERY !== 0) return;
       // The line comes down from a lead block under the top, is belayed round the pin, and its fall hangs in a coil.
-      const lead = new Vector3(s * LEAD_OUT, hounds - TRESTLE.deep, (rng.float() - 1 / 2) * 2 * LEAD_SPREAD);
-      const off = new Vector3(railX, pinTop + LINE_OFF_PIN, z);
+      const lead = new Vector3(s * LEAD_OUT, hounds - TRESTLE.deep, zc + (rng.float() - 1 / 2) * 2 * LEAD_SPREAD);
+      const off = new Vector3(x, pinTop + LINE_OFF_PIN, z);
       ropes.line(hanging(lead, off, LINE_SAG, LINE_STEPS), ROPE.running / 2, HEMP);
-      lathe(wood, new Matrix4().makeTranslation(railX, pinTop + LINE_OFF_PIN - BELAY_BAND, z), [[0, 0], [BELAY_RADIUS, 0], [BELAY_RADIUS, BELAY_BAND], [0, BELAY_BAND]], BOLT.sides, { rgb: ROPE_HEMP_RGB, paint: 1 });
-      ropes.line(coil(new Vector3(railX - s * (PIN_RAIL.width / 2 + COIL.spread), pinTop + LINE_OFF_PIN - BELAY_BAND, z), s, rng), ROPE.running / 2, HEMP);
-    }
+      lathe(wood, new Matrix4().makeTranslation(x, pinTop + LINE_OFF_PIN - BELAY_BAND, z), [[0, 0], [BELAY_RADIUS, 0], [BELAY_RADIUS, BELAY_BAND], [0, BELAY_BAND]], BOLT.sides, { rgb: ROPE_HEMP_RGB, paint: 1 });
+      ropes.line(coil(new Vector3(x - s * (PIN_RAIL.width / 2 + COIL.spread), pinTop + LINE_OFF_PIN - BELAY_BAND, z), s, rng), ROPE.running / 2, HEMP);
+    });
   }
-  return { masthead };
 }
 
 /** Hemp rope's colour where it is drawn as a solid (the turns round a pin). */
