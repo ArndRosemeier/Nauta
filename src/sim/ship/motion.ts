@@ -2,8 +2,8 @@
  * Floating (pure, implementation plan N2.2): the brig on the simulated sea. Her hull is a closed surface of pressure
  * points (the plan's hull, `hullMesh`, outside her planking, with her keel); each point under the water is pushed in
  * by the water's pressure at its depth below the surface over it, and her weight pulls her centre down. Heave, pitch
- * and roll are integrated at the simulation's fixed step; her heading and speed are given from outside (the sailing
- * model, N3.3, gives them later). The one owner of her pose (rules.json `owners`).
+ * and roll are integrated at the simulation's fixed step; her heading, her way through the water and her sails'
+ * heeling moment come from the sailing model (sailing.ts, `Way`). The one owner of her pose (rules.json `owners`).
  *
  * Ship space is section.ts's: metres, +x starboard, +y up from the load waterline, -z forward. Her pose places her
  * centre of gravity in the world and turns ship space about it: rolled (starboard down), pitched (bow up), then
@@ -50,11 +50,20 @@ export interface ShipMotion {
   readonly pose: ShipPose;
 }
 
-/** What she is told from outside for now: her heading (compass bearing, rad) and speed through the water (m/s). */
-export interface Course {
+/**
+ * How she goes, from the sailing model (sailing.ts): her heading (compass bearing, rad), her speed through the water
+ * ahead and to starboard (m/s), and the moment her sails heel her with, to starboard, kN·m (it holds her heeled and,
+ * since a sail aloft swinging across the wind presses against the swing, damps her roll).
+ */
+export interface Way {
   readonly heading: number;
-  readonly speed: number;
+  readonly ahead: number;
+  readonly leeway: number;
+  readonly rollMoment: number;
 }
+
+/** Lying still with her head on `heading` and no sail: the way of a ship at anchor (the slice). */
+export const lyingStill = (heading: number): Way => ({ heading, ahead: 0, leeway: 0, rollMoment: 0 });
 
 /** Her hull as pressure points: sections from end to end and rows up each side (about 1.6 m by 0.6 m panels). */
 const HULL_SECTIONS = 20;
@@ -238,10 +247,11 @@ const sample = seaSample();
 let world = new Float64Array(0);
 
 /**
- * One step of the simulation's fixed length: the water under her at `t` pushes on her hull, her weight pulls, and her
- * heave, pitch and roll move on; her heading is set and she goes ahead at her speed (both given by `course`).
+ * One step of the simulation's fixed length: the water under her at `t` pushes on her hull, her weight pulls, her
+ * sails heel her, and her heave, pitch and roll move on; her heading is set and she goes on through the water as the
+ * sailing model says (`way`).
  */
-export function stepMotion(m: ShipMotion, sea: SeaState, t: number, course: Course): ShipMotion {
+export function stepMotion(m: ShipMotion, sea: SeaState, t: number, way: Way): ShipMotion {
   const b = shipBody(), p = m.pose, r = poseRotation(p, rotation);
   const v = b.vertices, tris = b.triangles, areas = b.areas;
   // Her heading's axes on the water: forward and to starboard.
@@ -313,16 +323,17 @@ export function stepMotion(m: ShipMotion, sea: SeaState, t: number, course: Cour
 
   // Her turning moments in her heading's frame, about her athwartships (pitch) and fore-and-aft (roll) axes.
   const hTx = ch * tx + sh * tz, hTy = ty, hTz = -sh * tx + ch * tz;
-  const pitchAcc = hTx / b.pitchInertia, rollAcc = -(-sp * hTy + cp * hTz) / b.rollInertia;
+  const pitchAcc = hTx / b.pitchInertia, rollAcc = (way.rollMoment - (-sp * hTy + cp * hTz)) / b.rollInertia;
   const heaveRate = p.heaveRate + (fy / b.heaveMass) * STEP_SECONDS;
   const pitchRate = p.pitchRate + pitchAcc * STEP_SECONDS, rollRate = p.rollRate + rollAcc * STEP_SECONDS;
-  sincos(course.heading, sc);
+  // On through the water: ahead along her heading, her leeway to starboard of it.
+  sincos(way.heading, sc);
   return {
     pose: {
-      x: p.x + course.speed * sc[0] * STEP_SECONDS,
-      z: p.z - course.speed * sc[1] * STEP_SECONDS,
+      x: p.x + (way.ahead * sc[0] + way.leeway * sc[1]) * STEP_SECONDS,
+      z: p.z + (way.leeway * sc[0] - way.ahead * sc[1]) * STEP_SECONDS,
       heave: p.heave + heaveRate * STEP_SECONDS,
-      heading: course.heading,
+      heading: way.heading,
       pitch: p.pitch + pitchRate * STEP_SECONDS,
       roll: p.roll + rollRate * STEP_SECONDS,
       heaveRate, pitchRate, rollRate,

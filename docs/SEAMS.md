@@ -89,7 +89,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Ship space: heights above her base, metres forward of the mainmast | `src/sim/ship/section.ts#shipY` |
 | The weather deck's height across her (its camber) | `src/sim/ship/section.ts#deckY` |
 | The simulation's fixed step (30 a second) | `src/sim/units.ts#STEP_SECONDS` |
-| Her floating: one step of heave, pitch and roll on the sea, pushed by the water's pressure on her hull and pulled by her weight; heading and speed given | `src/sim/ship/motion.ts#stepMotion` |
+| Her floating: one step of heave, pitch and roll on the sea, pushed by the water's pressure on her hull, pulled by her weight and heeled by her sails; her heading and way from the sailing model | `src/sim/ship/motion.ts#stepMotion` |
+| How she goes, as the sailing model hands it to her floating: heading, way ahead and leeway, the sails' heeling moment | `src/sim/ship/motion.ts#Way` |
+| The way of a ship lying still with no sail (the slice) | `src/sim/ship/motion.ts#lyingStill` |
 | Putting her on the water still, at the draught's waterline and trim | `src/sim/ship/motion.ts#startMotion` |
 | Her body afloat: pressure points, mass, centre of gravity, inertia | `src/sim/ship/motion.ts#shipBody` |
 | Her rotation at a pose (ship space to the world) | `src/sim/ship/motion.ts#poseRotation` |
@@ -201,11 +203,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A state as bytes, and back | `src/sim/state.ts#encodeState` |
 | The state's hash (two machines with the same hash have the same state) | `src/sim/state.ts#hashState` |
 | One step of the match: orders in, the next state and events out | `src/sim/step.ts#step` |
-| What a ship can be ordered (for now: a course, taken at once) | `src/sim/step.ts#Order` |
+| What a ship can be ordered (for now, each taken at once: a course and which way to turn to it, a canvas, a mast's yards aback) | `src/sim/step.ts#Order` |
 | What happened in a step (for drawing, sound and the interface) | `src/sim/step.ts#SimEvent` |
 | Running a match on through a log of orders (a guest, a replay, the tests) | `src/sim/replay.ts#replay` |
 | The knot in m/s | `src/sim/units.ts#KNOT` |
-| The fastest a ship may be told to go until the sailing model works speed out | `src/sim/rules/ships.ts#TOP_SPEED` |
 | The bench's flight: where the eye is at a moment of it | `src/app/bench.ts#benchPose` |
 | A percentile of sorted measurements | `src/app/bench.ts#percentile` |
 | Frame times summed up as the budget reads them (percentiles, worst, on time, hitches) | `src/app/bench.ts#frameStats` |
@@ -230,6 +231,14 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The ways a sail can stand | `src/sim/ship/sails.ts#sailSettings` |
 | A sail's named corner | `src/sim/ship/sails.ts#corner` |
 | A point on a sail's edge (a leech's middle, a reef cringle) | `src/sim/ship/sails.ts#edgePoint` |
+| Sailing: one step of a ship under sail in the true wind (sails by the apparent wind, the crew's trim and bracing, hull, rudder, helmsman, tacking, wearing, missing stays), her way and her sails' heel out | `src/sim/ship/sailing.ts#stepSailing` |
+| A ship under sail at the start (heading, way, canvas, yards trimmed) | `src/sim/ship/sailing.ts#startSailing` |
+| Telling the helmsman a heading and which way to turn to it | `src/sim/ship/sailing.ts#steerTo` |
+| Setting a ship's canvas | `src/sim/ship/sailing.ts#setCanvas` |
+| Which sails a canvas sets in a wind, reefed for it | `src/sim/ship/sailing.ts#canvasFor` |
+| Laying a mast's yards aback, or filling them | `src/sim/ship/sailing.ts#layAback` |
+| How each sail stands this moment (area, brace or sheet, pressure, aback, shivering), for drawing and sound | `src/sim/ship/sailing.ts#sailsStanding` |
+| The sailing model's tuning: sail polars, hull and rudder, helmsman, bracing, canvas settings and reefs, heel limit, the speed table | `src/sim/rules/sailing.ts#SPEED_TABLE` |
 | The stays | `src/sim/ship/lines.ts#buildStays` |
 | The standing rigging: shrouds, futtock shrouds, backstays, slings, the bowsprit's | `src/sim/ship/lines.ts#buildStanding` |
 | The running rigging, each line on a pin of its own | `src/sim/ship/lines.ts#buildRunning` |

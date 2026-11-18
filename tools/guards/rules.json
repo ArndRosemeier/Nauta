@@ -97,9 +97,9 @@
       "what": "the ships of a match, each stepped once a step"
     },
     {
-      "field": "course",
-      "owner": "src/sim/step.ts",
-      "what": "the heading and speed a ship holds as last ordered (the stand-in until the sailing model, N3.3, owns them)"
+      "field": "sailing",
+      "owner": "src/sim/ship/sailing.ts",
+      "what": "how a ship sails: her heading, way, leeway, helm, what the helmsman steers, her canvas and her yards (N3.3)"
     }
   ]
 }

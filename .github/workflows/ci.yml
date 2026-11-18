@@ -69,6 +69,8 @@ jobs:
           SHOT_SIZE=1180x820 SHOT_DRAG=-300,120 node tools/guards/budget.mjs 120 180 -- npm run shot -- "?gl&hud&day=0" shots/tablet.png
       - name: The same orders give the same state after ten simulated minutes, in two processes and through bytes
         run: node tools/guards/budget.mjs 120 180 -- npm run check:replay
+      - name: The brig sails, tacks and heels within her limits in every wind, through the sea and the gusts
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:sailing
       - name: The standard sea shots (times of day, seas, eye heights) within their 3 minutes
         run: node tools/guards/budget.mjs 120 180 -- npm run shot:sea -- shots/sea
       - uses: actions/upload-artifact@v4

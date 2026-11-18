@@ -1,0 +1,3 @@
+Behind the scenes: the brig now sails by her own canvas in the wind. Each sail pulls by its angle to the wind, the crew braces the yards round, and the helmsman steers; she can tack, wear, miss stays and be taken aback.
+She makes about 5 knots close-hauled and 11 with the wind on the quarter in a fresh breeze, and none within 60 degrees of the wind. A tack at speed takes well under a minute.
+Her sails heel her and steady her roll: under battle sail she rolls about half as far in a beam sea as under bare poles. Nothing of this is drawn yet; the sails and the orders come next.
