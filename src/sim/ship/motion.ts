@@ -224,6 +224,17 @@ export function toWorld(pose: ShipPose, x: number, y: number, z: number, out: [n
 }
 const rotation = new Float64Array(MATRIX);
 
+/** A world point (x, y, z) in ship space at her pose, into `out`: `toWorld` undone. */
+export function toShip(pose: ShipPose, x: number, y: number, z: number, out: [number, number, number] = [0, 0, 0]): [number, number, number] {
+  const r = poseRotation(pose, rotation), b = shipBody();
+  const dx = x - pose.x, dy = y - pose.heave, dz = z - pose.z;
+  // The rotation's transpose turns the world back into ship space; then her centre's place in it is added.
+  for (let i = 0; i < XYZ; i++) out[i] = r[i]! * dx + r[i + XYZ]! * dy + r[i + XYZ + XYZ]! * dz;
+  out[1] += b.centreY;
+  out[2] += b.centreZ;
+  return out;
+}
+
 /** Where ship space's origin stands in the world at her pose (what a drawing of her is placed at). */
 export const shipOrigin = (pose: ShipPose, out: [number, number, number] = [0, 0, 0]): [number, number, number] => toWorld(pose, 0, 0, 0, out);
 

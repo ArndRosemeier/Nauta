@@ -10,9 +10,10 @@
  */
 import { HULL_AFT, HULL_FORE } from '../../sim/ship/hull';
 import { sectionGirth } from '../../sim/ship/plan';
+import { HOLE_GRID } from '../../sim/rules/damage';
 
-/** One texel of the map, m: a 32-pounder's hole is about four across. */
-export const DAMAGE_TEXEL = 0.04;
+/** One texel of the map, m: a 32-pounder's hole is about four across; the grid the simulation keeps holes to (damage.ts). */
+export const DAMAGE_TEXEL = HOLE_GRID;
 
 /** The regions, numbered from 1 (0: a surface with no damage drawn). */
 export const DAMAGE = {

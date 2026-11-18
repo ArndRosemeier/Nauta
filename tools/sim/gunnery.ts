@@ -15,7 +15,7 @@ import { bears, fireShot, layOn, type Flight, type Vec } from '../../src/sim/gun
 import { RAIL_TOP, TOP_OF_SIDE } from '../../src/sim/rules/ships.ts';
 import type { ShotKind } from '../../src/sim/rules/guns.ts';
 import { hullEnds, hullHalfBreadth, sideTop } from '../../src/sim/ship/hull.ts';
-import { lyingStill, poseRotation, shipBody, startMotion, stepMotion, type ShipMotion, type ShipPose } from '../../src/sim/ship/motion.ts';
+import { lyingStill, startMotion, stepMotion, toShip, type ShipMotion, type ShipPose } from '../../src/sim/ship/motion.ts';
 import { LOAD_WATERLINE } from '../../src/sim/rules/ships.ts';
 import { startMatch } from '../../src/sim/state.ts';
 import { duelStart } from '../../src/sim/start.ts';
@@ -85,19 +85,13 @@ function broadsideByOrders(): void {
   }
 }
 
-/** A world point in a ship's own space at her pose. */
-function toShip(pose: ShipPose, p: Vec): Vec {
-  const r = poseRotation(pose), b = shipBody();
-  const dx = p[0] - pose.x, dy = p[1] - pose.heave, dz = p[2] - pose.z;
-  return [r[0]! * dx + r[3]! * dy + r[6]! * dz, r[1]! * dx + r[4]! * dy + r[7]! * dz + b.centreY, r[2]! * dx + r[5]! * dy + r[8]! * dz + b.centreZ];
-}
-
 /** Whether a ball's path passes through her larboard side (the side toward the firing ship) as she lies at `pose`. */
 function strikes(pose: ShipPose, flight: Flight): boolean {
   const rail = RAIL_TOP - TOP_OF_SIDE;
-  let prev = toShip(pose, flight.path[0]!);
+  const at = (p: Vec): Vec => toShip(pose, p[0], p[1], p[2]);
+  let prev = at(flight.path[0]!);
   for (let i = 1; i < flight.path.length; i++) {
-    const q = toShip(pose, flight.path[i]!);
+    const q = at(flight.path[i]!);
     const along = -q[2], base = q[1] + LOAD_WATERLINE;
     const side = -hullHalfBreadth(Math.max(-1e3, along), Math.min(base, sideTop(along)));
     if (prev[0] <= side && q[0] >= side) {

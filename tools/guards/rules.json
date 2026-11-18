@@ -238,6 +238,46 @@
       "field": "guns",
       "owner": "src/sim/guns/guns.ts",
       "what": "a ship's guns packed, two whole numbers a gun in battery order: drill, load, mounting, work left; laying (N5.1)"
+    },
+    {
+      "field": "damage",
+      "owner": "src/sim/damage.ts",
+      "what": "what shot has done to a ship: her holes, lines cut, spars wounded, sails holed and men hurt (N6.1)"
+    },
+    {
+      "field": "flying",
+      "owner": "src/sim/damage.ts",
+      "what": "the shots on their way: which gun fired each and when, and what each ball has spent (N6.1)"
+    },
+    {
+      "field": "holes",
+      "owner": "src/sim/damage.ts",
+      "what": "every hole in a ship's timber: its cell, where in it, the ball, lodged or through (N6.1)"
+    },
+    {
+      "field": "cut",
+      "owner": "src/sim/damage.ts",
+      "what": "a ship's lines shot away (N6.1)"
+    },
+    {
+      "field": "wounds",
+      "owner": "src/sim/damage.ts",
+      "what": "the wounds to the parts of a ship's spars (N6.1)"
+    },
+    {
+      "field": "rent",
+      "owner": "src/sim/damage.ts",
+      "what": "the shot holes in each of a ship's sails (N6.1)"
+    },
+    {
+      "field": "hurt",
+      "owner": "src/sim/damage.ts",
+      "what": "a ship's men hurt and how badly (N6.1)"
+    },
+    {
+      "field": "spent",
+      "owner": "src/sim/damage.ts",
+      "what": "how much of its punch each ball of a shot in flight has spent (N6.1)"
     }
   ]
 }

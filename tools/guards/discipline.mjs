@@ -48,11 +48,13 @@ export function magicNumbers(source) {
 /** Writes to an owned field outside its owner: `owners` is [{ field, owner, what }], `files` is [{ file, text }]. */
 export function ownerBreaches(owners, files) {
   const out = [];
+  // Each file is masked once (masking is the costly part), then every owned field is looked for in its lines.
+  const masked = files.map(({ file, text }) => ({ file, lines: maskCode(text).split('\n') }));
   for (const { field, owner, what } of owners) {
     const write = new RegExp(`\\.${field}\\s*(?:[-+*/%]?=(?!=)|\\+\\+|--)|(?:\\+\\+|--)\\s*[\\w.]*\\.${field}\\b`);
-    for (const { file, text } of files) {
+    for (const { file, lines } of masked) {
       if (file === owner) continue;
-      maskCode(text).split('\n').forEach((l, i) => {
+      lines.forEach((l, i) => {
         if (write.test(l)) out.push(`${file}:${i + 1}: changes .${field} (${what}); only ${owner} may: call it instead`);
       });
     }
