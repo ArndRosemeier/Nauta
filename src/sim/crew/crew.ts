@@ -177,7 +177,12 @@ const pacePlace = (paces: readonly [string, string], i: number, tick: number): s
   paces[Math.floor((tick / STEPS_PER_SECOND + i * PACE_STAGGER) / PACE_SECONDS) % paces.length]!;
 
 /** The guns of each side that a powder boy serves (not the chase guns), in the plan's order, by side. */
-const servedGuns = (side: number): readonly string[] => shipPlan().guns.filter((g) => !g.chase && g.side === side).map((g) => g.id);
+const served = new Map<number, readonly string[]>();
+const servedGuns = (side: number): readonly string[] => {
+  let ids = served.get(side);
+  if (!ids) served.set(side, ids = shipPlan().guns.filter((g) => !g.chase && g.side === side).map((g) => g.id));
+  return ids;
+};
 /** A powder boy's place in the match's `tick` with her fighting `side`: his post (the magazine, a hatch) and the powder place of his gun in turn, each for `POWDER_SECONDS`, the boys' rounds put on by `POWDER_STAGGER`. */
 function powderRound(boy: number, side: number, post: string, tick: number): string {
   const guns = servedGuns(side);
