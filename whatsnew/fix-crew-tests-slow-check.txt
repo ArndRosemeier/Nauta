@@ -1,0 +1,1 @@
+Behind the scenes: the crew's long test runs moved to a separate check, so the quick tests stay fast as the game grows.
