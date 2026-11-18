@@ -346,6 +346,8 @@ You give every sailing order from the deck and watch the men do it.
 
 **The orders specification** is [orders.md](orders.md) (design thread, 2026-11-18, a proposal until Arnd agrees): the three ways to give an order, the fan, who takes which order, how an order travels, the reports, the bubbles and the keys. N3.4, N4.1, N4.4, N4.5 and N5.3 read it first.
 
+**Design decisions for N4 (design thread, 2026-11-18):** N4.1's roster, its split between guns, tops and sails, and each job's hands and seconds stand as first proposals for Arnd at G4. The first game has no fatigue and no morale as numbers: how the men look comes from what is happening to them (events), and health comes with N6. Keeping her hove to becomes a job of the crew like any other when N4.3 shows it (it is still instant in `orders.ts`). A walking man is sent over the network as his two ends, his haste, the leg he is on and how far along it, and each machine finds the route itself on the shared walk graph, so two busy crews stay inside the 16 KB of a state.
+
 **Open design questions for N4:** Arnd's four answers in orders.md (the midshipman, "Steer there", the "Fire!" button, no pause); the phrase book's words; dress by navy and rank; how much the men show mood.
 
 **Notes:** N4.1 (crew and tasks), `src/sim/crew/` (`roster.ts`, `drill.ts`, `crew.ts`), its numbers in `src/sim/rules/crew.ts`.
@@ -387,7 +389,15 @@ A broadside looks, sounds and feels like one, from both ships.
 
 **Gate G5 (Arnd, PC and iPad):** fight a gunnery exchange without damage; a broadside from both ends; smoke hides and clears with the wind; frame budget met in the thick of it.
 
-**Open design questions for N5:** how the captain chooses a target (by where he looks, or by order to the gunner); how much aiming the gunner does unprompted; ranges and accuracy for pace.
+**Design decisions for N5 (design thread, 2026-11-18; first proposals, the numbers live in `src/sim/rules/guns.ts` and are tuned at G5 and in N7.5):**
+
+- **Who aims.** The duel has one enemy, so she is the target. The captain orders what to fire (round, chain, grape), at what part of her (hull, rigging, deck) and when (as they bear, or on his word); see [orders.md](orders.md). Every gun captain trains and elevates his own gun onto that part without being told. The captain never lays a gun.
+- **The roll is the skill.** A gun's shot leaves along the barrel as the ship lies at that instant. "As they bear" lets each gun captain pick his own moment of the roll, with a seeded error that grows with the sea and shrinks with a full, unhurt crew. "On my word" fires every loaded gun of the side at the captain's instant: on the up-roll high into her rigging, on the down-roll low into her hull or the sea. That choice is the captain's and it matters.
+- **The guns.** 32-pounder carronade: muzzle speed about 230 m/s, trains 30° either way, elevates from 5° down to 11° up, reloads in 35 s with its full crew. Long 6-pounder: about 480 m/s, trains 20° either way, the same elevation, reloads in 30 s. Short-handed, the reload stretches in proportion to the hands missing, and a gun with fewer than two men stops.
+- **Range and accuracy, for pace.** Against a brig lying broadside on in a force 4 sea, with guns fired as they bear: at 100 m about three round shot in four strike her, at 200 m about half, at 400 m about one in five; beyond 600 m only the long sixes are worth firing. Chain is for her rigging out to about 250 m; grape is for her men inside about 100 m. So the fight is decided inside 200 m, closing is a choice with a cost, and the long sixes give the chase its sting.
+- **Left out.** Powder and shot are not counted in the first game; no double-shotting; no misfires or burst guns.
+
+**Open design questions for N5:** none before G5; Arnd's answer on the "Fire!" button (orders.md) decides N5.3's last part.
 
 ---
 

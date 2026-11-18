@@ -72,7 +72,7 @@ Reports are bubbles over the man who makes them, raised by the simulation's even
 | Lookout | A sail sighted; she tacks, wears, makes or shortens sail; she opens her ports; her mast is gone; she strikes |
 | Master | Wind shifts or freshens; "She won't lie that course"; missed stays; taken aback |
 | First lieutenant | At quarters; too few hands for what is ordered; fire; the colours shot away |
-| Gunner | Side ready; guns bear; a gun dismounted; powder running low |
+| Gunner | Side ready; guns bear; a gun dismounted |
 | Carpenter | Water in the well rising or gaining; holed below the waterline; a mast wounded |
 | Surgeon | Only when asked |
 
