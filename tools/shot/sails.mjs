@@ -26,12 +26,17 @@ const BEFORE_TACK = 75;
 const COMPASS = 360;
 /**
  * Seconds the match runs on after an order before a picture: a canvas order takes the crew a while, a course settles; a
- * sail being clewed up (all off their sheets from 15 s, the next furled after 30 s); furled. The match
+ * sail being clewed up (none set from 25 s, six of the twelve rolled up on their yards by then, since the hands stand by
+ * in the waist and below, PR 110); furled. The match
  * moves only by these jumps (main.ts `__nautaSail.onward`), not by the page's clock, so they hold on any machine.
  */
-const SETTLE = { canvas: 150, course: 75, clew: 18, furl: 200 };
-/** Through a tack the match runs on by this many seconds at a time until a sail is aback, at most this long. */
-const STAYS = { step: 2, most: 60 };
+const SETTLE = { canvas: 150, course: 75, clew: 28, furl: 200 };
+/**
+ * Through a tack the match runs on by this many seconds at a time until the sails stand as the step names, at most this
+ * long (the hands stand by in the waist and below, PR 110, and walk to their stations first: a tack waits for them, and
+ * the sails stay aback about 150 s after a course change from the beam).
+ */
+const STAYS = { step: 2, most: 240 };
 
 const { width, height } = shotSize('800x500');
 const served = await openBrowser();
