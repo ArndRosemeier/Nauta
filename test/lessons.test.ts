@@ -134,14 +134,15 @@ test('the first match\'s computer captain lies hove to and gives no order until 
   assert.equal(s.foeWaiting, false);
 });
 
-test('in the first match the first lieutenant sends the pumps himself, once, and says so, with the lessons skipped too', () => {
+test('in the first match the first lieutenant sends the pumps and the carpenter himself, once, and says so, with the lessons skipped too', () => {
   const water = { kind: 'water', tick: 1, ship: 0, mark: 1 } as const;
   for (const skip of [false, true]) {
     const l = new Lessons();
     l.guideFor(seen(at(0)));
     if (skip) l.silence();
     const g = l.guideFor(seen(at(1), { heard: [water] }));
-    assert.deepEqual(g.gives, [{ kind: 'pumps', ship: 0 }]);
+    assert.deepEqual(g.gives, [{ kind: 'pumps', ship: 0 }, { kind: 'plug', ship: 0 }]);
+    assert.ok(lines(g).includes('lesson.plug'));
     assert.ok(lines(g).includes('lesson.pumps'));
     assert.deepEqual(l.guideFor(seen(at(2), { heard: [water] })).gives, [], 'once');
   }

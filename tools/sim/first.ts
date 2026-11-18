@@ -15,7 +15,7 @@
  * undone (its time ran out), an order a lesson asked for refused, the course not reaching the fight within
  * `FIGHT_WITHIN` minutes, the other captain never woken, the ships never within `FIGHTING_RANGE` or a ship that never
  * fired, all on the first match's own seed; an order a lesson asked for refused on any. And on the fight (design thread,
- * 2026-11-18, after N7.5a): the captain who gives no orders winning at all, and (once `JUDGE_WINS`) the slow novice
+ * 2026-11-18, after N7.5a): the captain who gives no orders winning at all, and the slow novice
  * winning fewer than `MUST_WIN` of the `SEEDS`.
  *
  *   npm run check:first
@@ -45,11 +45,6 @@ const QUICK = [3, 8];
 /** The seeds the slow novice plays (the first match's own and the next), and how many he must win (design thread, 2026-11-18). */
 const SEEDS = 10;
 const MUST_WIN = 9;
-/**
- * Whether winning is judged yet: not until the first match's captain and help reach `MUST_WIN` (design thread,
- * 2026-11-18); until then the wins are printed. The lessons and the captain who gives no orders are judged always.
- */
-const JUDGE_WINS = false;
 /** The seeds the captain who gives no orders plays; he must win none. */
 const IDLE_SEEDS = 3;
 /** The captain who gives no orders, in place of a reaction. */
@@ -61,7 +56,7 @@ const FIGHT_WITHIN = 12;
 /** The ships must come within this of each other, m, to have fought (check:captains' measure). */
 const FIGHTING_RANGE = 600;
 /** The lessons the novice does himself, all of which must come. */
-const DONE_BY_HIM = ['look', 'walk', 'glass', 'sail', 'by', 'tack', 'follow', 'quarters', 'hold', 'abeam', 'fire'];
+const DONE_BY_HIM = ['look', 'walk', 'glass', 'sail', 'by', 'tack', 'follow', 'quarters', 'hold', 'abeam', 'fire', 'volley'];
 /** Her deck level by a new captain's eye, rad: he gives the word within this of level. */
 const LEVEL_BY_EYE = 2 * DEGREE;
 const STEP = 1 / STEPS_PER_SECOND;
@@ -143,9 +138,9 @@ function play(reaction: number | typeof IDLE, seed: number): Run {
     // He does what is asked once he has read it, and again each time it is asked again.
     if (g.asked) askedAt = t;
     if (g.wants && t - askedAt >= reaction) { asked = doIt(g.wants, session, me) ?? asked; askedAt = Infinity; }
-    if (lessons.taught('fight') && run.fight < 0) run.fight = minute;
+    if (lessons.taught('volley') && run.fight < 0) run.fight = minute;
     // In the fight, as he was taught (not the instant it comes: he sees it, then gives it).
-    if (lessons.taught('fight') && waitingForWord(state, ship) && wordNow(state, ship) && t - wordAt >= reaction) { session.give({ kind: 'fire', ship }); wordAt = t; }
+    if (lessons.taught('volley') && waitingForWord(state, ship) && wordNow(state, ship) && t - wordAt >= reaction) { session.give({ kind: 'fire', ship }); wordAt = t; }
   });
   const most = MOST_MINUTES * SECONDS_PER_MINUTE;
   while (!session.state.fight.end && now < most) { now += STEP; session.pump(); }
@@ -183,8 +178,8 @@ function report(runs: readonly Run[]): void {
     problems.push(...problemsOf(r));
   }
   const slow = runs.filter((r) => r.reaction === SLOW), won = slow.filter((r) => r.won).length;
-  console.log(`the slow novice (${SLOW} s) won ${won} of ${slow.length} seeds (${MUST_WIN} wanted${JUDGE_WINS ? '' : ', printed and not judged yet'})`);
-  if (JUDGE_WINS && won < MUST_WIN) problems.push(`the slow novice won ${won} of ${slow.length} seeds, not ${MUST_WIN}`);
+  console.log(`the slow novice (${SLOW} s) won ${won} of ${slow.length} seeds (${MUST_WIN} wanted)`);
+  if (won < MUST_WIN) problems.push(`the slow novice won ${won} of ${slow.length} seeds, not ${MUST_WIN}`);
   if (problems.length) {
     console.error(`check:first failed:\n  ${problems.join('\n  ')}`);
     process.exit(1);

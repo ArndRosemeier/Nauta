@@ -7,6 +7,7 @@
  * position and the rake, when he opens fire and fires on the roll, and how soon he sees to the water and the fire. Pure.
  */
 import { DEGREE, KNOT } from '../units';
+import type { AimName } from './guns';
 
 /** The three levels of skill a captain can be chosen at (N7.1). */
 export type Offered = 'green' | 'seasoned' | 'master';
@@ -36,6 +37,8 @@ export interface SkillRow {
   readonly open: number;
   /** He loads grape inside this range, m (0: never), round shot beyond a fifth more. */
   readonly grape: number;
+  /** Where he lays his round shot: her hull (to sink or beat her), or her rigging (the first match's captain: he cripples slowly and seldom sinks anyone). */
+  readonly roundAt: AimName;
   /** He loads chain at her rigging when she holds the weather position at fighting range, to cripple her (design N5: chain is for her rigging). */
   readonly chain: boolean;
   /** He holds the side for his word and gives it as her roll passes level (design N5: "the roll is the skill"); otherwise they fire as they bear. */
@@ -71,23 +74,24 @@ export const SKILL: Readonly<Record<Skill, SkillRow>> = {
   /**
    * The first match's captain (N7.4, design thread 2026-11-18): weaker than green by his decisions only, never by his
    * crew's drill. He looks round only every 40 s, steers straight at her, never works for the weather position or her
-   * stern, fires as they bear with round shot only, and is late to his pumps and his fires.
+   * stern, fires as they bear with round shot only, laid at her rigging (design thread, 2026-11-18), and is late to his
+   * pumps and his fires.
    */
   raw: {
     look: 40, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
-    grape: 0, chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 80, fireAt: 0.3, plugAt: 0, strikeAfter: 0, drill: 1,
+    grape: 0, roundAt: 'rigging', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 80, fireAt: 0.3, plugAt: 0, strikeAfter: 0, drill: 1,
   },
   green: {
     look: 8, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
-    grape: 0, chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.14, plugAt: 0, strikeAfter: 0, drill: 0.95,
+    grape: 0, roundAt: 'hull', chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.14, plugAt: 0, strikeAfter: 0, drill: 0.95,
   },
   seasoned: {
     look: 4, judgeRange: 0.12, judgeBearing: 2 * DEGREE, range: 110, gauge: 150, rake: 0.5, lead: 0.5, quarters: 1500, open: 500,
-    grape: 50, chain: false, word: false, keepBearing: true, plainBeyond: 1200, pumpsAt: 10, fireAt: 0, plugAt: 0, strikeAfter: 10, drill: 1,
+    grape: 50, roundAt: 'hull', chain: false, word: false, keepBearing: true, plainBeyond: 1200, pumpsAt: 10, fireAt: 0, plugAt: 0, strikeAfter: 10, drill: 1,
   },
   master: {
     look: 2, judgeRange: 0.05, judgeBearing: 1 * DEGREE, range: 90, gauge: 250, rake: 1, lead: 1, quarters: Infinity, open: 400,
-    grape: 60, chain: true, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, strikeAfter: 20, drill: 1.05,
+    grape: 60, roundAt: 'hull', chain: true, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, strikeAfter: 20, drill: 1.05,
   },
 };
 

@@ -81,7 +81,8 @@ function gunOrders(sight: Sight, row: SkillRow): Order[] {
   if (!told.quarters && sight.range < row.quarters) out.push({ kind: 'quarters', ship });
   const shot = wantedShot(sight, row, told);
   if (told.shot !== shot) out.push({ kind: 'shot', ship, shot });
-  if (told.aim !== AIM_FOR[shot]) out.push({ kind: 'aim', ship, at: AIM_FOR[shot] });
+  const aim = shot === 'round' ? row.roundAt : AIM_FOR[shot];
+  if (told.aim !== aim) out.push({ kind: 'aim', ship, at: aim });
   const inRange = sight.range < row.open * (told.firing === 'cease' ? 1 : HYSTERESIS);
   const mode = !inRange ? 'cease' : row.word ? 'hold' : 'bear';
   if ((told.quarters || out.length > 0) && told.firing !== mode) out.push({ kind: mode, ship });
