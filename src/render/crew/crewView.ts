@@ -41,7 +41,7 @@ import {
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
 import { facesNow, stepFace } from '../../app/faces';
-import { GUN_CLIP_NAMES, gunStrains, gunWork } from '../../app/gunDrill';
+import { GUN_CLIP_NAMES, gunClip, gunStrains, gunWork } from '../../app/gunDrill';
 import { VOICES, type Point3, type Speaker, type Voice } from '../../app/speech/speakers';
 import type { CrewKnobs } from '../../app/quality';
 import { pageSeconds } from '../../app/pageMatch';
@@ -189,6 +189,7 @@ export class CrewView {
   private time = 0;
   private mine = 0;
   private lastCamera: Camera | null = null;
+  private lastState: SimState | null = null;
   private readonly eye = new Vector3();
   private readonly local = new Vector3();
   private readonly world = new Vector3();
@@ -308,6 +309,7 @@ export class CrewView {
     this.frame++;
     this.time += dt;
     this.mine = fr.mine;
+    this.lastState = fr.state.to;
     this.lastCamera = fr.camera;
     const k = fr.knobs, s = this.stats;
     s.placed = 0; s.drawn = 0;
@@ -351,6 +353,15 @@ export class CrewView {
   /** Her men now hurt, where they are drawn (her space): for the browser checks, which stand near one (tools/shot/men.mjs). */
   hurtMen(ship: number): { man: number; harm: Harm; space: string; x: number; y: number; z: number; clip: string | null; shown: boolean; seen: boolean }[] {
     return (this.byShip[ship] ?? []).flatMap((d) => (d.harm && d.placed ? [{ man: d.man, harm: d.harm, space: d.at.space, x: d.at.x, y: d.at.y, z: d.at.z, clip: d.clip, shown: d.shown, seen: d.seen }] : []));
+  }
+
+  /** Her men now at a gun with what the drill has them doing, where they are drawn (her space): for the browser checks, which stand beside a gun crew (tools/shot/guns.mjs `drill`). */
+  gunMen(ship: number): { man: number; gun: number; part: string; step: string; working: boolean; want: string; clip: string | null; x: number; y: number; z: number; shown: boolean; seen: boolean }[] {
+    const state = this.lastState?.ships[ship];
+    return (this.byShip[ship] ?? []).flatMap((d) => {
+      const w = state ? gunWork(state, d.man, d.m) : null;
+      return w && d.placed ? [{ man: d.man, gun: w.gun, part: w.part, step: w.step, working: w.working, want: gunClip(w), clip: d.clip, x: d.at.x, y: d.at.y, z: d.at.z, shown: d.shown, seen: d.seen }] : [];
+    });
   }
 
   /** The key of a man among both crews (the pool and the speakers know him by it). */

@@ -100,7 +100,7 @@ test('she fires: the seconds since are her recoil gone, and her captain cries wh
   assert.ok(Math.abs(at(later, hand).sinceFired - 0.8) < 2 / STEPS_PER_SECOND);
   assert.ok(at(later, hand).sinceFired < GUNS.carronade.recoil);
   const why = (c: typeof captain, sinceFired: number): FaceWhy => ({
-    job: null, aloft: false, sinceStruck: Infinity, fighting: true, harm: null, shouting: false, ended: null,
+    job: null, aloft: false, sinceStruck: Infinity, sinceHurt: Infinity, fighting: true, harm: null, shouting: false, ended: null,
     gun: { strains: false, captain: c.place === 1, sinceFired },
   });
   assert.ok(facesNow(why(captain, 0.1)).includes('shout') && !facesNow(why(captain, 0.1)).includes('flinch'));

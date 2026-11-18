@@ -51,10 +51,13 @@ const FIRED = SIDE > 0
 const RECEIVED = [['glass-crosstrees', 0], ['glass-crosstrees', 0.3], ['50-m-off', 0.4], ['rail', 0.4], ['50-m-off', 0.6]];
 
 /** The drill's steps pictured after the broadside, and the views each is taken from (the crews stand half at each side's guns until a side bears: the starboard guns, the battery's second half, are looked at). */
-const DRILL_STEPS = ['loading', 'running-out'];
+const DRILL_STEPS = ['loading'];
 /** After the last, the match runs on so long (s) for every crew to be at its guns and every gun ready, and is pictured again. */
 const SETTLED = 60;
-const DRILL_VIEWS = [['gun', 'yaw=0&pitch=-6'], ['gun', 'yaw=180&pitch=-6'], ['rail', 'yaw=100&pitch=-8']];
+const CLOSE_FRAMES = 3;
+/** The close-ups: each part of a crew at the work of its step. */
+const CLOSE_UPS = [['loading', 'muzzle'], ['ramming', 'muzzle'], ['running-out', 'tackles']];
+const DRILL_VIEWS = [['gun', 'yaw=0&pitch=-6']];
 const STARBOARD = 9;
 const MOST_WAIT = 60;
 
@@ -74,6 +77,30 @@ async function untilDrill(step) {
     await sail('onward', 0.5, false);
   }
   return false;
+}
+
+/**
+ * The eye stood inboard of a man at a gun (the first `part` of a gun in `step`, drawn and worked), looking out at him and
+ * his gun, and a picture taken; false when nobody is there.
+ */
+async function closeUp(step, part, label) {
+  await page.evaluate(() => window.__nautaSail.glass(null));
+  await scene('ship=waist');
+  const where = await page.evaluate(([st, pt]) => {
+    const men = window.__nautaCrew.gunMen(0).filter((m) => m.step === st && m.part === pt && m.working && m.shown);
+    const man = men.sort((a, b) => b.y - a.y)[0];
+    if (!man) return null;
+    const side = Math.sign(man.x) || 1, inboard = 2.6;
+    window.__nautaSail.eyeAt([man.x - side * inboard, man.y + 1.55, man.z + 0.9], -side * Math.PI / 2 + 0.25 * side, -0.25);
+    return `gun ${man.gun} man ${man.man} wants ${man.want}, plays ${man.clip}, at ${man.x.toFixed(1)}, ${man.y.toFixed(1)}, ${man.z.toFixed(1)}`;
+  }, [step, part]);
+  if (!where) { console.log(`nobody of the ${part} at a gun in ${step}`); return false; }
+  // A few frames, so the men near the new eye are placed again and play their motions.
+  for (let f = 0; f < CLOSE_FRAMES; f++) await sail('onward', 0.001);
+  const file = `${out}/${String(k++).padStart(2, '0')}-${label}.png`;
+  await snap(page, file);
+  console.log(`${file}: ${where}`);
+  return true;
 }
 
 /** A picture from `view` once the match has run on `dt` s more (a frame drawn at that moment). */
@@ -113,8 +140,19 @@ if (FOE) {
       if (!(await untilDrill(step))) { console.error(`no gun came to ${step}`); failed = true; continue; }
       for (const [view, look] of DRILL_VIEWS) await picture(`${view}${look ? `&${look}` : ''}`, 0, `-${step}`);
     }
+    // Close beside the crews: at a gun the crews come to, each part at its step's work (waiting a little for the men to arrive).
+    for (const [step, part] of CLOSE_UPS) {
+      let found = false;
+      for (let waited = 0; waited < MOST_WAIT && !found; waited += 5) {
+        if (!(await untilDrill(step))) break;
+        found = await closeUp(step, part, `${step}-${part}`);
+        if (!found) await sail('onward', 5, false);
+      }
+      if (!found) { console.error(`nobody of the ${part} worked a gun in ${step}`); failed = true; }
+    }
     await sail('onward', SETTLED, false);
     for (const [view, look] of DRILL_VIEWS) await picture(`${view}${look ? `&${look}` : ''}`, 0, '-settled');
+    await closeUp('ready', 'captain', 'ready-captain');
     await game.context.close();
     await served.close();
     process.exit(game.failed() || failed || process.exitCode ? 1 : 0);
