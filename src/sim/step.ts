@@ -9,12 +9,14 @@
  * wind's mean at the step's start, and every ship has the acts of her orders falling due now carried out (orders.ts),
  * sails one step in the true wind at her place (sailing.ts), works and fires her guns at the other ship as she has
  * been told (guns/gunnery.ts) and floats one step on that sea as her sailing says (motion.ts).
+ * Before she sails, what her damage leads to is worked out (damage.ts `stepAftermath`: water, falling spars, fire), and
+ * what is left of her sails, her steering and the water's weight go to her sailing and floating.
  * Last, ships that have run into each other are pushed apart (ship/touch.ts: struck, fouled). Before the ships move,
  * every shot in flight is traced through them for the part of its flight this step covers (damage.ts), and what each
  * ball hits is done and reported (`hit`); after, the shots fired in the step are put in flight.
  */
 import { stepCrew } from './crew/crew';
-import { launch, stepHits, type Hit } from './damage';
+import { launch, stepAftermath, stepHits, type Aftermath, type Hit } from './damage';
 import { carryOut, giveOrder, heard, wordSpent, type AnswerCode, type Order, type RefusalCode, type SailingOrder } from './orders';
 import { stepGunnery } from './guns/gunnery';
 import type { GunFired } from './guns/shot';
@@ -26,7 +28,7 @@ import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
-export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit;
+export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit | Aftermath;
 
 /** An order the ship could not take: why, as a code (the phrase book, N4.5, words it) and in English for now. */
 export interface OrderRefused {
@@ -114,14 +116,21 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     }
     const carried = carryOut(s.told, setShares(s.sailing, crewed.sails), crewed.done, wind);
     for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
-    const sailed = stepSailing(carried.sailing, pose, windAt(state.wind, pose.x, pose.z, t));
+    const here = windAt(state.wind, pose.x, pose.z, t);
+    // What her damage leads to this step: the sea in at her holes, spars falling, fire (damage.ts).
+    const after = stepAftermath(s.damage, { seed: state.matchSeed, tick, t, ship: i, pose, sea, crew: crewed.crew, sailing: carried.sailing, wind: here });
+    events.push(...after.events);
+    const sailed = stepSailing(carried.sailing, pose, here, after.sailing);
     for (const kind of sailed.events) events.push({ kind, tick, ship: i });
     // The duel's one enemy is the other ship (design decisions for N5: she is the target).
     const enemy = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
     const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, sailing: s.sailing, pose, enemy, sea });
     events.push(...gunnery.fired);
     const told = heard(carried.told, sailed.events, sailed.sailing);
-    return { ...s, motion: stepMotion(s.motion, sea, t, sailed.way), sailing: sailed.sailing, told: gunnery.spent ? wordSpent(told) : told, crew: crewed.crew, guns: gunnery.guns };
+    return {
+      ...s, motion: stepMotion(s.motion, sea, t, sailed.way, after.load), sailing: sailed.sailing, told: gunnery.spent ? wordSpent(told) : told,
+      crew: crewed.crew, guns: gunnery.guns, damage: after.damage,
+    };
   });
   // Every shot fired in this step is put in flight (damage.ts); it is first traced in the next step.
   let flying = hits.flying;

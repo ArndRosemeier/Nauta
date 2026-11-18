@@ -287,11 +287,24 @@ const sample = seaSample();
 let world = new Float64Array(0);
 
 /**
- * One step of the simulation's fixed length: the water under her at `t` pushes on her hull, her weight pulls, her
- * sails heel her, and her heave, pitch and roll move on; her heading is set and she goes on through the water as the
- * sailing model says (`way`).
+ * What she carries beyond her own weight (the water in her, damage/flood.ts): t, and where its middle is in ship space.
+ * It weighs her down where it lies, so water on one side lists her, and it is moved with her.
  */
-export function stepMotion(m: ShipMotion, sea: SeaState, t: number, way: Way): ShipMotion {
+export interface Burden {
+  readonly tonnes: number;
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+/** Nothing carried. */
+export const UNBURDENED: Burden = { tonnes: 0, x: 0, y: 0, z: 0 };
+
+/**
+ * One step of the simulation's fixed length: the water under her at `t` pushes on her hull, her weight pulls (and what
+ * she carries, `burden`), her sails heel her, and her heave, pitch and roll move on; her heading is set and she goes on
+ * through the water as the sailing model says (`way`).
+ */
+export function stepMotion(m: ShipMotion, sea: SeaState, t: number, way: Way, burden: Burden = UNBURDENED): ShipMotion {
   const b = shipBody(), p = m.pose, r = poseRotation(p, rotation);
   const v = b.vertices, tris = b.triangles, areas = b.areas;
   // Her heading's axes on the water: forward and to starboard.
@@ -317,6 +330,18 @@ export function stepMotion(m: ShipMotion, sea: SeaState, t: number, way: Way): S
   const wx = ch * hx - sh * hz, wy = hy, wz = sh * hx + ch * hz;
 
   let fy = -b.mass * GRAVITY, tx = 0, ty = 0, tz = 0;
+  // What she carries pulls down where it lies (relative to her centre, in the world): its weight and its turning moment.
+  let heaveMass = b.heaveMass, pitchInertia = b.pitchInertia, rollInertia = b.rollInertia;
+  if (burden.tonnes > 0) {
+    const bx = burden.x, by = burden.y - b.centreY, bz = burden.z - b.centreZ, load = burden.tonnes * GRAVITY;
+    const lx = r[0]! * bx + r[1]! * by + r[2]! * bz, ly = r[3]! * bx + r[4]! * by + r[5]! * bz, lz = r[6]! * bx + r[7]! * by + r[8]! * bz;
+    fy -= load;
+    tx += lz * load;
+    tz -= lx * load;
+    heaveMass += burden.tonnes;
+    pitchInertia += burden.tonnes * (ly * ly + lz * lz);
+    rollInertia += burden.tonnes * (lx * lx + ly * ly);
+  }
   const aftZ = b.gridAft, along = LAST_ALONG / (b.gridFore - aftZ), across = LAST_ACROSS / (2 * WATER_HALF_WIDTH), heave = p.heave;
   const weight = WATER_WEIGHT, area = b.area, sideways = Math.sqrt(HULL_DAMPING.sideways), upward = Math.sqrt(HULL_DAMPING.upward);
   for (let k = 0, n = 0; k < tris.length; k += XYZ, n++) {
@@ -363,8 +388,8 @@ export function stepMotion(m: ShipMotion, sea: SeaState, t: number, way: Way): S
 
   // Her turning moments in her heading's frame, about her athwartships (pitch) and fore-and-aft (roll) axes.
   const hTx = ch * tx + sh * tz, hTy = ty, hTz = -sh * tx + ch * tz;
-  const pitchAcc = hTx / b.pitchInertia, rollAcc = (way.rollMoment - (-sp * hTy + cp * hTz)) / b.rollInertia;
-  const heaveRate = p.heaveRate + (fy / b.heaveMass) * STEP_SECONDS;
+  const pitchAcc = hTx / pitchInertia, rollAcc = (way.rollMoment - (-sp * hTy + cp * hTz)) / rollInertia;
+  const heaveRate = p.heaveRate + (fy / heaveMass) * STEP_SECONDS;
   const pitchRate = p.pitchRate + pitchAcc * STEP_SECONDS, rollRate = p.rollRate + rollAcc * STEP_SECONDS;
   // On through the water: ahead along her heading, her leeway to starboard of it.
   sincos(way.heading, sc);

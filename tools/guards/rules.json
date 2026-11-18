@@ -278,6 +278,36 @@
       "field": "spent",
       "owner": "src/sim/damage.ts",
       "what": "how much of its punch each ball of a shot in flight has spent (N6.1)"
+    },
+    {
+      "field": "flooded",
+      "owner": "src/sim/damage.ts",
+      "what": "the water in a ship, t, in her larboard and starboard halves (N6.2)"
+    },
+    {
+      "field": "fallen",
+      "owner": "src/sim/damage.ts",
+      "what": "where a ship's spars have broken and gone down (N6.2)"
+    },
+    {
+      "field": "alongside",
+      "owner": "src/sim/damage.ts",
+      "what": "what fell and lies alongside a ship dragging her until cut away (N6.2)"
+    },
+    {
+      "field": "fires",
+      "owner": "src/sim/damage.ts",
+      "what": "the fires burning in a ship, by space (N6.2)"
+    },
+    {
+      "field": "steering",
+      "owner": "src/sim/damage.ts",
+      "what": "whether a ship still answers her helm (N6.2)"
+    },
+    {
+      "field": "blownUp",
+      "owner": "src/sim/damage.ts",
+      "what": "a ship's magazine has gone up (N6.2)"
     }
   ]
 }

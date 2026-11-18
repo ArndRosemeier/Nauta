@@ -70,6 +70,21 @@ export interface Sailing {
   readonly backed: readonly boolean[];
 }
 
+/**
+ * What her damage does to her sailing (damage.ts `stepAftermath`, N6.2): the share of its drive each sail keeps (rig plan
+ * order; null: all of it), whether she answers her helm (false: her rudder trails amidships), what lies alongside
+ * dragging her (where, m forward of the mainmast and across, and how hard, kN per (m/s)² of the water past it), and the
+ * water in her, t (she is that much heavier to move).
+ */
+export interface SailingDamage {
+  readonly draws: readonly number[] | null;
+  readonly steered: boolean;
+  readonly wrecks: readonly { readonly along: number; readonly across: number; readonly drag: number }[];
+  readonly flooded: number;
+}
+/** A ship's sailing with nothing wrong. */
+export const UNDAMAGED: SailingDamage = { draws: null, steered: true, wrecks: [], flooded: 0 };
+
 /** The masts' order in `braces`, `sides` and `backed`. */
 export const MASTS: readonly MastName[] = ['fore', 'main'];
 const FORE = 0;
@@ -234,8 +249,9 @@ export function setShares(s: Sailing, work: readonly SailWork[]): Sailing {
   return { ...s, canvas };
 }
 
-/** The area a sail drives her with: its area as it stands, by how far it is sheeted home (sails.ts `drawShare`). */
-const drawingArea = (sail: Sail, setting: SailSetting): number => sailArea(sail, setting) * drawShare(sail, setting);
+/** The area a sail drives her with: its area as it stands, by how far it is sheeted home (sails.ts `drawShare`) and what of it her damage leaves (`draws`, its place `i`). */
+const drawingArea = (sail: Sail, setting: SailSetting, harm: SailingDamage, i: number): number =>
+  sailArea(sail, setting) * drawShare(sail, setting) * (harm.draws?.[i] ?? 1);
 
 /** What moves with her when she is shoved (ships touch, touch.ts): her mass (t), with the water that goes with her ahead and sideways (t), and turning (t·m², about her centre of gravity). */
 export interface ShovedMasses {
@@ -273,9 +289,12 @@ function apparent(heading: number, ahead: number, leeway: number, wind: Wind): {
   return { ax: wind.speed * (wind.x * fx + wind.z * fz) - ahead, ay: wind.speed * (wind.x * sx + wind.z * sz) - leeway };
 }
 
+/** The apparent wind on a ship making `way` through the water in the true wind `wind`, m/s, in her frame: ahead, and to starboard (the air moving that way). */
+export const apparentAt = (way: Pick<Sailing, 'heading' | 'ahead' | 'leeway'>, wind: Wind): { ax: number; ay: number } => apparent(way.heading, way.ahead, way.leeway, wind);
+
 /** The apparent wind's speed on a ship making `way` through the water in the true wind `wind`, m/s: what she feels aloft and on deck (the sound under sail, N3.9). */
 export function apparentSpeed(way: Pick<Sailing, 'heading' | 'ahead' | 'leeway'>, wind: Wind): number {
-  const { ax, ay } = apparent(way.heading, way.ahead, way.leeway, wind);
+  const { ax, ay } = apparentAt(way, wind);
   return Math.hypot(ax, ay);
 }
 
@@ -300,11 +319,11 @@ function sailPush(c: Curves, nx: number, ny: number, ax: number, ay: number): vo
  * her best with the wind on the mast's side, or, laid aback, the one that pushes her astern hardest. Unchanged when the
  * mast carries no square sail.
  */
-function braceTarget(s: Sailing, mast: number, ax: number, ay: number): number {
+function braceTarget(s: Sailing, mast: number, ax: number, ay: number, harm: SailingDamage = UNDAMAGED): number {
   const b = sailingBody(), side = s.sides[mast]!, backed = s.backed[mast]!;
   const set: { sb: SailBody; area: number }[] = [];
   b.sails.forEach((sb, i) => {
-    const area = sb.square && sb.mast === mast ? drawingArea(sb.sail, s.canvas[i]!) : 0;
+    const area = sb.square && sb.mast === mast ? drawingArea(sb.sail, s.canvas[i]!, harm, i) : 0;
     if (area > 0) set.push({ sb, area });
   });
   if (set.length === 0) return s.braces[mast]!;
@@ -348,7 +367,7 @@ const force = { x: 0, y: 0, turn: 0, heel: 0 };
  * The wind's forces on her sails and rig. `ax`, `ay`: the air across her at her centre; each sail also feels her
  * turning (`turnRate`) and her roll (`pose`), which steady her.
  */
-function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: boolean): void {
+function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: boolean, harm: SailingDamage): void {
   const b = sailingBody();
   sincos(pose.roll, sc);
   const heelCos = sc[1];
@@ -363,7 +382,7 @@ function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: 
     heel += k * cy * (WINDAGE.height - HULL_SIDEWAYS.height);
   }
   for (let i = 0; i < b.sails.length; i++) {
-    const sb = b.sails[i]!, area = drawingArea(sb.sail, s.canvas[i]!);
+    const sb = b.sails[i]!, area = drawingArea(sb.sail, s.canvas[i]!, harm, i);
     if (area === 0) continue;
     // The air this sail feels: her turning swings it across the wind; in the heeled sail's frame.
     const sx = ax, sy = (ay - s.turnRate * sb.along) * heelCos;
@@ -399,9 +418,17 @@ function headingToGo(heading: number, steer: Steer): number {
   return short + steer.turn * 2 * Math.PI;
 }
 
-/** Her hull's own forces: resistance ahead, sideways and to turning, and the rudder's (added into `force`). */
-function hullForces(s: Sailing): void {
+/** Her hull's own forces: resistance ahead, sideways and to turning, the rudder's, and the drag of what lies alongside (added into `force`). */
+function hullForces(s: Sailing, harm: SailingDamage): void {
   const b = sailingBody(), u = s.ahead, v = s.leeway, r = s.turnRate, au = Math.abs(u);
+  // What lies alongside: the water past it where it lies (her way, her leeway and her turning there), against it.
+  for (const w of harm.wrecks) {
+    const along = w.along - b.along, wu = u - r * w.across, wv = v + r * along, speed = Math.hypot(wu, wv);
+    const fx = -w.drag * speed * wu, fy = -w.drag * speed * wv;
+    force.x += fx;
+    force.y += fy;
+    force.turn += along * fy - w.across * fx;
+  }
   const wave = 1 + (au / HULL_AHEAD.hullSpeed) ** HULL_AHEAD.wave;
   const ahead = -Math.sign(u) * HULL_AHEAD.ahead * u * u * wave * (u < 0 ? HULL_AHEAD.astern : 1);
   const side = -(HULL_SIDEWAYS.linear * au * v + HULL_SIDEWAYS.square * v * Math.abs(v));
@@ -418,8 +445,10 @@ function hullForces(s: Sailing): void {
  * One step of the simulation's fixed length under sail, in the true wind `wind` (wind.ts `windAt` at her place),
  * lying as `pose` says (her roll and its rate, from motion.ts). Pure: `s` is not changed.
  */
-export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind): SailingStep {
+export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind, harm: SailingDamage = UNDAMAGED): SailingStep {
   const b = sailingBody(), dt = STEP_SECONDS, events: SailingEvent[] = [];
+  // The water in her is moved with her (her masses are the dry ship's and the water's).
+  const heavier = 1 + harm.flooded / b.mass;
   const { ax, ay } = apparent(s.heading, s.ahead, s.leeway, wind);
   const air = Math.hypot(ax, ay), fromAhead = ax < 0;
 
@@ -434,17 +463,19 @@ export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind): SailingStep
   const inStays = bound !== s.sides[FORE] && Math.sign(eye) === turning && Math.abs(toGo) > Math.abs(eye);
   const letFly = inStays && Math.abs(ay) < air * b.letFly;
 
-  windForces(s, pose, ax, ay, letFly);
-  hullForces(s);
+  windForces(s, pose, ax, ay, letFly, harm);
+  hullForces(s, harm);
 
   // Her way, leeway and turning, with the water moving with her (turning, her way carries her outward: the skid).
-  const ahead = s.ahead + (dt * (force.x + TURN_SKID * b.sideMass * s.leeway * s.turnRate)) / b.aheadMass;
-  const leeway = s.leeway + (dt * (force.y - TURN_SKID * b.aheadMass * s.ahead * s.turnRate)) / b.sideMass;
-  const turnRate = s.turnRate + (dt * force.turn) / b.turnInertia;
+  const aheadMass = b.aheadMass * heavier, sideMass = b.sideMass * heavier;
+  const ahead = s.ahead + (dt * (force.x + TURN_SKID * sideMass * s.leeway * s.turnRate)) / aheadMass;
+  const leeway = s.leeway + (dt * (force.y - TURN_SKID * aheadMass * s.ahead * s.turnRate)) / sideMass;
+  const turnRate = s.turnRate + (dt * force.turn) / (b.turnInertia * heavier);
   const heading = wrapBearing(s.heading + turnRate * dt);
 
   // The helm: hard over at most, put over at the helmsman's pace, the other way with sternway.
-  const wanted = clamp(HELMSMAN.heading * toGo - HELMSMAN.turning * s.turnRate, -RUDDER.most, RUDDER.most) * (s.ahead < 0 ? -1 : 1);
+  // With her steering shot away the rudder trails amidships, whatever he does.
+  const wanted = harm.steered ? clamp(HELMSMAN.heading * toGo - HELMSMAN.turning * s.turnRate, -RUDDER.most, RUDDER.most) * (s.ahead < 0 ? -1 : 1) : 0;
   const helm = s.helm + clamp(wanted - s.helm, -HELM_RATE * dt, HELM_RATE * dt);
 
   // Missed stays: in a tack, she has lost her way or begun to fall back. The helmsman bears away on the old tack and
@@ -465,7 +496,7 @@ export function stepSailing(s: Sailing, pose: ShipPose, wind: Wind): SailingStep
     return windSide;
   });
   const trimmed: Sailing = { ...s, sides };
-  const braces = s.braces.map((brace, m) => brace + clamp(braceTarget(trimmed, m, ax, ay) - brace, -BRACE_RATE * dt, BRACE_RATE * dt));
+  const braces = s.braces.map((brace, m) => brace + clamp(braceTarget(trimmed, m, ax, ay, harm) - brace, -BRACE_RATE * dt, BRACE_RATE * dt));
 
   return {
     sailing: { ...s, heading, turnRate, ahead, leeway, helm, steer, braces, sides },
@@ -489,11 +520,11 @@ export interface SailStanding {
   readonly shivering: boolean;
 }
 
-/** How each of her sails stands in the true wind `wind`, in the rig plan's order. */
-export function sailsStanding(s: Sailing, wind: Wind): SailStanding[] {
+/** How each of her sails stands in the true wind `wind`, in the rig plan's order (what her damage leaves of each, `harm`). */
+export function sailsStanding(s: Sailing, wind: Wind, harm: SailingDamage = UNDAMAGED): SailStanding[] {
   const b = sailingBody(), { ax, ay } = apparent(s.heading, s.ahead, s.leeway, wind), shiver = sinOf(SHIVER_ANGLE);
   return b.sails.map((sb, i) => {
-    const area = drawingArea(sb.sail, s.canvas[i]!);
+    const area = drawingArea(sb.sail, s.canvas[i]!, harm, i);
     let angle: number, aback: boolean;
     if (sb.square) {
       angle = -s.braces[sb.mast]! * sb.limit;

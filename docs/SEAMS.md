@@ -505,7 +505,27 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What a straight piece of a ball's path meets in a ship, in order: timber crossed (cell, thickness, how square), guns, men, spars, lines, sails as set | `src/sim/damage/meet.ts#meetings` |
 | The parts of her spars between the places each can break (what a wound is kept against) | `src/sim/damage/meet.ts#sparParts` |
 | The closest approach of two straight pieces | `src/sim/damage/meet.ts#closest` |
-| What a hit does: timber thickness, each shot's punch by speed, chain's bite, splinters, how men are hurt, stove in and smashed, the violence levels (first proposals) | `src/sim/rules/damage.ts#PIERCE` |
+| What a hit does and what follows: timber thickness, each shot's punch by speed, chain's bite, splinters, how men are hurt, stove in and smashed, the violence levels; water, pumps, falling spars, the wreck's drag, holed sails, fire, steering (first proposals) | `src/sim/rules/damage.ts#PIERCE` |
+| What damage leads to (N6.2), each step for each ship: the sea in at her holes against the pumps, spars falling with the men on them, fire growing, spreading, fought and reaching her powder; what is left of her sails, her steering, the wreck's drag and the water's weight for her sailing and floating (the one routine that takes what follows a hit) | `src/sim/damage.ts#stepAftermath` |
+| A hole as her damage keeps it | `src/sim/damage.ts#holeCode` |
+| The sea's flow in at a shot hole by its depth | `src/sim/damage/flood.ts#inflow` |
+| What the pumps clear, by the men at them | `src/sim/damage/flood.ts#pumped` |
+| The water in her running across her as she heels, with what comes in and what is pumped | `src/sim/damage/flood.ts#flowed` |
+| How water of a weight lies in her (its level, its middle, its surface's breadth) | `src/sim/damage/flood.ts#lyingOf` |
+| The water in her as what she carries (weight and middle in ship space) | `src/sim/damage/flood.ts#loadOf` |
+| How far water of a weight sinks her bodily; the water that founders her | `src/sim/damage/flood.ts#founderTonnes` |
+| What of her rig stands: spars down, lines gone, sails that cannot stand, what each sail still draws | `src/sim/damage/fall.ts#standingOf` |
+| The spars due to fall (three wounds in a part, weather shrouds or stays gone with the wind on them) | `src/sim/damage/fall.ts#fallsDue` |
+| What lies alongside as the drag it puts on her | `src/sim/damage/fall.ts#wreckOf` |
+| The spar a space aloft stands on | `src/sim/damage/fall.ts#sparUnder` |
+| Fire one step on: growing, spreading through her ways, beaten down, reaching her powder | `src/sim/damage/fire.ts#burnt` |
+| A fire started in a space | `src/sim/damage/fire.ts#kindled` |
+| The space a place in her is in | `src/sim/damage/fire.ts#spaceAt` |
+| Where the men at hand to a fire are (its space and those joined to it) | `src/sim/damage/fire.ts#atHand` |
+| Where a spot of a planking cell is on her side | `src/sim/damage/meet.ts#plankingPlace` |
+| What her damage does to her sailing (sails' drive left, steering, wreck's drag, water's weight) | `src/sim/ship/sailing.ts#SailingDamage` |
+| The apparent wind on a ship in her frame | `src/sim/ship/sailing.ts#apparentAt` |
+| What a ship carries beyond her own weight (the water in her), for floating | `src/sim/ship/motion.ts#Burden` |
 | The match the page sails (`?sail`, `?room`, `?join=`): the session running now behind one face, its events to the order panel, the poses to draw | `src/app/pageMatch.ts#PageMatch` |
 | Where a duel starts: 1,500 m apart, the wind on the beam of the line between them, the seed turning the picture and picking the force | `src/sim/start.ts#duelStart` |
 | How a duel starts (distance apart, way on at the start) | `src/sim/rules/start.ts#START_APART` |

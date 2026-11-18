@@ -18,27 +18,41 @@
  * Chain reaches lines, sails and spars `CHAIN_BITE` times as far. The flight itself does not slow for what the ball
  * went through (the spent punch is kept instead), so a ball through her goes on to its splash as it was flying.
  *
+ * **What damage leads to** (N6.2, `stepAftermath`, each step for each ship): the sea comes in at her holes below the
+ * water as she lies (damage/flood.ts) against the pumps, and its weight goes to her floating (motion.ts); spars with
+ * three wounds in a part, or their weather shrouds or stays gone with the wind on them, fall with all they carry and
+ * the men on them, and lie alongside dragging her until cut away (damage/fall.ts); a ball may set her afire, and fire
+ * grows, spreads through her ways, is beaten down by the men at hand and, left too long, reaches her powder
+ * (damage/fire.ts); a ball through her steering gear leaves her rudder trailing. What her sails can still draw, her
+ * steering, the wreck's drag and the water's weight go to her sailing (sailing.ts) as `SailingDamage`.
+ *
  * Seeded per ball and step (the match, the gun, the tick she fired, the ball, the step), so every machine does the same
  * damage. The captain is not in the simulation and is never hit; the `hit` events say where every ball went
  * through her, for the drawing (N6.5: holes, splinters, the captain staggered) and the sound (N6.8).
  */
 import { deriveSeed, Rng } from '@futuremagic/core';
-import { meetings, nearHer, type Aboard, type Meeting, type Place, type TimberPart } from './damage/meet';
+import { fallsDue, sparUnder, standingOf, wreckOf, type Standing, type Wreck } from './damage/fall';
+import { atHand, burnt, kindled, spaceAt, type Fire } from './damage/fire';
+import { flowed, inflow, loadOf, lyingOf, pumped } from './damage/flood';
+import { meetings, nearHer, plankingPlace, type Aboard, type Meeting, type Place, type TimberPart } from './damage/meet';
 import { manAt, type Crew } from './crew/crew';
 import { brigRoster, type Man } from './crew/roster';
 import { battery, dismountGun, gunAt, gunCount, type Battery } from './guns/guns';
 import type { GunFired, Shot, Vec } from './guns/shot';
 import {
-  CHAIN_BITE, FIR_AS_OAK, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS, MAN_AS_OAK, PIERCE, SMASHED,
-  SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, type Harm, type HurtBy,
+  CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
+  MAN_AS_OAK, PIERCE, PUMP_POST, SMASHED, SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, WAD_RANGE, type Harm, type HurtBy,
 } from './rules/damage';
 import { SHOT, PATH_STEP, type ShotKind } from './rules/guns';
 import { LOAD_WATERLINE, type GunKind } from './rules/ships';
-import { toShip, type ShipPose } from './ship/motion';
-import type { Cell } from './ship/plan';
+import { surfaceAt, seaSample, type SeaState } from './sea/sea';
+import { toShip, toWorld, UNBURDENED, type Burden, type ShipPose } from './ship/motion';
+import { shipPlan, type Cell } from './ship/plan';
 import { rigPlan } from './ship/rig';
+import { apparentAt, MASTS, sailsStanding, UNDAMAGED, type Sailing, type SailingDamage } from './ship/sailing';
 import { sailShare, type SailSetting } from './ship/sails';
 import { STEP_SECONDS } from './units';
+import type { Wind } from './wind';
 
 /** What has been done to a ship (her `SimShip.damage`; changed only here). Plain whole numbers, kept small for the state. */
 export interface Damage {
@@ -52,6 +66,18 @@ export interface Damage {
   readonly rent: readonly number[];
   /** Her men hurt, one whole number each (man × HARMS.length + how badly), ascending by man. */
   readonly hurt: readonly number[];
+  /** The water in her, t: in her larboard and starboard halves (damage/flood.ts). */
+  readonly flooded: readonly [larboard: number, starboard: number];
+  /** Where her spars have broken (`sparParts` places), ascending: each with all it carried is down (damage/fall.ts `standingOf`). */
+  readonly fallen: readonly number[];
+  /** What fell and lies alongside dragging her until it is cut away: part × 2, + 1 on her starboard side (`wreckOf`). */
+  readonly alongside: readonly number[];
+  /** The fires burning in her, by space (damage/fire.ts). */
+  readonly fires: readonly Fire[];
+  /** Whether she still answers her helm (false: her steering gear is shot away). */
+  readonly steering: boolean;
+  /** Her magazine has gone up. */
+  readonly blownUp: boolean;
 }
 
 /** A shot on its way: the ship and gun (battery place) that fired it and the tick, and how much of its punch each ball has spent (mm of oak; `GONE` once it is stopped or in the sea). */
@@ -74,11 +100,11 @@ export interface Hit {
   readonly ship: number;
   readonly by: number;
   readonly gun: number;
-  /** A hole through her timber, a ball lodged in it, splinters flying, a gun dismounted, a man struck, a spar wounded, a line cut, a sail holed. */
-  readonly what: 'hole' | 'lodged' | 'splinters' | 'gun' | 'man' | 'spar' | 'line' | 'sail';
+  /** A hole through her timber, a ball lodged in it, splinters flying, a gun dismounted, a man struck, a spar wounded, a line cut, a sail holed, her steering shot away, a fire started. */
+  readonly what: 'hole' | 'lodged' | 'splinters' | 'gun' | 'man' | 'spar' | 'line' | 'sail' | 'steering' | 'fire';
   /** Where in her (along, across, height above her base, m). */
   readonly at: Place;
-  /** The cell (-1: none kept there), gun, man, spar part, line or sail. */
+  /** The cell (-1: none kept there), gun, man, spar part, line, sail or space (a fire's: the plan's place). */
   readonly id: number;
   /** A hole's or a lodged ball's timber; a man's hurt and what struck him. */
   readonly part?: TimberPart;
@@ -86,9 +112,25 @@ export interface Hit {
   readonly cause?: HurtBy;
 }
 
+/** What followed from her damage in a step, as an event (N6.2): a spar fell (with all it carried, over a side), a man aloft was thrown down with it, fire spread to a space or was put out in one, her magazine went up. */
+export interface Aftermath {
+  readonly kind: 'aftermath';
+  readonly tick: number;
+  readonly ship: number;
+  readonly what: 'fell' | 'man' | 'fire' | 'out' | 'blew up';
+  /** The part a spar broke at (`sparParts` place), the man, the space (the plan's place); -1 for her magazine. */
+  readonly id: number;
+  /** The side a spar went over (-1 larboard, 1 starboard). */
+  readonly side?: -1 | 1;
+  readonly harm?: Harm;
+}
+
 /** A ship as nothing has struck her yet. */
 export function startDamage(): Damage {
-  return { holes: [], cut: [], wounds: [], rent: rigPlan().sails.map(() => 0), hurt: [] };
+  return {
+    holes: [], cut: [], wounds: [], rent: rigPlan().sails.map(() => 0), hurt: [],
+    flooded: [0, 0], fallen: [], alongside: [], fires: [], steering: true, blownUp: false,
+  };
 }
 
 // ---- Reading what has been done ----
@@ -109,7 +151,8 @@ export interface Hole {
   readonly lodged: boolean;
 }
 
-function holeCode(cell: number, u: number, v: number, shot: ShotKind, gun: GunKind, lodged: boolean): number {
+/** A hole as `Damage.holes` keeps it (`holeAt` reads it back). */
+export function holeCode(cell: number, u: number, v: number, shot: ShotKind, gun: GunKind, lodged: boolean): number {
   const grid = (x: number) => Math.max(0, Math.min(HOLE_SPAN - 1, Math.round(x / HOLE_GRID)));
   const ball = BALLS.findIndex(([s, g]) => s === shot && g === gun);
   return ((cell * HOLE_SPAN + grid(u)) * HOLE_SPAN + grid(v)) * MARKS + ball * 2 + (lodged ? 1 : 0);
@@ -210,6 +253,8 @@ interface Working {
   wounds: number[];
   rent: number[];
   hurt: Map<number, number>;
+  fires: Fire[];
+  steering: boolean;
   battery: Battery;
   aboard: Aboard | null;
   touched: boolean;
@@ -220,7 +265,8 @@ function opened(s: HitShip): Working {
   const d = s.damage;
   return {
     holes: [...d.holes], cut: new Set(d.cut), wounds: [...d.wounds], rent: [...d.rent],
-    hurt: new Map(d.hurt.map((h) => [Math.floor(h / HARMS.length), h % HARMS.length])), battery: s.guns, aboard: null, touched: false,
+    hurt: new Map(d.hurt.map((h) => [Math.floor(h / HARMS.length), h % HARMS.length])), fires: [...d.fires], steering: d.steering,
+    battery: s.guns, aboard: null, touched: false,
   };
 }
 
@@ -233,7 +279,8 @@ function aboardOf(s: HitShip, w: Working, roster: readonly Man[]): Aboard {
     return [spot.along, spot.across, height] as Place;
   });
   const mounted = Array.from({ length: gunCount(w.battery) }, (_, i) => !gunAt(w.battery, i).dismounted);
-  w.aboard = { men, mounted, sails: s.canvas.map(sailShare) };
+  const standing = standingOf(s.damage.fallen, s.damage.cut, s.damage.rent);
+  w.aboard = { men, mounted, sails: s.canvas.map((c, i) => (standing.sailDown[i] ? 0 : sailShare(c))), down: standing.down, gone: standing.gone, steering: w.steering };
   return w.aboard;
 }
 
@@ -274,7 +321,7 @@ export function stepHits(input: HitsIn, roster: readonly Man[] = brigRoster()): 
   return {
     flying,
     guns: work.map((w, i) => w?.battery ?? input.ships[i]!.guns),
-    damage: work.map((w, i) => (w?.touched ? freeze(w) : input.ships[i]!.damage)),
+    damage: work.map((w, i) => (w?.touched ? freeze(w, input.ships[i]!.damage) : input.ships[i]!.damage)),
     events,
   };
 }
@@ -295,6 +342,9 @@ function traceBall(
   if (punch <= 0) return 0;
   const a = pathAt(path, ends, from), e = pathAt(path, ends, to), reach = reachOf(shot, gun);
   const rng = new Rng(deriveSeed(input.seed, 'hit', f.by, f.gun, f.tick, b, input.tick));
+  // Whether it sets her afire is drawn apart, so the rest of what it does is drawn alike with or without fire.
+  const fireRng = new Rng(deriveSeed(input.seed, 'fire', f.by, f.gun, f.tick, b, input.tick));
+  const range = Math.hypot(a[0] - path[0]![0], a[1] - path[0]![1], a[2] - path[0]![2]);
   input.ships.forEach((s, j) => {
     if (j === f.by || punch <= 0) return;
     const pa = placeIn(s.pose, a), pe = placeIn(s.pose, e);
@@ -304,7 +354,7 @@ function traceBall(
     for (const m of meetings(pa, pe, reach, aboard)) {
       if (punch <= 0) break;
       const event = { kind: 'hit', tick: input.tick, ship: j, by: f.by, gun: f.gun, at: m.at } as const;
-      punch = meet(m, punch, { shot, gun, rng, w, d, events, event });
+      punch = meet(m, punch, { shot, gun, rng, fireRng, range, w, d, events, event });
     }
   });
   return punch;
@@ -315,6 +365,9 @@ interface MeetWith {
   readonly shot: ShotKind;
   readonly gun: GunKind;
   readonly rng: Rng;
+  readonly fireRng: Rng;
+  /** How far the ball has flown from the muzzle, m (burning wads reach her only close). */
+  readonly range: number;
   readonly w: Working;
   readonly d: Place;
   readonly events: Hit[];
@@ -331,6 +384,7 @@ function meet(m: Meeting, punch: number, c: MeetWith): number {
       if (m.cell) w.holes.push(holeCode(m.cell.id, m.u, m.v, c.shot, c.gun, !through));
       events.push({ ...event, what: through ? 'hole' : 'lodged', id: m.cell?.id ?? GONE, part: m.part });
       splinters(m.at, c, through ? 1 : LODGED_SPLINTERS);
+      kindle(m.at, c);
       return through ? punch - thick : 0;
     }
     case 'gun':
@@ -339,6 +393,7 @@ function meet(m: Meeting, punch: number, c: MeetWith): number {
         (w.aboard.mounted as boolean[])[m.gun] = false;
         w.touched = true;
         events.push({ ...event, what: 'gun', id: m.gun });
+        kindle(m.at, c);
       }
       return punch - GUN_AS_OAK;
     case 'man':
@@ -364,7 +419,25 @@ function meet(m: Meeting, punch: number, c: MeetWith): number {
         events.push({ ...event, what: 'sail', id: m.sail });
       }
       return punch;
+    case 'steering':
+      if (punch >= LEAST_PUNCH.line && w.steering) {
+        w.steering = false;
+        if (w.aboard) w.aboard = { ...w.aboard, steering: false };
+        w.touched = true;
+        events.push({ ...event, what: 'steering', id: GONE });
+      }
+      return punch;
   }
+}
+
+/** A ball that came through her timber or struck a gun may set her afire where it struck (rules/damage.ts `FIRE_CHANCE`). */
+function kindle(at: Place, c: MeetWith): void {
+  if (c.fireRng.float() >= (c.range <= WAD_RANGE ? FIRE_CHANCE.wad : FIRE_CHANCE.ball)) return;
+  const space = spaceAt(at);
+  if (space < 0) return;
+  c.w.fires = kindled(c.w.fires, space);
+  c.w.touched = true;
+  c.events.push({ ...c.event, what: 'fire', id: space });
 }
 
 /** A man struck by a ball or splinters: hurt by the table, never less than he was; a man killed is met no more. */
@@ -395,13 +468,186 @@ function splinters(at: Place, c: MeetWith, share: number): void {
 /** A man's middle above his feet, m (where splinters are aimed at him). */
 const MAN_MIDDLE = 1;
 
-/** One ship's working damage as plain data for the state. */
-function freeze(w: Working): Damage {
+/** One ship's working damage as plain data for the state (what a hit does not change kept from `d`). */
+function freeze(w: Working, d: Damage): Damage {
   return {
+    ...d,
+    fires: w.fires,
+    steering: w.steering,
     holes: w.holes,
     cut: [...w.cut].sort((p, q) => p - q),
     wounds: [...w.wounds].sort((p, q) => p - q),
     rent: w.rent,
     hurt: [...w.hurt].sort((p, q) => p[0] - q[0]).map(([man, harm]) => man * HARMS.length + harm),
   };
+}
+
+// ---- What damage leads to (N6.2) ----
+
+/** What `stepAftermath` works on for one ship: the match's seed, the step, the ship, how she lies, the sea, her crew, her sailing and the true wind at her place. */
+export interface AftermathIn {
+  readonly seed: number;
+  readonly tick: number;
+  readonly t: number;
+  readonly ship: number;
+  readonly pose: ShipPose;
+  readonly sea: SeaState;
+  readonly crew: Crew;
+  readonly sailing: Sailing;
+  readonly wind: Wind;
+}
+/** Her damage one step on, what followed, and what it does to her sailing (sailing.ts) and her floating (motion.ts: the water's weight). */
+export interface AftermathOut {
+  readonly damage: Damage;
+  readonly events: Aftermath[];
+  readonly sailing: SailingDamage;
+  readonly load: Burden;
+}
+
+/** A hole the sea can come in at: where (the plan's place), and the ball whose opening it is (a lodged ball plugs its hole; holes above her deck let in no sea). */
+interface Leak {
+  readonly at: Place;
+  readonly shot: ShotKind;
+  readonly gun: GunKind;
+}
+/** Each ship's leaks, by her holes (worked out again only when a hole is added). */
+const leaksOf = new WeakMap<readonly number[], readonly Leak[]>();
+function leaks(holes: readonly number[]): readonly Leak[] {
+  let out = leaksOf.get(holes);
+  if (out) return out;
+  const cells = shipPlan().cells;
+  out = holes.map(holeAt).filter((h) => !h.lodged && cells[h.cell]!.kind === 'planking').map((h) => ({ at: plankingPlace(cells[h.cell]!, h.u, h.v), shot: h.shot, gun: h.gun }));
+  leaksOf.set(holes, out);
+  return out;
+}
+
+/** Each ship's drag alongside, by her `alongside` (worked out again only when something more falls or is cut away). */
+const wrecksOf = new WeakMap<readonly number[], readonly Wreck[]>();
+const wrecks = (alongside: readonly number[]): readonly Wreck[] => {
+  let out = wrecksOf.get(alongside);
+  if (!out) wrecksOf.set(alongside, (out = alongside.map(wreckOf)));
+  return out;
+};
+
+/** The men of the quarter bill at the pumps (roster places). */
+let pumpMen: readonly number[] | null = null;
+const water = seaSample();
+const holeWorld: [number, number, number] = [0, 0, 0];
+
+/**
+ * One step of what her damage leads to (design decisions for N6): the sea in at her holes against the pumps and running
+ * across her as she heels; spars falling that are due (damage/fall.ts) with the men on them; fires growing, spreading,
+ * fought by the men at hand and reaching her powder. Her damage is the same value where nothing changed.
+ */
+export function stepAftermath(d: Damage, input: AftermathIn, roster: readonly Man[] = brigRoster()): AftermathOut {
+  const events: Aftermath[] = [], { tick, ship } = input;
+  let next = d;
+
+  // The sea coming in, and the pumps.
+  const holes = leaks(d.holes), [larboard, starboard] = d.flooded;
+  if (holes.length > 0 || larboard + starboard > 0) {
+    const roll = input.pose.roll, level = lyingOf(larboard + starboard).level;
+    let inL = 0, inS = 0;
+    for (const h of holes) {
+      toWorld(input.pose, h.at[1], h.at[2] - LOAD_WATERLINE, -h.at[0], holeWorld);
+      const depth = surfaceAt(input.sea, holeWorld[0], holeWorld[2], input.t, water).height - holeWorld[1];
+      if (!(depth > 0)) continue;
+      // The water inside stands over the hole by its level there (the surface lies level in the world as she heels).
+      const q = inflow(h.shot, h.gun, depth, level + h.at[1] * roll - h.at[2]);
+      if (h.at[1] < 0) inL += q; else inS += q;
+    }
+    const flooded = flowed(larboard, starboard, inL, inS, pumped(pumpHands(input.crew, d, roster), larboard + starboard), roll);
+    if (flooded[0] !== larboard || flooded[1] !== starboard) next = { ...next, flooded };
+  }
+
+  // Spars falling.
+  let standing: Standing | null = null;
+  if (d.wounds.length > 0 || d.cut.length > 0) {
+    standing = standingOf(d.fallen, d.cut, d.rent);
+    const { ay } = apparentAt(input.sailing, input.wind);
+    let aback: boolean[] | null = null;
+    const falls = fallsDue(standing, d.wounds, {
+      across: ay,
+      aback: (mast) => (aback ??= abackMasts(input.sailing, input.wind, standing!))[mast]!,
+    });
+    if (falls.length > 0) {
+      const fallen = [...d.fallen, ...falls.map((f) => f.part)].sort((p, q) => p - q);
+      const alongside = [...d.alongside, ...falls.map((f) => f.part * 2 + (f.side > 0 ? 1 : 0))].sort((p, q) => p - q);
+      for (const f of falls) events.push({ kind: 'aftermath', tick, ship, what: 'fell', id: f.part, side: f.side });
+      const after = standingOf(fallen, d.cut, d.rent);
+      const hurt = thrownDown(d, standing, after, input, roster, events);
+      next = { ...next, fallen, alongside, hurt };
+      standing = after;
+    }
+  }
+
+  // Fire.
+  if (d.fires.length > 0 && !d.blownUp) {
+    const fighting = menBySpace(input.crew, d, roster);
+    const b = burnt(d.fires, (space) => Math.min(FIGHT_AT_HAND, atHand(space).reduce((n, s) => n + (fighting.get(s) ?? 0), 0)));
+    for (const space of b.spread) events.push({ kind: 'aftermath', tick, ship, what: 'fire', id: space });
+    for (const space of b.out) events.push({ kind: 'aftermath', tick, ship, what: 'out', id: space });
+    if (b.magazine) events.push({ kind: 'aftermath', tick, ship, what: 'blew up', id: GONE });
+    next = { ...next, fires: b.fires, blownUp: b.magazine };
+  }
+
+  const [l, s] = next.flooded;
+  return {
+    damage: next,
+    events,
+    load: l + s > 0 ? loadOf(l, s) : UNBURDENED,
+    sailing: sailingDamage(next, standing),
+  };
+}
+
+/** What her damage does to her sailing: what each sail can still draw, her steering, the wreck alongside and the water's weight. */
+function sailingDamage(d: Damage, standing: Standing | null): SailingDamage {
+  const intact = d.steering && d.alongside.length === 0 && d.fallen.length === 0 && d.cut.length === 0 && d.flooded[0] + d.flooded[1] === 0 && d.rent.every((r) => r === 0);
+  if (intact) return UNDAMAGED;
+  const st = standing ?? standingOf(d.fallen, d.cut, d.rent);
+  return { draws: st.draws, steered: d.steering, wrecks: wrecks(d.alongside), flooded: d.flooded[0] + d.flooded[1] };
+}
+
+/** Whether each mast's square sails are aback now (fore, main). */
+function abackMasts(sailing: Sailing, wind: Wind, standing: Standing): boolean[] {
+  const rig = rigPlan(), stood = sailsStanding(sailing, wind, { ...UNDAMAGED, draws: standing.draws });
+  return MASTS.map((mast) => rig.sails.some((sail, i) => sail.mast === mast && sail.kind === 'square' && stood[i]!.aback));
+}
+
+/** Whether a man can still work (not badly hurt, not killed). */
+const fit = (d: Damage, man: number): boolean => {
+  const h = harmOf(d, man);
+  return h === null || h === 'wounded';
+};
+
+/** The men of the quarter bill at the pumps who are there and fit to work them. */
+function pumpHands(crew: Crew, d: Damage, roster: readonly Man[]): number {
+  pumpMen ??= roster.flatMap((m, i) => (m.post === PUMP_POST ? [i] : []));
+  return pumpMen.filter((i) => { const h = crew.men[i]; return h && !h.going && !h.stands && fit(d, i); }).length;
+}
+
+/** The fit men in each space (the plan's places) where they are now. */
+function menBySpace(crew: Crew, d: Damage, roster: readonly Man[]): Map<number, number> {
+  const index = new Map(shipPlan().spaces.map((s, i) => [s.id, i])), out = new Map<number, number>();
+  crew.men.forEach((hand, i) => {
+    if (!fit(d, i)) return;
+    const space = index.get(manAt(hand, roster[i]!.post).spot.space);
+    if (space !== undefined) out.set(space, (out.get(space) ?? 0) + 1);
+  });
+  return out;
+}
+
+/** The men aloft on what has just come down, thrown down with it (rules/damage.ts `HURT.fall`): her men hurt after. */
+function thrownDown(d: Damage, before: Standing, after: Standing, input: AftermathIn, roster: readonly Man[], events: Aftermath[]): readonly number[] {
+  const hurt = new Map(d.hurt.map((h) => [Math.floor(h / HARMS.length), h % HARMS.length]));
+  const rng = new Rng(deriveSeed(input.seed, 'fall', input.ship, input.tick));
+  input.crew.men.forEach((hand, i) => {
+    if (hurt.get(i) === HARMS.indexOf('killed')) return;
+    const s = sparUnder(manAt(hand, roster[i]!.post).spot.space);
+    if (s < 0 || before.down[s] || !after.down[s]) return;
+    const harm = Math.max(hurt.get(i) ?? 0, harmBy('fall', rng));
+    hurt.set(i, harm);
+    events.push({ kind: 'aftermath', tick: input.tick, ship: input.ship, what: 'man', id: i, harm: HARMS[harm]! });
+  });
+  return [...hurt].sort((p, q) => p[0] - q[0]).map(([man, harm]) => man * HARMS.length + harm);
 }
