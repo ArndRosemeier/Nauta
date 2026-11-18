@@ -311,12 +311,15 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her sails: corners, what they are bent to, their shapes | `src/sim/ship/sails.ts#buildSails` |
 | A sail's area as it stands (furled, reefed, set) | `src/sim/ship/sails.ts#sailArea` |
 | The ways a sail can stand | `src/sim/ship/sails.ts#sailSettings` |
+| How far a sail is set, furled 0 to sheeted home 1 (what the drawing shows) | `src/sim/ship/sails.ts#sailShare` |
+| How much of a sail's area draws as it is set (a square sail only past hanging in its gear) | `src/sim/ship/sails.ts#drawShare` |
 | A sail's named corner | `src/sim/ship/sails.ts#corner` |
 | A point on a sail's edge (a leech's middle, a reef cringle) | `src/sim/ship/sails.ts#edgePoint` |
 | Sailing: one step of a ship under sail in the true wind (sails by the apparent wind, the crew's trim and bracing, hull, rudder, helmsman, tacking, wearing, missing stays), her way and her sails' heel out | `src/sim/ship/sailing.ts#stepSailing` |
 | A ship under sail at the start (heading, way, canvas, yards trimmed) | `src/sim/ship/sailing.ts#startSailing` |
 | Telling the helmsman a heading and which way to turn to it | `src/sim/ship/sailing.ts#steerTo` |
 | Setting or taking in one sail | `src/sim/ship/sailing.ts#setSail` |
+| The sails the crew is working moved to how far each is set | `src/sim/ship/sailing.ts#setShares` |
 | Which sails a canvas sets in a wind, reefed for it | `src/sim/ship/sailing.ts#canvasFor` |
 | Laying a mast's yards aback, or filling them | `src/sim/ship/sailing.ts#layAback` |
 | How each sail stands this moment (area, brace or sheet, pressure, aback, shivering), for drawing and sound | `src/sim/ship/sailing.ts#sailsStanding` |
@@ -412,6 +415,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Every crew place of the plan and the rig, by id | `src/sim/crew/roster.ts#crewPlaces` |
 | A crew place's spot | `src/sim/crew/roster.ts#placeSpot` |
 | What the crew does for an act of an order: its jobs, their places, hands, work and which waits for which (the drill) | `src/sim/crew/drill.ts#drill` |
+| How far a sail's job takes it (furled, hanging, sheeted home), and its work left from where the sail stands | `src/sim/crew/drill.ts#jobSpan` |
 | Who works a sail (its gang) | `src/sim/crew/drill.ts#gangOf` |
 | What a job takes (hands, work, places, parts) from its name and what it is done on | `src/sim/crew/drill.ts#jobWork` |
 | A crew at the start, every man at his post | `src/sim/crew/crew.ts#startCrew` |

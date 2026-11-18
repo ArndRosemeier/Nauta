@@ -10,7 +10,8 @@ import { jobWork } from '../../src/sim/crew/drill.ts';
 import { brigRoster, type Man } from '../../src/sim/crew/roster.ts';
 import { carryOut, giveOrder, startOrders, type Order, type ShipOrders } from '../../src/sim/orders.ts';
 import type { Part } from '../../src/sim/rules/crew.ts';
-import { startSailing, type Sailing } from '../../src/sim/ship/sailing.ts';
+import { sailShare } from '../../src/sim/ship/sails.ts';
+import { setShares, startSailing, type Sailing } from '../../src/sim/ship/sailing.ts';
 import { DEGREE, STEP_SECONDS, STEPS_PER_SECOND } from '../../src/sim/units.ts';
 import { steadyWind } from './sail.ts';
 
@@ -29,6 +30,8 @@ export interface Run {
   readonly tasks: Map<number, { task: Task; began: number | null; ended: number | null }>;
   readonly events: CrewEvent[];
   readonly doneAt: Map<string, number>;
+  /** How far each sail was set at every tick (rigPlan().sails order). */
+  readonly shares: number[][];
 }
 
 /** Her orders and sailing at the start: a beam reach under battle sail, way on. */
@@ -45,7 +48,7 @@ export function give(told: ShipOrders, sailing: Sailing, order: Order, tick = 0)
 /** A ship given `orders` at tick 0 (and `later` at their ticks) and her crew stepped on until every order is done or `seconds` pass; every step checks that no man has two tasks. */
 export function drive(orders: readonly Order[], roster: readonly Man[] = brigRoster(), seconds = MOST_SECONDS, later: readonly { tick: number; order: Order }[] = []): Run {
   let sailing = startSail(), told = startTold(), crew = startCrew(roster);
-  const tasks: Run['tasks'] = new Map(), events: CrewEvent[] = [], doneAt = new Map<string, number>();
+  const tasks: Run['tasks'] = new Map(), events: CrewEvent[] = [], doneAt = new Map<string, number>(), shares: number[][] = [];
   for (const o of orders) told = give(told, sailing, o);
   for (let tick = 0; tick < seconds * STEPS_PER_SECOND; tick++) {
     for (const l of later) if (l.tick === tick) told = give(told, sailing, l.order, tick);
@@ -59,12 +62,13 @@ export function drive(orders: readonly Order[], roster: readonly Man[] = brigRos
       if (k && k.began !== null) assert.equal(t.began, k.began);
     }
     for (const [id, k] of tasks) if (k.ended === null && !r.crew.tasks.some((t) => t.id === id)) tasks.set(id, { ...k, ended: tick });
-    const c = carryOut(told, sailing, r.done, WIND);
+    const c = carryOut(told, setShares(sailing, r.sails), r.done, WIND);
     for (const o of c.done) doneAt.set(o.kind, tick);
     told = c.told; sailing = c.sailing; crew = r.crew;
+    shares.push(sailing.canvas.map(sailShare));
     if (told.given.length === 0 && crew.tasks.length === 0 && tick > 0 && later.every((l) => l.tick < tick)) break;
   }
-  return { told, sailing, crew, tasks, events, doneAt };
+  return { told, sailing, crew, tasks, events, doneAt, shares };
 }
 
 /** The roster with the men of `parts` beyond the first who make up `skill` turned to idlers (as if the rest were elsewhere). */

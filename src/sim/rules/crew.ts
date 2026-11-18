@@ -103,14 +103,17 @@ export const COMPLEMENT = 121;
  * - stations: "ready about" or "ready to wear": the hands cast off and man the braces of both masts and the headsail
  *   sheets; the helm goes over when they are ready.
  * - brace: one mast's yards swung aback or filled, at its braces.
- * - loose: a square sail loosed (or a reef taken in or shaken out) by men out on its yard.
+ * - loose: a square sail's gaskets cast off by men out on its yard, and it falls to hang in its gear.
  * - sheet: a square sail sheeted home and hoisted, at its sheets, tacks and halliard.
- * - clew: a square sail clewed up, at its clewlines, clewgarnets and buntlines (furling it aloft is the men's own
- *   business later and changes nothing she does).
+ * - clew: a square sail clewed up, at its clewlines, clewgarnets and buntlines: it hangs in its gear and no longer draws.
+ * - furl: a clewed-up square sail rolled up on its yard and its gaskets passed, by men out on the yard.
+ * - reef: a reef taken in or shaken out, by men out on the yard, the sail clewed up.
  * - hoist: a headsail, staysail or the boom sail run up and sheeted, at its halliards, sheets and outhauls.
  * - douse: one hauled down or brailed in, at its downhaul or brails.
+ * A sail's jobs move how far it is set (rules/rig.ts `HANGING`): loose from furled to hanging, sheet on to sheeted home,
+ * clew back to hanging, furl on to furled, hoist and douse the whole way; reef leaves it hanging.
  */
-export type JobName = 'helm' | 'stations' | 'brace' | 'loose' | 'sheet' | 'clew' | 'hoist' | 'douse';
+export type JobName = 'helm' | 'stations' | 'brace' | 'loose' | 'sheet' | 'clew' | 'furl' | 'reef' | 'hoist' | 'douse';
 
 /** A job's hands and seconds: one number, or one per yard (a square sail's jobs). */
 export type BySail = number | Readonly<Record<YardLevel, number>>;
@@ -132,6 +135,8 @@ export const JOBS: Readonly<Record<JobName, JobRow>> = {
   loose: { what: 'a square sail loosed on its yard', hands: { course: 4, topsail: 4, topgallant: 2 }, work: { course: 6, topsail: 8, topgallant: 5 }, lines: null },
   sheet: { what: 'a square sail sheeted home and hoisted', hands: { course: 8, topsail: 10, topgallant: 4 }, work: { course: 6, topsail: 8, topgallant: 5 }, lines: ['sheet', 'tack', 'halliard'] },
   clew: { what: 'a square sail clewed up', hands: { course: 6, topsail: 4, topgallant: 2 }, work: { course: 6, topsail: 6, topgallant: 4 }, lines: ['clewgarnet', 'clewline', 'buntline'] },
+  furl: { what: 'a square sail furled on its yard', hands: { course: 4, topsail: 4, topgallant: 2 }, work: { course: 12, topsail: 12, topgallant: 8 }, lines: null },
+  reef: { what: 'a reef taken in or shaken out on the yard', hands: { course: 4, topsail: 4, topgallant: 2 }, work: { course: 12, topsail: 14, topgallant: 8 }, lines: null },
   hoist: { what: 'a fore-and-aft sail hoisted and sheeted', hands: 4, work: 5, lines: ['halliard', 'sheet', 'outhaul'] },
   douse: { what: 'a fore-and-aft sail hauled down or brailed', hands: 2, work: 4, lines: ['downhaul', 'brail'] },
 };

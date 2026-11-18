@@ -3,7 +3,7 @@
  * set), from rules/rig.ts. The sailing model (N3.3) takes the area of each sail as it stands; the drawing (N3.10)
  * shapes the cloth between the corners.
  */
-import { BOOM_SAIL, COURSE_CLEW, COURSE_GORE, SAILS, type ForeAftSailRow, type MastName, type SailRow } from '../rules/rig';
+import { BOOM_SAIL, COURSE_CLEW, COURSE_GORE, HANGING, SAILS, type ForeAftSailRow, type MastName, type SailRow } from '../rules/rig';
 import { between, distance, named, onSpar, point, type MastGeometry, type RigPoint, type Spar } from './spars';
 
 /** How a sail's area is reckoned: a square sail as a trapezium (its head, foot and drop, m), the others from their corners, m². */
@@ -29,6 +29,21 @@ export interface Sail {
 export interface SailSetting {
   readonly set: boolean;
   readonly reefs: number;
+  /**
+   * How far it is set while the crew is at it, between 0 (furled) and 1 (sheeted home), rules/rig.ts `HANGING`; left out
+   * when it stands as it is (1 set, 0 furled), so a steady canvas costs nothing in the state. Read it with `sailShare`.
+   */
+  readonly share?: number;
+}
+
+/** How far a sail is set, 0 furled to 1 sheeted home (what the drawing shows). */
+export const sailShare = (setting: SailSetting): number => setting.share ?? (setting.set ? 1 : 0);
+
+/** How much of its area as it stands a sail draws with, 0 to 1: a square sail only as it is sheeted home past hanging in its gear, a fore-and-aft sail as it is hoisted. */
+export function drawShare(sail: Sail, setting: SailSetting): number {
+  const share = sailShare(setting);
+  if (sail.kind !== 'square') return share;
+  return Math.max(0, (share - HANGING) / (1 - HANGING));
 }
 
 /** The ways a sail can stand: furled, then set with every reef in down to none (full sail last). */

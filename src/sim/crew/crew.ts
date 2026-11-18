@@ -15,12 +15,13 @@
 import { CLIMB_METRES, FEWEST, PASSED, SENT_PER_STEP } from '../rules/crew';
 import { VOCABULARY, type ShipOrders } from '../orders';
 import { bareSpot, type Spot } from '../ship/plan';
-import type { SailSetting } from '../ship/sails';
+import { sailShare, type SailSetting } from '../ship/sails';
+import type { SailWork } from '../ship/sailing';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../units';
 import type { Closures } from './closures';
 import { goingAt, goingRoute, startGoing, stepGoings, type Going } from './going';
 import { heightAt, lineLength, routeNetwork } from './network';
-import { drill, jobWork, type Job } from './drill';
+import { drill, jobLeft, jobWork, shareAt, type Job } from './drill';
 import { brigRoster, placeSpot, type Man } from './roster';
 import { rigPlan } from '../ship/rig';
 
@@ -80,6 +81,8 @@ export interface Crewed {
   readonly crew: Crew;
   readonly done: readonly number[];
   readonly events: readonly CrewEvent[];
+  /** The sails the men are working, how far each is set now (for sailing.ts `setShares`). */
+  readonly sails: readonly SailWork[];
 }
 
 /** A crew at the start: every man at his post, nothing to do. */
@@ -158,7 +161,7 @@ function syncTasks(crew: Crew, told: ShipOrders, deck: Deck): Crew {
     const piped = (given?.tick ?? deck.tick) + Math.round(PASSED[to] * STEPS_PER_SECOND);
     const jobs = drill(a, kind, deck.canvas);
     const first = tasked;
-    tasks = [...tasks, ...jobs.map((j, k) => ({ ...j, after: j.after === null ? null : first + j.after, id: first + k, act: a.id, of: a.of, piped, hands: [], toDo: jobWork(j.job, j.on).work, began: null }))];
+    tasks = [...tasks, ...jobs.map((j, k) => ({ ...j, after: j.after === null ? null : first + j.after, id: first + k, act: a.id, of: a.of, piped, hands: [], toDo: jobWork(j.job, j.on).work * (j.after === null && a.kind === 'sail' ? jobLeft(j.job, sailShare(deck.canvas[a.sail]!)) : 1), began: null }))];
     tasked += jobs.length;
   }
   return tasks === crew.tasks ? crew : { ...crew, tasks, tasked };
@@ -247,7 +250,9 @@ function work(tasks: readonly Task[], men: readonly Hand[], roster: readonly Man
  */
 export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: readonly Man[] = brigRoster()): Crewed {
   let c = syncTasks(crew, told, deck);
-  if (c.tasks.length === 0 && c.men.every((h) => h.going === null && h.stands === null)) return { crew: c, done: [], events: [] };
+  // An act with nothing left to do (its sail already stands as told) is done at once.
+  const idle = told.acts.filter((a) => !c.tasks.some((t) => t.act === a.id)).map((a) => a.id);
+  if (c.tasks.length === 0 && c.men.every((h) => h.going === null && h.stands === null)) return { crew: c, done: idle, events: [], sails: [] };
   const events: CrewEvent[] = [];
   let tasks = manTasks(c.tasks, c.men, roster, deck.tick);
   const byMan = new Map(tasks.flatMap((t) => t.hands.map((i) => [i, t] as const)));
@@ -266,9 +271,25 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
   // Jobs with no work left are done, and their men free; an act is done with its last job.
   const finished = tasks.filter((t) => t.toDo <= 0);
   tasks = tasks.filter((t) => t.toDo > 0);
-  const done = [...new Set(finished.map((t) => t.act))].filter((a) => !tasks.some((t) => t.act === a));
+  const done = [...idle, ...new Set(finished.map((t) => t.act))].filter((a) => !tasks.some((t) => t.act === a));
   c = { ...c, men, tasks };
-  return { crew: c, done, events };
+  return { crew: c, done, events, sails: sailsWorked([...finished, ...tasks], told, deck.canvas) };
+}
+
+/** How far each sail its men are working is set: by the work done on its job so far, with the reefs it is set with. */
+function sailsWorked(tasks: readonly Task[], told: ShipOrders, canvas: readonly SailSetting[]): SailWork[] {
+  const out: SailWork[] = [];
+  for (const t of tasks) {
+    const act = told.acts.find((a) => a.id === t.act);
+    if (t.began === null || !act || act.kind !== 'sail') continue;
+    const share = shareAt(t.job, Math.max(0, t.toDo), jobWork(t.job, t.on).work);
+    if (share === null) continue;
+    const now = canvas[act.sail]!;
+    // Sheeted home or hoisted with the reefs told; let fall from furled with them; reefed once the reef is done.
+    const asTold = t.job === 'sheet' || t.job === 'hoist' || (t.job === 'loose' && !now.set) || (t.job === 'reef' && t.toDo <= 0);
+    out.push({ sail: act.sail, share, reefs: asTold ? act.reefs : now.reefs });
+  }
+  return out;
 }
 
 /** The task a man has, or null (for drawing and reports: what he is doing). */

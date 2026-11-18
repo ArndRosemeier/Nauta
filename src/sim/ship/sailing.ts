@@ -39,7 +39,7 @@ import { buoyancyAlong } from './hull';
 import type { ShipPose, Way } from './motion';
 import { shipPlan } from './plan';
 import { rigPlan, sparOf } from './rig';
-import { sailArea, type Sail, type SailSetting } from './sails';
+import { drawShare, sailArea, type Sail, type SailSetting } from './sails';
 import { shipWeight } from './weight';
 
 /** What the helmsman has been told: a heading (compass bearing, rad) and which way to turn to it (+1 to starboard, -1 to larboard, 0 the short way). */
@@ -215,6 +215,28 @@ export function setSail(s: Sailing, sail: number, setting: SailSetting): Sailing
   return { ...s, canvas: s.canvas.map((c, i) => (i === sail ? { set: setting.set, reefs: setting.set ? setting.reefs : 0 } : c)) };
 }
 
+/** A sail's work under way: how far it is set (0 furled to 1 sheeted home) and the reefs it is set with. */
+export interface SailWork {
+  readonly sail: number;
+  readonly share: number;
+  readonly reefs: number;
+}
+
+/** The sails the crew is working (crew/crew.ts) moved to how far each is set; furled at 0, set as it is at 1, its share kept in between. */
+export function setShares(s: Sailing, work: readonly SailWork[]): Sailing {
+  if (work.length === 0) return s;
+  const canvas = [...s.canvas];
+  for (const w of work) {
+    if (w.share <= 0) canvas[w.sail] = { set: false, reefs: 0 };
+    else if (w.share >= 1) canvas[w.sail] = { set: true, reefs: w.reefs };
+    else canvas[w.sail] = { set: true, reefs: w.reefs, share: w.share };
+  }
+  return { ...s, canvas };
+}
+
+/** The area a sail drives her with: its area as it stands, by how far it is sheeted home (sails.ts `drawShare`). */
+const drawingArea = (sail: Sail, setting: SailSetting): number => sailArea(sail, setting) * drawShare(sail, setting);
+
 /** One mast's yards laid aback (or filled again). */
 export function layAback(s: Sailing, mast: MastName, aback: boolean): Sailing {
   const m = MASTS.indexOf(mast);
@@ -253,7 +275,7 @@ function braceTarget(s: Sailing, mast: number, ax: number, ay: number): number {
   const b = sailingBody(), side = s.sides[mast]!, backed = s.backed[mast]!;
   const set: { sb: SailBody; area: number }[] = [];
   b.sails.forEach((sb, i) => {
-    const area = sb.square && sb.mast === mast ? sailArea(sb.sail, s.canvas[i]) : 0;
+    const area = sb.square && sb.mast === mast ? drawingArea(sb.sail, s.canvas[i]!) : 0;
     if (area > 0) set.push({ sb, area });
   });
   if (set.length === 0) return s.braces[mast]!;
@@ -312,7 +334,7 @@ function windForces(s: Sailing, pose: ShipPose, ax: number, ay: number, letFly: 
     heel += k * cy * (WINDAGE.height - HULL_SIDEWAYS.height);
   }
   for (let i = 0; i < b.sails.length; i++) {
-    const sb = b.sails[i]!, area = sailArea(sb.sail, s.canvas[i]);
+    const sb = b.sails[i]!, area = drawingArea(sb.sail, s.canvas[i]!);
     if (area === 0) continue;
     // The air this sail feels: her turning swings it across the wind; in the heeled sail's frame.
     const sx = ax, sy = (ay - s.turnRate * sb.along) * heelCos;
@@ -442,7 +464,7 @@ export interface SailStanding {
 export function sailsStanding(s: Sailing, wind: Wind): SailStanding[] {
   const b = sailingBody(), { ax, ay } = apparent(s.heading, s.ahead, s.leeway, wind), shiver = sinOf(SHIVER_ANGLE);
   return b.sails.map((sb, i) => {
-    const area = sailArea(sb.sail, s.canvas[i]);
+    const area = drawingArea(sb.sail, s.canvas[i]!);
     let angle: number, aback: boolean;
     if (sb.square) {
       angle = -s.braces[sb.mast]! * sb.limit;
