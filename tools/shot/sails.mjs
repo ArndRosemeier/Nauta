@@ -1,5 +1,6 @@
 /**
- * The sails check (plan N3.10): `npm run shot:sails [-- <out dir>]` (run `npm run build` first). One page of the brig
+ * The sails check (plan N3.10): `npm run shot:sails [-- <out dir> [all]]` (run `npm run build` first; CI takes the
+ * short set, the beam, in stays, clewing up and furled, inside its budget; `all` takes every picture below). One page of the brig
  * under way (`?sail`), commanded through `window.__nautaSail` (main.ts) and run on by whole minutes at once, so the
  * software GPU only draws the pictures:
  *  - all sail set from her start (the gaskets let go, sheeted home, the yards hoisted);
@@ -15,6 +16,8 @@ import { mkdirSync } from 'node:fs';
 import { openBrowser, openGame, shotSize, snap } from './browser.mjs';
 
 const out = process.argv[2] ?? 'shots/sails';
+/** `all` takes every picture (the package's set); CI takes the short one inside its budget: on the beam, in stays, clewing up, furled. */
+const all = process.argv.slice(3).includes('all');
 mkdirSync(out, { recursive: true });
 /** The points of sail on the port tack: degrees off the wind (`full and by` lies as close as she will). */
 const POINTS = [['close-hauled', null], ['beam', 90], ['quarter', 135], ['running', 180]];
@@ -50,17 +53,19 @@ const course = (from, off) => `steer ${String(Math.round((from + off) % COMPASS)
 
 await say('all sail');
 await onward(SETTLE.canvas);
-for (const [name, off] of POINTS) {
+for (const [name, off] of all ? POINTS : POINTS.filter(([n]) => n === 'beam')) {
   await say(off === null ? 'full and by' : course(await page.evaluate(() => window.__nautaSail.windFrom()), off));
   await onward(SETTLE.course);
   const s = await shot(name);
   if (s.set !== s.sails || !(s.deepest > 0)) problems.push(`${name}: ${s.set} of ${s.sails} sails set, deepest belly ${s.deepest}`);
 }
-await view('Quarterdeck');
-await shot('quarterdeck');
-await view('2 km off');
-const far = await shot('far-2km');
-if (far.set !== far.sails) problems.push(`2 km off: ${far.set} of ${far.sails} sails set`);
+if (all) {
+  await view('Quarterdeck');
+  await shot('quarterdeck');
+  await view('2 km off');
+  const far = await shot('far-2km');
+  if (far.set !== far.sails) problems.push(`2 km off: ${far.set} of ${far.sails} sails set`);
+}
 await view('50 m off');
 await say(course(await page.evaluate(() => window.__nautaSail.windFrom()), BEFORE_TACK));
 /** Runs the match on, a step at a time, until `done(sails aback)` or the most it waits; the seconds waited. */

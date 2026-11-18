@@ -1,0 +1,2 @@
+The sails are now drawn exactly as far as the crew has got them: you see each one let fall, sheeted home, clewed up and rolled up as the men work it, not on a clock of its own.
+Try it with ?sail&ship: give "all sail", then "take in sail".
