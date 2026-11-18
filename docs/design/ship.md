@@ -51,9 +51,20 @@ Arnd, from her deck: "The problem right now is not accuracy, but fun. From my fi
 1. **Open rails.** The hammock cranes and nettings stand empty along the rails. At "beat to quarters" the men carry the hammocks up and stow them in the waist's nettings only, where they shelter the gun crews; the rails of the quarterdeck and forecastle stay open at all times, so the captain's view from where he commands is never walled in.
 2. **Lower sides in the waist.** The rail top is about 1.1 m over the deck. The gun ports become notches up to the rail, the pin rails come down to about 0.95 m with pins only between the ports.
 3. **Leaning out.** At a rail, pushing on toward it leans the captain out over it, up to about 0.5 m outboard, to look down her side to the water, forward along her and aft at her wake. He cannot fall.
-4. **A raised quarterdeck and forecastle, each 1.2 m over the waist's deck,** with rails 1.0 m over their own decks. The quarterdeck runs from a break about 1.3 m aft of the mainmast to the taffrail and carries the wheel, binnacle, capstan, companion and skylight and carronades A to C of each side. The forecastle runs from about 13.9 m forward of the mainmast to the stem and carries the long sixes at ports I and J, the catheads and the bitts; the bowsprit comes out through it. Two ladders at each break, one a side. The berth deck stays where it is, so the cabins aft gain headroom and the stern ports become the great cabin's windows. The captain on his quarterdeck stands with his eye nearly 3 m over the waist's deck and sees his whole ship, the sea all round and the enemy.
+4. **A raised quarterdeck and forecastle, each 1.2 m over the waist's deck,** with rails 1.0 m over their own decks. The quarterdeck runs from a break about 1.3 m aft of the mainmast to the taffrail and carries the wheel, binnacle, capstan, companion and skylight and carronades A to C of each side. The forecastle runs from 13.45 m forward of the mainmast (clear of gun H's pocket and the bitts) to the stem and carries the long sixes at ports I and J, the catheads and the bitts; the bowsprit comes out through it. Two ladders at each break, one a side. The berth deck stays where it is, so the cabins aft gain headroom and the stern ports become the great cabin's windows. The captain on his quarterdeck stands with his eye nearly 3 m over the waist's deck and sees his whole ship, the sea all round and the enemy.
 
 What follows from it, each from the same numbers and never typed twice: the walk graph with its new levels, breaks and ladders (every space still reachable, a way across the centreline at least every 6 m on each level, the forward crossing now on the forecastle); the stations and crew places; where every line is made fast; the boom, which must clear a standing man on the quarterdeck by the body's height and a little more, the boom sail cut to suit; the gun ports and guns on the raised decks; the damage cells; the drawn hull, bulwarks and fittings. Her weight goes up a little (about 8 t raised by 1.2 m): displacement and trim are rechecked at each step and stay within 3 %, and `check:sailing` holds her heel and speeds in their ranges. The lower waist shelters its men less, which the balance sheet (plan, N7) must absorb.
+
+**As built (N2.12, PR 107).** Where this differs from the older sections of this document, this list holds:
+
+- The wheel stands 9.4 m aft of the mainmast.
+- The bread room's scuttle and its 3 m ladder are gone.
+- The fife rails moved so that each level has a way across within 6 m.
+- The stern ports are two glazed windows under the quarterdeck's beams; the stern board runs up to the taffrail.
+- Each channel sits under its own rail, and the main channel's run splits at the break.
+- The boom's jaws are 1.2 m higher and the gaff is 11.2 m (was 9.5 m), so the boom sail keeps its 133 m².
+- Gun-crew places past a break stand inboard of their gun.
+- She weighs 443.8 t against 439.3 t displaced (+1.0 %), her weight's centre 9 cm higher; she heels up to 0.5° more, within `check:sailing`'s ranges.
 
 ## Where you can go
 
