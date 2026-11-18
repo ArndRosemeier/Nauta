@@ -39,7 +39,7 @@ const POSTS: Readonly<Record<Taker, { readonly place: string; readonly forward: 
 export const quarterdeck = (): Spot => bareSpot(crewPlaces().get('station-quarterdeck')!);
 /** Where the midshipman waits at first: this far abaft the captain on the quarterdeck and inboard of him, m. */
 const MIDSHIPMAN_ABAFT = 1.2;
-const MIDSHIPMAN_INBOARD = 0.9;
+const MIDSHIPMAN_INBOARD = 0.6;
 export const midshipmanStart = (): Spot => { const q = quarterdeck(); return { ...q, along: q.along - MIDSHIPMAN_ABAFT, across: q.across - MIDSHIPMAN_INBOARD }; };
 /** Every man faces forward at his post: a half turn from aft. */
 export const FACING_FORWARD = Math.PI;
