@@ -3,17 +3,19 @@
  * its gusts and swings, her sailing and her floating) in every wind the game sails in, from a light breeze to the gale,
  * under battle and plain sail. Prints her speed on four points of sail and how long a tack from a beam reach takes, and
  * fails if a state stops being a number, a steady heel passes the limit, a tack in a working wind (force 3 and up) takes
- * a minute or more, or her speeds under plain sail in a fresh breeze stray from the table by more than half again its
+ * a minute or more (from the helm put over), heaving to in a working wind does not take her way off within five minutes
+ * (it prints how long it takes in each wind), or her speeds under plain sail in a fresh breeze stray from the table by more than half again its
  * tolerance (the test's steady wind has no gusts or sea; here she has both).
  *
  *   npm run check:sailing
  */
-import { angleDiff } from '@futuremagic/core';
 import {
   CLOSE_HAULED, HEEL_LIMIT, SPEED_CANVAS, SPEED_TABLE, SPEED_TOLERANCE, SPEED_WIND_FORCE, type CanvasName,
 } from '../../src/sim/rules/sailing.ts';
 import { WIND_PRESETS } from '../../src/sim/rules/wind.ts';
 import { startMatch, type SimState } from '../../src/sim/state.ts';
+import type { Order } from '../../src/sim/orders.ts';
+import { NO_WAY } from '../../src/sim/rules/orders.ts';
 import { step, type SimEvent } from '../../src/sim/step.ts';
 import { DEGREE, KNOT, STEPS_PER_SECOND } from '../../src/sim/units.ts';
 
@@ -22,6 +24,8 @@ const FROM = 0;
 /** Settling onto a point of sail, then measuring, s. */
 const SETTLE = 60;
 const MEASURE = 60;
+/** Hove to, her way must be off within this, s (in a working wind). */
+const HEAVE_LIMIT = 300;
 /** A tack must be through within this, s. */
 const TACK_LIMIT = 60;
 /** The lightest wind a tack is held to the limit in (a light breeze carries too little way through the wind). */
@@ -39,9 +43,9 @@ function match(force: number, canvas: CanvasName, angle: number): SimState {
 }
 
 /** Stepped on for `seconds`; `each` sees each state and its events. */
-function run(s: SimState, seconds: number, each?: (s: SimState, events: readonly SimEvent[]) => void): SimState {
+function run(s: SimState, seconds: number, each?: (s: SimState, events: readonly SimEvent[]) => void, first: readonly Order[] = []): SimState {
   for (let i = 0; i < seconds * STEPS_PER_SECOND; i++) {
-    const r = step(s);
+    const r = step(s, i === 0 ? first : []);
     s = r.state;
     const p = s.ships[0]!.motion.pose, sl = s.ships[0]!.sailing;
     if (![p.x, p.z, p.roll, p.heave, sl.ahead, sl.heading, sl.turnRate].every(Number.isFinite)) throw new Error('a state is no longer a number');
@@ -57,15 +61,27 @@ function pointOfSail(force: number, canvas: CanvasName, angle: number): { knots:
   return { knots: speed / n / KNOT, heel: heel / n };
 }
 
-/** How long a tack from a beam reach to close-hauled on the other tack takes, s (Infinity if she does not come through). */
+/** How long a tack from a beam reach takes, from the helm put over to her head through the wind, s (Infinity if she does not come through). */
 function tack(force: number, canvas: CanvasName): number {
   const s = run(match(force, canvas, 90), SETTLE);
-  const sl = s.ships[0]!.sailing, side = Math.sign(angleDiff(sl.heading, FROM));
   let at = Infinity, t = 0;
-  run(step(s, [{ kind: 'course', ship: 0, heading: FROM + side * CLOSE_HAULED, turn: side }]).state, TACK_LIMIT * 2, (_s, events) => {
+  // Timed from the helm put over (the order's `done`): the hands' time before it is the order table's (rules/orders.ts).
+  let from = Infinity;
+  run(s, TACK_LIMIT * 2, (_s, events) => {
     t += 1 / STEPS_PER_SECOND;
-    if (at === Infinity && events.some((e) => e.kind === 'tacked')) at = t;
-  });
+    if (from === Infinity && events.some((e) => e.kind === 'done' && e.order.kind === 'tack')) from = t;
+    if (at === Infinity && events.some((e) => e.kind === 'tacked')) at = t - from;
+  }, [{ kind: 'tack', ship: 0 }]);
+  return at;
+}
+
+/** How long heaving to from a beam reach under battle sail takes to take her way off, s (Infinity if not within `HEAVE_LIMIT`). */
+function heaveTo(force: number): number {
+  let at = Infinity, t = 0;
+  run(run(match(force, 'battle', 90), SETTLE), HEAVE_LIMIT, (st) => {
+    t += 1 / STEPS_PER_SECOND;
+    if (at === Infinity && st.ships[0]!.sailing.ahead < NO_WAY) at = t;
+  }, [{ kind: 'heave', ship: 0 }]);
   return at;
 }
 
@@ -85,6 +101,11 @@ for (const [angle, knots] of SPEED_TABLE) {
   const v = pointOfSail(SPEED_WIND_FORCE, SPEED_CANVAS, angle).knots, slack = SPEED_TOLERANCE * SEAWAY_SLACK;
   if (knots === 0 ? v > slack : Math.abs(v - knots) > slack) problems.push(`the table in a seaway: ${angle}° made ${v.toFixed(1)} kn against ${knots} kn`);
 }
+console.log(`hove to from a beam reach, battle sail, her way off after: ${FORCES.map((f) => {
+  const at = heaveTo(f);
+  if (f >= WORKING_FORCE && at === Infinity) problems.push(`force ${f}: hove to, her way was not off within ${HEAVE_LIMIT} s`);
+  return `force ${f} ${at === Infinity ? 'never' : `${at.toFixed(0)} s`}`;
+}).join(', ')}`);
 console.log(`sailing: ${FORCES.length} winds × ${CANVASES.length} canvases, ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 for (const p of problems) console.log(`PROBLEM: ${p}`);
 process.exit(problems.length ? 1 : 0);

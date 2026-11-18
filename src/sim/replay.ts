@@ -3,7 +3,8 @@
  * passes on (N3.7), what a saved match replays, and how the tests show that the same orders give the same state.
  * Pure.
  */
-import { step, type Order, type SimEvent } from './step';
+import type { Order } from './orders';
+import { step, type SimEvent } from './step';
 import type { SimState } from './state';
 
 /** The orders of one step, by the tick of the step they are given in. Ticks without orders are left out. */

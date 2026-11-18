@@ -214,7 +214,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A state as bytes, and back | `src/sim/state.ts#encodeState` |
 | The state's hash (two machines with the same hash have the same state) | `src/sim/state.ts#hashState` |
 | One step of the match: orders in, the next state and events out | `src/sim/step.ts#step` |
-| What a ship can be ordered (for now, each taken at once: a course and which way to turn to it, a canvas, a mast's yards aback) | `src/sim/step.ts#Order` |
+| What a ship can be ordered: the sailing vocabulary (steer, come up, bear away, full and by, tack, wear, heave to, the sail settings, back, fill) | `src/sim/orders.ts#Order` |
 | What happened in a step (for drawing, sound and the interface) | `src/sim/step.ts#SimEvent` |
 | Running a match on through a log of orders (a guest, a replay, the tests) | `src/sim/replay.ts#replay` |
 | The knot in m/s | `src/sim/units.ts#KNOT` |
@@ -246,11 +246,21 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Sailing: one step of a ship under sail in the true wind (sails by the apparent wind, the crew's trim and bracing, hull, rudder, helmsman, tacking, wearing, missing stays), her way and her sails' heel out | `src/sim/ship/sailing.ts#stepSailing` |
 | A ship under sail at the start (heading, way, canvas, yards trimmed) | `src/sim/ship/sailing.ts#startSailing` |
 | Telling the helmsman a heading and which way to turn to it | `src/sim/ship/sailing.ts#steerTo` |
-| Setting a ship's canvas | `src/sim/ship/sailing.ts#setCanvas` |
+| Setting or taking in one sail | `src/sim/ship/sailing.ts#setSail` |
 | Which sails a canvas sets in a wind, reefed for it | `src/sim/ship/sailing.ts#canvasFor` |
 | Laying a mast's yards aback, or filling them | `src/sim/ship/sailing.ts#layAback` |
 | How each sail stands this moment (area, brace or sheet, pressure, aback, shivering), for drawing and sound | `src/sim/ship/sailing.ts#sailsStanding` |
 | The sailing model's tuning: sail polars, hull and rudder, helmsman, bracing, canvas settings and reefs, heel limit, the speed table | `src/sim/rules/sailing.ts#SPEED_TABLE` |
+| The sailing orders as data: each order, who takes it, what it does | `src/sim/orders.ts#VOCABULARY` |
+| An order from its words (typed or spoken), and why words are none | `src/sim/orders.ts#parseOrder` |
+| An order in its own words | `src/sim/orders.ts#orderWords` |
+| A compass course in words (`090`) | `src/sim/orders.ts#headingWords` |
+| Why an order is no order at all (an untrusted order from another machine) | `src/sim/orders.ts#malformed` |
+| Giving a ship an order: taken, refused with its reason, or answered and changed (a course she will not lie); what she is told and the timed acts | `src/sim/orders.ts#giveOrder` |
+| Carrying out a ship's orders each step: the acts falling due done to her sailing, orders done reported, full and by following the wind | `src/sim/orders.ts#carryOut` |
+| What she is told after missing stays (the master bears away on the old tack) | `src/sim/orders.ts#heard` |
+| A ship's orders at the start | `src/sim/orders.ts#startOrders` |
+| The orders' time table and judgements: a point, no way, the time of each order and each sail, heaving to | `src/sim/rules/orders.ts#SAIL_SECONDS` |
 | The stays | `src/sim/ship/lines.ts#buildStays` |
 | The standing rigging: shrouds, futtock shrouds, backstays, slings, the bowsprit's | `src/sim/ship/lines.ts#buildStanding` |
 | The running rigging, each line on a pin of its own | `src/sim/ship/lines.ts#buildRunning` |
