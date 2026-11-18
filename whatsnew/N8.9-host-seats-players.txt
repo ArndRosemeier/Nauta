@@ -1,0 +1,1 @@
+In a room, the waiting room now lists the ships a player commands, with their side and navy. As host, tap a seat to give it to the next player in the room (or leave it free) before anyone taps Ready.

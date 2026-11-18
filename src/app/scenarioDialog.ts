@@ -19,12 +19,12 @@ type Say = Readonly<Record<WordKey, string>>;
 
 const PRESET_WORDS: Readonly<Record<PresetName, WordKey>> = { alone: 'presetAlone', room: 'presetRoom', watch: 'presetWatch', fleets: 'presetFleets' };
 const SKILL_WORDS: Readonly<Record<Offered, WordKey>> = { green: 'skillGreen', seasoned: 'skillSeasoned', master: 'skillMaster' };
-const NAVY_WORDS: Readonly<Record<(typeof NAVIES)[number], WordKey>> = { british: 'british', french: 'french' };
+export const NAVY_WORDS: Readonly<Record<(typeof NAVIES)[number], WordKey>> = { british: 'british', french: 'french' };
 /** What each limit says (scenario.ts `limitOf`). */
 export const LIMIT_WORDS: Readonly<Record<Limit, WordKey>> = { 'one side': 'limitOneSide', 'too close': 'limitTooClose', 'host ship': 'limitHostShip' };
 
 /** The letters the sides go by. */
-const SIDE_LETTERS = ['A', 'B', 'C', 'D'];
+export const SIDE_LETTERS = ['A', 'B', 'C', 'D'];
 /** A captain's choices in the order of their buttons: you, a player who joins, a computer at each skill. */
 const COMMANDS: readonly Command[] = [{ kind: 'you' }, { kind: 'player' }, ...SKILLS.map((skill): Command => ({ kind: 'computer', skill }))];
 

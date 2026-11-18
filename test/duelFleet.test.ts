@@ -45,6 +45,22 @@ test('the room carries the scenario; the host takes the first ship a person comm
   assert.equal(guest.state.ships.length, 4);
 });
 
+test('the host seats the players where he likes: moved, swapped or emptied, until someone is ready', async () => {
+  const { room, host, guest } = await fleetRoom();
+  assert.deepEqual(host.people.map((p) => p.id).sort(), [host.me, guest.me].sort());
+  assert.equal(guest.assign(0, guest.me), false, 'only the host seats');
+  assert.equal(host.assign(2, host.me), false, 'a computer\'s ship takes no player');
+  assert.equal(host.assign(0, guest.me), true);
+  assert.deepEqual(host.shipCaptains, [guest.me, host.me, null, null], 'the one who sat there takes the seat she left');
+  await room.settle();
+  assert.deepEqual(guest.shipCaptains, [guest.me, host.me, null, null], 'the guest has it');
+  assert.equal(guest.mine, 0);
+  assert.equal(host.assign(1, null), true);
+  assert.deepEqual(host.shipCaptains, [guest.me, null, null, null]);
+  host.ready();
+  assert.equal(host.assign(1, host.me), false, 'not once someone is ready');
+});
+
 test('the host steps the computer captains with the players; the guest runs the same match to the host\'s hash', async () => {
   const { room, host, guest } = await fleetRoom();
   room.run(SECONDS * STEPS_PER_SECOND);

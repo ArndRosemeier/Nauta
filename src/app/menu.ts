@@ -23,6 +23,7 @@ import type { Params } from './params';
 import { CODE_LENGTH, shareRow, waitingRooms } from './roomPanel';
 import { openSheet, rose, type Sheet } from './sheet';
 import { LIMIT_WORDS, scenarioParts } from './scenarioDialog';
+import { seatRows } from './seatRows';
 import { placementMap, type MapSelection } from './placementMap';
 import type { SettingsMenu } from './settingsPanel';
 import { choiceRow, row } from './settingsPanel';
@@ -447,16 +448,19 @@ export class Menu {
       const ready = menuButton('nt-button menu-go', say.ready, () => { s.ready(); look(); });
       const out = menuButton('nt-link', say.leaveTheRoom, leave);
       const terms = s.roomTerms;
-      const mine = terms ? (s.role === 'host' ? terms.navy : otherNavy(terms.navy as Navy)) : null;
+      const mine = s.mine >= 0 && s.navyOf(s.mine) ? s.navyOf(s.mine) : terms ? (s.role === 'host' ? terms.navy : otherNavy(terms.navy as Navy)) : null;
       sheet.body.append(make('p', 'room-big', code || '…'));
       if (problem) sheet.body.append(make('p', 'room-say room-problem', problem));
       if (s.code) sheet.body.append(shareRow(s.code, say), make('p', 'room-say', say.shareHelp));
       if (terms) sheet.body.append(make('div', 'nt-section', s.role === 'host' ? say.theMatch : say.asChosen), make('p', '', termsLine(terms, say)), ...(mine ? [make('p', 'room-say', `${say.yourNavy}: ${say[NAVY_WORDS[mine as Navy] ?? 'british']}`)] : []));
       const row = make('div', 'room-row');
       row.append(ready, make('small', 'room-say', say.readyHelp));
-      sheet.body.append(captains, row, out);
+      const seats = s.seatList.length > 2 || (terms && terms.scenario !== undefined) ? [make('div', 'nt-section', say.seatShip), seatRows(s, say, () => drawScreen()), ...(s.role === 'host' ? [make('p', 'room-say', say.seatHelp)] : [])] : [];
+      sheet.body.append(captains, ...seats, row, out);
+      const seatsNow = () => JSON.stringify([s.seatList, s.people.map((p) => p.id)]), drawn = seatsNow();
       const look = () => {
         if (this.sheet !== sheet) { off?.(); return; }
+        if (seatsNow() !== drawn) { drawScreen(); return; }
         const seated = s.shipCaptains.filter((c) => c !== null).length;
         const iAm = s.readyPlayers.includes(s.me), sheIs = s.readyPlayers.some((p) => p !== s.me);
         captains.textContent = seated < s.seats ? `${seated}/${s.seats} ${say.captainsOf}` : sheIs ? say.herReady : say.otherAboard;
