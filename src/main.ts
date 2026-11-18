@@ -19,6 +19,14 @@ import { Channel } from './audio/channel';
 import { OrderPanel } from './app/orderPanel';
 import { Speech } from './app/speaking';
 import { standIns } from './render/speech/standIns';
+import { OrderFan } from './app/orderFan';
+import { Midshipman } from './app/midshipman';
+import { OFFICERS, midshipmanStart, quarterdeck, type Officer } from './app/officers';
+import { lookBearing } from './app/look';
+import { OfficersView } from './render/crew/officersView';
+import { spotOf } from './sim/ship/deckWalk';
+import type { Spot } from './sim/ship/plan';
+import { characterSpeaker } from './render/speech/characterSpeaker';
 import { sailsSeen } from './app/sailsSeen';
 import { PageMatch, pageSeconds, rudderAngle, sparAngles } from './app/pageMatch';
 import { RoomPanel } from './app/roomPanel';
@@ -137,6 +145,8 @@ declare global {
      * seconds at once, looking `pitch` (rad, + up) and `yaw` (rad on her, 0 forward), without drawing in between (app/walking.ts `drive`); answers where
      * he is then (on deck, on the shrouds, out on a yard).
      */
+    /** The order fan (`?sail`), for the browser checks: open a man's fan and choose items in it by id (app/orderFan.ts `check`), light one up as under the finger. */
+    __nautaFan?: { open: (who: Officer, choose?: string[]) => string; lightUp: (id: string) => void };
     __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string };
   }
 }
@@ -202,6 +212,9 @@ async function start(): Promise<void> {
   // Walking, his own body (plan N2.7): an Actors figure from the crew's pack, his head not drawn.
   if (walking && ship) note.textContent = 'dressing the captain';
   const captain = walking && ship ? await CaptainView.load(view.renderer, import.meta.env.BASE_URL, ship.group) : null;
+  // Sailing, the men the captain gives his orders to (plan N4.4): six full characters at their posts, the midshipman at his side.
+  if (match && ship) note.textContent = 'the officers come on deck';
+  const officers = match && ship ? await OfficersView.load(view.renderer, import.meta.env.BASE_URL, ship) : null;
   view.camera.position.set(0, params.eye, 0);
   const startLook = params.look ?? START_LOOK;
   view.camera.rotation.set(startLook.pitch, startLook.yaw, 0);
@@ -262,6 +275,12 @@ async function start(): Promise<void> {
     note.textContent = 'building the captain\'s shaders';
     await view.stage.prepare(captain.group);
   }
+  if (officers) {
+    capTo(1);
+    note.textContent = 'building the officers\' shaders';
+    for (const o of officers.warmObjects()) await view.stage.prepare(o, { everyCaster: true });
+    officers.afterWarm();
+  }
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
   await view.stage.add(seaView.deep);
@@ -282,11 +301,14 @@ async function start(): Promise<void> {
     await view.stage.add(crew.twin);
   }
   if (captain) await view.stage.add(captain.group);
+  if (officers) await view.stage.add(officers.group);
   capTo(capShare);
   const crewMemory = crew?.memory();
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
-  const leaveView = walking ? (e: PointerEvent) => walking.input.owns(e) : undefined;
+  // Pointers not for looking: the walking thumb's, and a finger the order fan holds.
+  let fan: OrderFan | null = null;
+  const leaveView = (e: PointerEvent) => (walking?.input.owns(e) ?? false) || (fan?.owns(e) ?? false);
   const glassButton = el<HTMLButtonElement>('glass-button');
   const glassInput = glass ? watchGlass(canvas, glassButton, glass, leaveView, () => settings.now.keys.glass) : null;
   const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, leaveView, () => glassInput?.pinching ?? false,
@@ -331,12 +353,36 @@ async function start(): Promise<void> {
     if (walking) { walking.body.strength = s.motion; walking.input.layout(walkKeys(s.keys), s.thumb); }
     glassButton.textContent = words(s.language).glass;
   });
-  const orders = match ? new OrderPanel(match) : null;
-  // The men speaking (plan N4.5): bubbles over them for answers, orders passed down, reports and cries; until the
-  // officers are drawn (N4.4), faceless stand-ins at their stations carry them.
+  // The order fan (plan N4.4); the working panel of N3.5 beside it only when asked for (`?panel`).
+  const orders = match && params.panel ? new OrderPanel(match) : null;
+  /** Where the captain stands on her: his walker's spot; at a standpoint aboard, the quarterdeck; off her, nowhere. */
+  const captainSpot = (): Spot | null => (walking ? spotOf(walking.captain.walker) : where.off ? null : quarterdeck());
+  // The men speaking (plan N4.5): bubbles over them for answers, orders passed down, reports and cries, spoken by the
+  // officers drawn (N4.4); faceless stand-ins at the stations for the voices not drawn (the boatswain, the surgeon).
   const speech = match && ship ? new Speech(document.body, match, settings.now.language, matchClock) : null;
-  if (speech && ship) standIns(speech.speakers, match!.ship, ship.group, view.camera);
+  if (speech && ship) {
+    standIns(speech.speakers, match!.ship, ship.group, view.camera);
+    // The last put speaks: each drawn officer takes his voice over from his stand-in.
+    if (officers) for (const who of OFFICERS) speech.speakers.put(characterSpeaker(officers.men.get(who)!, who, match!.ship, view.camera));
+  }
   settings.watch((s) => { if (speech) speech.language = s.language; });
+  const midshipman = new Midshipman(midshipmanStart());
+  if (match && ship && officers) fan = new OrderFan(canvas, {
+    session: match,
+    men: () => officers.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight),
+    captain: captainSpot,
+    bearingLooked: () => lookBearing(input.look, ship.drawn.heading),
+    heel: () => ship.drawn.roll,
+    closures: () => match.state.ships[match.ship]!.closures,
+    midshipman,
+    addressed: (who) => officers.addressed(who),
+    thumb: (e) => walking?.input.owns(e) ?? false,
+    settings: () => settings.now,
+    wording: () => words(settings.now.language),
+  });
+  fan?.onSent((e) => speech?.sent(e));
+  const pointing = new Vector3();
+  if (fan) { const f = fan; window.__nautaFan = { open: (who, choose) => f.check(who, choose), lightUp: (id) => f.lightUp(id) }; }
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
   let jump = 0, jumped: (() => void) | null = null;
   if (match) window.__nautaSail = {
@@ -510,7 +556,11 @@ async function start(): Promise<void> {
         }
       }
       ship.shade(view.sun, sky.lightDirection, other);
-      if (captain && walking?.drawnBody) captain.draw(dt, walking.drawnBody, walking.captain.walker, walking.captain.climber, view.camera);
+      // The orders: the midshipman on his way, the fan judged anew; the officers drawn; the captain's arm pointing or his hand at his mouth.
+      fan?.onFrame(now, dt);
+      officers?.animate(dt, view.camera, midshipman.where(), captainSpot());
+      const arm = fan?.arm;
+      if (captain && walking?.drawnBody) captain.draw(dt, walking.drawnBody, walking.captain.walker, walking.captain.climber, view.camera, arm ? { ...arm, toward: view.camera.getWorldDirection(pointing) } : null);
       if (crew) {
         crew.crews = phase?.crews ?? 2;
         crew.override = phase?.override ?? {};

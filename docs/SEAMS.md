@@ -454,7 +454,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Whether an order would be refused now (a dim button), and whether it stands (a ringed one) | `src/app/orderReport.ts#wouldRefuse` |
 | Her turning spars' angles in a state, for drawing the yards braced as the sailing model trims them | `src/app/pageMatch.ts#sparAngles` |
 | Where her rudder lies in a state, for drawing it put over | `src/app/pageMatch.ts#rudderAngle` |
-| The order panel on the page (`?sail`): buttons, compass, typed orders, answers | `src/app/orderPanel.ts#OrderPanel` |
+| The order panel on the page (`?sail&panel`, a test tool beside the fan): buttons, compass, typed orders, answers | `src/app/orderPanel.ts#OrderPanel` |
 | Making an element of the page's own panels in one line | `src/app/dom.ts#make` |
 | The ways across her weather deck's centreline: how wide, how often (the fife rails' places that make them: `MAIN_FIFE_AT`, `FORE_FIFE_FORE_AT`) | `src/sim/rules/ships.ts#DECK_CROSSING` |
 | How fast a man gets about the ship: his pace on each footing, smartly, stooping, the heel, a crowd, queuing on a way, standing aside (first proposals) | `src/sim/rules/routes.ts#PACE` |
@@ -649,3 +649,13 @@ Before writing code that does something, look here. If a row covers it, call tha
 | An Actors man as a speaker: his head for the bubble, his mouth with the words, his look to the captain | `src/render/speech/characterSpeaker.ts#characterSpeaker` |
 | Faceless stand-ins at the stations for the men not yet drawn | `src/render/speech/standIns.ts#standIns` |
 | A ship's navy in the duel | `src/app/crewLooks.ts#navyOf` |
+| The men the captain gives orders to: who they are, where each stands, whom an order goes to, whether his voice reaches them (N4.4) | `src/app/officers.ts#OFFICERS` |
+| How far apart two spots are on one floor (another space: Infinity) | `src/app/officers.ts#floorApart` |
+| Where the midshipman gives a message to each man | `src/app/officers.ts#deliverAt` |
+| What the order fan offers each man now: at most six, one more ring, dim and ringed as the match stands | `src/app/fanOrders.ts#fanItems` |
+| What each order key gives | `src/app/fanOrders.ts#KEY_ORDERS` |
+| Which drawn man a finger points at on the view | `src/app/fanOrders.ts#manAt` |
+| The order fan on the page: tap or press a man, the midshipman, the keys, steer there; the captain's arm | `src/app/orderFan.ts#OrderFan` |
+| The midshipman: keeps by the captain on her decks, runs with a message and gives it when he arrives | `src/app/midshipman.ts#Midshipman` |
+| The compass bearing looked along from her ("steer there") | `src/app/look.ts#lookBearing` |
+| The officers drawn (six full characters with living faces; N4.3's near pool takes over): where each is on the view, looking at the captain | `src/render/crew/officersView.ts#OfficersView` |

@@ -51,7 +51,25 @@ const GRIP_CURL = 1.2;
 const RAIL_POLE = [0.8, -1, -0.4] as const;
 const BEAM_POLE = [0.9, -0.6, 0.2] as const;
 
+/** Pointing (steer there): his right hand this far out from his shoulder along the look, m (an arm held straight). */
+const ARM_REACH = 0.62;
+/** A hail: his left hand this far in front of his head and below his eyes, m (cupped at his mouth). */
+const HAIL_AHEAD = 0.14;
+const HAIL_BELOW = 0.1;
+/** A pointing hand's fingers, nearly straight. */
+const POINT_CURL = 0.3;
+
 const UP = new Vector3(0, 1, 0);
+/** Both hands' finger curl: closed on a hold, and the right nearly straight while pointing. */
+const GRIP_HANDS = { L: GRIP_CURL, R: GRIP_CURL } as const;
+const POINT_HANDS = { L: GRIP_CURL, R: POINT_CURL } as const;
+
+/** What his arms do for an order (app/orderFan.ts `arm`): point where he looks (`toward`, a world direction), lift a hand to his mouth. */
+export interface Gesture {
+  readonly pointing: boolean;
+  readonly hailing: boolean;
+  readonly toward: Vector3;
+}
 
 export class CaptainView {
   /** His figure rides in this group, which follows her pose; it goes in through `stage.add`. */
@@ -114,7 +132,7 @@ export class CaptainView {
    * Once a frame, after her pose and the view (ShipView's update): his figure posed from his body, or from the climb
    * while he is on a ladder, and shifted so its eyes are at the camera.
    */
-  draw(dt: number, body: BodyPose, walker: DeckWalker, climb: LadderClimb | null, camera: PerspectiveCamera): void {
+  draw(dt: number, body: BodyPose, walker: DeckWalker, climb: LadderClimb | null, camera: PerspectiveCamera, gesture: Gesture | null = null): void {
     this.group.matrix.copy(this.ship.matrixWorld);
     this.group.matrixWorldNeedsUpdate = true;
     this.group.updateWorldMatrix(true, false);
@@ -164,7 +182,7 @@ export class CaptainView {
     this.started = true;
     b.updateMatrixWorld(true);
 
-    rig.reachFor(climb?.limbs ? this.climbGoals(climb.limbs) : this.standGoals(body));
+    rig.reachFor(climb?.limbs ? this.climbGoals(climb.limbs) : this.gestureGoals(this.standGoals(body), gesture));
     if (!climb) this.layFeet(body, walker.floor);
     // No head: the view is his eyes.
     this.head.scale.setScalar(HIDDEN);
@@ -186,7 +204,7 @@ export class CaptainView {
       this.world(f.p.set(sole[0] + bx, sole[1] + ankle, sole[2] + bz));
       f.w = 1;
     }
-    g.L!.w = 0; g.R!.w = 0; g.curlW = 0;
+    g.L!.w = 0; g.R!.w = 0; g.curlW = 0; g.curl = GRIP_HANDS;
     const hold = body.hold;
     if (hold) {
       const hand = g[hold.side]!, [x, y, z] = hold.at.point, kind = hold.at.kind;
@@ -194,6 +212,26 @@ export class CaptainView {
       hand.w = hold.w;
       hand.pole = kind === 'beam' ? BEAM_POLE : RAIL_POLE;
       g.curlW = hold.w;
+    }
+    return g;
+  }
+
+  /** An order given: his right arm out along the look (steer there), his left hand at his mouth (a hail). */
+  private gestureGoals(g: LimbGoals, gesture: Gesture | null): LimbGoals {
+    if (!gesture) return g;
+    if (gesture.pointing) {
+      const hand = g.R!;
+      this.rig.bone('upperarm_r').getWorldPosition(hand.p).addScaledVector(gesture.toward, ARM_REACH);
+      hand.w = 1;
+      hand.pole = undefined;
+      g.curl = POINT_HANDS;
+      g.curlW = 1;
+    }
+    if (gesture.hailing) {
+      const hand = g.L!;
+      this.head.getWorldPosition(hand.p).addScaledVector(this.w.copy(gesture.toward).setY(0).normalize(), HAIL_AHEAD).addScaledVector(UP, -HAIL_BELOW);
+      hand.w = 1;
+      hand.pole = undefined;
     }
     return g;
   }

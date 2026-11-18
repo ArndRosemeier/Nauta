@@ -5,6 +5,7 @@
  * walking thumb's, walkInput.ts) are left alone.
  */
 import type { Spyglass } from './glass';
+import { DEFAULT_SETTINGS } from './settings';
 
 /** How much one notch of the mouse wheel (100 of its units) draws the glass out or in. */
 const WHEEL_STEP = 1.1;
@@ -16,7 +17,7 @@ export interface GlassInput {
 }
 
 /** The glass worked from the view `el` and its `button` (its words are the page's); `notForView`: pointers that are not for the view; `key`: the key's code that raises it. */
-export function watchGlass(el: HTMLElement, button: HTMLButtonElement, glass: Spyglass, notForView: (e: PointerEvent) => boolean = () => false, key: () => string = () => 'KeyG'): GlassInput {
+export function watchGlass(el: HTMLElement, button: HTMLButtonElement, glass: Spyglass, notForView: (e: PointerEvent) => boolean = () => false, key: () => string = () => DEFAULT_SETTINGS.keys.glass): GlassInput {
   const fingers = new Map<number, { x: number; y: number }>();
   let start = 0;
   const state = { pinching: false };

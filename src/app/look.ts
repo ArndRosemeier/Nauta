@@ -3,6 +3,8 @@
  * Pure: the input (lookInput.ts) feeds it pixels, the view reads the direction.
  */
 
+import { wrapBearing } from '../sim/units';
+
 /** Looking no higher or lower than this (rad): just short of straight up and down, so the view never flips. */
 export const PITCH_LIMIT = 1.5;
 
@@ -45,6 +47,12 @@ export function lookDir(look: Look): [number, number, number] {
   const c = Math.cos(look.pitch);
   return [-Math.sin(look.yaw) * c, Math.sin(look.pitch), -Math.cos(look.yaw) * c];
 }
+
+/**
+ * The compass bearing looked along from her (rad, 0 north, clockwise; sim/units.ts): a look's yaw is on her (0 her
+ * bow, growing to larboard), so it is her heading less the yaw. "Steer there" gives her this course (orders.md).
+ */
+export const lookBearing = (look: Look, heading: number): number => wrapBearing(heading - look.yaw);
 
 /** An angle brought into -pi..pi, so a heading never grows without end. */
 function wrap(a: number): number {
