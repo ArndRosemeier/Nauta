@@ -20,6 +20,9 @@ import type { JobName } from '../sim/rules/crew';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { CrewKnobs } from './quality';
 import { floorApart } from './officers';
+import { standByClip } from './standBy';
+import { apartOnWater } from '../sim/units';
+import { BREAKS } from '../sim/rules/ships';
 
 /** The motion a man hauling plays (at a pin, tailing on a fall). */
 const HAUL = 'pick up';
@@ -30,13 +33,11 @@ export const JOB_CLIPS: Readonly<Record<JobName, string>> = {
   plug: 'repair (kneeling)', fish: 'repair (kneeling)', splice: 'repair (kneeling)', tackle: 'interact', cut: 'chop wood',
   pump: 'push', fight: 'interact', fetch: 'pick up', carry: 'walk carrying',
 };
-/** A man standing by with nothing to do, by his seed: mostly still, some with their arms folded. */
-const STANDING_BY = ['idle', 'idle', 'arms folded', 'idle', 'nod'] as const;
-/** Waiting at his place for the work to begin. */
+/** Waiting at his place for the work to begin, or standing to his gun at quarters. */
 const WAITING = 'idle';
 /** On his way: walking, or smartly at a run. */
-const WALKING = 'walk';
-const RUNNING = 'jog';
+export const WALKING = 'walk';
+export const RUNNING = 'jog';
 /** Killed, or badly hurt and lying where he fell (he is carried below by others: N6.6 draws the carrying). */
 export const LYING = 'death';
 /** Clips that play once and hold their last frame. */
@@ -118,6 +119,25 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
   return { along, across, height, space: at.spot.space, yaw, way: null, moving: false };
 }
 
+/** A man stands this far from the foot of a raised deck's face, m: a body nearer sinks into it (N2.12). */
+const BREAK_CLEAR = 0.5;
+/** Which of her three decks (aft of the quarterdeck's break, the waist, forward of the forecastle's) a place of the weather deck is on. */
+const deckOf = (along: number): number => (along <= BREAKS.quarterdeck ? 0 : along >= BREAKS.forecastle ? 2 : 1);
+/** Whether `p` is on the deck of `own` (a man shared round his place never crosses a break) and not against the face of a break. */
+function awayFromBreaks(own: Spot, p: Spot): boolean {
+  if (own.space !== 'deck') return true;
+  return deckOf(p.along) === deckOf(own.along) && Math.abs(p.along - BREAKS.quarterdeck) >= BREAK_CLEAR && Math.abs(p.along - BREAKS.forecastle) >= BREAK_CLEAR;
+}
+
+/** A man shared round a place keeps this far from the foot or head of a ladder, m: they are for the men going up and down. */
+const LADDER_CLEAR = 0.7;
+let ladders: readonly Spot[] | null = null;
+/** Whether `p` is within `LADDER_CLEAR` of a ladder's foot or head on its floor. */
+function nearLadder(p: Spot): boolean {
+  ladders ??= [...crewPlaces().values()].filter((c) => c.kind === 'ladder').map((c) => placeSpot(c.id));
+  return ladders.some((l) => l.space === p.space && floorApart(l, p) < LADDER_CLEAR);
+}
+
 /** A floor point of hers and its height. */
 interface Stand { readonly along: number; readonly across: number; readonly height: number }
 
@@ -144,7 +164,7 @@ function postSpots(): Map<number, Stand> {
         if (aloft && Math.max(Math.abs(f), Math.abs(k)) > TOP_STEPS) continue;
         const p = { space: spot.space, along: spot.along + f * gap, across: spot.across + inboard * k * gap };
         // His own place is where the match has him, standable or not (a pin at the rail); the others must be clear deck.
-        if ((f !== 0 || k !== 0) && !standable(net, p, [])) continue;
+        if ((f !== 0 || k !== 0) && (!standable(net, p, []) || !awayFromBreaks(spot, p) || nearLadder(p))) continue;
         if (!clear(p, gap) || floorApart(captain, p) < room - TINY) continue;
         taken.push(p);
         out.set(i, { along: p.along, across: p.across, height: heightAt(net, p) });
@@ -193,6 +213,22 @@ function placeOf(task: Task, man: number): { id: string; rank: number } | null {
   return { id: places[n % places.length]!, rank: Math.floor(n / places.length) };
 }
 
+/** A man standing still keeps this far from the captain's body, m: he steps aside as the captain walks up to him. */
+export const CAPTAIN_CLEAR = 1;
+
+/**
+ * A man standing at `at` (ship space) with the captain's feet at `eye`: where he is drawn, kept `CAPTAIN_CLEAR` from
+ * the captain along the line from him, so the captain never walks through him. Only the drawing moves: the match does
+ * not know where the captain walks. Into `out` (a man who is already clear is left as he is).
+ */
+export function stepAside(at: ManDrawn, eye: { readonly x: number; readonly z: number }): void {
+  const dx = at.x - eye.x, dz = at.z - eye.z, near = apartOnWater(at, eye);
+  if (near >= CAPTAIN_CLEAR) return;
+  const along = near > TINY ? 1 / near : 0;
+  at.x = eye.x + (near > TINY ? dx * along : 1) * CAPTAIN_CLEAR;
+  at.z = eye.z + (near > TINY ? dz * along : 0) * CAPTAIN_CLEAR;
+}
+
 /** The turn from `a` to `b` the short way round, rad. */
 const turnBetween = (a: number, b: number): number => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
@@ -211,18 +247,19 @@ export function manDrawn(from: SimShip, to: SimShip, f: number, man: number, m: 
   out.yaw = a.yaw + g * turnBetween(a.yaw, b.yaw);
   out.space = b.space;
   out.way = b.way;
-  out.clip = clipOf(to, man, task, b, seed);
+  out.clip = clipOf(to, man, m, task, b, seed);
   return out;
 }
 
-/** The motion a man plays: lying if struck down, on his way walking or running, at work by his job, else standing by. */
-function clipOf(ship: SimShip, man: number, task: Task | null, at: At, seed: number): string {
+/** The motion a man plays: lying if struck down, on his way walking or running, at work by his job, else busy at his home place. */
+function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, seed: number): string {
   const harm = harmOf(ship.damage, man);
   if (harm === 'killed' || harm === 'badly') return LYING;
   const hand = ship.crew.men[man]!;
   if (at.moving) return hand.going!.haste === 'smart' ? RUNNING : WALKING;
   if (task) return task.began === null ? WAITING : JOB_CLIPS[task.job];
-  return STANDING_BY[seed % STANDING_BY.length]!;
+  // At his home place he busies himself (standBy.ts); away from it (at his gun at quarters) he stands to.
+  return hand.stands === null ? standByClip(m, seed) : WAITING;
 }
 
 /** A man's own seed (his phase in a clip, his standing-by motion), the same on every machine. */

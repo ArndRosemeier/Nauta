@@ -6,7 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OUTFITS, type CharacterCatalog } from '@actors/generator';
-import { FULL, JOB_CLIPS, MEDIUM, POOL_STICK, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
+import { CAPTAIN_CLEAR, FULL, JOB_CLIPS, MEDIUM, POOL_STICK, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
+import { BREAKS } from '../src/sim/rules/ships.ts';
+import { crewPlaces, placeSpot } from '../src/sim/crew/roster.ts';
 import { FACES, FEAR_SECONDS, facesNow, stepFace, type FaceState, type FaceWhy } from '../src/app/faces.ts';
 import { PACK_CLIPS, PACK_GARMENTS, PACK_HAIR, crowdKinds, figureOf, fullLook, navyOf, wearing } from '../src/app/crewLooks.ts';
 import { voiceMan } from '../src/app/officers.ts';
@@ -47,6 +49,45 @@ test('the men who share the captain\'s post stand clear of him', () => {
     const d = men[i]!;
     assert.ok(Math.hypot(d.x - captain.x, d.z - captain.z) >= room - 0.05, `${m.rank} ${i} is ${Math.hypot(d.x - captain.x, d.z - captain.z).toFixed(2)} m from the captain`);
   });
+});
+
+test('nobody visible just stands about: every man with nothing to do is busy at his place, the sentries on watch', () => {
+  const men = drawnAll(ship, ship), idle = ['idle', 'arms folded'];
+  roster.forEach((m, i) => assert.ok(!idle.includes(men[i]!.clip), `${m.rank} ${i} at ${m.home} plays ${men[i]!.clip}`));
+  assert.ok(roster.every((m, i) => m.home.startsWith('station-sentries') || m.home.startsWith('station-cabin-door') || men[i]!.clip !== 'pistol idle'), 'only sentries keep a pistol ready');
+  // The hands below are at their messes, those on deck at their chores.
+  const at = (home: string) => roster.flatMap((m, i) => (m.home === home ? [men[i]!.clip] : []));
+  for (const clip of at('station-mess-p')) assert.ok(['eat or drink', 'talk', 'nod'].includes(clip), clip);
+  for (const clip of at('station-idle-waist-a')) assert.ok(['repair (kneeling)', 'pick up', 'interact'].includes(clip), clip);
+});
+
+test('the men are drawn on the deck of their place, never against the face of a break where a body sinks into the raised deck', () => {
+  const men = drawnAll(ship, ship), deckOf = (a: number) => (a <= BREAKS.quarterdeck ? 0 : a >= BREAKS.forecastle ? 2 : 1), breakClear = 0.5;
+  roster.forEach((m, i) => {
+    const home = placeSpot(m.home), d = men[i]!, along = -d.z;
+    if (home.space !== 'deck' || d.space !== 'deck') return;
+    assert.equal(deckOf(along), deckOf(home.along), `${m.rank} ${i} left his deck`);
+    // (A man whose own place is at a break stands there: a ladder's foot.)
+    // A man shared round a place keeps clear of the ladders (a man at a place of his own, the carpenter at the pumps beside the quarterdeck ladder, is where the plan puts him).
+    const own = Math.abs(home.along - along) < 1e-6 && Math.abs(home.across - d.x) < 1e-6;
+    if (!own) for (const c of crewPlaces().values()) if (c.kind === 'ladder' && c.space === 'deck') assert.ok(Math.hypot(c.along - along, c.across - d.x) >= 0.7 - 1e-6, `${m.rank} ${i} at the foot of ${c.id}`);
+    if (Math.abs(home.along - BREAKS.quarterdeck) >= breakClear && Math.abs(home.along - BREAKS.forecastle) >= breakClear) {
+      for (const at of [BREAKS.quarterdeck, BREAKS.forecastle]) assert.ok(Math.abs(along - at) >= breakClear - 1e-6, `${m.rank} ${i} against a break at ${along.toFixed(2)}`);
+    }
+  });
+});
+
+test('a man standing still steps aside for the captain: kept the captain\'s room from him, and left alone when clear', () => {
+  const man = newManDrawn(), eye = { x: 1, z: 2 };
+  Object.assign(man, { x: 1.3, y: 0, z: 2 });
+  stepAside(man, eye);
+  assert.ok(Math.abs(Math.hypot(man.x - eye.x, man.z - eye.z) - CAPTAIN_CLEAR) < 1e-9 && man.z === 2 && man.x > eye.x, 'pushed straight out');
+  Object.assign(man, { x: 1 + 2 * CAPTAIN_CLEAR, z: 2 });
+  stepAside(man, eye);
+  assert.equal(man.x, 1 + 2 * CAPTAIN_CLEAR);
+  Object.assign(man, { x: 1, z: 2 });
+  stepAside(man, eye);
+  assert.ok(Math.hypot(man.x - eye.x, man.z - eye.z) >= CAPTAIN_CLEAR - 1e-9, 'a man on the captain\'s very spot is moved too');
 });
 
 test('making sail, men on their way walk or run and men at work play their job\'s motion; between two steps they are between', () => {

@@ -26,13 +26,15 @@ import { brigRoster, type Man } from '../../sim/crew/roster';
 import { heightAt, routeNetwork } from '../../sim/crew/network';
 import type { Whereabouts } from '../../sim/crew/going';
 import { taskOf } from '../../sim/crew/crew';
+import { STAND_BY_CLIPS } from '../../app/standBy';
+import { apartOnWater } from '../../sim/units';
 import { harmOf } from '../../sim/damage';
 import type { Spot } from '../../sim/ship/plan';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { belowDeck } from '../../audio/crewHearing';
 import { BUILDS, DRESSES, PACK, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
 import {
-  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, choosePool, clipPhase, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAt, type ManDrawn,
+  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, WALKING, choosePool, clipPhase, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn,
 } from '../../app/crewDrawn';
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
@@ -205,7 +207,7 @@ export class CrewView {
     const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, clipLibraries: false, levels: [CROWD_LEVEL] });
     const kinds = crowdKinds(workbench.catalog, rosters);
     note(`baking ${kinds.length} kinds of men`);
-    const clips = [...new Set([...Object.values(JOB_CLIPS), LYING, WALK, 'jog', 'idle', 'arms folded', 'nod'])];
+    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, LYING, WALK, 'jog', 'idle'])];
     const figures = await buildCrowdFigures(workbench, { material: createNodeCrowdFigureMaterial, builds: { ...BUILDS }, kinds, clips, once: ONCE_CLIPS, fps: BAKE_FPS });
     note('the officers come on deck');
     const pool = await NearPool.load(renderer, `${base}${PACK}`, workbench, knobs.pool, knobs.poolFull, fullLook(workbench.catalog, figureOf(0, 1, rosters[0]![1]!)));
@@ -343,9 +345,11 @@ export class CrewView {
     if (mine) this.officerAt(d, fr);
     const view = mine || (this.other && 'aboard' in this.other) ? this.views[fr.mine]! : null;
     const eye = this.eyes[d.ship]!;
+    // A man at his place on the captain's floor steps aside as the captain walks up to him (the match does not know where he walks).
+    if (at.clip !== WALKING && at.clip !== RUNNING && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT) stepAside(at, eye);
     d.distance = Math.hypot(at.x - eye.x, at.y + BODY_MIDDLE - eye.y, at.z - eye.z);
     // A man the match puts where the captain's eye is (it does not keep the captain clear) is not drawn: he is not seen inside out.
-    const inEye = Math.hypot(at.x - eye.x, at.z - eye.z) < EYE_CLEAR && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT;
+    const inEye = apartOnWater(at, eye) < EYE_CLEAR && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT;
     d.shown = this.crews > d.ship && !inEye && (view ? view.zoneGroupOf(at.space).visible : !belowDeck(at.space));
     this.local.set(at.x, at.y + BODY_MIDDLE, at.z).applyMatrix4(this.groups[d.ship]!.matrixWorld);
     d.seen = d.shown && this.frustum.intersectsSphere(this.sphere.set(this.local, BODY_RADIUS));
