@@ -16,19 +16,11 @@
     "reason": "False alarm: officers.ts floorApart is the one distance on one floor between two spots; spars.ts measures between rig points in three dimensions, ship.ts between a deck's middle and a point with its height."
   },
   {
-    "key": "idiom: [.addEventListener .pointerId] in app/lookInput.ts + app/orderFan.ts + app/walkInput.ts",
-    "reason": "False alarm: each input keeps the one pointer it owns (the look's drag, the walking thumb, the order fan's finger) and hands the others on; that is the pointer events' own way, not a copied routine."
-  },
-  {
     "key": "same name: render/crew/crewView.ts#afterWarm + render/crew/officersView.ts#afterWarm",
     "reason": "False alarm: only the name matches the Stage warm-up's convention (warmObjects, then afterWarm puts the men back): the trial crew resets 240 men to the crowd level, the officers go back into their places."
   },
   {
     "key": "same name: render/crew/crewView.ts#load + render/crew/officersView.ts#load",
     "reason": "Only the name and the Actors loading call match: the trial musters 240 men in lanes of workers with progress; the officers are six with living faces. N4.3's near pool replaces both with one muster."
-  },
-  {
-    "key": "idiom: [.addEventListener .preventDefault] in app/glassInput.ts + app/orderFan.ts + app/orderPanel.ts",
-    "reason": "False alarm: each listens for its own event and stops the page's default for it (the glass its wheel, the Fire! button its touch, so the word is given as the thumb comes down, not on a click after it lifts); no routine is shared."
   }
 ]

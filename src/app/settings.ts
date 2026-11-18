@@ -143,3 +143,9 @@ export function withKey(s: Settings, action: KeyAction, code: string): Settings 
 
 /** The language a browser asks for, as far as the interface has it (`navigator.language`, `de-AT` is German). */
 export const languageOf = (asked: string | undefined): Language => (asked?.toLowerCase().startsWith('de') ? 'de' : 'en');
+
+/** Keys named as people read them, where the key's code does not say it plainly. */
+const KEY_NAMES: Readonly<Record<string, string>> = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: '␣' };
+
+/** A key's code (`KeyW`, `Digit1`, `ShiftLeft`) as its cap reads. */
+export const keyName = (code: string): string => KEY_NAMES[code] ?? code.replace(/^Key|^Digit/, '').replace(/(Left|Right)$/, ' $1');

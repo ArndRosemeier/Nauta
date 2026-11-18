@@ -352,3 +352,44 @@ body.in-menu #orders, body.in-menu #glass-button, body.in-menu #stick, body.in-m
   .menu-choice { min-height: 52px; padding: 6px 22px; }
   .menu-choice.first { min-height: 60px; }
 }
+
+/* ---------- The mouse on a desk (src/app/mouse.ts) and the keys' caps ---------- */
+/* A key's cap beside what it does (a fan's tag, Fire!, the glass, the reports): only where a mouse points, so a finger never sees it */
+.nt-cap {
+  display: none; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border: 1px solid var(--brass-dim); border-bottom-width: 2px; border-radius: 4px;
+  background: var(--lacquer-deep); color: var(--ivory); font: normal 11px/15px var(--word-font); letter-spacing: 0; text-transform: none; text-align: center; vertical-align: middle;
+}
+.nt-desk { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .nt-cap { display: inline-block; }
+  .nt-desk { display: inline; }
+}
+#glass-button .nt-cap { margin-left: 8px; }
+.nt-fan-tag .nt-cap { position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%); }
+.nt-fire .nt-cap, .nt-steer-give .nt-cap { margin-left: 12px; font-size: 13px; height: 22px; line-height: 19px; min-width: 22px; }
+/* The taken mouse's dot in the middle of the view (hidden while the steer mark stands there) */
+.nt-aim { position: fixed; z-index: 14; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--brass); box-shadow: 0 0 0 1px #000a; pointer-events: none; display: none; }
+body.mouse-taken .nt-aim { display: block; }
+/* The man the mouse is on, named under it with what a click does */
+.nt-aim-name {
+  position: fixed; z-index: 14; pointer-events: none; transform: translate(-50%, 18px); padding: 4px 12px; border: 1px solid var(--brass-dim); border-radius: 14px;
+  background: var(--lacquer-over); color: var(--brass); text-align: center; font: 13px/1.2 var(--title-font); letter-spacing: 0.12em; font-variant: small-caps; white-space: nowrap; box-shadow: 0 3px 10px #0008;
+}
+.nt-aim-name small { display: block; font: italic 13px/1.25 var(--word-font); letter-spacing: 0; font-variant: normal; color: var(--ivory-soft); }
+/* The taken mouse's pointer in the open fan: a brass ring moved from the hub onto an order */
+.nt-fan-pointer { position: fixed; z-index: 16; left: 0; top: 0; width: 14px; height: 14px; margin: -7px 0 0 -7px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--brass); background: var(--lacquer-deep); box-shadow: 0 0 0 1px #000a; pointer-events: none; }
+body.in-menu .nt-aim, body.in-menu .nt-aim-name, body.in-menu .nt-fan-pointer { display: none !important; }
+
+/* ---------- The controls card (src/app/controlsCard.ts) ---------- */
+.controls-card.nt-sheet { width: min(660px, 100%); }
+.controls-tabs { display: flex; gap: 8px; margin-bottom: 4px; }
+.controls-grid { display: grid; grid-template-columns: minmax(130px, auto) 1fr; gap: 3px 18px; margin: 4px 0 2px; align-items: center; }
+.controls-how { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 0; }
+.controls-does { margin: 0; color: var(--ivory); font-size: 15px; line-height: 1.25; }
+.controls-gesture { font-style: italic; color: var(--brass); }
+.controls-or { color: var(--ivory-soft); }
+.controls-card .nt-cap { display: inline-block; min-width: 24px; height: 24px; font-size: 13px; line-height: 20px; }
+.controls-card .nt-section { margin: 10px 0 4px; }
+.controls-card .menu-sheet-foot { margin-top: 10px; }
+.controls-card .menu-sheet-foot .nt-note { margin: 0; }
+@media (max-width: 520px) { .controls-grid { grid-template-columns: 1fr; gap: 2px 0; } .controls-does { margin-bottom: 8px; } }

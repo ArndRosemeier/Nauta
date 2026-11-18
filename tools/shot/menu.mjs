@@ -1,7 +1,8 @@
 /**
  * The menu (docs/design/menu.md, plan N7.2), by hand, not in CI: `npm run shot:menu [-- <out dir>]` (run `npm run
  * build` first). The plain address at the tablet's 1180 × 820: the title asking for the tap once the game is ready,
- * the main screen over her quarterdeck, the match setup, the deck after "Beat to quarters", the captain's pause, the
+ * the main screen over her quarterdeck, the match setup, the controls card the first match opens (once on a device),
+ * the deck after "Beat to quarters", the captain's pause, the
  * end card after she strikes, joining and the waiting room (without a GameHub key they show the server's refusal),
  * the main screen in German, upright, and the first match's welcome and first lesson (N7.4). Fails if the page
  * throws. About 8 minutes in the cloud (each frame costs seconds on the software GPU; run `npm run packs` first).
@@ -41,6 +42,9 @@ await shot('main');
 await tap('.menu-choice.first');
 await shot('setup');
 await tap('.menu-go');
+await page.waitForSelector('.controls-card', { timeout: TIMEOUT });
+await shot('controls');
+await tap('.controls-card .menu-go');
 await shot('deck');
 await tap('#settings');
 await shot('pause');

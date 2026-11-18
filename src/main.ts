@@ -6,6 +6,8 @@ import './ui/nauta.css';
 import { readParams, type Params } from './app/params';
 import { BenchRun } from './app/benchRun';
 import { watchLook } from './app/lookInput';
+import { MouseTaker, keepBrowserMenusAway } from './app/mouse';
+import { keyCap, onKeyPress } from './app/dom';
 import { standpoint, type Standpoint } from './app/standpoints';
 import { showStandpoints } from './app/standpointBar';
 import { Walking } from './app/walking';
@@ -87,6 +89,8 @@ import { makeWind, meanWind, windAt } from './sim/wind';
 import { followWind, startSea } from './sim/sea/sea';
 import type { Look } from './app/look';
 
+/** The Escape key's code. */
+const ESCAPE = 'Escape';
 /** Where the captain looks at the start: a little above the horizon, toward the morning sun. */
 const START_LOOK: Look = { yaw: -1.2, pitch: 0.12 };
 /** The longest step of time one frame may take, seconds (a tab that slept does not jump the clock). */
@@ -153,7 +157,11 @@ declare global {
      * he is then (on deck, on the shrouds, out on a yard).
      */
     /** The order fan (`?sail`), for the browser checks: open a man's fan and choose items in it by id (app/orderFan.ts `openForCheck`), light one up as under the finger. */
-    __nautaFan?: { open: (who: Officer, choose?: string[]) => string; lightUp: (id: string) => void };
+    __nautaFan?: {
+      open: (who: Officer, choose?: string[]) => string; lightUp: (id: string) => void;
+      /** Where the officers are on the view now, CSS px from its top left (the checks put the mouse on one). */
+      men: () => readonly { who: Officer; x: number; y: number; seen: boolean }[];
+    };
     __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string };
   }
 }
@@ -336,10 +344,12 @@ async function start(): Promise<void> {
   // Pointers not for looking: the walking thumb's, and a finger the order fan holds.
   let fan: OrderFan | null = null;
   const leaveView = (e: PointerEvent) => (walking?.input.owns(e) ?? false) || (fan?.owns(e) ?? false);
+  // The mouse on a desk: free (drag to look, click a man) or taken for looking by a click on the sea (mouse.ts); never in the menu or under a sheet.
+  const mouse = new MouseTaker(canvas, () => !document.body.classList.contains('in-menu') && !document.querySelector('.nt-backdrop'));
   const glassButton = el<HTMLButtonElement>('glass-button');
   const glassInput = glass ? watchGlass(canvas, glassButton, glass, leaveView, () => settings.now.keys.glass) : null;
-  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, leaveView, () => glassInput?.pinching ?? false,
-    (by) => { const s = settings.now; return by === 'mouse' ? { speed: s.mouseSpeed, inverted: s.mouseInverted } : { speed: s.fingerSpeed, inverted: false }; });
+  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, leaveView, () => (glassInput?.pinching ?? false) || (fan?.holdsLook ?? false),
+    (by) => { const s = settings.now; return by === 'mouse' ? { speed: s.mouseSpeed, inverted: s.mouseInverted } : { speed: s.fingerSpeed, inverted: false }; }, () => mouse.taken);
   const glassField = el('glass');
   /** The scene the address asks for: the hour and the day's pace, the wind and its sea, the eye, the look. */
   const setScene = (p: Params) => {
@@ -378,7 +388,7 @@ async function start(): Promise<void> {
     showHud = s.frameTimes || crew !== null;
     hud.style.display = showHud ? 'block' : 'none';
     if (walking) { walking.body.strength = s.motion; walking.input.layout(walkKeys(s.keys), s.thumb); }
-    glassButton.textContent = words(s.language).glass;
+    glassButton.replaceChildren(words(s.language).glass, keyCap(s.keys.glass));
   });
   // The order fan (plan N4.4); the working panel of N3.5 beside it only when asked for (`?panel`).
   const orders = match && params.panel ? new OrderPanel(match) : null;
@@ -406,10 +416,12 @@ async function start(): Promise<void> {
     thumb: (e) => walking?.input.owns(e) ?? false,
     settings: () => settings.now,
     wording: () => words(settings.now.language),
+    taken: () => mouse.taken,
   });
+  mouse.whenTakenOrFreed((taken) => { if (!taken) fan?.freed(); });
   fan?.onSent((e) => speech?.sent(e));
   const pointing = new Vector3();
-  if (fan) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id) }; }
+  if (fan && officers) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id), men: () => officers.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) }; }
   // Every line the men said, in a sheet opened by the Reports tag or its key (Arnd, 2026-11-18).
   if (speech) new ReportsPanel(speech.log, settings);
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
@@ -473,6 +485,13 @@ async function start(): Promise<void> {
     if (changed && quality.choose(s.quality)) apply(quality.knobs);
   });
   const settingsMenu = new SettingsMenu(settings, { qualityNow: () => `${quality.knobs.name} · ${quality.reason}` });
+  // Escape: a sheet closes itself; the mouse taken is freed by the browser (and nothing more); an open fan or the
+  // pointing arm is put away; otherwise, in play, the captain's pause (or the settings) opens, as the rose would.
+  onKeyPress(() => ESCAPE, () => {
+    if (document.querySelector('.nt-backdrop') || mouse.justFreed) return;
+    if (fan?.escape()) return;
+    if (!document.body.classList.contains('in-menu')) settingsMenu.press();
+  });
   document.addEventListener('visibilitychange', () => quality.interrupt());
   // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want (the title's tap opens it).
   const sound = new SeaSound(pageEngine(), MATCH_SEED);
@@ -691,6 +710,7 @@ async function start(): Promise<void> {
     sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], room, sailing && aboard ? sailing.sailing : undefined);
     view.stage.frame();
     view.draw(halfSmoke ? drawHalfSmoke : undefined);
+    fan?.nameAimed();
     orders?.update(now);
     bench?.worked(performance.now() - now);
     trial?.measured(now, performance.now() - now, crew?.stats.ms ?? 0, view.renderer.info.render.drawCalls);
@@ -730,6 +750,8 @@ function crewLine(crew: CrewView, musterSeconds: number, held: ReturnType<CrewVi
  * `?probe` shows what the device offers instead of the game (plan N0.5), `?netcheck` runs a match through the hub
  * without drawing (the network check, plan N3.7); their code loads only when asked for.
  */
+// The browser's own menus and navigation stay off the game from the first frame of the title (mouse.ts).
+keepBrowserMenusAway();
 const asked = readParams(location.search);
 // `?title`: the title alone (title/boot.ts), nothing behind it.
 const titleAlone = new URLSearchParams(location.search).has('title');

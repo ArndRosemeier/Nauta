@@ -39,6 +39,8 @@ export interface Sheet {
 
 /** Opens a sheet titled `title` (with `kind` as its class) over the view; `closed` is called once it is shut, however. */
 export function openSheet(kind: string, title: string, closeLabel: string, closed: () => void = () => {}): Sheet {
+  // A sheet is read and clicked: the mouse taken for looking (mouse.ts) is freed.
+  if (document.pointerLockElement) document.exitPointerLock();
   const backdrop = make('div', 'nt-backdrop'), panel = make('section', `nt-sheet ${kind}`);
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', title);

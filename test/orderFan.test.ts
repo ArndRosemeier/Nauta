@@ -12,7 +12,7 @@ import { openShip } from '../src/sim/crew/closures.ts';
 import { routeNetwork, standable } from '../src/sim/crew/network.ts';
 import { DEGREE, KNOT } from '../src/sim/units.ts';
 import { meanWind } from '../src/sim/wind.ts';
-import { FAN_DEPTH, FAN_MOST, KEY_ORDERS, waitingForWord, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem } from '../src/app/fanOrders.ts';
+import { FAN_DEPTH, FAN_MOST, KEY_ORDERS, keyOfItem, waitingForWord, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem } from '../src/app/fanOrders.ts';
 import { OFFICERS, TAKERS, deliverAt, floorApart, inVoice, midshipmanStart, postOf, quarterdeck, takerOf } from '../src/app/officers.ts';
 import { Midshipman } from '../src/app/midshipman.ts';
 import { lookBearing } from '../src/app/look.ts';
@@ -90,6 +90,16 @@ test('the order keys: each a different key, and a glass kept on G gives G up to 
   assert.equal(old.keys.glass, 'KeyQ');
   assert.equal(old.keys.wear, 'KeyG');
   assert.equal(new Set(KEY_ACTIONS.map((a) => old.keys[a])).size, KEY_ACTIONS.length);
+});
+
+test('a tag shows the key that gives what it gives: the fan teaches the keys', () => {
+  const keyed = (items: readonly FanItem[]): string[] => items.flatMap((i) => (i.act.kind === 'ring' ? keyed(i.act.items) : [`${i.id}:${keyOfItem(i) ?? '-'}`]));
+  assert.deepEqual(keyed(fanItems('master', UNDER_WAY, 0)), ['steer:steer', 'up:up', 'away:away', 'tack:tack', 'wear:wear', 'by:-', 'follow:-', 'abeam:-', 'heave:heave']);
+  assert.deepEqual(keyed(fanItems('gunner', UNDER_WAY, 0)).filter((k) => !k.endsWith(':-')), ['shot-round:round', 'shot-chain:chain', 'shot-grape:grape', 'bear:fire', 'cease:cease']);
+  const lieutenant = keyed(fanItems('first lieutenant', UNDER_WAY, 0));
+  for (const k of ['sail-battle:battle', 'sail-plain:plain', 'sail-all:all', 'shorten:shorten', 'quarters:quarters', 'strike:-']) assert.ok(lieutenant.includes(k), k);
+  // A ring has no key of its own: its orders carry theirs.
+  assert.equal(keyOfItem(fanItems('master', UNDER_WAY, 0).find((i) => i.id === 'about')!), null);
 });
 
 test('the men stand on her floor; the voice reaches across the weather deck and aloft, not from below', () => {
