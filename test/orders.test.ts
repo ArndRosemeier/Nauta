@@ -19,10 +19,12 @@ import { rigPlan } from '../src/sim/ship/rig.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import { DEGREE } from '../src/sim/units.ts';
 import { steadyWind } from './support/sail.ts';
-import { EACH, FROM, MODERATE, SEED, answers, reasons, run, underWay, windFrom } from './support/orders.ts';
+import { EACH, FROM, MODERATE, SEED, answers, kinds, reasons, run, underWay, windFrom } from './support/orders.ts';
 
 /** On the beam in a moderate breeze, settled: built once for the file (states are plain data, never changed). */
 const BEAM = Object.freeze(underWay(MODERATE, 90));
+/** Seconds she is given to come through the wind in a tack from the beam. */
+const TACK_WITHIN = 90;
 
 test('every order of the vocabulary parses from its own words and back, and from the words a captain might use', () => {
   assert.deepEqual(VOCABULARY.map((w) => w.kind).sort(), Object.keys(EACH).sort());
@@ -52,6 +54,23 @@ test('every order of the vocabulary parses from its own words and back, and from
   assert.match(parseOrder('steer', 0) as string, /which course/);
   assert.match(parseOrder('steer 400', 0) as string, /which course/);
   assert.match(parseOrder('tack now', 0) as string, /takes nothing more/);
+});
+
+test('a tack is refused until she is round: through the wind and still swinging onto her new course, but not once she lies on it', () => {
+  // On through the wind: the fore yards come over ('tacked') while her bow still swings on toward her new course.
+  let s = run(BEAM, 1, [EACH.tack]).state;
+  for (let t = 0, through = false; t < TACK_WITHIN && !through; t++) {
+    const r = run(s, 1);
+    s = r.state;
+    through = kinds(r.events).includes('tacked');
+  }
+  assert.equal(Math.abs(s.ships[0]!.sailing.steer.turn), 1, 'she is through the wind and still swinging');
+  const again = run(s, 1, [EACH.tack]);
+  assert.ok(!kinds(again.events).includes('taken'));
+  assert.match(reasons(again.events)[0]!, /in stays/);
+  // Once she lies on her new course with every sail over, she may be tacked again.
+  for (let t = 0; t < TACK_WITHIN && s.ships[0]!.sailing.steer.turn !== 0; t++) s = run(s, 1).state;
+  assert.ok(kinds(run(s, 1, [EACH.tack]).events).includes('taken'));
 });
 
 test('orders that cannot be done are refused with the reason as an event, and change nothing', () => {
