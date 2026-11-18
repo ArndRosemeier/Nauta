@@ -25,6 +25,7 @@
     "plan:draw": "tsx tools/plan/draw.ts",
     "shot:sea": "node tools/shot/sea.mjs",
     "check:shots": "node tools/shot/check.mjs",
+    "check:ship": "node tools/shot/ship.mjs",
     "walk:check": "tsx tools/walk/everywhere.ts",
     "check:room": "node tools/net/room.mjs"
   },

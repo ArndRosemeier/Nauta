@@ -24,6 +24,8 @@ import { furnish } from './sim/ship/furnish';
 import { shipPlan } from './sim/ship/plan';
 import { OtherShipView } from './render/ship/otherShip';
 import { VERSION } from 'virtual:nauta/version';
+import { SprayView } from './render/spray';
+import { SPRAY } from './render/materials';
 import { SeaSound } from './audio/seaSound';
 import { ShipSound } from './audio/shipSound';
 import { CrewSound } from './audio/crewSound';
@@ -31,7 +33,7 @@ import { OPEN_AIR } from './audio/acoustics';
 import { Vector3 } from 'three/webgpu';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
 import { simTime } from './sim/state';
-import { makeWind, meanWind } from './sim/wind';
+import { makeWind, meanWind, windAt } from './sim/wind';
 import { followWind, startSea } from './sim/sea/sea';
 import type { Look } from './app/look';
 
@@ -63,7 +65,8 @@ declare global {
     /** Set once the first frame with everything in it is drawn (the headless checks wait for it). */
     __nautaReady?: boolean;
     /**
-     * Sets the scene from a query (`hour=6.3&day=0&sea=gale&eye=10&look=0,-6`: hour and day, wind or sea, eye, look) with
+     * Sets the scene from a query (`hour=6.3&day=0&sea=gale&eye=10&look=0,-6`: hour and day, wind or sea, eye, look; on
+     * the brig `ship=bow`, the standpoint) with
      * the clocks stopped and the sea started afresh, and resolves once it is drawn: `npm run shot:sea` takes its
      * shots on one page with it (tools/shot/sea.mjs).
      */
@@ -118,9 +121,11 @@ async function start(): Promise<void> {
   await seaView.fine.warmUp(view.renderer);
   seaView.fine.run(view.renderer);
   // The sea's mesh is drawn as many tiles at once, a shader of its own: the warm-up builds it with the kinds.
-  // So are her fittings' instanced draws, which three builds shaders of their own for.
+  // So are her fittings' instanced draws, which three builds shaders of their own for, and the spray from her bow (N2.5).
+  await seaView.wake.compile(view.renderer);
+  const spray = ship ? new SprayView(SPRAY.make()) : null;
   await furnished?.ready();
-  await view.stage.warmUp([seaView.mesh, ...(furnished ? [...furnished.zones.values()].map((d) => d.group) : [])]);
+  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(furnished ? [...furnished.zones.values()].map((d) => d.group) : [])]);
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
   await view.stage.add(seaView.deep);
@@ -129,6 +134,7 @@ async function start(): Promise<void> {
   // Her yards braced as the address asks (`?brace=30`), until the sailing model braces them (N3.3).
   if (ship) for (const id of ship.swingIds) ship.setBrace(id, params.brace);
   if (other) await view.stage.add(other.group);
+  if (spray) await view.stage.add(spray.mesh);
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
   const input = watchLook(canvas, walking ? params.look ?? walking.startLook : ship ? where.look : startLook, view.radPerPixel, walking ? (e) => walking.input.owns(e) : undefined);
@@ -155,6 +161,8 @@ async function start(): Promise<void> {
     wind = makeWind(MATCH_SEED, p.wind, WIND_FROM); blowing = meanWind(wind, 0);
     sea = startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, 0);
     seaTime = SHOT_SEA_TIME;
+    // On the brig: the standpoint the query names (`ship=bow`). Sailing, the match keeps its own clock, wind and sea.
+    if (ship && p.ship !== null) { where = standpoint(p.ship); input.look = where.look; }
     setScene(p);
     sceneFrames = SCENE_FRAMES; sceneDrawn = done;
   });
@@ -170,7 +178,10 @@ async function start(): Promise<void> {
     const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.use(s));
     match.onChange(() => rooms.refresh());
   }
-  const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k.ropeShadows, k.shipFarFrom); };
+  const apply = (k: QualityKnobs) => {
+    view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k.ropeShadows, k.shipFarFrom);
+    seaView.wake.levels = k.wakeLevels;
+  };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());
   // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want.
@@ -181,7 +192,9 @@ async function start(): Promise<void> {
   // without a match only the bell, by the page's clock.
   const crewSound = ship ? new CrewSound(sound.engine, MATCH_SEED, match?.ship ?? 0) : null;
   if (match && crewSound) match.on('events', (events) => crewSound.onEvents(events));
-  const ear = new Vector3(), facing = new Vector3(), crown = new Vector3();
+  const ear = new Vector3(), facing = new Vector3(), crown = new Vector3(), gust = meanWind(wind, 0);
+  /** Her way through the water, sailed by a match (`?sail`); still without one. Her wake follows it (N2.5). */
+  const way = { ahead: 0, leeway: 0 };
   // `?bench`: the fixed flight, measured once the quality level is chosen (plan N1.9).
   const bench = params.bench > 0 ? new BenchRun(el('bench'), params.bench, {
     settled: () => quality.chosen,
@@ -230,8 +243,15 @@ async function start(): Promise<void> {
       view.sun.position.copy(view.sun.target.position).addScaledVector(sky.lightDirection, SUN_DISTANCE);
     }
     sky.update(dt, view.camera);
-    seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky);
+    const mine = match?.state.ships[match.ship]?.sailing;
+    way.ahead = mine?.ahead ?? 0; way.leeway = mine?.leeway ?? 0;
+    seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky, ship?.water(way) ?? null);
+    if (ship && spray) {
+      const bow = ship.bow(way);
+      spray.show(ship.slams, bow, windAt(wind, bow.stem[0], bow.stem[2], seaTime, gust), seaTime, dt, seaView.origin);
+    }
     seaView.fine.run(view.renderer);
+    seaView.wake.fill(view.renderer);
     view.camera.getWorldPosition(ear);
     view.camera.getWorldDirection(facing);
     crown.copy(view.camera.up).applyQuaternion(view.camera.quaternion);

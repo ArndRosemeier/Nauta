@@ -26,6 +26,8 @@ export interface QualityKnobs {
   readonly ropeShadows: boolean;
   /** How far off a ship is first drawn as her far version, m (N2.4 crossfades over the next third of that): nearer, fewer triangles for a ship further off. */
   readonly shipFarFrom: number;
+  /** A ship's wake map (render/wakeMap.ts, N2.5): 2 fills the near level and the far one (the long wake out to 256 m), 1 the near only (128 m). */
+  readonly wakeLevels: number;
 }
 
 export interface QualityLevel extends QualityKnobs {
@@ -39,10 +41,10 @@ export interface QualityLevel extends QualityKnobs {
  * rig's rope shadows and how near another ship turns to her far version.
  */
 export const QUALITY_LEVELS: readonly QualityLevel[] = [
-  { name: 'high', renderScale: 1, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130 },
-  { name: 'medium', renderScale: 0.8, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130 },
-  { name: 'low', renderScale: 0.65, seaCells: 8, fineSeaBands: 2, fineSeaSize: 256, ropeShadows: false, shipFarFrom: 100 },
-  { name: 'lowest', renderScale: 0.5, seaCells: 8, fineSeaBands: 2, fineSeaSize: 128, ropeShadows: false, shipFarFrom: 80 },
+  { name: 'high', renderScale: 1, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2 },
+  { name: 'medium', renderScale: 0.8, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2 },
+  { name: 'low', renderScale: 0.65, seaCells: 8, fineSeaBands: 2, fineSeaSize: 256, ropeShadows: false, shipFarFrom: 100, wakeLevels: 2 },
+  { name: 'lowest', renderScale: 0.5, seaCells: 8, fineSeaBands: 2, fineSeaSize: 128, ropeShadows: false, shipFarFrom: 80, wakeLevels: 1 },
 ];
 
 /** The frame rate a level must hold. */

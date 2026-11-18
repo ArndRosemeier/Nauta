@@ -9,12 +9,14 @@ import { surfaceAt, seaSample, seaWind, type SeaState } from '../sim/sea/sea';
 import type { WaveSet } from '../sim/sea/waves';
 import type { WindState } from '../sim/wind';
 import { DEEP, SEA } from './materials';
-import { SEA_INPUTS, SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, TILE_AT, useFineSea, useSeaSky } from './seaMaterial';
+import { SEA_INPUTS, SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, TILE_AT, useFineSea, useSeaSky, useWake } from './seaMaterial';
+import { WakeMap } from './wakeMap';
+import type { Track, WakeSource } from './wake';
 import { SEA_MAX_TILES, SEA_TILE_CELLS, seaCellChoices, seaDropAtReach, seaReach, seaTiles, seaTileTriangles } from './seaGrid';
 import { SEA_WAVE_STRIDE, WAVE_AT, fillSeaWaves, seaWaveTable } from './seaWaves';
 import { fineFrame, slopeVariance } from './seaFine';
 import { FineSea, setBandInputs, type FineChoice } from './seaBands';
-import { FOAM_WRAP, bunchVariance, foamDepth, foamLevels } from './seaFoam';
+import { FOAM_WRAP, bunchVariance, foamDepth, foamLevels, whitecapShare } from './seaFoam';
 import { RIPPLE_REPEATS_SECOND, RIPPLE_TILE } from './seaRipples';
 import { drawGusts, type GustMap } from './seaGusts';
 import type { SkyView } from './skyView';
@@ -67,6 +69,14 @@ function tileGrid(): { geometry: BufferGeometry; runs: Map<number, { start: numb
   return { geometry: g, runs };
 }
 
+/** A ship on the water, as her wake needs her each frame: where she has been, what she is doing, the water at her side. */
+export interface ShipWater {
+  readonly track: Track;
+  readonly source: WakeSource;
+  /** The stations along her waterline (wake.ts `ChurnWatch.lists`). */
+  readonly churn: Float32Array;
+}
+
 export class SeaView {
   /** The sea: it goes in with the Stage after the warm-up has built its shader. */
   readonly mesh: Mesh;
@@ -86,6 +96,8 @@ export class SeaView {
   readonly origin = new Vector3();
   /** The fine sea's bands on the GPU (plan N1.2): main.ts runs their passes each frame before drawing. */
   readonly fine: FineSea;
+  /** A ship's wake on the GPU (plan N2.5): main.ts fills it each frame after the fine sea's passes. */
+  readonly wake = new WakeMap();
   private readonly gusts: GustMap;
   private readonly sample = seaSample();
   private readonly coarse = new WeakMap<WaveSet, number>();
@@ -104,6 +116,7 @@ export class SeaView {
     useSeaSky(sky.envTexture);
     this.fine = new FineSea(fine, seed);
     useFineSea(this.fine);
+    useWake(this.wake);
     const { geometry: grid, runs } = tileGrid();
     this.runs = runs;
     grid.setAttribute(SEA_TILE_ATTRIBUTE, SEA_INPUTS.tiles);
@@ -132,7 +145,7 @@ export class SeaView {
    * Once per frame, before drawing: the sea at time `t` (s of the shared clock) under the wind `wind` (its gusts)
    * blowing at `speed` m/s on the mean, seen by `camera`, lit by `sky`; `dt` is the time since the last frame (s).
    */
-  show(sea: SeaState, wind: WindState, speed: number, t: number, dt: number, camera: PerspectiveCamera, sky: SkyView): void {
+  show(sea: SeaState, wind: WindState, speed: number, t: number, dt: number, camera: PerspectiveCamera, sky: SkyView, ship: ShipWater | null = null): void {
     const I = SEA_INPUTS, cam = camera.position;
     this.origin.set(Math.round(cam.x / ORIGIN_STEP) * ORIGIN_STEP, 0, Math.round(cam.z / ORIGIN_STEP) * ORIGIN_STEP);
     this.mesh.position.copy(this.origin);
@@ -152,8 +165,15 @@ export class SeaView {
     for (let i = 0; i < table.count; i++) variance += table.wave[i * SEA_WAVE_STRIDE + WAVE_AT.height]! ** 2 / 2;
     I.crest.value = Math.max(CREST_DEVIATIONS * Math.sqrt(variance), Number.EPSILON);
 
+    // A ship's wake, laid along where she has been.
+    if (ship) {
+      const p = ship.source.pose, drift = ship.source.ahead > 0 ? ship.source.leeway / ship.source.ahead : 0;
+      this.wake.update(ship.track.follow(ship.source, t, ox, oz), Math.hypot(ship.source.ahead, ship.source.leeway), drift, ship.churn, p.x - ox, p.z - oz, ox, oz);
+    } else this.wake.update(null, 0, 0, null, 0, 0, ox, oz);
+
     // The fine sea's bands, the foam's levels and its drift, the gusts.
     I.foamDepth.value = foamDepth(speed);
+    I.whitecaps.value = whitecapShare(speed);
     this.showFine(sea, t, dt, ox, oz);
     const levels = foamLevels(table, speed);
     I.foamLevel.value = levels.level;

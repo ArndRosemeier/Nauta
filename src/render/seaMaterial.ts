@@ -16,6 +16,10 @@
  * glitter, the deep water's own colour lit by the sun and the sky, light through the thin tops of crests, gust patches
  * that roughen it (seaGusts.ts), foam, and the air's haze toward the horizon. From below: the sky through Snell's
  * window, the dark of total reflection around it, and the murk of the deep.
+ *
+ * A ship's water comes in through one seam (plan N2.5, wakeMap.ts): her waves' height in the vertex stage, and per
+ * pixel their slope, the foam she makes and the slick she leaves, which smooths the fine waves and the ripples and
+ * greens the water with bubbles.
  */
 import {
   ClampToEdgeWrapping, DataTexture, DoubleSide, InstancedBufferAttribute, LinearFilter, MeshBasicNodeMaterial,
@@ -33,6 +37,7 @@ import { seaCut } from './seaCut';
 import { SEA_LOD_RANGE, SEA_MAX_TILES, SEA_MORPH_START, SEA_TILE_CELLS, SEA_WAVE_FULL_CELLS, SEA_WAVE_GONE_CELLS } from './seaGrid';
 import { SEA_DRAWN_WAVES, SEA_WAVE_STRIDE } from './seaWaves';
 import type { FineSea } from './seaBands';
+import { wakeHeight, wakeSurface, type WakeMap } from './wakeMap';
 import { FINE_CHOP, MOST_BANDS } from './seaFine';
 import { FOAM_DEPTH_NONE, FOAM_RAMP, FOAM_TEXELS, FOAM_WRAP, foamPattern } from './seaFoam';
 import { RIPPLE_LONGEST, RIPPLE_REPEATS, RIPPLE_REPEATS_SECOND, RIPPLE_SHORTEST, RIPPLE_RANGE, RIPPLE_TEXELS, ripplePattern } from './seaRipples';
@@ -156,6 +161,20 @@ const MURK = [0.004, 0.035, 0.045] as const;
 /** The deep below is darker than the water toward the surface: its share of the murk straight down. */
 const MURK_DOWN = 0.15;
 
+// --- Her wake (wakeMap.ts).
+/** How much of the fine waves' and the ripples' slope her slick takes away, at its strongest. */
+const SLICK_CALM = 0.5;
+/** How much her slick's bubbles colour the water, at its strongest (as foam's do, AERATED_SHARE). */
+const SLICK_AERATED = 0.1;
+/**
+ * Foam from the vertex stage is only as fine as the grid: where a drawn cell is wider than FOAM_CELL_FULL (m) it
+ * gives way, by FOAM_CELL_GONE, to the share a wind whitens spread evenly, so far-off foam on the coarse tiles does not
+ * read as soft sheets (plan N1.4's loose end, N2.5); and how bright that even share shows.
+ */
+const FOAM_CELL_FULL = 4;
+const FOAM_CELL_GONE = 12;
+const FOAM_EVEN = 0.5;
+
 /** Samples the foam texture takes along a pixel's long side, seen at a grazing angle. */
 const FOAM_ANISOTROPY = 8;
 /** The microfacet reflection's 4 · n·l · n·v (n·l cancels against the light's own). */
@@ -220,6 +239,8 @@ export const SEA_INPUTS = {
   coarseBunch: uniform(0),
   /** How far the foam's pattern has drifted with the wind, m (x, z). */
   foamDrift: uniform(new Vector2()),
+  /** The share of the sea the wind whitens (seaFoam.ts `whitecapShare`), for the far sea where the grid is too coarse for foam's shape. */
+  whitecaps: uniform(0),
   /** How stirred the water is by the wind, 0 clear to 1 a gale's. */
   stirred: uniform(0),
   /** The gust map (seaGusts.ts) and its corner from the sea's origin, m. */
@@ -243,6 +264,10 @@ export function useSeaSky(env: Texture): void { skyMap = env; }
 let fineSea: FineSea | null = null;
 /** Hand the sea its fine bands: the material reads their textures. */
 export function useFineSea(fine: FineSea): void { fineSea = fine; }
+/** A ship's wake (SeaView), set before the warm-up builds the sea. */
+let wakeMap: WakeMap | null = null;
+/** Hand the sea the wake map: the one seam a ship's water comes in through (plan N2.5). */
+export function useWake(map: WakeMap): void { wakeMap = map; }
 
 /** Beckmann's distribution of facets at `nh` (cosine to the half vector) for a mean square slope `m2`. */
 function beckmann(nh, m2) {
@@ -259,18 +284,30 @@ function smith(c, m2) {
   return select(a.lessThan(SMITH_KNEE), fit, float(1));
 }
 
+/**
+ * The light a matte, level surface sends back per unit of albedo (the sea's body, the deep, foam and spray): the
+ * sun's, and the sky's through the environment map at the strength lit materials take it (three: the map's colour
+ * times its intensity).
+ */
+export function daylight() {
+  const I = SEA_INPUTS, L = I.sunDir;
+  return I.sun.mul(max(L.y, 0)).div(Math.PI).add(pmremTexture(skyMap!, vec3(0, 1, 0), float(1)).rgb.mul(I.skyLight));
+}
+
 /** Schlick's Fresnel for water at cosine `c`. */
 const fresnel = (c) => float(FRESNEL_DOWN).add(float(1 - FRESNEL_DOWN).mul(pow(float(1).sub(saturate(c)), FRESNEL_POWER)));
 
 export function makeSeaMaterial(): MeshBasicNodeMaterial {
   if (!skyMap) throw new Error('the sea was built before the sky\'s environment map (useSeaSky)');
   if (!fineSea) throw new Error('the sea was built before its fine bands (useFineSea)');
-  const I = SEA_INPUTS, env = skyMap, bands = fineSea;
+  if (!wakeMap) throw new Error('the sea was built before its wake map (useWake)');
+  const I = SEA_INPUTS, env = skyMap, bands = fineSea, wake = wakeMap;
   const m = new MeshBasicNodeMaterial({ side: DoubleSide, fog: false });
   m.name = 'sea';
 
   const vCalm = varyingProperty('vec2', 'vSeaCalm'), vToEye = varyingProperty('vec3', 'vSeaToEye');
   const vFoam = varyingProperty('vec2', 'vSeaFoam'), vCrest = varyingProperty('float', 'vSeaCrest');
+  const vFoamEven = varyingProperty('float', 'vSeaFoamEven');
   m.positionNode = Fn(() => {
     // --- Where this vertex lies on the calm sea, slid onto the coarser grid by how far it is from the eye.
     const tile = attribute(SEA_TILE_ATTRIBUTE, 'vec4');
@@ -323,15 +360,18 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     const fromEye = flat.sub(I.eye.xz);
     // The earth's curve (earth.ts `earthDrop`): the sea falls away from the eye to a true horizon.
     const drop = dot(fromEye, fromEye).div(2 * EARTH_RADIUS);
-    const placed = vec3(flat.x, h.add(fh).add(I.lift).sub(drop), flat.y);
+    const placed = vec3(flat.x, h.add(fh).add(wakeHeight(wake, calm)).add(I.lift).sub(drop), flat.y);
     // How bunched the water is (1 calm, lower on a crest): now (the fragment stage adds the bands' and turns it white
     // there), and a little while ago, turned white as foam that lingers (seaFoam.ts).
     const stretch = (a, b, c) => float(1).add(a).mul(float(1).add(c)).sub(b.mul(b));
     const white = (j) => float(1).sub(smoothstep(I.foamLevel.sub(I.foamRamp.mul(HALF)), I.foamLevel.add(I.foamRamp.mul(HALF)), j));
-    const now = stretch(xx, xz, zz);
-    const old = max(white(stretch(xx1, xz1, zz1)).mul(FOAM_LEFT_NEAR), white(stretch(xx2, xz2, zz2)).mul(FOAM_LEFT_FAR));
+    // Where the grid is too coarse for foam's shape, it gives way to the wind's even share (FOAM_CELL_FULL).
+    const even = smoothstep(FOAM_CELL_FULL, FOAM_CELL_GONE, span);
+    const now = mix(stretch(xx, xz, zz), float(1), even);
+    const old = max(white(stretch(xx1, xz1, zz1)).mul(FOAM_LEFT_NEAR), white(stretch(xx2, xz2, zz2)).mul(FOAM_LEFT_FAR)).mul(float(1).sub(even));
     vCalm.assign(calm);
     vFoam.assign(vec2(now, old));
+    vFoamEven.assign(even);
     vCrest.assign(h.div(I.crest));
     vToEye.assign(I.eye.sub(placed));
     return placed;
@@ -360,8 +400,11 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     const p = calm.add(I.foamDrift);
     const coarse = texture(FOAM, p.div(FOAM_TILE)), fine = texture(FOAM, p.div(FOAM_TILE_FINE));
 
-    // --- The surface's slope and stretch per pixel: every simulated wave, then the fine ones, long to short.
-    const hx = float(0).toVar(), hz = float(0).toVar(), xx = float(0).toVar(), xz = float(0).toVar(), zz = float(0).toVar();
+    // --- Her wake here (wakeMap.ts): its slope, foam and slick.
+    const wakeHere = wakeSurface(wake, calm), calmed = float(1).sub(saturate(wakeHere.slick).mul(SLICK_CALM));
+
+    // --- The surface's slope and stretch per pixel: every simulated wave, her wake's, then the fine ones, long to short.
+    const hx = wakeHere.slope.x.toVar(), hz = wakeHere.slope.y.toVar(), xx = float(0).toVar(), xz = float(0).toVar(), zz = float(0).toVar();
     const rough = float(ROUGH_LEAST).toVar();
     Loop({ start: 0, end: I.count, type: 'int', condition: '<' }, ({ i }) => {
       const w = I.wave.element(i), more = I.more.element(i);
@@ -380,7 +423,7 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       If(I.bandCount.greaterThan(int(b)), () => {
         const B = I.band.element(b), M = I.bandMore.element(b);
         const F = bands.slope(b, calm.add(B.xy).div(B.z));
-        const g = mix(float(1), grow, M.w);
+        const g = mix(float(1), grow, M.w).mul(calmed);
         hx.addAssign(F.x.mul(g)); hz.addAssign(F.y.mul(g));
         // The share of the band's range (on a log scale) longer than the pixel can still draw.
         const drawn = saturate(M.y.sub(max(log(gone), M.z)).div(M.y.sub(M.z)));
@@ -396,20 +439,19 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     const r1 = texture(RIPPLES, p.mul(RIPPLE_REPEATS / FOAM_WRAP).add(I.rippleDrift.xy)).xy;
     const r2 = texture(RIPPLES, vec2(p.y, p.x.negate()).mul(RIPPLE_REPEATS_SECOND / FOAM_WRAP).add(I.rippleDrift.zw)).xy;
     // Each layer's slopes have a deviation of 1 along each axis; the two together √2, scaled to the ripples' slope.
-    const rippleAmp = sqrt(I.ripples).mul(grow).mul(RIPPLE_RANGE);
+    const rippleAmp = sqrt(I.ripples).mul(grow).mul(calmed).mul(RIPPLE_RANGE);
     hx.addAssign(r1.x.sub(r2.y).mul(rippleAmp));
     hz.addAssign(r1.y.add(r2.x).sub(1).mul(rippleAmp));
     const rippleDrawn = saturate(log(float(RIPPLE_LONGEST).div(full)).div(Math.log(RIPPLE_LONGEST / RIPPLE_SHORTEST)));
-    rough.addAssign(I.ripples.mul(grow).mul(grow).mul(float(1).sub(rippleDrawn)));
+    rough.addAssign(I.ripples.mul(grow).mul(grow).mul(calmed).mul(calmed).mul(float(1).sub(rippleDrawn)));
     const along = vec3(xx.add(1), hx, xz), across = vec3(xz, hz, zz.add(1));
     const up = normalize(cross(across, along));
 
     // --- The light.
     const L = I.sunDir;
-    // The light a matte, level surface sends back per unit of albedo: the sun's, and the sky's through the
-    // environment map at the strength lit materials take it (three: the map's colour times its intensity).
+    // The light a matte, level surface sends back per unit of albedo (`daylight`); the sky's part alone for foam.
     const skyDown = pmremTexture(env, vec3(0, 1, 0), float(1)).rgb.mul(I.skyLight);
-    const daylight = I.sun.mul(max(L.y, 0)).div(Math.PI).add(skyDown);
+    const daylit = daylight();
     // The water's body: what it sends back up of the light that enters it, coloured by the deep, stirred in a gale,
     // and green-white where foam has filled it with bubbles.
     // Not all of a crest breaks at once: a broad noise picks the stretches that do.
@@ -418,12 +460,13 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     // the white share is Monahan's; where the bands are too fine for the pixel, the broad noise breaks it up instead.
     const deviation = sqrt(bunchVar), level = float(1).sub(deviation.mul(I.foamDepth)), ramp = max(deviation.mul(FOAM_RAMP), PIXEL_LEAST);
     const fresh = float(1).sub(smoothstep(level.sub(ramp.mul(HALF)), level.add(ramp.mul(HALF)), vFoam.x.add(bunch)));
-    const foamNow = fresh.mul(mix(breaking, float(1), resolved));
+    // Her wake's foam is her own, not the wind's: no noise picks where it breaks.
+    const foamNow = max(fresh.mul(mix(breaking, float(1), resolved)), wakeHere.fresh);
     // Old foam: where the simulated waves bunched a while ago; its lace is partly where the bands folded (seaBands.ts).
-    const foamOld = vFoam.y.mul(breaking);
-    const bubbles = saturate(foamNow.add(foamOld)).mul(AERATED_SHARE);
+    const foamOld = max(vFoam.y.mul(breaking), wakeHere.old);
+    const bubbles = saturate(saturate(foamNow.add(foamOld)).mul(AERATED_SHARE).add(saturate(wakeHere.slick).mul(SLICK_AERATED)));
     const albedo = mix(mix(v3(DEEP), v3(DEEP_STIRRED), I.stirred), v3(AERATED), bubbles);
-    const body = albedo.mul(daylight);
+    const body = albedo.mul(daylit);
 
     // From above.
     const above = Fn(() => {
@@ -458,13 +501,14 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       const ragged = mix(mix(coarse.y, coarse.x, LACE_SHARE), linger, LINGER_LACE);
       const oldShape = smoothstep(float(1).sub(foamOld), float(1).sub(foamOld).add(LACE_SOFT), ragged).mul(foamOld);
       const oldCover = mix(oldShape, foamOld.mul(foamOld).mul(FOAM_FAR_SHARE), blurred);
-      const cover = max(freshCover, oldCover);
+      // The far sea, too coarse for foam's shape: the wind's share of white spread evenly.
+      const cover = max(max(freshCover, oldCover), vFoamEven.mul(I.whitecaps).mul(FOAM_EVEN));
       const foamLit = I.sun.mul(saturate(dot(N, L))).div(Math.PI).add(skyDown).mul(FOAM_ALBEDO);
       return mix(gusted, foamLit, cover);
     })();
 
     // From below: the sky through Snell's window, the deep reflected around it, the murk with distance.
-    const murk = v3(MURK).mul(daylight);
+    const murk = v3(MURK).mul(daylit);
     const below = Fn(() => {
       const N = up.negate(), I_ = V.negate();
       const T = refract(I_, N, WATER_INDEX);
@@ -496,9 +540,8 @@ export function makeDeepMaterial(): MeshBasicNodeMaterial {
   const m = new MeshBasicNodeMaterial({ side: BackSide, fog: false, depthWrite: false });
   m.name = 'deep';
   m.colorNode = Fn(() => {
-    const d = normalize(positionLocal), L = I.sunDir;
-    const light = I.sun.mul(max(L.y, 0)).div(Math.PI).add(pmremTexture(skyMap!, vec3(0, 1, 0), float(1)).rgb.mul(I.skyLight));
-    return vec4(v3(MURK).mul(light).mul(mix(float(MURK_DOWN), float(1), saturate(d.y.add(1).div(2)))), 1);
+    const d = normalize(positionLocal);
+    return vec4(v3(MURK).mul(daylight()).mul(mix(float(MURK_DOWN), float(1), saturate(d.y.add(1).div(2)))), 1);
   })();
   return m;
 }
