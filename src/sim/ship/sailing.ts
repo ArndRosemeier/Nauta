@@ -237,6 +237,29 @@ export function setShares(s: Sailing, work: readonly SailWork[]): Sailing {
 /** The area a sail drives her with: its area as it stands, by how far it is sheeted home (sails.ts `drawShare`). */
 const drawingArea = (sail: Sail, setting: SailSetting): number => sailArea(sail, setting) * drawShare(sail, setting);
 
+/** What moves with her when she is shoved (ships touch, touch.ts): her mass (t), with the water that goes with her ahead and sideways (t), and turning (t·m², about her centre of gravity). */
+export interface ShovedMasses {
+  readonly mass: number;
+  readonly ahead: number;
+  readonly sideways: number;
+  readonly turning: number;
+}
+
+/** Her masses as a shove meets them. */
+export function shovedMasses(): ShovedMasses {
+  const b = sailingBody();
+  return { mass: b.mass, ahead: b.aheadMass, sideways: b.sideMass, turning: b.turnInertia };
+}
+
+/**
+ * She shoved (ships touch, touch.ts): blows ahead and to starboard (kN·s) and a turning blow (kN·m·s, + to starboard)
+ * change her way, leeway and turning by what moves with her.
+ */
+export function shoved(s: Sailing, ahead: number, sideways: number, turning: number): Sailing {
+  const m = shovedMasses();
+  return { ...s, ahead: s.ahead + ahead / m.ahead, leeway: s.leeway + sideways / m.sideways, turnRate: s.turnRate + turning / m.turning };
+}
+
 /** One mast's yards laid aback (or filled again). */
 export function layAback(s: Sailing, mast: MastName, aback: boolean): Sailing {
   const m = MASTS.indexOf(mast);

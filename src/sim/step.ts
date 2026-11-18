@@ -9,6 +9,7 @@
  * wind's mean at the step's start, and every ship has the acts of her orders falling due now carried out (orders.ts),
  * sails one step in the true wind at her place (sailing.ts), works and fires her guns at the other ship as she has
  * been told (guns/gunnery.ts) and floats one step on that sea as her sailing says (motion.ts).
+ * Last, ships that have run into each other are pushed apart (ship/touch.ts: struck, fouled).
  */
 import { stepCrew } from './crew/crew';
 import { carryOut, giveOrder, heard, wordSpent, type AnswerCode, type Order, type RefusalCode, type SailingOrder } from './orders';
@@ -17,11 +18,12 @@ import type { GunFired } from './guns/shot';
 import { followWind } from './sea/sea';
 import { stepMotion } from './ship/motion';
 import { setShares, stepSailing, type SailingEvent } from './ship/sailing';
+import { touch, type TouchEvent } from './ship/touch';
 import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
-export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired;
+export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent;
 
 /** An order the ship could not take: why, as a code (the phrase book, N4.5, words it) and in English for now. */
 export interface OrderRefused {
@@ -96,7 +98,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     if (answer.told !== ship.told) ships = ships.map((s, i) => (i === order.ship ? { ...s, told: answer.told } : s));
   }
   const sea = followWind(state.sea, { speed: wind.speed, toward: wind.toward }, t);
-  return {
+  const stepped = {
     state: {
       ...state,
       tick: tick + 1,
@@ -122,4 +124,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     },
     events,
   };
+  const touched = touch(state.ships, stepped.state.ships, tick);
+  events.push(...touched.events);
+  return { state: { ...stepped.state, ships: touched.ships }, events };
 }

@@ -13,7 +13,7 @@ import { JOBS } from '../sim/rules/crew';
 import { AIM_HEIGHT, SHOT, type AimName, type ShotKind } from '../sim/rules/guns';
 import { CLOSE_HAULED } from '../sim/rules/sailing';
 import { gunAt, gunCount, type Battery } from '../sim/guns/guns';
-import { rigPlan } from '../sim/ship/rig';
+import { rigPlan, sparOf } from '../sim/ship/rig';
 import { MASTS } from '../sim/ship/sailing';
 import { simTime, type SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
@@ -164,6 +164,10 @@ export function eventWords(e: SimEvent, ship: number): string | null {
     case 'short-handed': return e.ship === ship ? `${at} ${orderWords(e.order)}: short-handed: ${jobWords(e.job)}` : null;
     // A gun fired, hers or the enemy's: a broadside is a run of the same words (the panel counts them).
     case 'fired': return `${at} ${e.ship === ship ? 'our guns fire' : 'she fires'} ${e.fired.shot} shot`;
+    case 'struck': return e.ship === ship ? `${at} she has run foul of the other ship` : null;
+    case 'fouled':
+      if (e.ship === ship) return `${at} her ${sparOf(rigPlan(), e.spar).name} is foul of the other ship's rigging`;
+      return e.other === ship ? `${at} the other ship's ${sparOf(rigPlan(), e.spar).name} is foul of our rigging` : null;
   }
 }
 

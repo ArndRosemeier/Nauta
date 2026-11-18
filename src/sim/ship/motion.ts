@@ -264,6 +264,11 @@ export function startMotion(x: number, z: number, heading: number): ShipMotion {
   return { pose: { ...level, heave } };
 }
 
+/** She moved bodily across the water by (dx, dz), m (ships touch, touch.ts: two hulls pushed out of each other). */
+export function shifted(m: ShipMotion, dx: number, dz: number): ShipMotion {
+  return { pose: { ...m.pose, x: m.pose.x + dx, z: m.pose.z + dz } };
+}
+
 /** The water under her this step: its height and velocity on the grid. */
 const water = new Float64Array(WATER_ALONG * WATER_ACROSS * WATER_FIELDS);
 const sample = seaSample();

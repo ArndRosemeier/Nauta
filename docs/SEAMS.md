@@ -504,3 +504,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The spyglass: raised and lowered, drawn out, its tremble, how the hands hold it against her motion | `src/app/glass.ts#Spyglass` |
 | The spyglass's controls: its button, two fingers spread or pinched, the G key and the wheel | `src/app/glassInput.ts#watchGlass` |
 | The view magnified (the glass) | `src/render/view.ts#createView` |
+| Ships touching: two hulls pushed out of each other, shoved apart and turned, grinding, the blows struck and the spars fouled (a step's last part) | `src/sim/ship/touch.ts#touch` |
+| How far apart two hulls lie (0 overlapping) | `src/sim/ship/touch.ts#hullGap` |
+| How deep two hulls overlap | `src/sim/ship/touch.ts#overlap` |
+| The numbers of ships touching: how a blow springs back, the grinding, the push, how hard a blow is heard | `src/sim/rules/touch.ts#RESTITUTION` |
+| A ship shoved: blows change her way, leeway and turning, by what moves with her | `src/sim/ship/sailing.ts#shoved` |
+| What moves with her when she is shoved: mass, added masses ahead and sideways, turning inertia | `src/sim/ship/sailing.ts#shovedMasses` |
+| A ship moved bodily across the water | `src/sim/ship/motion.ts#shifted` |
