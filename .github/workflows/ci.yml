@@ -156,6 +156,8 @@ jobs:
       - run: npm ci
       - name: Computer captains fight duels to the end; each closes, fires and strikes when beaten, and no order of his is refused (N7.1)
         run: node tools/guards/budget.mjs 120 180 -- npm run check:captains
+      - name: Fleets of four and eight computer ships fight on two sides; no order refused, every ship fires, the state sent stays small (scenarios stage 7)
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:fleets
       - name: A novice plays the first match doing only what the first lieutenant asks; every lesson comes and is done (N7.4)
         run: node tools/guards/budget.mjs 120 180 -- npm run check:first
       # npm test runs its files in shards, several files to a process (docs/CHECKS.md): in this job every file runs alone
