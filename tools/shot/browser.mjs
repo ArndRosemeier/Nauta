@@ -33,14 +33,15 @@ export async function openBrowser() {
 
 /**
  * The game at `query` in a new page, once it reports ready and with the loading screen gone. `failed()` tells
- * whether the page has thrown or never got ready.
+ * whether the page has thrown or never got ready. `scripts`: more files run before the page (probe.mjs's counter).
  */
-export async function openGame({ base, browser }, query, viewport, hasTouch = false) {
+export async function openGame({ base, browser }, query, viewport, hasTouch = false, scripts = []) {
   const context = await browser.newContext({ viewport, hasTouch });
   const page = await context.newPage();
   let failed = false;
   // The software GPU cannot present WebGPU to a canvas: a stand-in swap chain does (swapchain.js).
   if (!process.env.SHOT_GPU) await page.addInitScript({ path: fileURLToPath(new URL('./swapchain.js', import.meta.url)) });
+  for (const path of scripts) await page.addInitScript({ path });
   // Errors, and three's warnings (a shader node that failed to build is only warned about, and the mesh is not drawn).
   page.on('console', (m) => { if (m.type() === 'error' || (m.type() === 'warning' && m.text().startsWith('THREE.')) || process.env.SHOT_LOG) console.error(`[page] ${m.text()}`); });
   page.on('pageerror', (e) => { failed = true; console.error(`[page error] ${e.message}`); });

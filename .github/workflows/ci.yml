@@ -43,9 +43,10 @@ jobs:
       - name: Typecheck and build
         run: npm run build
 
-  # The slow checks (docs/CHECKS.md): each under its own budget, all of them within this job's 10 minutes.
+  # The slow checks (docs/CHECKS.md), in two jobs side by side, each with its own 10 minutes: each check under its own
+  # budget, each job's checks together within two thirds of its 10 minutes. A new check goes where there is more room.
   slow:
-    name: Slow checks
+    name: "Slow checks: the start, the sea and the simulation"
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -59,23 +60,8 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      # Playwright's own Chromium, not the runner's Chrome: the runner's Chrome took 98 s to ready the page where
-      # Playwright's Chromium takes 14 s on a machine as large (docs/CHECKS.md). Kept between runs.
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Playwright's Chromium
-        run: |
-          npx playwright install chromium
-          echo "CHROMIUM_PATH=$(node -e "import('playwright').then((p) => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
-      - run: npm run build
-      # Two browser checks, each on its own page load (docs/CHECKS.md): together on one page they took 130 to 200 s.
+      - uses: ./.github/actions/slow-setup
+      # Browser checks, each on its own page load (docs/CHECKS.md, "Browser checks: the rule").
       # SHOT_TIMEOUT: a page that never gets ready fails inside the step's 3 minutes.
       - name: The game starts and draws in a browser (desktop, and a dragged tablet view)
         env:
@@ -103,6 +89,31 @@ jobs:
           GAMEHUB_URL: https://games.futuremagic.de
           GAMEHUB_KEY: ${{ vars.GAMEHUB_KEY }}
         run: node tools/guards/budget.mjs 120 180 -- npm run check:room
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots
+          path: shots
+      - name: All slow checks together within the job's 10 minutes
+        if: always()
+        run: node tools/guards/budget.mjs --sum 600
+
+  slow-brig:
+    name: "Slow checks: the brig in a browser"
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Every budgeted step adds its time to BUDGET_LOG; the last step sums them against the job's 10 minutes.
+      - name: The job's start and the budget log
+        run: |
+          echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+          echo "BUDGET_LOG=$RUNNER_TEMP/budget.log" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: ./.github/actions/slow-setup
       - name: The ship and the water together, under way (N2.5)
         run: node tools/guards/budget.mjs 120 180 -- npm run check:ship
       - name: The sails set, on every point of sail, through a tack, taken in; the far ship's (N3.10)
@@ -112,7 +123,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: shots
+          name: shots-brig
           path: shots
       - name: All slow checks together within the job's 10 minutes
         if: always()

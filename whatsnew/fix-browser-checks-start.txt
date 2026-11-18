@@ -1,0 +1,1 @@
+Behind the scenes: the game's loading screen asks the graphics chip for less work while it gets the shaders ready, and the automatic browser checks on the build server now take about half as long.
