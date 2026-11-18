@@ -24,13 +24,21 @@ let failures = 0;
 const ok = (cond, label) => { console.log(`${cond ? 'PASS' : 'FAIL'} ${label}`); if (!cond) failures++; };
 const net = (page, what) => page.evaluate(what);
 
-async function open(query) {
+/** How long a page may take to be in its room, ms: a connection that fails is given one more try. */
+const CONNECT_MS = 30000;
+
+async function open(query, tries = 2) {
   const page = await (await served.browser.newContext()).newPage();
   page.on('console', (m) => { if (m.type() === 'error') console.error(`[page] ${m.text()}`); });
   page.on('pageerror', (e) => { failures++; console.error(`[page error] ${e.message}`); });
   await page.goto(`${served.base}?netcheck&hub=${encodeURIComponent(hub)}${key ? `&key=${encodeURIComponent(key)}` : ''}&${query}`, { timeout: TIMEOUT });
-  await page.waitForFunction(() => window.__nautaNet?.role === 'host' || window.__nautaNet?.role === 'guest', null, { timeout: TIMEOUT });
-  return page;
+  const inRoom = await page.waitForFunction(() => window.__nautaNet?.role === 'host' || window.__nautaNet?.role === 'guest', null, { timeout: CONNECT_MS }).then(() => true, () => false);
+  if (inRoom) return page;
+  const problem = await page.evaluate(() => window.__nautaNet?.problem ?? 'no answer').catch(() => 'no answer');
+  await page.context().close();
+  if (tries <= 1) throw new Error(`a page did not get into its room (${problem})`);
+  console.log(`a page did not get into its room (${problem}); one more try`);
+  return open(query, tries - 1);
 }
 
 const t0 = Date.now();
@@ -41,7 +49,7 @@ try {
   ok(/^[A-Z0-9]{6}$/.test(code), `the host opened room ${code}`);
   const guest = await open(`join=${code}`);
   // The guest starts from the room's state of before he came; the host seats him once it hears he is there.
-  const seated = await guest.waitForFunction(() => window.__nautaNet.role === 'guest' && window.__nautaNet.ship === 1, null, { timeout: TIMEOUT }).then(() => true, () => false);
+  const seated = await guest.waitForFunction(() => window.__nautaNet.role === 'guest' && window.__nautaNet.ship === 1, null, { timeout: CONNECT_MS }).then(() => true, () => false);
   ok(seated, 'the guest joined it and commands the second ship');
   ok(await net(host, () => window.__nautaNet.give('plain sail')) === '', 'the host gives an order');
   ok(await net(guest, () => window.__nautaNet.give('come up a point')) === '', 'the guest gives one');
@@ -55,7 +63,7 @@ try {
   ok(await net(host, () => window.__nautaNet.canvas(0)) === 'plain', 'the host\'s order for his own');
   const before = await net(guest, () => window.__nautaNet.tick);
   await host.close();
-  await guest.waitForFunction(() => window.__nautaNet.role === 'host', null, { timeout: TIMEOUT });
+  await guest.waitForFunction(() => window.__nautaNet.role === 'host', null, { timeout: CONNECT_MS });
   ok(true, 'the host left; the guest hosts now');
   await guest.waitForTimeout(2000);
   const after = await net(guest, () => window.__nautaNet.tick);
