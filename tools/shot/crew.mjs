@@ -21,7 +21,7 @@ const { width, height } = shotSize('1024x640');
 const served = await openBrowser();
 const game = await openGame(served, '?sail&ship=quarterdeck&hud&wind=4', { width, height });
 const { page } = game;
-await page.addStyleTag({ content: '#version,#orders,#room{display:none!important}' });
+await page.addStyleTag({ content: '#version,#orders,#room,.nt-officers{display:none!important}' });
 const problems = [];
 const say = async (words) => { const why = await page.evaluate((w) => window.__nautaSail.say(w), words); if (why) problems.push(`"${words}" refused: ${why}`); };
 const onward = (s) => page.evaluate((x) => window.__nautaSail.onward(x, false), s);

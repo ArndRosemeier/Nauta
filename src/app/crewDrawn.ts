@@ -20,7 +20,7 @@ import type { JobName } from '../sim/rules/crew';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { CrewKnobs } from './quality';
 import { floorApart } from './officers';
-import { standByClip } from './standBy';
+import { standByClip, standToClip } from './standBy';
 import { apartOnWater } from '../sim/units';
 import { BREAKS } from '../sim/rules/ships';
 
@@ -28,13 +28,11 @@ import { BREAKS } from '../sim/rules/ships';
 const HAUL = 'pick up';
 /** What a man at work plays, by his job (crewLooks.ts PACK_CLIPS): hauling at the pins, at the wheel, out on a yard, the repairs. */
 export const JOB_CLIPS: Readonly<Record<JobName, string>> = {
-  helm: 'interact', stations: 'idle', brace: HAUL, sheet: HAUL, clew: HAUL, hoist: HAUL, douse: HAUL,
+  helm: 'interact', stations: HAUL, brace: HAUL, sheet: HAUL, clew: HAUL, hoist: HAUL, douse: HAUL,
   loose: 'interact', furl: 'interact', reef: 'interact',
   plug: 'repair (kneeling)', fish: 'repair (kneeling)', splice: 'repair (kneeling)', tackle: 'interact', cut: 'chop wood',
   pump: 'push', fight: 'interact', fetch: 'pick up', carry: 'walk carrying',
 };
-/** Waiting at his place for the work to begin, or standing to his gun at quarters. */
-const WAITING = 'idle';
 /** On his way: walking, or smartly at a run. */
 export const WALKING = 'walk';
 export const RUNNING = 'jog';
@@ -94,7 +92,7 @@ export interface ManDrawn {
 }
 
 /** A new, empty man drawn (to be filled by `manDrawn`). */
-export const newManDrawn = (): ManDrawn => ({ x: 0, y: 0, z: 0, yaw: FORWARD, space: '', clip: WAITING, way: null });
+export const newManDrawn = (): ManDrawn => ({ x: 0, y: 0, z: 0, yaw: FORWARD, space: '', clip: JOB_CLIPS.tackle, way: null });
 
 /** Where a man is in one state, before the frame's in-between. */
 interface At { along: number; across: number; height: number; space: string; yaw: number; way: string | null; moving: boolean }
@@ -291,9 +289,9 @@ function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, s
   if (harm === 'killed' || harm === 'badly') return LYING;
   const hand = ship.crew.men[man]!;
   if (at.moving) return task?.job === 'carry' ? JOB_CLIPS.carry : hand.going?.haste === 'smart' ? RUNNING : WALKING;
-  if (task) return task.began === null ? WAITING : JOB_CLIPS[task.job];
-  // At his home place he busies himself (standBy.ts); away from it (at his gun at quarters) he stands to.
-  return hand.stands === null ? standByClip(m, seed) : WAITING;
+  if (task) return task.began === null ? standToClip(m, seed) : JOB_CLIPS[task.job];
+  // At his home place he busies himself (standBy.ts); away from it (at his gun at quarters) he stands to, ready.
+  return hand.stands === null ? standByClip(m, seed) : standToClip(m, seed);
 }
 
 /** A man's own seed (his phase in a clip, his standing-by motion), the same on every machine. */

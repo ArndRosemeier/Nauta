@@ -26,7 +26,7 @@ import { brigRoster, type Man } from '../../sim/crew/roster';
 import { heightAt, routeNetwork } from '../../sim/crew/network';
 import type { Whereabouts } from '../../sim/crew/going';
 import { taskOf } from '../../sim/crew/crew';
-import { STAND_BY_CLIPS } from '../../app/standBy';
+import { STAND_BY_CLIPS, attentiveClip } from '../../app/standBy';
 import { apartOnWater } from '../../sim/units';
 import { harmOf } from '../../sim/damage';
 import type { Harm } from '../../sim/rules/damage';
@@ -85,9 +85,8 @@ const STRUCK_NEAR = 6;
 /** A man just hurt matters (the near pool takes him, so his face is a living one) this long, s, if he is within this far of the eye, m. */
 const HURT_MATTERS = 10;
 const HURT_REACH = 15;
-/** The clip a walking midshipman plays, and standing. */
+/** The clip a walking midshipman plays. */
 const WALK = 'walk';
-const STAND = 'idle';
 
 /** One man of either crew. */
 interface Drawn {
@@ -467,7 +466,7 @@ export class CrewView {
       at.yaw = Math.atan2(w.facing[1], -w.facing[0]);
       const standing = w.share === 0 && w.way === null;
       if (standing && fr.captain && floorApart(fr.captain, w) < FACE_CAPTAIN) at.yaw = Math.atan2(fr.captain.across - at.x, shipZ(fr.captain.along) - at.z);
-      at.clip = standing ? STAND : WALK;
+      at.clip = standing ? attentiveClip(d.seed) : WALK;
       return;
     }
     const ship = fr.state.to.ships[d.ship]!, hand = ship.crew.men[d.man]!;

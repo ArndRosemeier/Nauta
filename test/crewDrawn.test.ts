@@ -20,6 +20,8 @@ import { brigRoster } from '../src/sim/crew/roster.ts';
 import { startMatch, type SimShip } from '../src/sim/state.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { give, startSail, startTold } from './support/crew.ts';
+import { musterCrew } from './support/muster.ts';
+import { STAND_BY_CLIPS, attentiveClip } from '../src/app/standBy.ts';
 import { duelSetup } from './support/match.ts';
 
 const roster = brigRoster(), knobs = QUALITY_LEVELS[0]!.crew;
@@ -59,6 +61,15 @@ test('nobody visible just stands about: every man with nothing to do is busy at 
   const at = (home: string) => roster.flatMap((m, i) => (m.home === home ? [men[i]!.clip] : []));
   for (const clip of at('station-mess-p')) assert.ok(['eat or drink', 'talk', 'nod'].includes(clip), clip);
   for (const clip of at('station-idle-waist-a')) assert.ok(['repair (kneeling)', 'pick up', 'interact'].includes(clip), clip);
+});
+
+test('at quarters nobody just stands: the gun crews are ready at their guns, the marines armed, the rest alert', () => {
+  const at = { ...ship, crew: musterCrew() };
+  const men = drawnAll(at, at), plain = ['idle'];
+  roster.forEach((m, i) => assert.ok(!plain.includes(men[i]!.clip), `${m.rank} ${i} at ${m.post} plays ${men[i]!.clip}`));
+  const gunClips = new Set(roster.flatMap((m, i) => (m.gun !== null ? [men[i]!.clip] : [])));
+  assert.ok(gunClips.size >= 3, [...gunClips].join(', '));
+  assert.ok(STAND_BY_CLIPS.includes(attentiveClip(0)) && attentiveClip(0) !== 'idle');
 });
 
 test('the men are drawn on the deck of their place, never against the face of a break where a body sinks into the raised deck', () => {
