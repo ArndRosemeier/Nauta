@@ -1,0 +1,137 @@
+{
+  "about": "The boatswain's calls (plan N4.6), synthesised by tools/sound/pipe.mjs into the raw folder and listed in sounds.json with `from`. The call has two notes, low (the hand open) and high (the hand closed over the buoy), glides between them, and three tones: plain, warble (the fingers fluttering, the pitch undulating) and trill (the tongue rolled, the sound broken fast). The calls of about 1800 were not written down; these follow the calls as the Royal Navy kept them (the Still: one high plain note, ended sharply; Carry On after it; Haul: the low note is the pause, the high note the pull; Hoist rises, Veer and Lower fall) and are shortened to a game's pace. Each segment: `note` [from, to] with 0 the low note and 1 the high, `tone`, `s` seconds; or `rest` seconds.",
+  "low": 2050,
+  "high": 3150,
+  "calls": [
+    {
+      "id": "pipe/helm",
+      "what": "A course for the master (steer, come up, bear away, full and by): the short call that the word is passed, two quick high notes and a drop.",
+      "segments": [
+        { "note": [1, 1], "tone": "plain", "s": 0.22 },
+        { "rest": 0.07 },
+        { "note": [1, 1], "tone": "plain", "s": 0.22 },
+        { "note": [1, 0], "tone": "plain", "s": 0.25 },
+        { "note": [0, 0], "tone": "plain", "s": 0.18 }
+      ]
+    },
+    {
+      "id": "pipe/tack",
+      "what": "Tack (all hands about ship): the general call, the low note rising to a warbled high and falling, then Haul Taut, a short low note snapped up to the high.",
+      "segments": [
+        { "note": [0, 0], "tone": "plain", "s": 0.25 },
+        { "note": [0, 1], "tone": "plain", "s": 0.35 },
+        { "note": [1, 1], "tone": "warble", "s": 1.0 },
+        { "note": [1, 0], "tone": "plain", "s": 0.2 },
+        { "rest": 0.25 },
+        { "note": [0, 0], "tone": "plain", "s": 0.3 },
+        { "note": [0, 1], "tone": "plain", "s": 0.08 },
+        { "note": [1, 1], "tone": "plain", "s": 0.45 }
+      ]
+    },
+    {
+      "id": "pipe/wear",
+      "what": "Wear (all hands wear ship): the general call, then Veer, the high note gliding slowly down to the low.",
+      "segments": [
+        { "note": [0, 0], "tone": "plain", "s": 0.25 },
+        { "note": [0, 1], "tone": "plain", "s": 0.35 },
+        { "note": [1, 1], "tone": "warble", "s": 1.0 },
+        { "note": [1, 0], "tone": "plain", "s": 0.2 },
+        { "rest": 0.25 },
+        { "note": [1, 1], "tone": "plain", "s": 0.35 },
+        { "note": [1, 0], "tone": "plain", "s": 1.1 },
+        { "note": [0, 0], "tone": "plain", "s": 0.3 }
+      ]
+    },
+    {
+      "id": "pipe/heave",
+      "what": "Heave to: the general call cut short, then Belay, a held high note, a low catch and a high note cut off: make fast, she stops.",
+      "segments": [
+        { "note": [0, 1], "tone": "plain", "s": 0.3 },
+        { "note": [1, 1], "tone": "warble", "s": 0.6 },
+        { "rest": 0.2 },
+        { "note": [1, 1], "tone": "plain", "s": 0.6 },
+        { "note": [0, 0], "tone": "plain", "s": 0.15 },
+        { "rest": 0.06 },
+        { "note": [1, 1], "tone": "plain", "s": 0.2 }
+      ]
+    },
+    {
+      "id": "pipe/sail",
+      "what": "Make sail (battle, plain, all sail): Away Aloft, a trilled low note, then Hoist, the low note rising slowly to a high one held and warbled.",
+      "segments": [
+        { "note": [0, 0], "tone": "trill", "s": 0.45 },
+        { "rest": 0.12 },
+        { "note": [0, 0], "tone": "plain", "s": 0.25 },
+        { "note": [0, 1], "tone": "plain", "s": 1.1 },
+        { "note": [1, 1], "tone": "warble", "s": 0.7 }
+      ]
+    },
+    {
+      "id": "pipe/shorten",
+      "what": "Shorten sail: Away Aloft, a trilled low note, then Lower, a high note gliding slowly down to a trilled low one.",
+      "segments": [
+        { "note": [0, 0], "tone": "trill", "s": 0.45 },
+        { "rest": 0.12 },
+        { "note": [1, 1], "tone": "plain", "s": 0.35 },
+        { "note": [1, 0], "tone": "plain", "s": 1.0 },
+        { "note": [0, 0], "tone": "trill", "s": 0.5 }
+      ]
+    },
+    {
+      "id": "pipe/back",
+      "what": "Back a topsail (man the braces): Haul, three pulls, each a low note (the pause) snapped up to the high (the pull).",
+      "segments": [
+        { "note": [0, 0], "tone": "plain", "s": 0.3 },
+        { "note": [0, 1], "tone": "plain", "s": 0.06 },
+        { "note": [1, 1], "tone": "plain", "s": 0.22 },
+        { "note": [0, 0], "tone": "plain", "s": 0.3 },
+        { "note": [0, 1], "tone": "plain", "s": 0.06 },
+        { "note": [1, 1], "tone": "plain", "s": 0.22 },
+        { "note": [0, 0], "tone": "plain", "s": 0.3 },
+        { "note": [0, 1], "tone": "plain", "s": 0.06 },
+        { "note": [1, 1], "tone": "plain", "s": 0.4 }
+      ]
+    },
+    {
+      "id": "pipe/fill",
+      "what": "Fill (let draw): Heave Round, the notes rolling warbled from low to high and back, ending on the low.",
+      "segments": [
+        { "note": [0, 0], "tone": "warble", "s": 0.4 },
+        { "note": [0, 1], "tone": "warble", "s": 0.3 },
+        { "note": [1, 1], "tone": "warble", "s": 0.4 },
+        { "note": [1, 0], "tone": "warble", "s": 0.3 },
+        { "note": [0, 0], "tone": "warble", "s": 0.4 },
+        { "note": [0, 1], "tone": "warble", "s": 0.3 },
+        { "note": [1, 0], "tone": "plain", "s": 0.35 }
+      ]
+    },
+    {
+      "id": "pipe/haul",
+      "what": "Haul away, piped as she comes through the wind or round before it (tacked, wore), when the yards are swung: two quick pulls.",
+      "segments": [
+        { "note": [0, 0], "tone": "plain", "s": 0.22 },
+        { "note": [0, 1], "tone": "plain", "s": 0.05 },
+        { "note": [1, 1], "tone": "plain", "s": 0.2 },
+        { "note": [0, 0], "tone": "plain", "s": 0.22 },
+        { "note": [0, 1], "tone": "plain", "s": 0.05 },
+        { "note": [1, 1], "tone": "plain", "s": 0.35 }
+      ]
+    },
+    {
+      "id": "pipe/still",
+      "what": "The Still: one high plain note, ended sharply; every man stops what he is doing. Piped when she misses stays. Shortened from the Navy's eight seconds.",
+      "segments": [
+        { "note": [1, 1], "tone": "plain", "s": 2.6 }
+      ]
+    },
+    {
+      "id": "pipe/carry-on",
+      "what": "Carry On: a short high note falling to the low; the work is done, the men go back to what they were doing.",
+      "segments": [
+        { "note": [1, 1], "tone": "plain", "s": 0.25 },
+        { "note": [1, 0], "tone": "plain", "s": 0.15 },
+        { "note": [0, 0], "tone": "plain", "s": 0.35 }
+      ]
+    }
+  ]
+}

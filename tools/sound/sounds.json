@@ -171,6 +171,134 @@
       "kind": "steps",
       "prompt": "The sound of a man climbing a steep wooden ladder on a ship, one step at a time, each a hard knock of a leather shoe on a wooden rung with a small creak, about one step a second, nothing else, no water, no wind, no voices, no talking, no music",
       "count": 8
+    },
+    {
+      "id": "step/run",
+      "kind": "steps",
+      "prompt": "The sound of a sailor running barefoot across the wooden deck of a sailing ship, quick light thuds of bare feet slapping on thick oak planks, about three steps a second, nothing else, no shoes, no water, no wind, no voices, no talking, no music",
+      "count": 12,
+      "tail": 250
+    },
+    {
+      "id": "bed/crew-run-a",
+      "kind": "bed",
+      "prompt": "The sound of a crowd of sailors running barefoot across the wooden deck of a sailing ship, many bare feet pounding and slapping on oak planks at once, a rumble of hurrying feet coming and going, now and then a coil of rope thrown down on the deck, no voices, no talking, no shouting, no music, no water, no wind, continuous for thirty seconds"
+    },
+    {
+      "id": "bed/crew-run-b",
+      "kind": "bed",
+      "prompt": "The sound of many barefoot men hurrying about on the wooden deck of a warship, a busy patter and thump of bare feet on planks, some running past close by, some further off, the deck boards knocking under them, no voices, no talking, no shouting, no music, no water, no wind, continuous for thirty seconds"
+    },
+    {
+      "id": "haul/pull",
+      "kind": "calls",
+      "prompt": "The sound of eight separate pulls on a heavy rope by a gang of sailors on a wooden ship, each pull a deep creaking squeal of the rope running through a wooden block and the thump of many bare feet taking the strain together, one pull at a time with three seconds of complete silence between them, no words, no voices, no singing, no talking, no music, no water, no wind",
+      "count": 8,
+      "most": 2.5,
+      "quiet": 0.04,
+      "gap": 0.5
+    },
+    {
+      "id": "bell/strike",
+      "kind": "calls",
+      "prompt": "The sound of six separate single strikes of a brass ship's bell on the forecastle of a sailing ship, each one clear bright clang that rings on and slowly dies away, one at a time with four seconds of complete silence between them, nothing else, no water, no wind, no voices, no talking, no music",
+      "count": 6,
+      "most": 4,
+      "quiet": 0.008,
+      "gap": 0.8
+    },
+    {
+      "id": "drum/quarters",
+      "kind": "bed",
+      "prompt": "The sound of a single military side drum on the deck of a wooden warship beating to quarters, a rapid urgent rolling beat with crisp strokes and rolls, the same rousing rhythm repeated without pause, nothing else, no fife, no other instruments, no voices, no talking, no water, no wind, continuous for thirty seconds"
+    },
+    {
+      "id": "pipe/helm",
+      "kind": "call",
+      "from": [
+        "pipe/helm.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: A course for the master (steer, come up, bear away, full and by): the short call that the word is passed, two quick high notes and a drop."
+    },
+    {
+      "id": "pipe/tack",
+      "kind": "call",
+      "from": [
+        "pipe/tack.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Tack (all hands about ship): the general call, the low note rising to a warbled high and falling, then Haul Taut, a short low note snapped up to the high."
+    },
+    {
+      "id": "pipe/wear",
+      "kind": "call",
+      "from": [
+        "pipe/wear.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Wear (all hands wear ship): the general call, then Veer, the high note gliding slowly down to the low."
+    },
+    {
+      "id": "pipe/heave",
+      "kind": "call",
+      "from": [
+        "pipe/heave.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Heave to: the general call cut short, then Belay, a held high note, a low catch and a high note cut off: make fast, she stops."
+    },
+    {
+      "id": "pipe/sail",
+      "kind": "call",
+      "from": [
+        "pipe/sail.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Make sail (battle, plain, all sail): Away Aloft, a trilled low note, then Hoist, the low note rising slowly to a high one held and warbled."
+    },
+    {
+      "id": "pipe/shorten",
+      "kind": "call",
+      "from": [
+        "pipe/shorten.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Shorten sail: Away Aloft, a trilled low note, then Lower, a high note gliding slowly down to a trilled low one."
+    },
+    {
+      "id": "pipe/back",
+      "kind": "call",
+      "from": [
+        "pipe/back.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Back a topsail (man the braces): Haul, three pulls, each a low note (the pause) snapped up to the high (the pull)."
+    },
+    {
+      "id": "pipe/fill",
+      "kind": "call",
+      "from": [
+        "pipe/fill.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Fill (let draw): Heave Round, the notes rolling warbled from low to high and back, ending on the low."
+    },
+    {
+      "id": "pipe/haul",
+      "kind": "call",
+      "from": [
+        "pipe/haul.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Haul away, piped as she comes through the wind or round before it (tacked, wore), when the yards are swung: two quick pulls."
+    },
+    {
+      "id": "pipe/still",
+      "kind": "call",
+      "from": [
+        "pipe/still.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: The Still: one high plain note, ended sharply; every man stops what he is doing. Piped when she misses stays. Shortened from the Navy's eight seconds."
+    },
+    {
+      "id": "pipe/carry-on",
+      "kind": "call",
+      "from": [
+        "pipe/carry-on.wav"
+      ],
+      "about": "Synthesised by tools/sound/pipe.mjs from pipe-calls.json: Carry On: a short high note falling to the low; the work is done, the men go back to what they were doing."
     }
   ]
 }
