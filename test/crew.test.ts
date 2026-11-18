@@ -25,6 +25,7 @@ import { decodeState, encodeState, startMatch } from '../src/sim/state.ts';
 import { STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { drive, fullCrewOrder, give, MOST_SECONDS, short, skillOf, startSail, startTold } from './support/crew.ts';
 import { duelSetup } from './support/match.ts';
+import './support/warm.ts';
 
 /** The network's most a state may take, bytes (16 KB until the off-watch hands slept below, 2026-11-18: then every hand an order calls comes up through the hatches at once). */
 const STATE_BYTES = 20 * 1024;
@@ -134,6 +135,8 @@ test('standing by, the gun crews are in the waist, on the forecastle and below, 
   for (let tick = 0; tick < MUSTER_SECONDS * STEPS_PER_SECOND; tick++) {
     crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas, quarters: side }).crew;
     if (tick === 2 * STEPS_PER_SECOND) running = crew.men.filter((h) => h.going).length;
+    // Once each gun of the side has its crew the rest of the muster's time shows nothing more (it is a bound, and costs 0.7 s).
+    if (tick > 2 * STEPS_PER_SECOND && tick % STEPS_PER_SECOND === 0 && guns.every((i) => handsAtGuns(crew)[i]! >= MUSTERED_AT_GUN)) break;
   }
   assert.ok(running >= COMPLEMENT / 3, `${running} running two seconds in`);
   assert.ok(guns.every((i) => handsAtGuns(crew)[i]! >= MUSTERED_AT_GUN), handsAtGuns(crew).join(' '));

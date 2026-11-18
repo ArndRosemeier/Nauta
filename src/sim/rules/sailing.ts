@@ -183,7 +183,7 @@ export const HEEL_LIMIT = 15 * DEGREE;
 
 /**
  * The speeds she is tuned to, knots, under plain sail in a fresh breeze (force 5): by the true wind's angle off her
- * bow, degrees. Within about 60° of the wind she makes no way (55°: her sails aback, she falls astern); close-hauled,
+ * bow, degrees. Within about 60° of the wind she makes barely any way (55°: a knot or so, her sails aback or lifting; 45°: she falls astern); close-hauled,
  * six points off, about 5 knots; fastest with the wind abaft the beam on the quarter, about 11.5 knots, where the
  * apparent wind is strongest and every sail draws; running before it about 10. A first proposal for the design thread
  * ("how much pace", implementation plan N3): a brig sloop logged 10 to 11 knots at her best, so this is a little
@@ -192,7 +192,7 @@ export const HEEL_LIMIT = 15 * DEGREE;
 export const SPEED_WIND_FORCE = 5;
 export const SPEED_CANVAS: CanvasName = 'plain';
 export const SPEED_TABLE: readonly (readonly [angle: number, knots: number])[] = [
-  [55, 0], [60, 2.5], [67.5, 5], [90, 10.2], [110, 11.5], [135, 11], [160, 10.2], [180, 10],
+  [55, 1], [60, 2.5], [67.5, 5], [90, 10.2], [110, 11.5], [135, 11], [160, 10.2], [180, 10],
 ];
 /**
  * Light airs are not slow (implementation plan, N3 design decisions, 2026-11-18; fun before realism). In a match sailed
