@@ -26,6 +26,16 @@ export class DuelRoom {
     return s;
   }
 
+  /** A host and a guest in a room, its match running (round 0). */
+  async pair(): Promise<{ host: DuelSession; guest: DuelSession }> {
+    const host = this.machine('Host'), guest = this.machine('Guest');
+    await host.create('duel');
+    await this.settle();
+    await guest.join(host.code);
+    await this.settle();
+    return { host, guest };
+  }
+
   /** Hands out the messages, and runs what a host decides once it has its room's history. */
   async settle(): Promise<void> {
     this.server.deliver();

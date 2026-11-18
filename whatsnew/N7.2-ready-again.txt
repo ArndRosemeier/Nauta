@@ -1,0 +1,2 @@
+In a duel of two, the match now begins when both captains have tapped "Ready" in the waiting room.
+When it ends, both tapping "Again" on the end card begins another in the same room.

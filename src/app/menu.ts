@@ -43,8 +43,6 @@ const QUIET_HOUR = 8;
 const QUIET_MINUTES = HOURS_PER_DAY * MINUTES_PER_HOUR;
 /** After the fight ends, the quiet moment on deck before the end card, ms (menu.md: after N6.7's moment). */
 const END_QUIET_MS = 8000;
-/** How long the waiting room says "the other captain is aboard" before the deck, ms. */
-const ABOARD_MS = 1500;
 /** Leaving a duel of two: the strike sent, then the room left this long after, ms (the orders on their way first). */
 const STRIKE_LEAVE_MS = 1000;
 /** Digits of seconds on the end card's clock. */
@@ -315,6 +313,7 @@ export class Menu {
       if (s.role === 'refused') throw new Error(s.problem);
       if (this.pendingRoom !== s) { s.close(); return; }
       this.run(s, { kind: 'duel', session: s });
+      this.watchRounds(s);
       const terms = s.roomTerms;
       if (terms) this.h.sky(terms.hour, MATCH_DAY_MINUTES);
       this.waitingRoom(s, null, code);
@@ -322,6 +321,19 @@ export class Menu {
       s.close();
       if (this.pendingRoom === s) this.waitingRoom(s, hubProblem(err), code);
     }
+  }
+
+  /** Each new round of the room's match (both captains ready, menu.md): its count afresh, and onto her deck. */
+  private watchRounds(s: DuelSession): void {
+    let round = s.round;
+    const off = s.on('change', () => {
+      if (this.playing.kind !== 'duel' || this.playing.session !== s) { off(); return; }
+      if (s.round === round) return;
+      round = s.round;
+      clearTimeout(this.endTimer);
+      this.tally.reset();
+      this.aboard();
+    });
   }
 
   private connect(): DuelHub {
@@ -365,8 +377,7 @@ export class Menu {
       const say = this.wordsNow, code = s.code || joining;
       const sheet = this.open('menu-room', s.role === 'host' || (!joining && s.role === 'joining') ? say.waitingRoom : say.roomJoined, leave);
       const captains = make('p', 'room-say');
-      const ready = menuButton('nt-button coming', say.ready);
-      ready.disabled = true;
+      const ready = menuButton('nt-button menu-go', say.ready, () => { s.ready(); look(); });
       const out = menuButton('nt-link', say.leaveTheRoom, leave);
       const terms = s.roomTerms;
       const mine = terms ? (s.role === 'host' ? terms.navy : otherNavy(terms.navy as Navy)) : null;
@@ -378,9 +389,13 @@ export class Menu {
       row.append(ready, make('small', 'room-say', say.readyHelp));
       sheet.body.append(captains, row, out);
       const look = () => {
+        if (this.sheet !== sheet) { off?.(); return; }
         const seated = s.shipCaptains.filter((c) => c !== null).length;
-        captains.textContent = seated >= MOST_PLAYERS ? say.otherAboard : `${seated}/${MOST_PLAYERS} ${say.captainsOf}`;
-        if (seated >= MOST_PLAYERS && s.started && s.mine >= 0) { off?.(); setTimeout(() => { if (this.sheet === sheet) this.aboard(); }, ABOARD_MS); }
+        const iAm = s.readyPlayers.includes(s.me), sheIs = s.readyPlayers.some((p) => p !== s.me);
+        captains.textContent = seated < MOST_PLAYERS ? `${seated}/${MOST_PLAYERS} ${say.captainsOf}` : sheIs ? say.herReady : say.otherAboard;
+        ready.disabled = iAm || s.role === 'refused' || !s.started;
+        ready.textContent = iAm ? say.readyWaiting : say.ready;
+        ready.classList.toggle('on', iAm);
       };
       off = s.on('change', look);
       look();
@@ -427,7 +442,9 @@ export class Menu {
 
   /** The fight is over: after the quiet moment on deck, the end card. */
   private fightOver(): void {
-    if (this.playing.kind === 'quiet' || this.playing.kind === 'walk') return;
+    const p = this.playing;
+    // A room's match before both captains were ready (round 0) is not theirs to end.
+    if (p.kind === 'quiet' || p.kind === 'walk' || (p.kind === 'duel' && p.session.round === 0)) return;
     clearTimeout(this.endTimer);
     this.endTimer = window.setTimeout(() => this.endScreen(), END_QUIET_MS);
   }
@@ -453,8 +470,23 @@ export class Menu {
       line('shotStruck', (n) => n.struck);
       line('menLost', (n) => n.men);
       line('sparsDown', (n) => n.spars);
-      const again = menuButton('nt-button menu-go', say.again, () => { if (p.kind === 'alone') this.sail('alone', true); else if (p.kind === 'first') this.first(); });
-      if (p.kind === 'duel') { again.disabled = true; again.classList.add('coming'); }
+      const her = make('p', 'room-say');
+      const again = menuButton('nt-button menu-go', say.again, () => {
+        if (p.kind === 'alone') this.sail('alone', true);
+        else if (p.kind === 'first') this.first();
+        else if (p.kind === 'duel') { p.session.ready(); look(); }
+      });
+      const look = () => {
+        if (p.kind !== 'duel') return;
+        const s = p.session, iAm = s.readyPlayers.includes(s.me), gone = s.shipCaptains.some((c) => c === null);
+        her.textContent = gone ? say.herGone : s.readyPlayers.some((r) => r !== s.me) ? say.herAgain : say.againTwoHelp;
+        again.disabled = iAm || gone;
+        again.textContent = iAm ? say.againWaiting : say.again;
+      };
+      if (p.kind === 'duel') {
+        const off = p.session.on('change', () => { if (this.sheet === sheet) look(); else off(); });
+        look();
+      }
       const back = menuButton('nt-button', say.back, () => this.main());
       const foot = make('div', 'menu-sheet-foot');
       foot.append(back, again);
@@ -462,7 +494,7 @@ export class Menu {
         make('p', 'menu-ending', endingWords(card.ending, say)),
         make('p', 'room-say', `${say.foughtFor} ${minutesAndSeconds(card.seconds)}${p.kind === 'alone' ? ` · ${say.seed} ${p.seed}` : ''}`),
         table,
-        ...(p.kind === 'duel' ? [make('p', 'room-say', say.againTwoHelp)] : []),
+        ...(p.kind === 'duel' ? [her] : []),
         foot,
       );
     };
