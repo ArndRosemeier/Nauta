@@ -49,6 +49,8 @@
       /* ?bench (src/app/benchRun.ts): the frame times and memory, large enough to read off a tablet, clear of the HUD. */
       #bench { position: fixed; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); max-width: calc(100% - 20px); display: none; margin: 0; padding: 10px 14px; border-radius: 10px; background: #0b1a2acc; white-space: pre-wrap; font: 15px/1.45 ui-monospace, monospace; -webkit-user-select: text; user-select: text; }
       #bench button { margin-top: 8px; min-height: 44px; padding: 0 18px; border-radius: 22px; border: 1px solid #f2c14e; background: none; color: #f2c14e; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; }
+      /* Walking: the calm view's button (src/app/motionSetting.ts), top right, clear of the HUD and the walking thumb's half. */
+      #motion { position: fixed; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); display: none; min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #ffffff33; background: #0b1a2a99; color: #e8eef4cc; font: 13px/1 system-ui, sans-serif; touch-action: manipulation; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
       /* Walking (src/app/walkInput.ts): the left thumb's stick, a ring where it lands and a knob that follows it. */
       #stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid #ffffff40; background: #0b1a2a33; pointer-events: none; display: none; }
       #stick.on { display: block; }
@@ -60,6 +62,7 @@
     <pre id="hud"></pre>
     <pre id="bench"></pre>
     <button id="version" type="button"></button>
+    <button id="motion" type="button"></button>
     <div id="loading"><h1>NAUTA</h1></div>
     <div id="failed"></div>
     <script type="module" src="/src/main.ts"></script>

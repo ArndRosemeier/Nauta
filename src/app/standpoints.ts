@@ -19,6 +19,11 @@ export interface Standpoint {
   readonly look: Look;
   /** Off her: the eye stands still on the water, not riding her pitch, roll and heave. */
   readonly off?: boolean;
+  /**
+   * How the head is held, ship space (a unit up; his body on her deck gives it, app/body.ts). None: a standpoint
+   * without a body, whose eye rides a fixed share of her pitch and roll.
+   */
+  readonly up?: readonly [number, number, number];
 }
 
 /** A man's eye over the deck he stands on, m; stooping under the beams below; crouching in the hold. */

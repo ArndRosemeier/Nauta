@@ -233,6 +233,23 @@ export function shipFrame(pose: ShipPose): Frame {
   return { origin: { x, y, z }, rotation: poseRotation(pose) };
 }
 
+/** A short look ahead along her rates, s: short enough that her turn over it is a straight line. */
+const RATE_PEEK = 1e-3;
+
+/**
+ * How fast a point of ship space moves in the world from her heave, pitch and roll (m/s, world axes), into `out`: what
+ * the feet of someone standing there feel (the body on her deck, N2.7, takes its change as the deck's push). Her way
+ * through the water is left out: steady, it pushes no one.
+ */
+export function pointVelocity(pose: ShipPose, x: number, y: number, z: number, out: [number, number, number] = [0, 0, 0]): [number, number, number] {
+  const ahead: ShipPose = { ...pose, heave: pose.heave + pose.heaveRate * RATE_PEEK, pitch: pose.pitch + pose.pitchRate * RATE_PEEK, roll: pose.roll + pose.rollRate * RATE_PEEK };
+  const [x0, y0, z0] = toWorld(pose, x, y, z, peekFrom);
+  toWorld(ahead, x, y, z, out);
+  out[0] = (out[0] - x0) / RATE_PEEK; out[1] = (out[1] - y0) / RATE_PEEK; out[2] = (out[2] - z0) / RATE_PEEK;
+  return out;
+}
+const peekFrom: [number, number, number] = [0, 0, 0];
+
 /**
  * She put on the water with her centre at (x, z) and her bow toward `heading`, still, at the draught's load waterline:
  * trimmed by the stern as it slopes, the waterline at the mainmast on the calm level.

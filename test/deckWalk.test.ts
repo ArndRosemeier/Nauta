@@ -115,3 +115,13 @@ test('the walking thumb: a resting thumb does not creep, a full drag is a full p
   assert.ok(Math.abs(Math.hypot(both.forward, both.strafe) - 1) < 1e-9 && both.forward > 0 && both.strafe > 0);
   assert.deepEqual(keyPush(new Set(['ArrowUp', 'ArrowDown'])), { forward: 0, strafe: 0 });
 });
+
+test('sliding past a ladder\'s side below is walking past it, not climbing it; pressed against its front he climbs', () => {
+  const way = plan.ways.find((w) => w.id === 'magazine-ladder')!, foot = way.line!.foot;
+  const beside: DeckWalker = { ...walkerAt(plan, { space: way.from.space, along: foot[0] + 0.15, across: way.width / 2 + 0.06 }), vx: 0.5 };
+  // Pushing aft (into the ladder's climb), a little to starboard, while sliding along beside it.
+  const push = { forward: 1, strafe: 0, heading: -2.81 };
+  assert.equal(ladderOffered(beside, push, plan), null);
+  const before: DeckWalker = { ...beside, x: 0, vx: 0 };
+  assert.equal(ladderOffered(before, push, plan)?.way.id, 'magazine-ladder');
+});

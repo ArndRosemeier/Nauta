@@ -108,6 +108,8 @@ export class ShipView {
   private readonly spaceZones = zoneOfSpaces(this.plan);
   private readonly inverse = new Matrix4();
   private readonly look = new Quaternion();
+  private readonly tilt = new Quaternion();
+  private readonly headUp = new Vector3();
   private readonly ride = new Quaternion();
   private readonly euler = new Euler(0, 0, 0, 'YXZ');
   private readonly eye = new Vector3();
@@ -255,6 +257,8 @@ export class ShipView {
       this.euler.set(this.drawn.pitch * RIDE, -this.drawn.heading, -this.drawn.roll * RIDE, 'YXZ');
     }
     this.ride.setFromEuler(this.euler);
+    // A body on her deck holds its head its own way (app/body.ts): her turn, then the head's tilt in her frame.
+    if (where.up && !where.off) this.ride.copy(g.quaternion).multiply(this.tilt.setFromUnitVectors(UP, this.headUp.set(...where.up)));
     this.euler.set(look.pitch, look.yaw, 0, 'YXZ');
     this.look.setFromEuler(this.euler);
     camera.quaternion.copy(this.ride).multiply(this.look);

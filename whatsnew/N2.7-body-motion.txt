@@ -1,0 +1,3 @@
+Walking the decks (?walk) you now stand in a body: you lean against her roll a moment late and catch yourself, your feet shift to a wider stance in a heavy sea, your walk bobs, and her heel slows you.
+In rough weather beside the rail or under a beam you take hold of it and sway less. Try ?walk&sea=gale.
+The "Motion" button at the top right steps from full to half to calm, which keeps the view almost still for anyone who gets queasy; the device remembers it.
