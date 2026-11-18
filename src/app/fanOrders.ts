@@ -6,7 +6,7 @@
  * first whom the message is for, then that man's own fan. Also: which drawn man a finger points at, and the order
  * keys. Pure: the fan on the page is orderFan.ts.
  */
-import type { Order, PlainOrder } from '../sim/orders';
+import type { GunsOrder, LifeOrder, Order, PlainOrder } from '../sim/orders';
 import type { SimState } from '../sim/state';
 import { MASTS } from '../sim/ship/sailing';
 import { isStanding, wouldRefuse } from './orderReport';
@@ -47,7 +47,7 @@ export const FAN_MOST = 6;
 export const FAN_DEPTH = 2;
 
 const order = (id: string, word: WordKey, o: Order, detail: WordKey | null = null): FanItem => ({ id, word, detail, act: { kind: 'order', order: o } });
-const plain = (kind: PlainOrder['kind']): Order => ({ kind, ship: 0 });
+const plain = (kind: PlainOrder['kind'] | GunsOrder['kind'] | LifeOrder['kind']): Order => ({ kind, ship: 0 } as Order);
 
 /** The master's ring "About": through the wind, or round before it. */
 const ABOUT: readonly FanItem[] = [order('tack', 'fanTack', plain('tack')), order('wear', 'fanWear', plain('wear'))];
@@ -59,11 +59,40 @@ const SETTINGS: readonly FanItem[] = [
 ];
 /** Back the main topsail (orders.md names the main; the fore stays an order of the panel). */
 const BACK: Order = { kind: 'back', ship: 0, mast: 'main' };
+/** The first lieutenant's ring "Her life": men from the guns to the pumps, against fire, to cut the wreckage away. */
+const LIFE: readonly FanItem[] = [
+  order('pumps', 'fanPumps', plain('pumps')),
+  order('fires', 'fanFires', plain('fires')),
+  order('wreckage', 'fanWreckage', plain('wreckage')),
+];
+/** The gunner's rings: the shot of the next loading, and where the guns are laid on her. */
+const SHOTS: readonly FanItem[] = [
+  order('shot-round', 'fanRound', { kind: 'shot', ship: 0, shot: 'round' }),
+  order('shot-chain', 'fanChain', { kind: 'shot', ship: 0, shot: 'chain' }),
+  order('shot-grape', 'fanGrape', { kind: 'shot', ship: 0, shot: 'grape' }),
+];
+const AIMS: readonly FanItem[] = [
+  order('aim-hull', 'fanHull', { kind: 'aim', ship: 0, at: 'hull' }),
+  order('aim-rigging', 'fanRigging', { kind: 'aim', ship: 0, at: 'rigging' }),
+  order('aim-deck', 'fanDeck', { kind: 'aim', ship: 0, at: 'deck' }),
+];
 
 /** Whether she has a mast aback or is hove to: then the first lieutenant offers "Fill" where he offered "Back". */
 function backed(state: SimState, ship: number): boolean {
   const told = state.ships[ship]?.told;
   return !!told && (told.hove || MASTS.some((_, m) => told.backed[m]));
+}
+
+/** Whether she is at quarters: the first lieutenant offers "Stand down" where he offered "Beat to quarters". */
+const atQuarters = (state: SimState, ship: number): boolean => state.ships[ship]?.told.quarters ?? false;
+
+/**
+ * Whether her guns wait for the captain's word now (held at quarters, the word not yet given): the one order with no
+ * walk and no fan, a large "Fire!" by the thumb wherever he stands (orders.md).
+ */
+export function waitingForWord(state: SimState, ship: number): boolean {
+  const told = state.ships[ship]?.told;
+  return !!told && told.quarters && told.firing === 'hold' && !told.word;
 }
 
 /** The orders a man takes, as offered now (the midshipman's are the men he can carry a message to). */
@@ -81,10 +110,19 @@ export function fanItems(who: Officer, state: SimState, ship: number): readonly 
       { id: 'sail', word: 'fanSail', detail: null, act: { kind: 'ring', items: SETTINGS } },
       order('shorten', 'fanShorten', plain('shorten')),
       backed(state, ship) ? order('fill', 'fanFill', plain('fill'), 'fanFillDetail') : order('back', 'fanBack', BACK, 'fanBackDetail'),
+      atQuarters(state, ship) ? order('stand', 'fanStand', plain('stand')) : order('quarters', 'fanQuarters', plain('quarters')),
+      { id: 'life', word: 'fanLife', detail: 'fanLifeDetail', act: { kind: 'ring', items: LIFE } },
+      order('strike', 'fanStrike', plain('strike'), 'fanStrikeDetail'),
     ];
+    case 'gunner': return [
+      { id: 'shot', word: 'fanShot', detail: null, act: { kind: 'ring', items: SHOTS } },
+      { id: 'aim', word: 'fanAim', detail: null, act: { kind: 'ring', items: AIMS } },
+      order('bear', 'fanBear', plain('bear')),
+      order('hold', 'fanHold', plain('hold'), 'fanHoldDetail'),
+      order('cease', 'fanCease', plain('cease')),
+    ];
+    case 'carpenter': return [order('plug', 'fanPlug', plain('plug')), order('pumping', 'fanPumping', plain('pumping'))];
     case 'lookout': return [{ id: 'look-out', word: 'fanLookOut', detail: null, act: { kind: 'look out' } }];
-    // The gunner's and the carpenter's orders come with N5.3b and N6.
-    case 'gunner': case 'carpenter': return [];
     case 'midshipman': return TAKERS.filter((t) => fanItems(t, state, ship).length > 0).map((t) => ({ id: `to-${t}`, word: RANK_WORDS[t], detail: null, act: { kind: 'to', who: t } }));
   }
 }
@@ -143,8 +181,8 @@ export function manAt(men: readonly ManOnScreen[], x: number, y: number, reach: 
   return i < 0 ? null : men[i]!.who;
 }
 
-/** What each order key does: an order to its man, or steer there where the captain looks (orders.md "Keys"). */
-export const KEY_ORDERS: Readonly<Partial<Record<KeyAction, Order | 'steer there'>>> = {
+/** What each order key does: an order to its man, steer there where the captain looks, or F: fire as they bear, and while the guns wait for his word, the word (orders.md "Keys"). */
+export const KEY_ORDERS: Readonly<Partial<Record<KeyAction, Order | 'steer there' | 'fire'>>> = {
   steer: 'steer there',
   up: plain('up'),
   away: plain('away'),
@@ -155,5 +193,11 @@ export const KEY_ORDERS: Readonly<Partial<Record<KeyAction, Order | 'steer there
   plain: { kind: 'sail', ship: 0, canvas: 'plain' },
   all: { kind: 'sail', ship: 0, canvas: 'all' },
   shorten: plain('shorten'),
+  quarters: plain('quarters'),
+  round: { kind: 'shot', ship: 0, shot: 'round' },
+  chain: { kind: 'shot', ship: 0, shot: 'chain' },
+  grape: { kind: 'shot', ship: 0, shot: 'grape' },
+  fire: 'fire',
+  cease: plain('cease'),
 };
 

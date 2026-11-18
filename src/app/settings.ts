@@ -27,9 +27,10 @@ export type SoundPart = (typeof SOUND_PARTS)[number];
 /**
  * The keys a player may change, each one key (its `code`); the arrows always walk as well. Walking and the glass,
  * then the orders (docs/design/orders.md "Keys"): steer there, come up and bear away a point, tack, wear, heave to,
- * the three settings of sail and shorten, the fan of the man looked at, the midshipman.
+ * the three settings of sail and shorten, beat to quarters, the three shot, fire (as they bear, or the word), cease
+ * firing, the fan of the man looked at, the midshipman.
  */
-export const KEY_ACTIONS = ['forward', 'back', 'left', 'right', 'glass', 'steer', 'up', 'away', 'tack', 'wear', 'heave', 'battle', 'plain', 'all', 'shorten', 'fan', 'midshipman'] as const;
+export const KEY_ACTIONS = ['forward', 'back', 'left', 'right', 'glass', 'steer', 'up', 'away', 'tack', 'wear', 'heave', 'battle', 'plain', 'all', 'shorten', 'quarters', 'round', 'chain', 'grape', 'fire', 'cease', 'fan', 'midshipman'] as const;
 export type KeyAction = (typeof KEY_ACTIONS)[number];
 
 export interface Settings {
@@ -73,7 +74,8 @@ export const DEFAULT_SETTINGS: Settings = {
   keys: {
     forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', glass: 'KeyQ',
     steer: 'KeyX', up: 'KeyZ', away: 'KeyC', tack: 'KeyT', wear: 'KeyG', heave: 'KeyH',
-    battle: 'Digit1', plain: 'Digit2', all: 'Digit3', shorten: 'Digit4', fan: 'KeyE', midshipman: 'KeyM',
+    battle: 'Digit1', plain: 'Digit2', all: 'Digit3', shorten: 'Digit4',
+    quarters: 'KeyB', round: 'Digit7', chain: 'Digit8', grape: 'Digit9', fire: 'KeyF', cease: 'KeyV', fan: 'KeyE', midshipman: 'KeyM',
   },
   violence: 'plain',
   matchMinutes: MATCH_MINUTES,

@@ -12,7 +12,7 @@ import { openShip } from '../src/sim/crew/closures.ts';
 import { routeNetwork, standable } from '../src/sim/crew/network.ts';
 import { DEGREE, KNOT } from '../src/sim/units.ts';
 import { meanWind } from '../src/sim/wind.ts';
-import { FAN_DEPTH, FAN_MOST, KEY_ORDERS, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem } from '../src/app/fanOrders.ts';
+import { FAN_DEPTH, FAN_MOST, KEY_ORDERS, waitingForWord, fanItems, fanSlots, manAt, slotAt, slotPlaces, type FanItem } from '../src/app/fanOrders.ts';
 import { OFFICERS, TAKERS, deliverAt, floorApart, inVoice, midshipmanStart, postOf, quarterdeck, takerOf } from '../src/app/officers.ts';
 import { Midshipman } from '../src/app/midshipman.ts';
 import { lookBearing } from '../src/app/look.ts';
@@ -33,9 +33,11 @@ test('every man offers at most six orders and at most one more ring', () => {
     assert.ok(depth(items) <= FAN_DEPTH, `${who} goes ${depth(items)} rings deep`);
   }
   assert.deepEqual(ids(fanItems('master', UNDER_WAY, 0)), ['steer', 'up', 'away', 'by', 'about', 'heave']);
-  assert.deepEqual(ids(fanItems('first lieutenant', UNDER_WAY, 0)), ['sail', 'shorten', 'back']);
+  assert.deepEqual(ids(fanItems('first lieutenant', UNDER_WAY, 0)), ['sail', 'shorten', 'back', 'quarters', 'life', 'strike']);
+  assert.deepEqual(ids(fanItems('gunner', UNDER_WAY, 0)), ['shot', 'aim', 'bear', 'hold', 'cease']);
+  assert.deepEqual(ids(fanItems('carpenter', UNDER_WAY, 0)), ['plug', 'pumping']);
   // The midshipman offers the men who have orders now, and each order goes to the man who takes it.
-  assert.deepEqual(ids(fanItems('midshipman', UNDER_WAY, 0)), ['to-master', 'to-first lieutenant', 'to-lookout']);
+  assert.deepEqual(ids(fanItems('midshipman', UNDER_WAY, 0)), ['to-master', 'to-first lieutenant', 'to-gunner', 'to-carpenter', 'to-lookout']);
   const orderOf = (i: FanItem): Order[] => (i.act.kind === 'order' ? [i.act.order] : i.act.kind === 'ring' ? i.act.items.flatMap(orderOf) : []);
   for (const who of TAKERS) for (const o of fanItems(who, UNDER_WAY, 0).flatMap(orderOf)) assert.equal(takerOf(o), who);
 });
@@ -47,9 +49,22 @@ test('an order he cannot carry out now is dim, the one he carries out is ringed,
   const s = UNDER_WAY.ships[0]!, moment = { tick: UNDER_WAY.tick, wind: meanWind(UNDER_WAY.wind, 0), force: UNDER_WAY.wind.windForce };
   const backed = { ...UNDER_WAY, ships: [{ ...s, told: giveOrder(s.told, s.sailing, { kind: 'back', ship: 0, mast: 'main' }, moment).told }] };
   const slots = fanSlots(fanItems('first lieutenant', backed, 0), backed, 0);
-  assert.deepEqual(slots.map((x) => x.item.id), ['sail', 'shorten', 'fill']);
+  assert.deepEqual(slots.map((x) => x.item.id), ['sail', 'shorten', 'fill', 'quarters', 'life', 'strike']);
   const battle = fanSlots(fanItems('first lieutenant', UNDER_WAY, 0), UNDER_WAY, 0).find((x) => x.item.id === 'sail')!;
   assert.equal(battle.on, true, 'she starts under battle sail: the ring "Make sail" is ringed');
+});
+
+test('at quarters "Beat to quarters" becomes "Stand down", and held for his word the guns wait for "Fire!" until it is given', () => {
+  const s = UNDER_WAY.ships[0]!, moment = { tick: UNDER_WAY.tick, wind: meanWind(UNDER_WAY.wind, 0), force: UNDER_WAY.wind.windForce };
+  const tell = (state: SimState, o: Order): SimState => ({ ...state, ships: [{ ...state.ships[0]!, told: giveOrder(state.ships[0]!.told, s.sailing, o, moment).told }] });
+  assert.equal(waitingForWord(UNDER_WAY, 0), false);
+  const quarters = tell(UNDER_WAY, { kind: 'quarters', ship: 0 });
+  assert.ok(ids(fanItems('first lieutenant', quarters, 0)).includes('stand'));
+  const held = tell(quarters, { kind: 'hold', ship: 0 });
+  assert.equal(waitingForWord(held, 0), true);
+  assert.equal(fanSlots(fanItems('gunner', held, 0), held, 0).find((x) => x.item.id === 'hold')!.on, true, 'the hold is ringed while it stands');
+  assert.equal(waitingForWord(tell(held, { kind: 'fire', ship: 0 }), 0), false, 'the word given, the button goes');
+  assert.equal(waitingForWord(tell(UNDER_WAY, { kind: 'hold', ship: 0 }), 0), false, 'not at quarters, nothing waits');
 });
 
 test('a finger finds the order and the man nearest it, within reach', () => {
@@ -70,7 +85,7 @@ test('steer there is the bearing he looks along from her', () => {
 test('the order keys: each a different key, and a glass kept on G gives G up to Wear', () => {
   const keys = Object.values(DEFAULT_SETTINGS.keys);
   assert.equal(new Set(keys).size, keys.length);
-  for (const a of ['steer', 'up', 'away', 'tack', 'wear', 'heave', 'battle', 'plain', 'all', 'shorten'] as const) assert.ok(KEY_ORDERS[a], a);
+  for (const a of ['steer', 'up', 'away', 'tack', 'wear', 'heave', 'battle', 'plain', 'all', 'shorten', 'quarters', 'round', 'chain', 'grape', 'fire', 'cease'] as const) assert.ok(KEY_ORDERS[a], a);
   const old = readSettings({ keys: { forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', glass: 'KeyG' } });
   assert.equal(old.keys.glass, 'KeyQ');
   assert.equal(old.keys.wear, 'KeyG');

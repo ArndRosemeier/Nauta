@@ -1,0 +1,3 @@
+The gunner now takes orders in the waist: shot, aim, fire as they bear, hold for your word, cease firing; the first lieutenant beats to quarters, sends men to the pumps or the fire, and strikes the colours; the carpenter plugs shot holes.
+Try ?sail&walk&foe=master: tap the first lieutenant, Beat to quarters, then tap the gunner, Hold for my word. Turn her side to the enemy and a large brass Fire! stays by your right thumb: tap it when the roll is right.
+Keys: B quarters, 7 8 9 round, chain, grape, F fire (the word while held), V cease firing.

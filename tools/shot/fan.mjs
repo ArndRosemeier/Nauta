@@ -2,7 +2,8 @@
  * The order fan (plan N4.4), by hand, not in CI: `npm run shot:fan [-- <out dir>]` (run `npm run build` first).
  * `?sail&walk` at the tablet's 1180 × 820, the captain on the quarterdeck: the officers at their posts; the first
  * lieutenant's fan and its ring "Make sail"; the master's fan with "About" under the finger; a key's order (T) sent by
- * the midshipman from below; "steer there" with the captain's arm out. Fails if the page throws. Slow on the cloud's
+ * the midshipman from below; "steer there" with the captain's arm out; at quarters the gunner's fan, and held for the
+ * word the large "Fire!" (N5.3b). Fails if the page throws. Slow on the cloud's
  * software GPU (each picture takes a while).
  */
 import { mkdirSync } from 'node:fs';
@@ -32,6 +33,13 @@ await page.evaluate(() => window.__nautaFan.open('master', ['steer']));
 await frames(page);
 await snap(page, `${out}/steer-there.png`);
 await page.keyboard.press('Escape');
+// N5.3b: at quarters the gunner's fan; held for the captain's word, the large Fire! by the thumb.
+await page.evaluate(() => window.__nautaSail.say('beat to quarters'));
+await say('gunner', 'gunner', [], 'hold');
+await page.keyboard.press('Escape');
+await page.evaluate(() => window.__nautaSail.say('hold for my word'));
+await frames(page, 2);
+await snap(page, `${out}/fire.png`);
 const failed = game.failed();
 console.log(`${out}: pictures taken${failed ? ', the page failed' : ''}`);
 await served.close();

@@ -254,7 +254,10 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .nt-fan-tag.on { box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-faint), 0 0 0 3px var(--lacquer), 0 0 0 5px var(--brass), 0 4px 12px #0008; }
 
 /* Steer there: the captain points; a mark in the middle of the view, and the word by the thumb, clear of the glass */
-.nt-steer { position: fixed; z-index: 15; right: max(14px, env(safe-area-inset-right)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--target) + 16px); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.nt-thumb { position: fixed; z-index: 15; right: max(14px, env(safe-area-inset-right)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--target) + 16px); display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+.nt-fire { min-width: 168px; min-height: 96px; padding: 0 30px; border: 2px solid var(--brass-line); border-radius: 48px; background: var(--brass-fill); color: var(--on-brass); font: 400 34px/1 var(--title-font); letter-spacing: 0.1em; text-transform: uppercase; box-shadow: 0 0 0 3px var(--signal), 0 8px 20px #000a; touch-action: none; user-select: none; -webkit-user-select: none; }
+.nt-fire:active { transform: translateY(2px); box-shadow: 0 0 0 3px var(--signal), 0 3px 8px #000a; }
+.nt-steer { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .nt-steer-help { font: italic 15px/1.2 var(--word-font); color: var(--ivory); text-shadow: 0 1px 3px #000c; }
 .nt-steer-give { min-height: 72px; min-width: 150px; padding: 0 26px; border: 1px solid var(--brass-line); border-radius: 36px; background: var(--brass-fill); color: var(--on-brass); font: 400 22px/1 var(--title-font); letter-spacing: 0.12em; text-transform: uppercase; box-shadow: 0 6px 16px #0009; touch-action: manipulation; }
 .nt-steer .nt-link { margin: 0; align-self: flex-end; background: var(--lacquer-over); color: var(--ivory); }
