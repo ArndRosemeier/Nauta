@@ -35,9 +35,9 @@ import { sideIndex, sightOf, type Sight } from './sight';
 /** Where the gun captains lay for each shot: round at her hull, grape at her deck, chain at her rigging. */
 const AIM_FOR: Readonly<Record<ShotKind, AimName>> = { round: 'hull', grape: 'deck', chain: 'rigging' };
 
-/** Whether this step is one of his looks round: every `look` seconds, the two captains of a duel a step apart. */
-function looks(state: SimState, ship: number, row: SkillRow): boolean {
-  return (state.tick + ship) % Math.round(row.look * STEPS_PER_SECOND) === 0;
+/** Whether this step is one of his looks round: every `look` seconds from the match's first step. */
+function looks(state: SimState, row: SkillRow): boolean {
+  return state.tick % Math.round(row.look * STEPS_PER_SECOND) === 0;
 }
 
 /** Beaten: strike the colours, and again when his first lieutenant asks back. */
@@ -105,7 +105,7 @@ function canvasOrder(sight: Sight, row: SkillRow): Order | null {
  */
 export function captainOrders(state: SimState, ship: number, skill: Skill): Order[] {
   if (state.fight.end || state.ships.length !== 2 || !state.ships[ship]) return [];
-  const row = SKILL[skill], own = state.ships[ship]!.told, look = looks(state, ship, row);
+  const row = SKILL[skill], own = state.ships[ship]!.told, look = looks(state, row);
   const strikeDue = own.strike !== null && !own.struck;
   const word = row.word && own.quarters && own.firing === 'hold' && !own.word;
   if (!look && !strikeDue && !word) return [];

@@ -18,12 +18,12 @@ import { startDamage, type Damage } from '../src/sim/damage.ts';
 import { giveOrder, type Order } from '../src/sim/orders.ts';
 import { HARMS } from '../src/sim/rules/damage.ts';
 import { CLOSE_HAULED } from '../src/sim/rules/sailing.ts';
-import { CLOSEST, SKILL, SKILLS, type Skill } from '../src/sim/rules/captain.ts';
+import { CLOSEST, SKILL, SKILLS, STRIKE_AGAIN, type Skill } from '../src/sim/rules/captain.ts';
+import { beaten, lostHow } from '../src/sim/end.ts';
 import { COMPLEMENT } from '../src/sim/rules/crew.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { duelStart } from '../src/sim/start.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
-import { step } from '../src/sim/step.ts';
 import { DEGREE, KNOT, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { meanWind } from '../src/sim/wind.ts';
 
@@ -38,31 +38,30 @@ function pair(at: [number, number], heading = 0, damage: Partial<Damage> = {}): 
   return { ...s, ships: s.ships.map((sh, i) => (i === 0 ? { ...sh, damage: { ...startDamage(), ...damage } } : sh)) };
 }
 
-/** Seconds of a duel's start stepped with captains: past a master's first look for the second ship. */
-const FIRST_SECONDS = 4;
-
 /** The orders of the first ship's captain at his first look (tick 0 is one for ship 0 at every skill). */
 const firstLook = (s: SimState, skill: Skill = 'master'): Order[] => captainOrders(s, 0, skill);
 const kinds = (orders: readonly Order[]) => orders.map((o) => o.kind);
-
-test('he gives only orders she takes, the same from the same state, and nothing once the fight is over', () => {
-  for (const seed of [1]) {
-    let s = startMatch(duelStart(seed));
-    const skills = [SKILLS[seed % SKILLS.length]!, 'master' as const];
-    for (let k = 0; k < FIRST_SECONDS * STEPS_PER_SECOND; k++) {
-      const orders = [0, 1].flatMap((ship) => captainOrders(s, ship, skills[ship]!));
-      assert.deepEqual([0, 1].flatMap((ship) => captainOrders(s, ship, skills[ship]!)), orders, 'the same state, the same orders');
-      const r = step(s, orders);
-      assert.deepEqual(r.events.filter((e) => e.kind === 'refused'), [], `seed ${seed}: no order of his refused`);
-      s = r.state;
-    }
-    assert.ok(s.ships[1]!.told.quarters, 'a master beats to quarters at the start of a duel (1,500 m)');
+/**
+ * His orders given to his ship as the step would give them (orders.ts `giveOrder`), without stepping the match: he goes
+ * by the state alone, so the tests move only what he reads. Fails on an order she refuses.
+ */
+function tell(s: SimState, orders: readonly Order[]): SimState {
+  const moment = { tick: s.tick, wind: meanWind(s.wind, s.tick / STEPS_PER_SECOND), force: s.wind.windForce };
+  let ships = s.ships;
+  for (const o of orders) {
+    const ship = ships[o.ship]!, answer = giveOrder(ship.told, ship.sailing, o, moment);
+    assert.equal(answer.refused, false, `${o.kind} refused: ${answer.reason}`);
+    ships = ships.map((sh, i) => (i === o.ship ? { ...sh, told: answer.told } : sh));
   }
+  return { ...s, ships };
+}
+
+test('nothing once the fight is over', () => {
   const over = startMatch(duelStart(1));
   assert.deepEqual(captainOrders({ ...over, fight: { ...over.fight, end: { tick: 0, lost: [null, null] } } }, 0, 'master'), []);
 });
 
-test('he looks round as often as his skill says, and gives nothing between his looks', () => {
+test('he looks round as often as his skill says, gives nothing between his looks, the same orders from the same state, none refused', () => {
   for (const skill of SKILLS) {
     let s = pair([1200, 0]), looks = 0;
     const steps = Math.round(SKILL.green.look * STEPS_PER_SECOND) * 2;
@@ -72,8 +71,9 @@ test('he looks round as often as his skill says, and gives nothing between his l
       const orders = captainOrders(s, 0, skill);
       if (orders.length === 0) continue;
       looks++;
+      assert.deepEqual(captainOrders(s, 0, skill), orders, 'the same state, the same orders');
       assert.equal(s.tick % Math.round(SKILL[skill].look * STEPS_PER_SECOND), 0, `${skill}: orders only at a look`);
-      s = step(s, orders).state;
+      s = tell(s, orders);
     }
     assert.ok(looks >= 1, `${skill}: he gave orders at his first look`);
   }
@@ -102,7 +102,7 @@ test('her life: pumps once the water passes his mark, a fire party at a fire, th
   assert.deepEqual(kinds(firstLook(pair([1200, 0], 0, hurt), 'green')).filter((k) => ['pumps', 'fires', 'wreckage'].includes(k)), ['wreckage']);
   // Given once, they stand: he does not give them again.
   const s = pair([1200, 0], 0, hurt), given = firstLook(s);
-  const after = step(s, given).state, later = { ...after, tick: Math.round(SKILL.master.look * STEPS_PER_SECOND) };
+  const later = { ...tell(s, given), tick: Math.round(SKILL.master.look * STEPS_PER_SECOND) };
   assert.deepEqual(kinds(captainOrders(later, 0, 'master')).filter((k) => ['pumps', 'fires', 'wreckage'].includes(k)), []);
 });
 
@@ -139,26 +139,33 @@ test('the helm: never closer than close-hauled; closing to windward of her; a br
 test('beaten, he strikes: he asks, and gives it again when asked back; the fight ends with her struck', () => {
   const killed = HARMS.indexOf('killed');
   const hurt = Array.from({ length: Math.ceil(COMPLEMENT / 2) }, (_, m) => (m + 1) * HARMS.length + killed);
-  let s = step(pair([300, 0], 0, { hurt })).state;
-  assert.equal(s.fight.beaten[0], true, 'half her men out: beaten');
+  const was = pair([300, 0], 0, { hurt });
+  assert.equal(beaten(was.ships[0]!, was.ships[0]!.damage), true, 'half her men out: beaten');
+  // His first lieutenant has said so (end.ts sets `fight.beaten` as the step ends).
+  let s: SimState = { ...was, fight: { ...was.fight, beaten: [true, false] } };
   const struck: number[] = [];
-  for (let k = 0; k < 3 * STEPS_PER_SECOND * SKILL.master.look && !s.fight.end; k++) {
+  for (let k = 0; k < 3 * STEPS_PER_SECOND * SKILL.master.look && !s.ships[0]!.told.struck; k++) {
+    s = { ...s, tick: k };
     const orders = captainOrders(s, 0, 'master');
     if (orders.some((o) => o.kind === 'strike')) struck.push(s.tick);
-    s = step(s, orders).state;
+    s = tell(s, orders);
   }
   assert.equal(struck.length, 2, 'asked twice');
-  assert.deepEqual(s.fight.end?.lost, ['struck', null]);
+  assert.equal(struck[1]! - struck[0]!, Math.round(STRIKE_AGAIN * STEPS_PER_SECOND), 'again when asked back');
+  assert.equal(lostHow(s.ships[0]!), 'struck');
 });
 
 test('played alone with a foe (?foe=master), the other ship is commanded by the computer captain; without one she is not', () => {
   assert.equal(readParams('?sail&foe=master').foe, 'master');
   assert.equal(readParams('?sail&foe').foe, 'seasoned');
   assert.equal(readParams('?sail').foe, null);
+  // One step: at the match's first step he looks round and gives his orders (a master beats to quarters at any range).
   let t = 0;
   const alone = new DuelSession({ build: 'test', now: () => t, seed: 3 }), fought = new DuelSession({ build: 'test', now: () => t, seed: 3, foe: 'master' });
-  t = SKILL.master.look;
+  const his = captainOrders(fought.state, 1, 'master');
+  assert.ok(his.length > 0, 'he has orders at his first look');
+  t = 1 / STEPS_PER_SECOND;
   for (const s of [alone, fought]) s.pump();
-  assert.equal(alone.state.ships[1]!.told.quarters, false);
-  assert.equal(fought.state.ships[1]!.told.quarters, true, 'the master beat to quarters at his first look');
+  assert.equal(alone.state.ships[1]!.told.serial, 0, 'alone, nobody orders her');
+  assert.equal(fought.state.ships[1]!.told.quarters, true, 'with a foe, his orders were stepped: quarters');
 });
