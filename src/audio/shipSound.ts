@@ -8,7 +8,7 @@
  * muffled and quieter by the room (`SeaSound.hear` takes the room this returns). Both buses ring with the room's echo.
  * Call `aboard` each frame before `SeaSound.hear`, whose `settle` keeps only the beds set since the last frame.
  */
-import type { AudioEngine } from '@futuremagic/audio/web';
+import type { Speaker } from './channel';
 import type { SeaState } from '../sim/sea/sea';
 import type { ShipPose } from '../sim/ship/motion';
 import { shipPlan } from '../sim/ship/plan';
@@ -45,7 +45,7 @@ export class ShipSound {
   /** The room's echo now (null: not set yet), so the engine is told only of a change. */
   private echoed: { t60: number; wet: number } | null = null;
 
-  constructor(private readonly engine: AudioEngine, seed: number) {
+  constructor(private readonly engine: Speaker, seed: number) {
     this.creaks = new CreakWatch(seed);
     this.water = new HullWater(seed);
     // The short sounds are fetched as soon as sound opens: a footstep or a creak that arrives late is left out.

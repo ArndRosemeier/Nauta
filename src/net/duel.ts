@@ -83,6 +83,8 @@ export interface DuelOptions {
   readonly now: () => number;
   /** A match played alone: the other ship commanded by a computer captain at this skill (plan N7.1); none: she sails on as she started. */
   readonly foe?: Skill;
+  /** How long a match this machine starts may last before it is drawn, minutes (the player's setting, plan N7.3); none: the rules' own. */
+  readonly minutes?: number;
 }
 
 /** What the page draws: her pose between two steps, `f` of the way from `from` to `to`, at the match's time `time` (s). */
@@ -115,6 +117,8 @@ export class DuelSession {
   private readonly build: string;
   /** The computer captain of the other ship of a match played alone, or null. */
   private readonly foe: Skill | null;
+  /** The length of a match this machine starts, minutes, or undefined for the rules' own. */
+  private readonly minutes: number | undefined;
   private readonly listeners: { [K in keyof Events]: Set<Events[K]> } = { events: new Set(), change: new Set() };
   private known: SimState | null = null;
   private previous: SimState | null = null;
@@ -141,9 +145,10 @@ export class DuelSession {
     this.now = options.now;
     this.build = options.build;
     this.foe = options.foe ?? null;
+    this.minutes = options.minutes;
     if (!this.hub) {
       this.role = 'solo';
-      const start = options.setup ?? duelStart(options.seed ?? SOLO_SEED);
+      const start = options.setup ?? this.timed(duelStart(options.seed ?? SOLO_SEED));
       this.begin(startMatch(options.windForce === undefined ? start : { ...start, windForce: options.windForce }), [SOLO_PLAYER, null]);
       return;
     }
@@ -351,13 +356,18 @@ export class DuelSession {
     }
   }
 
+  /** A start this machine begins, with the player's match length when there is one. */
+  private timed(setup: MatchSetup): MatchSetup {
+    return this.minutes === undefined ? setup : { ...setup, minutes: this.minutes };
+  }
+
   /** Hosting from here: run on through what the old host passed on, seat who is here, and go on stepping. */
   private host(): void {
     const hub = this.need();
     if (!this.known) {
       const latest = this.snapshots.at(-1);
       if (latest) this.adopt(latest);
-      else this.begin(startMatch(duelStart(roomSeed(this.code))), [hub.you, null]);
+      else this.begin(startMatch(this.timed(duelStart(roomSeed(this.code)))), [hub.you, null]);
     }
     this.jumpIfFar(this.hostTick);
     this.catchUp(this.hostTick, Infinity);

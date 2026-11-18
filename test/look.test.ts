@@ -8,13 +8,22 @@ test('a drag turns the look by pixels times the angle per pixel', () => {
   assert.ok(Math.abs(l.pitch + 0.05) < 1e-12);
 });
 
-test('the mouse turns the heading the way it moves, the finger drags the picture the other way; up and down alike', () => {
+test('the mouse turns the head the way it moves, the finger drags the picture the other way', () => {
   const mouse = turn({ yaw: 0, pitch: 0 }, 100, -50, 0.001, 'mouse');
   const finger = turn({ yaw: 0, pitch: 0 }, 100, -50, 0.001, 'finger');
   // Yaw grows to the left: the mouse moved right looks right (yaw falls), a finger dragged right turns left.
   assert.ok(Math.abs(mouse.yaw + 0.1) < 1e-12);
   assert.ok(Math.abs(finger.yaw - 0.1) < 1e-12);
-  assert.equal(mouse.pitch, finger.pitch);
+  // Moved up, the mouse looks up; a finger dragged up pulls the picture up, looking down.
+  assert.ok(Math.abs(mouse.pitch - 0.05) < 1e-12);
+  assert.ok(Math.abs(finger.pitch + 0.05) < 1e-12);
+});
+
+test('the settings scale the turn and can invert the mouse up and down', () => {
+  const fast = turn({ yaw: 0, pitch: 0 }, 100, 0, 0.001, 'finger', { speed: 2, inverted: false });
+  assert.ok(Math.abs(fast.yaw - 0.2) < 1e-12);
+  const inverted = turn({ yaw: 0, pitch: 0 }, 0, -50, 0.001, 'mouse', { speed: 1, inverted: true });
+  assert.ok(Math.abs(inverted.pitch + 0.05) < 1e-12);
 });
 
 test('the tilt stops short of straight up and down', () => {

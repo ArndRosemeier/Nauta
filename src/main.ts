@@ -1,14 +1,19 @@
 /** The page: the view, the sky, the sea and the look, started behind the loading screen. */
 import { GraphicsUnavailable } from '@futuremagic/stage';
+import './ui/nauta.css';
 import { readParams, type Params } from './app/params';
 import { BenchRun } from './app/benchRun';
 import { watchLook } from './app/lookInput';
 import { standpoint, type Standpoint } from './app/standpoints';
 import { showStandpoints } from './app/standpointBar';
-import { showVersion } from './app/whatsNew';
 import { Walking } from './app/walking';
 import { QUALITY_LEVELS, QualityChooser, type QualityKnobs } from './app/quality';
-import { showMotionSetting } from './app/motionSetting';
+import { SettingsStore } from './app/settingsStore';
+import { SettingsMenu } from './app/settingsPanel';
+import { words } from './app/words';
+import { walkKeys } from './app/thumbs';
+import type { Settings } from './app/settings';
+import { Channel } from './audio/channel';
 import { OrderPanel } from './app/orderPanel';
 import { sailsSeen } from './app/sailsSeen';
 import { PageMatch, pageSeconds, sparAngles } from './app/pageMatch';
@@ -134,6 +139,9 @@ const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as
 
 async function start(): Promise<void> {
   const params = readParams(location.search);
+  // The player's settings (plan N7.3), kept on the device; the address sets a few for this visit only.
+  const visit: Partial<Settings> = { ...(params.quality ? { quality: params.quality } : {}), ...(params.motion !== null ? { motion: params.motion } : {}), ...(params.hud ? { frameTimes: true } : {}) };
+  const settings = new SettingsStore(visit);
   const canvas = el<HTMLCanvasElement>('view'), hud = el('hud'), loading = el('loading');
   // `?ship`: the whole brig, built in a worker behind the loading screen (plan N2.4); the sun casts shadows then.
   // `?walk`: the captain walks her decks with two thumbs (plan N2.3), on the whole brig.
@@ -149,7 +157,7 @@ async function start(): Promise<void> {
    * in the same state at each picture on a fast machine and a slow one.
    */
   let ahead = 0, pinned: number | null = null;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => (pinned ?? pageSeconds()) + ahead, params.windAsked ? params.wind : null, params.foe) : null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => (pinned ?? pageSeconds()) + ahead, params.windAsked ? params.wind : null, params.foe, settings.now.matchMinutes) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   const other = build && match ? new ShipView(build, 1) : null;
@@ -260,8 +268,10 @@ async function start(): Promise<void> {
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
   const leaveView = walking ? (e: PointerEvent) => walking.input.owns(e) : undefined;
-  const glassInput = glass ? watchGlass(canvas, el<HTMLButtonElement>('glass-button'), glass, leaveView) : null;
-  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, leaveView, () => glassInput?.pinching ?? false);
+  const glassButton = el<HTMLButtonElement>('glass-button');
+  const glassInput = glass ? watchGlass(canvas, glassButton, glass, leaveView, () => settings.now.keys.glass) : null;
+  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, leaveView, () => glassInput?.pinching ?? false,
+    (by) => { const s = settings.now; return by === 'mouse' ? { speed: s.mouseSpeed, inverted: s.mouseInverted } : { speed: s.fingerSpeed, inverted: false }; });
   const glassField = el('glass');
   /** The scene the address asks for: the hour and the day's pace, the wind and its sea, the eye, the look. */
   const setScene = (p: Params) => {
@@ -293,11 +303,15 @@ async function start(): Promise<void> {
   });
   if (ship && !walking) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (walking && ship) window.__nautaWalk = { drive: (forward, strafe, seconds, pitch, yaw) => walking.drive({ forward, strafe }, seconds, ship.drawn, input, pitch, yaw) };
-  const showHud = params.hud || crew !== null;
-  if (showHud) hud.style.display = 'block';
-  showVersion(el<HTMLButtonElement>('version'));
-  // Walking: the calm view, how much of his body's motion the view takes (plan N2.7).
-  if (walking) showMotionSetting(el<HTMLButtonElement>('motion'), params.motion, (s) => { walking.body.strength = s; });
+  let showHud = false;
+  // The settings that need no more than the page above: the HUD, the calm view (plan N2.7), the walking thumb and
+  // keys, the glass button's word.
+  settings.watch((s) => {
+    showHud = s.frameTimes || crew !== null;
+    hud.style.display = showHud ? 'block' : 'none';
+    if (walking) { walking.body.strength = s.motion; walking.input.layout(walkKeys(s.keys), s.thumb); }
+    glassButton.textContent = words(s.language).glass;
+  });
   const orders = match ? new OrderPanel(match) : null;
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
   let jump = 0, jumped: (() => void) | null = null;
@@ -342,11 +356,10 @@ async function start(): Promise<void> {
     other: () => (other?.group.visible ? { drawn: other.trianglesDrawn, near: other.nearDrawn, apart: Math.round(other.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null),
     firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
   };
-  // Walking, the calm view's button has the top right corner: the panel stands below it.
-  if (orders && walking) el('orders').classList.add('under-motion');
   if (match) {
-    const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.use(s));
+    const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.use(s), () => words(settings.now.language), () => settings.now.matchMinutes);
     match.onChange(() => rooms.refresh());
+    settings.watch((s, before) => { if (before && before.language !== s.language) rooms.refresh(); });
   }
   const apply = (k: QualityKnobs) => {
     view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k);
@@ -354,22 +367,34 @@ async function start(): Promise<void> {
     if (fireDrawn) fireDrawn.plenty = k.gunfireShare;
   };
   apply(quality.knobs);
+  // The quality the player chose (plan N7.3): a level fixed, or measured again from the top for `auto`.
+  settings.watch((s, before) => {
+    const changed = before ? before.quality !== s.quality : s.quality !== 'auto' && !settings.setByAddress('quality');
+    if (changed && quality.choose(s.quality)) apply(quality.knobs);
+  });
+  new SettingsMenu(settings, { qualityNow: () => `${quality.knobs.name} · ${quality.reason}` });
   document.addEventListener('visibilitychange', () => quality.interrupt());
   // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want.
   const sound = new SeaSound(import.meta.env.BASE_URL, MATCH_SEED);
   // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
-  const shipSound = ship ? new ShipSound(sound.engine, MATCH_SEED) : null;
+  // Each part of the sound at the player's level (plan N7.3): the whole is the engine's master volume.
+  const shipPart = new Channel(sound.engine), crewPart = new Channel(sound.engine), battlePart = new Channel(sound.engine);
+  settings.watch((s) => {
+    sound.engine.setVolume('master', s.sound.all);
+    sound.level = s.sound.sea; shipPart.level = s.sound.ship; crewPart.level = s.sound.crew; battlePart.level = s.sound.battle;
+  });
+  const shipSound = ship ? new ShipSound(shipPart, MATCH_SEED) : null;
   // The crew at work heard (N4.6), sailing: the boatswain's calls for the orders given, feet, hauling, the bell; on her
   // without a match only the bell, by the page's clock.
-  const crewSound = ship ? new CrewSound(sound.engine, MATCH_SEED, match?.ship ?? 0) : null;
+  const crewSound = ship ? new CrewSound(crewPart, MATCH_SEED, match?.ship ?? 0) : null;
   if (match && crewSound) match.on('events', (events) => crewSound.onEvents(events));
   // Her sails and rigging heard (N3.9): the wind in the rigging on her always; canvas, blocks and yards when a match sails her.
-  const sailSound = ship ? new SailSound(sound.engine, MATCH_SEED) : null;
+  const sailSound = ship ? new SailSound(shipPart, MATCH_SEED) : null;
   // Gunfire heard (N5.6), both ships' guns as the match fires them.
-  const gunSound = ship && match ? new GunSound(sound.engine) : null;
+  const gunSound = ship && match ? new GunSound(battlePart) : null;
   if (match && gunSound) match.on('events', (events) => gunSound.onFired(events));
   // Damage heard (N6.8): blows where each ship was struck, masts going, fires, the sea coming in, breaking up.
-  const damageSound = ship && match ? new DamageSound(sound.engine, MATCH_SEED) : null;
+  const damageSound = ship && match ? new DamageSound(battlePart, MATCH_SEED) : null;
   if (match && damageSound) match.on('events', (events) => damageSound.onDamage(events));
   const drawnSails: SailHeard[] = [];
   let aloft = meanWind(wind, 0);

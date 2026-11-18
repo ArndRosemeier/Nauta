@@ -1,0 +1,3 @@
+The interface has its own look now, brass and lacquer like the binnacle: black lacquer, engraved brass, ivory words in the type of 1800.
+Tap the compass rose top left for the settings: quality, five sound levels, view motion, look speed (the mouse now looks up when moved up, or set it inverted), which thumb walks, the keys, violence, match length, English or Deutsch. Every change works at once and is kept on the iPad.
+The version and What's new moved into the settings; a red dot on the compass rose means a new build.

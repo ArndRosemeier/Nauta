@@ -6,7 +6,7 @@
  * Give it the steps' events as they come (`onDamage`) and call `struck` each frame before `SeaSound.hear`, whose
  * `settle` keeps only the beds set since the last frame.
  */
-import type { AudioEngine } from '@futuremagic/audio/web';
+import type { Speaker } from './channel';
 import type { SimEvent } from '../sim/step';
 import { damageHits, DamageWatch, type DamageHeard, type DamageScene } from './damageHearing';
 import { playHeard } from './heard';
@@ -15,7 +15,7 @@ export class DamageSound {
   private readonly watch: DamageWatch;
   private readonly out: DamageHeard = { shots: [], beds: [], jolts: [] };
 
-  constructor(private readonly sound: AudioEngine, seed: number) {
+  constructor(private readonly sound: Speaker, seed: number) {
     this.watch = new DamageWatch(seed);
     // The blows are fetched as soon as sound opens (about 0.9 MB): a blow heard late is heard in the wrong place. The
     // fires, the sea rushing in and her breaking up are beds, fetched when first heard.

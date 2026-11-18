@@ -5,7 +5,7 @@
  * since the last frame. Sounds on the ear's side of her decks go on the ship's own bus (close, never muffled); those
  * across a deck on the world's, muffled by the room the ear is in.
  */
-import type { AudioEngine } from '@futuremagic/audio/web';
+import type { Speaker } from './channel';
 import type { ShipPose } from '../sim/ship/motion';
 import type { SimShip } from '../sim/state';
 import type { SimEvent } from '../sim/step';
@@ -21,7 +21,7 @@ export class CrewSound {
   drum = false;
 
   /** `ship`: hers in the match (0 with no match: then only the bell is heard, `bellAlone`). */
-  constructor(private readonly sound: AudioEngine, seed: number, ship = 0) {
+  constructor(private readonly sound: Speaker, seed: number, ship = 0) {
     this.watch = new CrewWatch(seed, ship);
     // The calls and the short sounds are fetched as soon as sound opens (about 250 KB): a call that comes late says
     // the wrong thing. The crowd's feet and the drum are beds, fetched when first heard.

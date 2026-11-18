@@ -8,6 +8,8 @@ import type { RoomSummary } from '../../vendor/gamehub/gamehub';
 import { DuelSession, type DuelHub } from '../net/duel';
 import { MOST_PLAYERS, roomRefusal } from '../net/wire';
 import { make } from './dom';
+import { openSheet } from './sheet';
+import type { WordKey } from './words';
 import { hubKey, openHub } from './hub';
 import { joinLink, type Params } from './params';
 
@@ -21,20 +23,26 @@ const COPIED_MS = 2000;
 export class RoomPanel {
   private hub: DuelHub | null = null;
   private pendingSession: DuelSession | null = null;
-  private readonly button = make('button', '', 'Two players');
+  private readonly button = make('button', 'nt-pill', '');
   private open: (() => void) | null = null;
+  private close: (() => void) | null = null;
   /** What went wrong last, shown in the panel. */
   private problem = '';
 
-  /** `current`: the session the page runs now; `chosen`: a new one to run instead (a room's, or alone again). */
+  /**
+   * `current`: the session the page runs now; `chosen`: a new one to run instead (a room's, or alone again). `say`: the
+   * interface's words now; `minutes`: the player's match length, for a match this machine starts.
+   */
   constructor(
     private readonly params: Params, private readonly build: string, private readonly now: () => number,
     private readonly current: () => DuelSession, private readonly chosen: (s: DuelSession) => void,
+    private readonly say: () => Readonly<Record<WordKey, string>>, private readonly minutes: () => number,
   ) {
     this.button.id = 'room';
     this.button.type = 'button';
     this.button.addEventListener('click', () => this.openRooms());
     document.body.append(this.button);
+    this.refresh();
     if (params.join) void this.enter((s) => s.join(params.join!));
     else if (params.room) void this.enter((s) => s.create(CAPTAIN));
   }
@@ -43,7 +51,8 @@ export class RoomPanel {
   refresh(): void {
     const s = this.current();
     const captains = s.shipCaptains.filter((c) => c !== null).length;
-    this.button.textContent = s.role === 'solo' ? 'Two players' : `Room ${s.code || '…'} · ${captains} of ${MOST_PLAYERS} captains`;
+    const say = this.say();
+    this.button.textContent = s.role === 'solo' ? say.twoPlayers : `${say.room} ${s.code || '…'} · ${captains}/${MOST_PLAYERS} ${say.captainsOf}`;
     this.open?.();
   }
 
@@ -70,77 +79,70 @@ export class RoomPanel {
 
   private session(): DuelSession {
     if (!this.hub) this.hub = openHub(this.params, CAPTAIN);
-    this.pendingSession ??= new DuelSession({ hub: this.hub, build: this.build, now: this.now });
+    this.pendingSession ??= new DuelSession({ hub: this.hub, build: this.build, now: this.now, minutes: this.minutes() });
     return this.pendingSession;
   }
 
   /** The panel over the view until it is closed. */
   private openRooms(): void {
-    document.querySelector('.room-backdrop')?.remove();
-    const backdrop = make('div', 'whatsnew-backdrop room-backdrop'), panel = make('section', 'whatsnew-panel');
-    panel.setAttribute('role', 'dialog');
-    const head = make('header', 'whatsnew-head'), close = make('button', 'whatsnew-close', '✕');
-    close.setAttribute('aria-label', 'Close');
-    head.append(make('h2', '', 'Two captains'), close);
-    const body = make('div', 'whatsnew-list room-body');
-    panel.append(head, body);
-    backdrop.append(panel);
+    this.close?.();
+    const say = this.say();
+    const sheet = openSheet('rooms', say.twoCaptains, say.close, () => { stopLobby?.(); this.open = null; this.close = null; });
+    const body = sheet.body;
     let stopLobby: (() => void) | null = null;
-    const shut = () => { stopLobby?.(); backdrop.remove(); this.open = null; };
-    close.addEventListener('click', shut);
-    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) shut(); });
+    const shut = () => sheet.shut();
+    this.close = shut;
     const fill = () => {
       body.replaceChildren();
       const s = this.current();
       if (s.role !== 'solo') { this.inRoom(body, s, shut); return; }
-      const say = make('p', 'room-say', this.problem);
-      const openRoom = make('button', 'room-wide', 'Open a room');
-      openRoom.addEventListener('click', () => { say.textContent = 'Opening a room…'; void this.enter((x) => x.create(CAPTAIN)); });
+      const told = make('p', 'room-say', this.problem);
+      const openRoom = make('button', 'nt-button room-wide', say.openRoom);
+      openRoom.addEventListener('click', () => { told.textContent = say.opening; void this.enter((x) => x.create(CAPTAIN)); });
       const code = make('input', 'room-code');
-      code.placeholder = 'code';
+      code.placeholder = say.code;
       code.maxLength = CODE_LENGTH;
       code.autocapitalize = 'characters';
-      const join = make('button', '', 'Join');
-      join.addEventListener('click', () => { say.textContent = 'Joining…'; void this.enter((x) => x.join(code.value)); });
+      const join = make('button', 'nt-button', say.join);
+      join.addEventListener('click', () => { told.textContent = say.joining; void this.enter((x) => x.join(code.value)); });
       const byCode = make('div', 'room-row');
       byCode.append(code, join);
       const waiting = make('div', 'room-list');
-      body.append(openRoom, make('h3', '', 'Rooms waiting for a captain'), waiting, make('h3', '', 'Or join by its code'), byCode, say);
+      body.append(openRoom, make('div', 'nt-section', say.roomsWaiting), waiting, make('div', 'nt-section', say.joinByCode), byCode, told);
       this.session();
       stopLobby?.();
       stopLobby = this.hub!.watchLobby((rooms) => {
         waiting.replaceChildren();
         const open = rooms.filter((r) => !roomRefusal(r.meta, this.build) && r.players < r.maxPlayers);
-        if (!open.length) waiting.append(make('p', 'room-say', 'None yet: open one here, or on the other device.'));
+        if (!open.length) waiting.append(make('p', 'room-say', say.noneWaiting));
         for (const r of open) {
-          const b = make('button', 'room-wide', `Join ${r.name} · ${r.id}`);
-          b.addEventListener('click', () => { say.textContent = 'Joining…'; void this.enter((x) => x.join(r.id)); });
+          const b = make('button', 'nt-button room-wide', `${say.join} ${r.name} · ${r.id}`);
+          b.addEventListener('click', () => { told.textContent = say.joining; void this.enter((x) => x.join(r.id)); });
           waiting.append(b);
         }
       });
     };
     this.open = fill;
     fill();
-    document.body.append(backdrop);
   }
 
   /** In a room: its code, the link for the other device, how it stands, and the way out. */
   private inRoom(body: HTMLElement, s: DuelSession, shut: () => void): void {
-    const link = joinLink(location.href, s.code);
-    const copy = make('button', '', 'Copy link');
+    const link = joinLink(location.href, s.code), say = this.say();
+    const copy = make('button', 'nt-button', say.copyLink);
     copy.addEventListener('click', () => {
-      void navigator.clipboard?.writeText(link).then(() => { copy.textContent = 'Copied'; setTimeout(() => { copy.textContent = 'Copy link'; }, COPIED_MS); });
+      void navigator.clipboard?.writeText(link).then(() => { copy.textContent = say.copied; setTimeout(() => { copy.textContent = say.copyLink; }, COPIED_MS); });
     });
-    const leave = make('button', 'room-wide', 'Leave the room and sail alone');
+    const leave = make('button', 'nt-button room-wide', say.leaveRoom);
     leave.addEventListener('click', () => {
       s.close();
       this.hub = null;
       this.pendingSession = null;
-      this.chosen(new DuelSession({ build: this.build, now: this.now, seed: this.params.seed ?? undefined, windForce: this.params.windAsked ? this.params.wind : undefined }));
+      this.chosen(new DuelSession({ build: this.build, now: this.now, seed: this.params.seed ?? undefined, windForce: this.params.windAsked ? this.params.wind : undefined, minutes: this.minutes() }));
       shut();
     });
     const row = make('div', 'room-row');
     row.append(make('span', 'room-link', link), copy);
-    body.append(make('p', 'room-big', s.code), make('p', '', 'On the other device open this link, or tap the room in its list of rooms waiting:'), row, make('p', 'room-say', s.line()), leave);
+    body.append(make('p', 'room-big', s.code), make('p', '', say.otherDevice), row, make('p', 'room-say', s.line()), leave);
   }
 }

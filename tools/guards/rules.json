@@ -9,6 +9,8 @@
     "src/app/params.ts",
     "src/app/standpoints.ts",
     "src/app/quality.ts",
+    "src/app/settings.ts",
+    "src/app/words.ts",
     "src/app/orderReport.ts",
     "src/app/pageMatch.ts",
     "src/app/glass.ts",

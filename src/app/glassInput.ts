@@ -1,7 +1,7 @@
 /**
  * The spyglass's controls (plan N3.8), touch first: its button raises and lowers it; two fingers spread on the view
  * raise it, and while it is up spread or pinch to draw it out or in, pinched right in it is lowered. On a desk the
- * `G` key raises and lowers it and the mouse wheel draws it out and in. Pointers that are not for the view (the
+ * `G` key (or the player's own, plan N7.3) raises and lowers it and the mouse wheel draws it out and in. Pointers that are not for the view (the
  * walking thumb's, walkInput.ts) are left alone.
  */
 import type { Spyglass } from './glass';
@@ -15,8 +15,8 @@ export interface GlassInput {
   readonly pinching: boolean;
 }
 
-/** The glass worked from the view `el` and its `button`; `notForView`: pointers that are not for the view. */
-export function watchGlass(el: HTMLElement, button: HTMLButtonElement, glass: Spyglass, notForView: (e: PointerEvent) => boolean = () => false): GlassInput {
+/** The glass worked from the view `el` and its `button` (its words are the page's); `notForView`: pointers that are not for the view; `key`: the key's code that raises it. */
+export function watchGlass(el: HTMLElement, button: HTMLButtonElement, glass: Spyglass, notForView: (e: PointerEvent) => boolean = () => false, key: () => string = () => 'KeyG'): GlassInput {
   const fingers = new Map<number, { x: number; y: number }>();
   let start = 0;
   const state = { pinching: false };
@@ -26,7 +26,6 @@ export function watchGlass(el: HTMLElement, button: HTMLButtonElement, glass: Sp
   };
   const mark = () => button.classList.toggle('on', glass.up);
   button.style.display = 'block';
-  button.textContent = 'Glass';
   button.addEventListener('click', () => { glass.toggle(); mark(); });
   el.addEventListener('pointerdown', (e) => {
     if (notForView(e)) return;
@@ -48,7 +47,7 @@ export function watchGlass(el: HTMLElement, button: HTMLButtonElement, glass: Sp
   el.addEventListener('pointercancel', lift);
   el.addEventListener('wheel', (e) => { e.preventDefault(); glass.draw(WHEEL_STEP ** (-e.deltaY / WHEEL_NOTCH)); }, { passive: false });
   window.addEventListener('keydown', (e) => {
-    if (e.key !== 'g' && e.key !== 'G') return;
+    if (e.code !== key()) return;
     // Typing an order is not looking through the glass.
     if (e.target instanceof HTMLInputElement) return;
     glass.toggle();

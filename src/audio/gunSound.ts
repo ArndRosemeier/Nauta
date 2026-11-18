@@ -6,7 +6,7 @@
  * Give it the steps' events as they come (`onFired`) and call `roar` each frame after `ShipSound.aboard`: the room it
  * returns is the one the crew, the sails and the sea are heard through (deafened, the world bus is dull and quieter).
  */
-import type { AudioEngine } from '@futuremagic/audio/web';
+import type { Speaker } from './channel';
 import type { SimEvent } from '../sim/step';
 import type { Room } from './acoustics';
 import { deafened, GunWatch, type GunHeard, type GunScene } from './gunHearing';
@@ -17,7 +17,7 @@ export class GunSound {
   private readonly watch = new GunWatch();
   private readonly out: GunHeard = { shots: [], beds: [], jolts: [], deaf: 0, ring: 0 };
 
-  constructor(private readonly sound: AudioEngine) {
+  constructor(private readonly sound: Speaker) {
     // Every take is fetched as soon as sound opens (about 0.8 MB): a report that comes late is a gun not heard.
     sound.preload([GUN_NEAR.id, GUN_FAR.id, GUN_THROUGH.id, SHOT_PASS.id, SHOT_SPLASH.id, RING.id]);
   }

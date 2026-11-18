@@ -3,7 +3,7 @@
  * cover both, so there is one path (docs/design/nauta-plan.md, Tablets: touch is designed first). The finger drags the
  * picture, the mouse turns the head (look.ts#turn).
  */
-import { turn, type Look } from './look';
+import { NATURAL, turn, type Dragger, type Look, type LookFeel } from './look';
 
 export interface LookInput {
   /** The look as dragged so far; set it to turn the look from elsewhere (a new standpoint). */
@@ -13,9 +13,10 @@ export interface LookInput {
 /**
  * `radPerPixel`: the view's vertical angle over its height now (it changes when the window does, and through the
  * glass). `leave`: pointers that are not for looking (the walking thumb's, walkInput.ts). `waits`: true while the drag
- * does not turn the look (two fingers pinching the glass, glassInput.ts).
+ * does not turn the look (two fingers pinching the glass, glassInput.ts). `feel`: the player's look speed and mouse
+ * inversion for a finger or the mouse now (the settings, plan N7.3).
  */
-export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => number, leave: (e: PointerEvent) => boolean = () => false, waits: () => boolean = () => false): LookInput {
+export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => number, leave: (e: PointerEvent) => boolean = () => false, waits: () => boolean = () => false, feel: (by: Dragger) => LookFeel = () => NATURAL): LookInput {
   const state = { look: start };
   /** The pointer that is dragging (the first one down), and where it was last. */
   let id: number | null = null, x = 0, y = 0;
@@ -27,7 +28,8 @@ export function watchLook(el: HTMLElement, start: Look, radPerPixel: () => numbe
   });
   el.addEventListener('pointermove', (e) => {
     if (e.pointerId !== id) return;
-    if (!waits()) state.look = turn(state.look, e.clientX - x, e.clientY - y, radPerPixel(), e.pointerType === 'mouse' ? 'mouse' : 'finger');
+    const by: Dragger = e.pointerType === 'mouse' ? 'mouse' : 'finger';
+    if (!waits()) state.look = turn(state.look, e.clientX - x, e.clientY - y, radPerPixel(), by, feel(by));
     x = e.clientX; y = e.clientY;
   });
   const end = (e: PointerEvent) => { if (e.pointerId === id) id = null; };

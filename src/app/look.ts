@@ -16,15 +16,27 @@ export interface Look {
 /** What drags the look: a finger (or pen) on the glass, or the mouse on a desk. */
 export type Dragger = 'finger' | 'mouse';
 
+/** How a drag turns the look besides the natural (the player's settings, plan N7.3). */
+export interface LookFeel {
+  /** Times the natural turn: 1 keeps the picture under a finger. */
+  readonly speed: number;
+  /** The mouse moved up looks down, as a flight stick does (a finger always drags the picture). */
+  readonly inverted: boolean;
+}
+
+/** The natural feel: the picture under the finger, the mouse up looking up. */
+export const NATURAL: LookFeel = { speed: 1, inverted: false };
+
 /**
  * Turn by a drag of (dx, dy) pixels. Under a finger the picture follows it: `radPerPixel` is the view's vertical
  * angle over its height in pixels, so a point under the finger stays under it (exactly at the view's middle). The
  * mouse steers the head instead, as on every desk game: moved right, he looks right (Arnd 2026-11-18, "mouselook is
- * left/right inverted"). Up and down stay as the finger has them for both.
+ * left/right inverted"), moved up, he looks up, unless the player inverts it. `feel` scales the turn.
  */
-export function turn(look: Look, dx: number, dy: number, radPerPixel: number, by: Dragger = 'finger'): Look {
-  const yaw = wrap(by === 'mouse' ? look.yaw - dx * radPerPixel : look.yaw + dx * radPerPixel);
-  const pitch = Math.min(PITCH_LIMIT, Math.max(-PITCH_LIMIT, look.pitch + dy * radPerPixel));
+export function turn(look: Look, dx: number, dy: number, radPerPixel: number, by: Dragger = 'finger', feel: LookFeel = NATURAL): Look {
+  const k = radPerPixel * feel.speed, head = by === 'mouse' ? -1 : 1, nod = by === 'mouse' && !feel.inverted ? -1 : 1;
+  const yaw = wrap(look.yaw + head * dx * k);
+  const pitch = Math.min(PITCH_LIMIT, Math.max(-PITCH_LIMIT, look.pitch + nod * dy * k));
   return { yaw, pitch };
 }
 

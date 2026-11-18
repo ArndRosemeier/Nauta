@@ -50,7 +50,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The game's version and its history, from git at build time | `tools/version/version.ts#readVersion` |
 | Which commits are builds, and which build added a note | `tools/version/version.ts#versionInfo` |
 | A version's number as shown (`0.012`) | `tools/version/version.ts#formatVersion` |
-| The version button and the what's-new panel | `src/app/whatsNew.ts#showVersion` |
+| The version's history on a sheet (what's new), and whether this version is unseen on the device | `src/app/whatsNew.ts#openWhatsNew` |
 | The wave sets that show at a moment and how strongly (the swell, then each wind layer by its weight) | `src/sim/sea/sea.ts#forEachShownSet` |
 | The earth's curve: how far a point at a distance sinks below the eye's sea level (the horizon, hull-down) | `src/render/earth.ts#earthDrop` |
 | How far the horizon lies from an eye at a height | `src/render/earth.ts#horizonDistance` |
@@ -432,7 +432,6 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What a hand can hold where he stands (her rail on deck, the beam overhead below) | `src/sim/ship/handholds.ts#handholdNear` |
 | What a hand can hold aloft (the shrouds over a top or the crosstrees) | `src/sim/ship/handholds.ts#handholdAloft` |
 | How fast a point of her moves in the world from her heave, pitch and roll (what feet on her deck feel) | `src/sim/ship/motion.ts#pointVelocity` |
-| The calm view's button (how much of his body's motion the view takes; the device remembers it) | `src/app/motionSetting.ts#showMotionSetting` |
 | The walking thumb's stick as a push | `src/app/thumbs.ts#stickPush` |
 | Keys held as a push (WASD and arrows) | `src/app/thumbs.ts#keyPush` |
 | The walking thumb and keys on the page (the left half's floating stick) | `src/app/walkInput.ts#watchWalk` |
@@ -609,3 +608,14 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Keeping station alongside her: the main topsail aback when she drops astern, filled when she is abreast | `src/sim/captain/helm.ts#stationOrder` |
 | The computer captain's three levels of skill and the tactics they share | `src/sim/rules/captain.ts#SKILL` |
 | A match played alone against a computer captain (`?foe=`) | `src/net/duel.ts#DuelOptions` |
+| The player's settings: what they are, defaults, bounds, read back from what the device kept (N7.3) | `src/app/settings.ts#readSettings` |
+| Giving an action a key without two actions sharing one | `src/app/settings.ts#withKey` |
+| Keeping the settings on the device and telling the page of every change (the address's for one visit) | `src/app/settingsStore.ts#SettingsStore` |
+| The settings on the page: the rose button, the sheet's pages and controls | `src/app/settingsPanel.ts#SettingsMenu` |
+| A key's code as its cap reads (`KeyW` is W) | `src/app/settingsPanel.ts#keyName` |
+| The interface's words in English and German | `src/app/words.ts#words` |
+| A panel over the view that is not the world (the sheet: frame, rose, title, close); the look is docs/design/ui-style.md | `src/app/sheet.ts#openSheet` |
+| The compass rose, the interface's mark | `src/app/sheet.ts#rose` |
+| A part of the sound (ship, crew, battle) at the player's level | `src/audio/channel.ts#Channel` |
+| The walking keys from one key a direction (arrows always walk) | `src/app/thumbs.ts#walkKeys` |
+| The interface's look: colours, type, the sheet, buttons, choices, sliders (every panel's CSS) | `src/ui/nauta.css` |
