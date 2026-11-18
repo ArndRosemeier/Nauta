@@ -1,0 +1,1 @@
+Every ship in a fleet now has her crew on deck and aloft, not just two. Try ?watch&ships=4 and fly in close to any of them.

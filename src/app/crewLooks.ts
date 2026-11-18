@@ -179,15 +179,15 @@ function preset(catalog: Pick<CharacterCatalog, 'outfits'>, id: string): { garme
 
 /**
  * The crowd figures' kinds of both crews (Actors' `buildCrowdFigures`): one for every dress, navy and build some man
- * of `rosters` wears, with room for as many men as wear it whichever navy the first ship is given (the match setup
- * may change it after the crews are built). Hats a seaman may leave off are options, not dress.
+ * of `rosters` wears, with room for as many men as wear it whichever navy each ship is given (the match setup
+ * may change them after the crews are built). Hats a seaman may leave off are options, not dress.
  */
 export function crowdKinds(catalog: Pick<CharacterCatalog, 'outfits'>, rosters: readonly (readonly Pick<Man, 'rank'>[])[]): CrowdKindSpec[] {
   const counts = new Map<string, { figure: Figure; count: number }>();
-  for (const first of NAVIES) {
+  for (const navy of NAVIES) {
     const here = new Map<string, { figure: Figure; count: number }>();
     rosters.forEach((roster, ship) => roster.forEach((m, i) => {
-      const f = figureOf(ship, i, m, navyOf(ship, first)), c = here.get(f.kind);
+      const f = figureOf(ship, i, m, navy), c = here.get(f.kind);
       if (c) c.count++; else here.set(f.kind, { figure: f, count: 1 });
     }));
     for (const [id, c] of here) if ((counts.get(id)?.count ?? 0) < c.count) counts.set(id, c);

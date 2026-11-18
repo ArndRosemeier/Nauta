@@ -107,8 +107,8 @@ const ESCAPE = 'Escape';
 const NOT_ORDER_KEYS: readonly KeyAction[] = ['forward', 'back', 'left', 'right', 'glass', 'reports'];
 /** Where the captain looks at the start: a little above the horizon, toward the morning sun. */
 const START_LOOK: Look = { yaw: -1.2, pitch: 0.12 };
-/** The ships whose crews are drawn: the first two of a match, until the crowd serves every ship (scenarios stage 5b). */
-const CREWS_DRAWN = 2;
+/** The ships whose crews are drawn: every ship a match holds. */
+const CREWS_DRAWN = MOST_SHIPS;
 /** The other ship that has the second wake map keeps it until another is nearer by this factor and this many metres: the map's trail would otherwise start afresh at every change. */
 const WAKE_KEEP = 1.25, WAKE_KEEP_MORE = 20;
 /** The longest step of time one frame may take, seconds (a tab that slept does not jump the clock). */
@@ -199,7 +199,7 @@ declare global {
      */
     __nautaWatch?: {
       company: (to: 'british' | 'both' | 'french' | 'stay') => void;
-      flyFor: (seconds: number, push?: { forward?: number; strafe?: number; climb?: number; boost?: boolean }, look?: { yaw?: number; pitch?: number }) => { eye: number[]; apart: number[] };
+      flyFor: (seconds: number, push?: { forward?: number; strafe?: number; climb?: number; boost?: boolean }, look?: { yaw?: number; pitch?: number }) => { eye: number[]; apart: number[]; ships: { x: number; z: number }[] };
     };
     __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string; press: (forward?: number, strafe?: number) => void };
   }
@@ -371,6 +371,7 @@ async function start(): Promise<void> {
   if (crew) {
     note.textContent = 'bringing the crews aboard';
     for (const g of crew.groups) await view.stage.add(g);
+    await view.stage.add(crew.crowd);
   }
   if (captain) await view.stage.add(captain.group);
   capTo(capShare);
@@ -398,7 +399,8 @@ async function start(): Promise<void> {
       for (let t = 0; t < seconds; t += DRIVE_STEP) { const f = spectator.eyeFor(DRIVE_STEP, input.look, hullsNow(), (x, z) => surfaceAt(sea, x, z, seaTime).height); input.look = f.look; }
       spectator.forced = null;
       const [x, y, z] = spectator.eye;
-      return { eye: [x, y, z], apart: hullsNow().map((h) => Math.hypot(h.x - x, h.z - z)) };
+      const hulls = hullsNow();
+      return { eye: [x, y, z], apart: hulls.map((h) => Math.hypot(h.x - x, h.z - z)), ships: hulls.map((h) => ({ x: h.x, z: h.z })) };
     },
   };
   const watching = (caption: string | null) => {
@@ -578,7 +580,7 @@ async function start(): Promise<void> {
       if (navy === dressed) return;
       dressed = navy;
       void captain?.changeCoat(navy);
-      crew?.changeNavy(match.ship === 0 ? navy : match.herNavy);
+      crew?.changeNavy((i) => match.navyAt(i));
     };
     match.onChange(dress);
     // `?watch` began its match before this: the French ship flies her own colours from the start.
@@ -702,7 +704,7 @@ async function start(): Promise<void> {
       if (captain && walking?.drawnBody && !spectator?.watching) captain.draw(dt, walking.drawnBody, walking.captain.walker, walking.captain.climber, view.camera, arm ? { ...arm, toward: view.camera.getWorldDirection(pointing) } : null);
       // Both crews (N4.3): every man as the match has him, the pool near the captain.
       if (crew && match && between) {
-        crew.crews = phase?.crews ?? 2;
+        crew.crews = phase?.crews ?? CREWS_DRAWN;
         crew.poolInUse = phase && !phase.pool ? 0 : startCrew.pool;
         crew.everyFrame = phase?.everyFrame ?? false;
         crew.noShadows = phase?.noShadows ?? false;
