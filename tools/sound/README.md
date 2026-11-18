@@ -19,7 +19,8 @@ NODE_USE_ENV_PROXY=1 node vendor/assetgenerator/packages/audio/tools/make.mjs --
 - What plays when is decided in `src/audio/ambience.ts` and `src/audio/slaps.ts` (pure, tested), tuned in
   `src/audio/tuning.ts`, and played by `src/audio/seaSound.ts`; the ship's own sounds (N2.8) in `creaks.ts`,
   `counter.ts`, `hullWater.ts`, `footsteps.ts` and `acoustics.ts`, tuned in `shipTuning.ts`, played by `shipSound.ts`.
-  The crew at work (N4.6) in `crewHearing.ts`, tuned in `crewTuning.ts`, played by `crewSound.ts`.
+  The crew at work (N4.6) in `crewHearing.ts`, tuned in `crewTuning.ts`, played by `crewSound.ts`; the sound under
+  sail (N3.9) in `sailHearing.ts`, tuned in `sailTuning.ts`, played by `sailSound.ts`.
 - **The boatswain's calls are synthesised, not asked of a model**: `node tools/sound/pipe.mjs --raw <raw folder>`
   writes each call of [`pipe-calls.json`](pipe-calls.json) (two notes, glides, plain, warbled and trilled tones, in
   seconds) as a WAV into `<raw>/pipe/`, and sounds.json takes them with `from`, so make.mjs levels and encodes them
@@ -50,3 +51,8 @@ NODE_USE_ENV_PROXY=1 node vendor/assetgenerator/packages/audio/tools/make.mjs --
   calls as kept since (the Still a high plain note cut off sharply, Haul with the low note the pause and the high the
   pull, Hoist rising, Veer and Lower falling), shortened to a game's pace. The bell's strikes were cut with `quiet`
   0.008 so each rings about 1.7 s. A transcriber heard no speech in any take, the calls included. Under $0.10.
+- 2026-11-18 (N3.9, sound under sail): the wind in the rigging (a hum and whistle, a gale's shriek; two takes each), loose
+  canvas flogging (two takes), eight sails filling, six sails slamming aback, eight runs of a rope through a block, six
+  creaks of a yard swung round its mast. The first rigging hum, one flogging take, the fills, the slams and the creaks
+  came out nearly all below 300 Hz (a drone the iPad's speakers would not play) and were asked for again with "close
+  and clear, no deep rumble"; the fills stay mostly low. A transcriber heard no speech in any take. About $0.25.

@@ -250,6 +250,12 @@ function apparent(heading: number, ahead: number, leeway: number, wind: Wind): {
   return { ax: wind.speed * (wind.x * fx + wind.z * fz) - ahead, ay: wind.speed * (wind.x * sx + wind.z * sz) - leeway };
 }
 
+/** The apparent wind's speed on a ship making `way` through the water in the true wind `wind`, m/s: what she feels aloft and on deck (the sound under sail, N3.9). */
+export function apparentSpeed(way: Pick<Sailing, 'heading' | 'ahead' | 'leeway'>, wind: Wind): number {
+  const { ax, ay } = apparent(way.heading, way.ahead, way.leeway, wind);
+  return Math.hypot(ax, ay);
+}
+
 /** A sail's push per unit of half the air's density and its area: the force vector in her frame, written into `push`. */
 const push = { x: 0, y: 0, sinAttack: 0, onFace: 0 };
 function sailPush(c: Curves, nx: number, ny: number, ax: number, ay: number): void {

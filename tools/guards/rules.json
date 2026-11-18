@@ -25,7 +25,10 @@
     "src/audio/creaks.ts",
     "src/audio/counter.ts",
     "src/audio/hullWater.ts",
-    "src/audio/footsteps.ts"
+    "src/audio/footsteps.ts",
+    "src/audio/heard.ts",
+    "src/audio/sailTuning.ts",
+    "src/audio/sailHearing.ts"
   ],
   "banned": [
     "three",

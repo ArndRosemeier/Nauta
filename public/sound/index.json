@@ -1,5 +1,23 @@
 {
  "sounds": {
+  "bed/canvas-flog-a": {
+   "kind": "bed",
+   "files": [
+    "bed/canvas-flog-a.mp3"
+   ],
+   "seconds": [
+    29.795
+   ]
+  },
+  "bed/canvas-flog-b": {
+   "kind": "bed",
+   "files": [
+    "bed/canvas-flog-b.mp3"
+   ],
+   "seconds": [
+    29.7
+   ]
+  },
   "bed/crew-run-a": {
    "kind": "bed",
    "files": [
@@ -52,6 +70,42 @@
    ],
    "seconds": [
     31.335
+   ]
+  },
+  "bed/rigging-high-a": {
+   "kind": "bed",
+   "files": [
+    "bed/rigging-high-a.mp3"
+   ],
+   "seconds": [
+    29.835
+   ]
+  },
+  "bed/rigging-high-b": {
+   "kind": "bed",
+   "files": [
+    "bed/rigging-high-b.mp3"
+   ],
+   "seconds": [
+    29.84
+   ]
+  },
+  "bed/rigging-low-a": {
+   "kind": "bed",
+   "files": [
+    "bed/rigging-low-a.mp3"
+   ],
+   "seconds": [
+    29.835
+   ]
+  },
+  "bed/rigging-low-b": {
+   "kind": "bed",
+   "files": [
+    "bed/rigging-low-b.mp3"
+   ],
+   "seconds": [
+    29.835
    ]
   },
   "bed/sea-breeze-a": {
@@ -224,6 +278,71 @@
     1.655,
     1.715,
     1.72
+   ]
+  },
+  "block/run": {
+   "kind": "calls",
+   "files": [
+    "block/run-1.mp3",
+    "block/run-2.mp3",
+    "block/run-3.mp3",
+    "block/run-4.mp3",
+    "block/run-5.mp3",
+    "block/run-6.mp3",
+    "block/run-7.mp3",
+    "block/run-8.mp3"
+   ],
+   "seconds": [
+    1.54,
+    1.6,
+    1.165,
+    0.58,
+    0.545,
+    0.43,
+    0.555,
+    0.465
+   ]
+  },
+  "canvas/aback": {
+   "kind": "calls",
+   "files": [
+    "canvas/aback-1.mp3",
+    "canvas/aback-2.mp3",
+    "canvas/aback-3.mp3",
+    "canvas/aback-4.mp3",
+    "canvas/aback-5.mp3",
+    "canvas/aback-6.mp3"
+   ],
+   "seconds": [
+    0.64,
+    0.84,
+    0.745,
+    0.855,
+    0.645,
+    0.705
+   ]
+  },
+  "canvas/fill": {
+   "kind": "calls",
+   "files": [
+    "canvas/fill-1.mp3",
+    "canvas/fill-2.mp3",
+    "canvas/fill-3.mp3",
+    "canvas/fill-4.mp3",
+    "canvas/fill-5.mp3",
+    "canvas/fill-6.mp3",
+    "canvas/fill-7.mp3",
+    "canvas/fill-8.mp3"
+   ],
+   "seconds": [
+    0.415,
+    0.47,
+    0.955,
+    0.505,
+    0.19,
+    0.395,
+    0.46,
+    0.45
    ]
   },
   "creak/hull": {
@@ -599,6 +718,25 @@
     0.41,
     0.41,
     0.41
+   ]
+  },
+  "yard/creak": {
+   "kind": "calls",
+   "files": [
+    "yard/creak-1.mp3",
+    "yard/creak-2.mp3",
+    "yard/creak-3.mp3",
+    "yard/creak-4.mp3",
+    "yard/creak-5.mp3",
+    "yard/creak-6.mp3"
+   ],
+   "seconds": [
+    3,
+    2.75,
+    2.64,
+    2.61,
+    2.62,
+    2.635
    ]
   }
  },

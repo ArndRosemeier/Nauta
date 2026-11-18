@@ -83,7 +83,7 @@ export function takeAngle(seed: number, id: string, t: number): number {
 const share: number[] = [];
 
 /** Push the two takes of every anchor of `anchors` at `x`, scaled by `scale`, onto `out`. */
-function pushBeds(out: BedLevel[], anchors: readonly BedAnchor[], x: number, scale: number, glide: number, seed: number, t: number): void {
+export function pushBeds(out: BedLevel[], anchors: readonly BedAnchor[], x: number, scale: number, glide: number, seed: number, t: number): void {
   anchorWeights(anchors, x, share);
   anchors.forEach((a, i) => {
     const level = share[i]! * a.gain * scale, angle = takeAngle(seed, a.id, t);

@@ -30,29 +30,18 @@ import {
   NEAR_FEET, NEAR_REACH, ORDER_CALLS, PIPED_DONE, PIPE_HEIGHT, RUN_STEP, RUN_STRIDE, SAILED_CALLS, SHORT_HANDED_AGAIN,
   SHORT_HANDED_GAIN, STRIKES_A_PAIR, SWING_PERIOD, SWING_PULLS, THROUGH_DECK, WALK_GAIN, WALK_STRIDE, type PipeCall,
 } from './crewTuning';
+import type { Heard, PlacedBed, PlacedShot } from './heard';
 import type { SlapKind } from './tuning';
 
 type Vec3 = readonly [number, number, number];
 
-/** A sound to start: its id, where in the world, how loud, its bus (the ear's side of a deck or the other) and delay, s. */
-export interface CrewShot {
-  readonly id: string;
-  readonly at: Vec3;
-  readonly ref: number;
-  readonly gain: number;
-  readonly bus: 'body' | 'world';
-  readonly delay: number;
-}
+/** A sound to start (heard.ts): where in the world, how loud, its bus (the ear's side of a deck or the other) and delay. */
+export type CrewShot = PlacedShot;
 
-/** A bed to hold this frame (the crowd of feet, the drum): set each frame it is heard, as the engine's beds are. */
-export interface CrewBed {
-  readonly id: string;
-  readonly key: string;
-  readonly level: number;
+/** A bed to hold this frame (the crowd of feet, the drum), always placed amid the men. */
+export interface CrewBed extends PlacedBed {
   readonly at: Vec3;
   readonly ref: number;
-  readonly glide: number;
-  readonly bus: 'body' | 'world';
 }
 
 /** One frame of the crew heard. */
@@ -74,7 +63,7 @@ export interface CrewScene {
 export type Hearing = Pick<CrewScene, 't' | 'pose' | 'below'>;
 
 /** What a frame gives: the sounds to start (in `shots`) and the beds to hold (in `beds`), both cleared first. */
-export interface CrewHeard {
+export interface CrewHeard extends Heard {
   readonly shots: CrewShot[];
   readonly beds: CrewBed[];
 }

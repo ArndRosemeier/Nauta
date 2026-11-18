@@ -10,6 +10,7 @@ import type { ShipPose } from '../sim/ship/motion';
 import type { SimShip } from '../sim/state';
 import type { SimEvent } from '../sim/step';
 import type { Room } from './acoustics';
+import { playHeard } from './heard';
 import { CrewWatch, type CrewHeard } from './crewHearing';
 import { BELL, CARRY_ON, HAUL_PULL, ORDER_CALLS, RUN_STEP, SAILED_CALLS } from './crewTuning';
 
@@ -48,9 +49,6 @@ export class CrewSound {
   }
 
   private play(heard: CrewHeard): void {
-    const e = this.sound;
-    if (!e.open) return;
-    for (const s of heard.shots) e.play(s.id, { at: s.at, ref: s.ref, gain: s.gain, bus: s.bus, delay: s.delay });
-    for (const b of heard.beds) e.bed(b.id, b.level, { at: b.at, ref: b.ref, glide: b.glide, bus: b.bus }, b.key);
+    playHeard(this.sound, heard);
   }
 }

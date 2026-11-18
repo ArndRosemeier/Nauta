@@ -256,6 +256,13 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The ship's bell for a turn of her clock: one more strike each half hour of a watch, in pairs | `src/audio/crewHearing.ts#bellStrikes` |
 | Whether a spot of her plan is below deck | `src/audio/crewHearing.ts#belowDeck` |
 | The crew at work heard: its sounds played through the ship's engine | `src/audio/crewSound.ts#CrewSound` |
+| A watch's sounds (placed shots and beds) played through the engine | `src/audio/heard.ts#playHeard` |
+| The sound under sail as data: the rigging's beds by apparent wind, flogging, fill, aback, blocks, yard creaks (the takes: tools/sound/sounds.json) | `src/audio/sailTuning.ts#RIGGING_BEDS` |
+| What is heard of her sails and rigging, from the sails as drawn and the apparent wind | `src/audio/sailHearing.ts#SailWatch` |
+| How much of a sail flogs as drawn | `src/audio/sailHearing.ts#looseShare` |
+| Her sails and rigging heard: their sounds played through the ship's engine | `src/audio/sailSound.ts#SailSound` |
+| The apparent wind's speed on a ship under way | `src/sim/ship/sailing.ts#apparentSpeed` |
+| Each sail as drawn, for the sound | `src/render/ship/sailsView.ts#SailsView` |
 | Plain data to bytes and back, canonical and exact (the state, orders and events as they travel and are saved) | `src/sim/codec.ts#encode` |
 | Bytes back to plain data, bit for bit | `src/sim/codec.ts#decode` |
 | A 64-bit hash of bytes, for comparing machines | `src/sim/codec.ts#hashBytes` |

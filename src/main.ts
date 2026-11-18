@@ -19,7 +19,7 @@ import { SeaView } from './render/seaView';
 import { makeTestBodies } from './render/testBodies';
 import { loadShip } from './render/ship/loadShip';
 import { ShipView } from './render/ship/shipView';
-import type { SailsSummary } from './render/ship/sailsView';
+import type { SailHeard, SailsSummary } from './render/ship/sailsView';
 import { Furnishings } from './render/ship/furnishings';
 import { loadFittings } from './render/ship/fittings';
 import { furnish } from './sim/ship/furnish';
@@ -31,6 +31,7 @@ import { SPRAY } from './render/materials';
 import { SeaSound } from './audio/seaSound';
 import { ShipSound } from './audio/shipSound';
 import { CrewSound } from './audio/crewSound';
+import { SailSound } from './audio/sailSound';
 import { OPEN_AIR } from './audio/acoustics';
 import { CrewView } from './render/crew/crewView';
 import { TWIN_OFFSET, musterCrews } from './app/crew';
@@ -40,6 +41,7 @@ import { Vector3 } from 'three/webgpu';
 import { DEGREE, MS_PER_SECOND } from './sim/units';
 import { simTime } from './sim/state';
 import { parseOrder } from './sim/orders';
+import { apparentSpeed } from './sim/ship/sailing';
 import { makeWind, meanWind, windAt } from './sim/wind';
 import { followWind, startSea } from './sim/sea/sea';
 import type { Look } from './app/look';
@@ -255,6 +257,10 @@ async function start(): Promise<void> {
   // without a match only the bell, by the page's clock.
   const crewSound = ship ? new CrewSound(sound.engine, MATCH_SEED, match?.ship ?? 0) : null;
   if (match && crewSound) match.on('events', (events) => crewSound.onEvents(events));
+  // Her sails and rigging heard (N3.9): the wind in the rigging on her always; canvas, blocks and yards when a match sails her.
+  const sailSound = ship ? new SailSound(sound.engine, MATCH_SEED) : null;
+  const drawnSails: SailHeard[] = [];
+  let aloft = meanWind(wind, 0);
   const ear = new Vector3(), facing = new Vector3(), crown = new Vector3(), gust = meanWind(wind, 0);
   /** Her way through the water, sailed by a match (`?sail`); still without one. Her wake follows it (N2.5). */
   const way = { ahead: 0, leeway: 0 };
@@ -298,10 +304,11 @@ async function start(): Promise<void> {
     }
     const phase = trial?.phaseAt(now) ?? null;
     if (phase) input.look = { ...CREW_LOOK };
+    // Her sails as the match says they stand (furled when no match sails her).
+    const seen = ship && match ? sailsSeen(match.state, match.ship) : null;
     if (ship) {
-      // Her sails as the match says they stand (furled when no match sails her), the flags in the true wind; after a
-      // jump of the browser checks, the sails as drawn catch up with it at once.
-      const seen = match ? sailsSeen(match.state, match.ship) : null;
+      // The sails drawn as they stand, the flags in the true wind; after a jump of the browser checks, the sails as
+      // drawn catch up with it at once.
       ship.sails.stand(seen?.standing ?? null, seen?.canvas ?? null);
       ship.sails.blow(windAt(wind, ship.drawn.x, ship.drawn.z, seaTime));
       if (jump > 0) ship.sails.follow(jump);
@@ -345,7 +352,14 @@ async function start(): Promise<void> {
     const room = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: where.eye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: sailing?.sailing.ahead ?? 0 }) : OPEN_AIR;
     if (ship && crewSound && match && sailing) crewSound.atWork(sailing, simTime(match.state), ship.drawn, where.eye, room);
     else if (ship && crewSound && !still) crewSound.bellAlone(seaTime, ship.drawn, room);
-    sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], room);
+    // Her sails and rigging (N3.9): the rigging by the wind she feels aloft, the canvas as it is drawn; the wind on the
+    // ear, aboard her, is the apparent wind too.
+    const aboard = !(where.off ?? false);
+    if (ship && sailSound) {
+      aloft = windAt(wind, ship.drawn.x, ship.drawn.z, seaTime, aloft);
+      sailSound.aloft({ t: seaTime, dt, pose: ship.drawn, aboard, wind: sailing ? apparentSpeed(sailing.sailing, aloft) : aloft.speed, standing: seen?.standing ?? null, drawn: seen ? ship.sails.heard(drawnSails) : null }, room);
+    }
+    sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], room, sailing && aboard ? sailing.sailing : undefined);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
     orders?.update(now);
