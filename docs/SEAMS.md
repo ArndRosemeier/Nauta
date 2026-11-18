@@ -440,6 +440,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The surfaces and ways aloft, the stations and crew places there | `src/sim/ship/aloft.ts#buildAloft` |
 | A yard's footrope as the climb takes it | `src/sim/ship/aloft.ts#footropeOf` |
 | The ladder (deck ladder, shrouds, futtock shrouds) a man stands on at a height, and which ways the crew climb hand over hand | `src/app/ladders.ts#crewLadder` |
+| The yard a man leans over out on its footrope, and how far out along it (the crew's, from where his feet are) | `src/app/ladders.ts#crewYard` |
 | The crew's climbing figure: one posed donor lent to a crowd figure or a pool character, by the same climb the captain uses | `src/render/crew/climbRig.ts#ClimbRig` |
 | The walk graph with the rig joined to it | `src/sim/ship/aloft.ts#walkAloft` |
 | The brig's rig plan, built once: spars, deadeyes, sails, every line, climbs, surfaces, ways | `src/sim/ship/rig.ts#rigPlan` |

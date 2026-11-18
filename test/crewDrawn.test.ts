@@ -26,7 +26,7 @@ import { give, startSail, startTold } from './support/crew.ts';
 import { musterCrew } from './support/muster.ts';
 import { STAND_BY_CLIPS, attentiveClip } from '../src/app/standBy.ts';
 import { duelSetup } from './support/match.ts';
-import { CLIMBED, crewLadder } from '../src/app/ladders.ts';
+import { CLIMBED, SIDLING, crewLadder, crewYard } from '../src/app/ladders.ts';
 
 const roster = brigRoster(), knobs = QUALITY_LEVELS[0]!.crew;
 const ship = startMatch(duelSetup(1805, 4)).ships[0]!;
@@ -161,9 +161,9 @@ test('making sail, men on their way walk or run and men at work play their job\'
   assert.ok(taskOf(crew, crew.tasks[0]!.hands[0]!));
 });
 
-test('a man on a ladder or the shrouds is drawn climbing, on the rungs of his way, and never runs there or aloft (Arnd 2026-11-18)', () => {
+test('a man on a ladder or the shrouds is drawn climbing, on the rungs of his way, a man on a footrope leaning over its yard, and never runs there or aloft (Arnd 2026-11-18)', () => {
   const sailing = startSail(), told = give(startTold(), sailing, { kind: 'sail', ship: 0, canvas: 'plain' });
-  let crew: Crew = ship.crew, climbing = 0, onWays = 0;
+  let crew: Crew = ship.crew, climbing = 0, onWays = 0, footropes = 0;
   for (let tick = 0; tick < 25 * STEPS_PER_SECOND; tick++) {
     crew = stepCrew(crew, told, { tick, heel: 0, closures: openShip(), captain: null, canvas: sailing.canvas }).crew;
     if (tick % STEPS_PER_SECOND) continue;
@@ -173,6 +173,14 @@ test('a man on a ladder or the shrouds is drawn climbing, on the rungs of his wa
       if (d.way !== null) onWays++;
       if (!d.climb) continue;
       climbing++;
+      if (d.climb.kind === SIDLING) {
+        footropes++;
+        assert.equal(routeNetwork().surfaces.get(d.space)?.kind, 'footrope');
+        const at = crewYard(d.climb, d.x, d.z)!;
+        assert.ok(at && Math.abs(at.s) <= at.yard.reach, `${d.space}: he is out along its yard, leaning over it`);
+        assert.equal(d.climbOnto, 1);
+        continue;
+      }
       assert.ok(CLIMBED.has(d.climb.kind) && d.way === d.climb.kind);
       const on = crewLadder(d.climb, d.y);
       assert.ok(on && on.h >= 0 && on.h <= on.ladder.hi - (on.ladder.rim ? on.ladder.lo : on.ladder.floor) + 1, `${d.climb.way}: his feet are on its rungs`);
@@ -180,6 +188,7 @@ test('a man on a ladder or the shrouds is drawn climbing, on the rungs of his wa
     }
   }
   assert.ok(onWays > 0 && climbing > 0, 'men climb in making sail');
+  assert.ok(footropes > 0, 'men lean over the yards they work on');
 });
 
 test('men are placed again less often far off and out of sight, spread evenly over the frames', () => {
