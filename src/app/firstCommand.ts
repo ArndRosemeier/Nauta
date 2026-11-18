@@ -79,6 +79,7 @@ export class FirstCommand {
       if (!lessons || state.matchSeed !== session.state.matchSeed) return;
       const g = lessons.guideFor({ state, ship: this.page.myShip(), heard, looked: this.looked, glass: this.glassRaised, at: this.page.captain(), hands: this.handsNow() });
       if (g.wake) session.wakeFoe();
+      for (const order of g.gives) session.give(order);
       this.page.speech.speak(g.says);
       this.show(g);
     });

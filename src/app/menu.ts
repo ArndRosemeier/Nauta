@@ -9,7 +9,7 @@
 import type { AudioEngine } from '@futuremagic/audio/web';
 import { DuelSession, type DuelHub } from '../net/duel';
 import { MOST_PLAYERS, roomTerms, type RoomTerms } from '../net/wire';
-import { SKILLS, type Skill } from '../sim/rules/captain';
+import { SKILLS, type Offered } from '../sim/rules/captain';
 import { MEETINGS, WIND_CHOICE_NAMES, type Meeting, type WindChoice } from '../sim/start';
 import { HOURS_PER_DAY, MINUTES_PER_HOUR, SECONDS_PER_MINUTE } from '../sim/units';
 import { beginOnTap, handOver, titleTheme } from '../title/title';
@@ -54,7 +54,7 @@ const SEED_DIGITS = 10;
 
 type Say = Readonly<Record<WordKey, string>>;
 
-const SKILL_WORDS: Readonly<Record<Skill, WordKey>> = { green: 'skillGreen', seasoned: 'skillSeasoned', master: 'skillMaster' };
+const SKILL_WORDS: Readonly<Record<Offered, WordKey>> = { green: 'skillGreen', seasoned: 'skillSeasoned', master: 'skillMaster' };
 const NAVY_WORDS: Readonly<Record<Navy, WordKey>> = { british: 'british', french: 'french' };
 const WIND_WORDS: Readonly<Record<WindChoice, WordKey>> = { drawn: 'asItComes', light: 'windLight', fresh: 'windFresh', strong: 'windStrong' };
 const HOUR_WORDS: Readonly<Record<HourChoice, WordKey>> = { drawn: 'asItComes', dawn: 'dawn', day: 'day', dusk: 'dusk', moon: 'moonlight' };

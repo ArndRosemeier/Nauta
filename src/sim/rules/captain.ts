@@ -8,10 +8,12 @@
  */
 import { DEGREE, KNOT } from '../units';
 
-/** The three levels of skill a computer captain plays at (N7.1). */
-export type Skill = 'green' | 'seasoned' | 'master';
-/** The levels, weakest first. */
-export const SKILLS: readonly Skill[] = ['green', 'seasoned', 'master'];
+/** The three levels of skill a captain can be chosen at (N7.1). */
+export type Offered = 'green' | 'seasoned' | 'master';
+/** Those and the first match's own captain, a step below green and never offered (N7.4, design thread 2026-11-18). */
+export type Skill = 'raw' | Offered;
+/** The levels offered, weakest first. */
+export const SKILLS: readonly Offered[] = ['green', 'seasoned', 'master'];
 
 /** One level of skill. */
 export interface SkillRow {
@@ -66,6 +68,15 @@ export interface SkillRow {
  * one fights on ten seconds and the master twenty, in case it turns (not when she is going down under him).
  */
 export const SKILL: Readonly<Record<Skill, SkillRow>> = {
+  /**
+   * The first match's captain (N7.4, design thread 2026-11-18): weaker than green by his decisions only, never by his
+   * crew's drill. He looks round only every 40 s, steers straight at her, never works for the weather position or her
+   * stern, fires as they bear with round shot only, and is late to his pumps and his fires.
+   */
+  raw: {
+    look: 40, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
+    grape: 0, chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 80, fireAt: 0.3, plugAt: 0, strikeAfter: 0, drill: 1,
+  },
   green: {
     look: 8, judgeRange: 0.25, judgeBearing: 4 * DEGREE, range: 180, gauge: 0, rake: 0, lead: 0, quarters: 1000, open: 800,
     grape: 0, chain: false, word: false, keepBearing: false, plainBeyond: 0, pumpsAt: 40, fireAt: 0.14, plugAt: 0, strikeAfter: 0, drill: 0.95,
