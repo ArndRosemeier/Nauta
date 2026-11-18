@@ -145,7 +145,7 @@ declare global {
      * seconds at once, looking `pitch` (rad, + up) and `yaw` (rad on her, 0 forward), without drawing in between (app/walking.ts `drive`); answers where
      * he is then (on deck, on the shrouds, out on a yard).
      */
-    /** The order fan (`?sail`), for the browser checks: open a man's fan and choose items in it by id (app/orderFan.ts `check`), light one up as under the finger. */
+    /** The order fan (`?sail`), for the browser checks: open a man's fan and choose items in it by id (app/orderFan.ts `openForCheck`), light one up as under the finger. */
     __nautaFan?: { open: (who: Officer, choose?: string[]) => string; lightUp: (id: string) => void };
     __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string };
   }
@@ -382,7 +382,7 @@ async function start(): Promise<void> {
   });
   fan?.onSent((e) => speech?.sent(e));
   const pointing = new Vector3();
-  if (fan) { const f = fan; window.__nautaFan = { open: (who, choose) => f.check(who, choose), lightUp: (id) => f.lightUp(id) }; }
+  if (fan) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id) }; }
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
   let jump = 0, jumped: (() => void) | null = null;
   if (match) window.__nautaSail = {

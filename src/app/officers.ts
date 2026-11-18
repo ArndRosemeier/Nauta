@@ -37,9 +37,10 @@ const POSTS: Readonly<Record<Taker, { readonly place: string; readonly forward: 
 };
 /** The quarterdeck station, where the captain comes on deck (and is taken to stand when he looks from a standpoint aboard). */
 export const quarterdeck = (): Spot => bareSpot(crewPlaces().get('station-quarterdeck')!);
-/** Where the midshipman waits at first: this far abaft the captain on the quarterdeck, m. */
+/** Where the midshipman waits at first: this far abaft the captain on the quarterdeck and inboard of him, m. */
 const MIDSHIPMAN_ABAFT = 1.2;
-export const midshipmanStart = (): Spot => { const q = quarterdeck(); return { ...q, along: q.along - MIDSHIPMAN_ABAFT }; };
+const MIDSHIPMAN_INBOARD = 0.9;
+export const midshipmanStart = (): Spot => { const q = quarterdeck(); return { ...q, along: q.along - MIDSHIPMAN_ABAFT, across: q.across - MIDSHIPMAN_INBOARD }; };
 /** Every man faces forward at his post: a half turn from aft. */
 export const FACING_FORWARD = Math.PI;
 

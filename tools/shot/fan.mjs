@@ -11,9 +11,9 @@ import { frames, openBrowser, openGame, snap } from './browser.mjs';
 const out = process.argv[2] ?? 'shots/fan';
 mkdirSync(out, { recursive: true });
 const served = await openBrowser();
-const game = await openGame(served, '?sail&walk&hour=10&day=0&look=40,-6', { width: 1180, height: 820 }, true);
+const game = await openGame(served, '?sail&walk&hour=10&day=0&yaw=45&pitch=-8', { width: 1180, height: 820 }, true);
 const { page } = game;
-await frames(page);
+await frames(page, 8);
 await snap(page, `${out}/officers.png`);
 const say = async (name, who, choose = [], light = null) => {
   const shown = await page.evaluate(([w, c]) => window.__nautaFan.open(w, c), [who, choose]);

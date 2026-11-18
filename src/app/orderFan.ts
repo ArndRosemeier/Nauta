@@ -156,7 +156,7 @@ export class OrderFan {
    * in view), and, given an item's id, chooses it as a finger would (a ring opens, an order is given). Answers the ids
    * shown then, or why not.
    */
-  check(who: Officer, choose: readonly string[] = []): string {
+  openForCheck(who: Officer, choose: readonly string[] = []): string {
     const r = this.view.getBoundingClientRect(), man = this.page.men().find((m) => m.who === who);
     const x = man?.seen ? r.left + man.x : window.innerWidth / 2, y = man?.seen ? r.top + man.y : window.innerHeight / 2;
     this.close();
