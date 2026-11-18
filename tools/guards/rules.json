@@ -177,6 +177,51 @@
       "field": "stuck",
       "owner": "src/sim/crew/going.ts",
       "what": "a man with no way open to where he is going (N4.2)"
+    },
+    {
+      "field": "crew",
+      "owner": "src/sim/crew/crew.ts",
+      "what": "a ship's crew: every man's task and where he is (N4.1)"
+    },
+    {
+      "field": "closures",
+      "owner": "src/sim/crew/closures.ts",
+      "what": "what is shut aboard a ship (N4.2; held in her state since N4.1)"
+    },
+    {
+      "field": "men",
+      "owner": "src/sim/crew/crew.ts",
+      "what": "every man of a ship's crew: where he stands, his way, whether no way is open (N4.1)"
+    },
+    {
+      "field": "tasks",
+      "owner": "src/sim/crew/crew.ts",
+      "what": "the jobs a ship's crew is at: their places, hands told off, work left (N4.1)"
+    },
+    {
+      "field": "tasked",
+      "owner": "src/sim/crew/crew.ts",
+      "what": "the id a ship's next crew task gets (N4.1)"
+    },
+    {
+      "field": "stands",
+      "owner": "src/sim/crew/crew.ts",
+      "what": "where a man stands when not on his way, null at his post (N4.1)"
+    },
+    {
+      "field": "blocked",
+      "owner": "src/sim/crew/crew.ts",
+      "what": "a man with no way open to his place, under which closures (N4.1)"
+    },
+    {
+      "field": "toDo",
+      "owner": "src/sim/crew/crew.ts",
+      "what": "the seconds of full-handed work a crew task has left (N4.1)"
+    },
+    {
+      "field": "began",
+      "owner": "src/sim/crew/crew.ts",
+      "what": "the tick a crew task's work began (N4.1)"
     }
   ]
 }

@@ -11,27 +11,24 @@
  *
  * **Giving an order** (`giveOrder`) answers at once: refused with the reason in words (a tack without way, a tack
  * while in stays), or taken, and then it is what she has been told (`ShipOrders`: the course, the canvas, hove to, the
- * masts aback) and a list of timed acts: the helm put over, each sail set or taken in, a mast's yards swung. A course
+ * masts aback) and a list of acts for the crew: the helm put over, each sail set or taken in, a mast's yards swung. A course
  * closer than close-hauled is answered and changed (design decision for N3): the master says she will not lie it and
  * steers full and by on the nearer tack. A course order never takes her through the wind's eye: a course on the other
  * tack is reached by wearing; tacking is its own order.
  *
- * **Carrying it out** (`carryOut`, every step): until the crew exists (N4) each act falls due at a time from the table
- * (rules/orders.ts); a later order for the same helm, sail or mast replaces what is not yet done. When the last act
- * of an order is done it is reported (`done`). Full and by, the helmsman follows the wind as it shifts. When she
- * misses stays the master bears away on the old tack (`heard`), and that is then her course.
+ * **Carrying it out** (`carryOut`, every step): the crew (crew/crew.ts, N4.1) does each act when its men have done
+ * its jobs, so an order's time comes from the men; a later order for the same helm, sail or mast replaces what is not
+ * yet done. When the last act of an order is done it is reported (`done`). Full and by, the helmsman follows the wind
+ * as it shifts. When she misses stays the master bears away on the old tack (`heard`), and that is then her course.
  */
 import { angleDiff } from '@futuremagic/core';
-import {
-  BRACE_SECONDS, BY_FOLLOW, HELM_SECONDS, HOVE_TO_CHECK, HOVE_TO_IN, HOVE_TO_MAST, NO_WAY, POINT, SAIL_SECONDS, SAIL_START_SECONDS,
-  TACK_SECONDS, WEAR_SECONDS,
-} from './rules/orders';
+import { BY_FOLLOW, HOVE_TO_CHECK, HOVE_TO_IN, HOVE_TO_MAST, NO_WAY, POINT } from './rules/orders';
 import type { MastName } from './rules/rig';
 import { CLOSE_HAULED, type CanvasName } from './rules/sailing';
 import { rigPlan } from './ship/rig';
 import { canvasFor, layAback, MASTS, setSail, steerTo, type Sailing, type SailingEvent } from './ship/sailing';
 import type { SailSetting } from './ship/sails';
-import { STEPS_PER_SECOND, wrapBearing } from './units';
+import { wrapBearing } from './units';
 import type { Wind } from './wind';
 
 /** The sail settings an order names (docs/design/orders.md): bare poles come only by shortening sail. */
@@ -175,9 +172,9 @@ export interface Helm {
   readonly by: number;
 }
 
-/** A timed act of an order: what the crew does at tick `at`, for the order given as `of` (its `Given.id`). */
+/** An act of an order: something the crew does (crew/crew.ts), known by its `id`, for the order given as `of` (its `Given.id`). */
 interface ActOf {
-  readonly at: number;
+  readonly id: number;
   readonly of: number;
 }
 /** The helm put over: the helmsman told a heading and which way to turn (sailing.ts `steerTo`). */
@@ -217,11 +214,11 @@ export interface ShipOrders {
   readonly hove: boolean;
   /** Each mast told to lie aback. */
   readonly backed: readonly boolean[];
-  /** What is still to be done, each at its tick. */
+  /** What is still to be done, in the order it was told (the crew has it in hand). */
   readonly acts: readonly Act[];
   /** The orders still being carried out. */
   readonly given: readonly Given[];
-  /** The id the next order given gets. */
+  /** The id the next order or act gets. */
   readonly serial: number;
 }
 
@@ -261,8 +258,6 @@ function toldHeading(helm: Helm, from: number): number {
 
 const TACK_NAMES: Readonly<Record<number, string>> = { [1]: 'starboard', [-1]: 'larboard' };
 
-const ticks = (seconds: number): number => Math.round(seconds * STEPS_PER_SECOND);
-
 /** Which pending acts a new act replaces: one helm, one act per sail, one per mast's yards. */
 function sameWork(a: Act, b: Act): boolean {
   if (a.kind !== b.kind) return false;
@@ -272,7 +267,7 @@ function sameWork(a: Act, b: Act): boolean {
 }
 
 type Changes = Partial<Pick<ShipOrders, 'helm' | 'canvas' | 'hove' | 'backed'>>;
-type NewAct = { readonly at: number } & (Omit<HelmAct, 'at' | 'of'> | Omit<SailAct, 'at' | 'of'> | Omit<YardsAct, 'at' | 'of'>);
+type NewAct = Omit<HelmAct, 'id' | 'of'> | Omit<SailAct, 'id' | 'of'> | Omit<YardsAct, 'id' | 'of'>;
 
 /**
  * An order taken: the changes to what she is told, its acts (replacing the pending acts for the same work, and every
@@ -280,11 +275,13 @@ type NewAct = { readonly at: number } & (Omit<HelmAct, 'at' | 'of'> | Omit<SailA
  */
 function tell(told: ShipOrders, order: Order, tick: number, changes: Changes, acts: readonly NewAct[], resail: boolean, reason = ''): OrderAnswer {
   const id = told.serial;
-  const added = acts.map((a) => ({ ...a, of: id }) as Act);
+  const added = acts.map((a, k) => ({ ...a, id: id + 1 + k, of: id }) as Act);
   const kept = told.acts.filter((p) => !(resail && p.kind === 'sail') && !added.some((a) => sameWork(a, p)));
   const all = [...kept, ...added];
   const given = told.given.filter((g) => all.some((a) => a.of === g.id));
-  return { told: { ...told, ...changes, acts: all, given: [...given, { id, order, tick }], serial: id + 1 }, reason };
+  // An order that leaves nothing to do (it only stops work under way) is carried out at once.
+  const now = added.length > 0 ? [...given, { id, order, tick }] : given;
+  return { told: { ...told, ...changes, acts: all, given: now, serial: id + 1 + acts.length }, reason };
 }
 
 const refuse = (told: ShipOrders, reason: string): OrderAnswer => ({ told, reason });
@@ -294,16 +291,15 @@ const refuse = (told: ShipOrders, reason: string): OrderAnswer => ({ told, reaso
  * other. Closer than close-hauled, the master answers that she will not lie it and steers full and by on the nearer
  * tack instead (design decision for N3).
  */
-function steer(told: ShipOrders, s: Sailing, order: Order, heading: number, now: OrderMoment, delay = HELM_SECONDS): OrderAnswer {
+function steer(told: ShipOrders, s: Sailing, order: Order, heading: number, now: OrderMoment): OrderAnswer {
   const from = now.wind.from, tack = tackOf(s.heading, from, s.sides[0]!), to = tackOf(heading, from, tack);
   const turn = to === tack ? 0 : -tack;
-  const at = now.tick + ticks(delay);
   if (Math.abs(angleDiff(heading, from)) < CLOSE_HAULED - BY_FOLLOW) {
     const by = closeHauled(to, from);
     const reason = `she will not lie ${headingWords(heading)}: full and by on the ${TACK_NAMES[to]} tack, ${headingWords(by)}${turn ? ', wearing round' : ''}`;
-    return tell(told, order, now.tick, { helm: { heading: 0, by: to } }, [{ kind: 'helm', at, heading: by, turn }], false, reason);
+    return tell(told, order, now.tick, { helm: { heading: 0, by: to } }, [{ kind: 'helm', heading: by, turn }], false, reason);
   }
-  return tell(told, order, now.tick, { helm: { heading: wrapBearing(heading), by: 0 } }, [{ kind: 'helm', at, heading: wrapBearing(heading), turn }], false);
+  return tell(told, order, now.tick, { helm: { heading: wrapBearing(heading), by: 0 } }, [{ kind: 'helm', heading: wrapBearing(heading), turn }], false);
 }
 
 /** The sails the canvas `name` sets in a wind of `force` (hove to: the courses and boom sail kept in). */
@@ -312,27 +308,15 @@ function canvasTarget(name: CanvasName, force: number, hove: boolean): SailSetti
   return canvasFor(name, force).map((c, i) => (hove && HOVE_TO_IN.includes(sails[i]!.id) ? { set: false, reefs: 0 } : c));
 }
 
-/** Who works a sail: each mast's square sails one gang, the headsails one, the after sails one; the gangs work side by side. */
-function sailGang(i: number): string {
-  const sail = rigPlan().sails[i]!;
-  return sail.kind === 'square' ? sail.mast : sail.kind === 'head' ? 'head' : 'after';
-}
-
 /**
- * The acts that bring her sails from how they stand (`now`) to `target`: each gang starts after `SAIL_START_SECONDS`
- * and works its sails one after another, taking in first (aloft down), then setting.
+ * The acts that bring her sails from how they stand (`now`) to `target`, one per sail changed: taking in first (aloft
+ * down), then setting. The crew mans them in that order, so where hands are short the sails come in before others go
+ * up.
  */
-function sailActs(now: readonly SailSetting[], target: readonly SailSetting[], tick: number): NewAct[] {
-  const sails = rigPlan().sails, free = new Map<string, number>(), acts: NewAct[] = [];
+function sailActs(now: readonly SailSetting[], target: readonly SailSetting[]): NewAct[] {
   const changed = target.map((_, i) => i).filter((i) => target[i]!.set !== now[i]!.set || target[i]!.reefs !== now[i]!.reefs);
   const order = [...changed.filter((i) => !target[i]!.set).reverse(), ...changed.filter((i) => target[i]!.set)];
-  for (const i of order) {
-    const gang = sailGang(i);
-    const at = (free.get(gang) ?? tick + ticks(SAIL_START_SECONDS)) + ticks(SAIL_SECONDS[sails[i]!.id] ?? 0);
-    free.set(gang, at);
-    acts.push({ kind: 'sail', at, sail: i, set: target[i]!.set, reefs: target[i]!.reefs });
-  }
-  return acts;
+  return order.map((i) => ({ kind: 'sail', sail: i, set: target[i]!.set, reefs: target[i]!.reefs }));
 }
 
 /** One step shorter in sail (docs/design/orders.md: "Shorten" is one step down). */
@@ -340,7 +324,7 @@ const SHORTER: Readonly<Record<CanvasName, CanvasName | null>> = { all: 'plain',
 
 /** A canvas ordered: sail by sail from how her sails stand now, refused when nothing would change. */
 function makeSail(told: ShipOrders, s: Sailing, order: Order, canvas: CanvasName, now: OrderMoment): OrderAnswer {
-  const acts = sailActs(s.canvas, canvasTarget(canvas, now.force, told.hove), now.tick);
+  const acts = sailActs(s.canvas, canvasTarget(canvas, now.force, told.hove));
   const pending = told.acts.some((a) => a.kind === 'sail');
   if (acts.length === 0 && !pending) return refuse(told, `in this wind ${canvas === 'bare' ? 'bare poles are' : `${canvas} sail is`} what she carries already`);
   return tell(told, order, now.tick, { canvas }, acts, true);
@@ -381,28 +365,26 @@ export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: Order
     case 'away': return steer(told, s, order, base - baseTack * POINT, now);
     case 'by':
       if (told.helm.by === tack) return refuse(told, `she is full and by on the ${TACK_NAMES[tack]} tack already`);
-      return tell(told, order, now.tick, { helm: { heading: 0, by: tack } }, [{ kind: 'helm', at: now.tick + ticks(HELM_SECONDS), heading: closeHauled(tack, from), turn: 0 }], false);
+      return tell(told, order, now.tick, { helm: { heading: 0, by: tack } }, [{ kind: 'helm', heading: closeHauled(tack, from), turn: 0 }], false);
     case 'tack': {
       if (s.ahead < NO_WAY) return refuse(told, 'she has no way on her');
       if (inStays(told, s, from)) return refuse(told, 'she is in stays: not until she is round');
-      const at = now.tick + ticks(TACK_SECONDS);
-      return tell(told, order, now.tick, { helm: { heading: 0, by: -tack } }, [{ kind: 'helm', at, heading: closeHauled(-tack, from), turn: tack }], false);
+      return tell(told, order, now.tick, { helm: { heading: 0, by: -tack } }, [{ kind: 'helm', heading: closeHauled(-tack, from), turn: tack }], false);
     }
     case 'wear': {
       if (s.ahead < NO_WAY) return refuse(told, 'she has no way on her');
       const mirror = wrapBearing(2 * from - base), close = Math.abs(angleDiff(mirror, from)) < CLOSE_HAULED || told.helm.by !== 0;
       const helm = close ? { heading: 0, by: -tack } : { heading: mirror, by: 0 };
-      const at = now.tick + ticks(WEAR_SECONDS);
-      return tell(told, order, now.tick, { helm }, [{ kind: 'helm', at, heading: toldHeading(helm, from), turn: -tack }], false);
+      return tell(told, order, now.tick, { helm }, [{ kind: 'helm', heading: toldHeading(helm, from), turn: -tack }], false);
     }
     case 'heave': {
       if (told.hove) return refuse(told, 'she is hove to already');
-      const mast = MASTS.indexOf(HOVE_TO_MAST), at = now.tick + ticks(HELM_SECONDS), heading = closeHauled(tack, from);
+      const mast = MASTS.indexOf(HOVE_TO_MAST), heading = closeHauled(tack, from);
       const acts: NewAct[] = [
-        { kind: 'helm', at, heading, turn: 0 },
-        ...sailActs(s.canvas, canvasTarget(told.canvas, now.force, true), now.tick),
-        { kind: 'yards', at: now.tick + ticks(BRACE_SECONDS), mast, aback: true },
-        { kind: 'yards', at: now.tick + ticks(BRACE_SECONDS), mast: MASTS.indexOf(HOVE_TO_CHECK), aback: true },
+        { kind: 'helm', heading, turn: 0 },
+        { kind: 'yards', mast, aback: true },
+        { kind: 'yards', mast: MASTS.indexOf(HOVE_TO_CHECK), aback: true },
+        ...sailActs(s.canvas, canvasTarget(told.canvas, now.force, true)),
       ];
       return tell(told, order, now.tick, { helm: { heading: 0, by: tack }, hove: true, backed: told.backed.map((b, m) => b || m === mast) }, acts, true);
     }
@@ -414,17 +396,16 @@ export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: Order
     case 'back': {
       const mast = MASTS.indexOf(order.mast);
       if (told.backed[mast]) return refuse(told, `the ${order.mast} topsail is aback already`);
-      return tell(told, order, now.tick, { backed: told.backed.map((b, m) => b || m === mast) }, [{ kind: 'yards', at: now.tick + ticks(BRACE_SECONDS), mast, aback: true }], false);
+      return tell(told, order, now.tick, { backed: told.backed.map((b, m) => b || m === mast) }, [{ kind: 'yards', mast, aback: true }], false);
     }
     case 'fill': {
       const aback = MASTS.map((_, m) => told.backed[m]! || s.backed[m]!);
       if (!told.hove && !aback.some(Boolean)) return refuse(told, 'every sail is drawing');
-      const at = now.tick + ticks(BRACE_SECONDS);
-      const acts: NewAct[] = aback.flatMap((b, mast) => (b ? [{ kind: 'yards' as const, at, mast, aback: false }] : []));
+      const acts: NewAct[] = aback.flatMap((b, mast) => (b ? [{ kind: 'yards' as const, mast, aback: false }] : []));
       if (!told.hove) return tell(told, order, now.tick, { backed: told.backed.map(() => false) }, acts, false);
       // Hove to: her canvas made again as ordered, and full and by on the tack she lies on.
-      acts.push(...sailActs(s.canvas, canvasTarget(told.canvas, now.force, false), now.tick));
-      acts.push({ kind: 'helm', at: now.tick + ticks(HELM_SECONDS), heading: closeHauled(tack, from), turn: 0 });
+      acts.push({ kind: 'helm', heading: closeHauled(tack, from), turn: 0 });
+      acts.push(...sailActs(s.canvas, canvasTarget(told.canvas, now.force, false)));
       return tell(told, order, now.tick, { hove: false, backed: told.backed.map(() => false), helm: { heading: 0, by: tack } }, acts, true);
     }
   }
@@ -447,20 +428,21 @@ function act(s: Sailing, a: Act): Sailing {
 }
 
 /**
- * The acts falling due at `tick` done, in the order they were given, and the orders whose last act that was reported
- * done; full and by, the helmsman told the heading close-hauled in the mean wind `wind` as it shifts.
+ * The acts the crew finished this step (`finished`, their ids) done, in the order they were given, and the orders
+ * whose last act that was reported done; full and by, the helmsman told the heading close-hauled in the mean wind
+ * `wind` as it shifts.
  */
-export function carryOut(told: ShipOrders, s: Sailing, tick: number, wind: Wind): CarriedOut {
+export function carryOut(told: ShipOrders, s: Sailing, finished: readonly number[], wind: Wind): CarriedOut {
   let sailing = s;
-  const due = told.acts.filter((a) => a.at <= tick);
+  const due = told.acts.filter((a) => finished.includes(a.id));
   let next = told;
   const done: Order[] = [];
   if (due.length > 0) {
     for (const a of due) sailing = act(sailing, a);
-    const acts = told.acts.filter((a) => a.at > tick);
-    const finished = told.given.filter((g) => due.some((a) => a.of === g.id) && !acts.some((a) => a.of === g.id));
-    for (const g of finished) done.push(g.order);
-    next = { ...told, acts, given: told.given.filter((g) => !finished.includes(g)) };
+    const acts = told.acts.filter((a) => !finished.includes(a.id));
+    const ended = told.given.filter((g) => due.some((a) => a.of === g.id) && !acts.some((a) => a.of === g.id));
+    for (const g of ended) done.push(g.order);
+    next = { ...told, acts, given: told.given.filter((g) => !ended.includes(g)) };
   }
   if (next.hove && !next.acts.some((a) => a.kind === 'yards')) sailing = keepHove(sailing, next);
   if (next.helm.by && !next.acts.some((a) => a.kind === 'helm') && !next.given.some((g) => g.order.kind === 'tack' || g.order.kind === 'wear')) {

@@ -28,6 +28,8 @@ export interface Spot {
   readonly along: number;
   readonly across: number;
 }
+/** A spot alone, from anything that stands on one (a crew place, where a man on his way is). */
+export const bareSpot = (p: Spot): Spot => ({ space: p.space, along: p.along, across: p.across });
 
 /** A space with what it needs answered: its oblong (clipped to her sides at its floor), its floor and its overhead. */
 export interface Space extends Rect {

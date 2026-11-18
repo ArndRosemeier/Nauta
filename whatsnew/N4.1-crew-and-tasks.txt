@@ -1,0 +1,3 @@
+Behind the scenes: the ship now has her crew of 121, each man with his rank, his place at a gun or in a top, and his part of the ship.
+Every sailing order now takes as long as the men take: the order is passed down, the nearest hands run to the ropes or climb aloft, and the work goes slower when hands are short.
+You cannot see the men yet; that comes when the crew is drawn.
