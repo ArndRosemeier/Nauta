@@ -343,8 +343,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What the crew is still doing for each order, in words | `src/app/orderReport.ts#crewLines` |
 | An event of a step in the panel's words (a refused order she kept is the master's answer) | `src/app/orderReport.ts#eventWords` |
 | Whether an order would be refused now (a dim button), and whether it stands (a ringed one) | `src/app/orderReport.ts#wouldRefuse` |
-| A match stepped on this machine alone (`?sail`), her pose between steps; a stand-in for the two-player session | `src/app/soloMatch.ts#SoloMatch` |
-| Her turning spars' angles in a state, for drawing the yards braced as the sailing model trims them | `src/app/soloMatch.ts#sparAngles` |
+| Her turning spars' angles in a state, for drawing the yards braced as the sailing model trims them | `src/app/pageMatch.ts#sparAngles` |
 | The order panel on the page (`?sail`): buttons, compass, typed orders, answers | `src/app/orderPanel.ts#OrderPanel` |
 | Making an element of the page's own panels in one line | `src/app/dom.ts#make` |
 | The ways across her weather deck's centreline: how wide, how often (the fife rails' places that make them: `MAIN_FIFE_AT`, `FORE_FIFE_FORE_AT`) | `src/sim/rules/ships.ts#DECK_CROSSING` |
@@ -412,3 +411,18 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The seeded randomness of a gun's shot | `src/sim/guns/shot.ts#shotRng` |
 | The shot's rules: muzzle speeds, each shot's balls, mass, size, speed, drag, spread and span; scatter; skipping; the range table (first proposals) | `src/sim/rules/guns.ts#SHOT` |
 | The highest the water can stand anywhere at a moment (above it nothing meets the sea) | `src/sim/sea/sea.ts#highestWater` |
+| The match the page sails (`?sail`, `?room`, `?join=`): the session running now behind one face, its events to the order panel, the poses to draw | `src/app/pageMatch.ts#PageMatch` |
+| Where a duel starts: 1,500 m apart, the wind on the beam of the line between them, the seed turning the picture and picking the force | `src/sim/start.ts#duelStart` |
+| How a duel starts (distance apart, way on at the start) | `src/sim/rules/start.ts#START_APART` |
+| The match as the page runs it: stepped by the clock alone, or as host or guest through GameHub; hashes checked, the host's state winning; the host leaving passes hosting on | `src/net/duel.ts#DuelSession` |
+| A room's match seed from its code | `src/net/duel.ts#roomSeed` |
+| What the machines send each other (snapshot, delta, a captain's orders), the protocol's version | `src/net/wire.ts#PROTOCOL` |
+| An order from another machine made safe to step (only an order's fields, named to the sender's ship, through JSON) | `src/net/wire.ts#cleanOrder` |
+| Whether a room may be joined (the game, the protocol, the build) | `src/net/wire.ts#roomRefusal` |
+| A state as a snapshot to send, and back | `src/net/wire.ts#makeSnapshot` |
+| The connection to GameHub (its server, the game's app key) | `src/app/hub.ts#openHub` |
+| Opening a room, joining one from the lobby or by its code, on the page | `src/app/roomPanel.ts#RoomPanel` |
+| The link that brings another device into a room | `src/app/params.ts#joinLink` |
+| The network check's bare page (`?netcheck`) | `src/app/netCheck.ts#runNetCheck` |
+| The other captain's ship drawn (her coarse outside, until N3.8) | `src/render/ship/otherShip.ts#OtherShipView` |
+| A ship's group placed on the water by her pose | `src/render/ship/otherShip.ts#placeShip` |

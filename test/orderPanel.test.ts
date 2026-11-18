@@ -2,7 +2,7 @@
  * The order panel (implementation plan N3.5): its buttons give every order of the vocabulary, its words say how she
  * answers, and with nothing but the panel's taps she can be sailed anywhere: compass points on every side of the wind reached or answered
  * with full and by, round onto the other tack, stopped and made to sail again. Whole matches of one brig through the
- * match the page runs alone (soloMatch.ts), a few simulated minutes each.
+ * match the page runs alone (N3.7's session offline, src/net/duel.ts), a few simulated minutes each.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,32 @@ import { meanWind } from '../src/sim/wind.ts';
 import {
   bearingWords, clockWords, crewLines, eventWords, isStanding, orderButtons, pointOfSail, shipLines, STEER_POINTS, steerPoint, wouldRefuse,
 } from '../src/app/orderReport.ts';
-import { SoloMatch, sparAngles } from '../src/app/soloMatch.ts';
+import { sparAngles } from '../src/app/pageMatch.ts';
+import { DuelSession } from '../src/net/duel.ts';
+import type { MatchSetup } from '../src/sim/state.ts';
+import type { ShipPose } from '../src/sim/ship/motion.ts';
+
+/** The page's match sailed alone (N3.7's session, offline), on a clock the test moves: the match one brig at the start given. */
+class SoloMatch {
+  private t = 0;
+  private readonly session: DuelSession;
+  constructor(start: { seed: number; windForce: number; windFrom: number; x: number; z: number; heading: number }) {
+    const setup: MatchSetup = { seed: start.seed, windForce: start.windForce, windFrom: start.windFrom, ships: [{ x: start.x, z: start.z, heading: start.heading, speed: START_SPEED }] };
+    this.session = new DuelSession({ build: 'test', now: () => this.t, setup });
+  }
+  get state() { return this.session.state; }
+  get ship() { return this.session.mine; }
+  give(order: Order): void { this.session.give(order); }
+  on(kind: 'events', fn: (events: readonly SimEvent[]) => void): void { this.session.on(kind, fn); }
+  /** The match stepped up to the clock's `t`, s (a hair over, so a whole step is never lost to rounding). */
+  advance(t: number): void { this.t = t + CLOCK_HAIR; this.session.pump(); }
+  /** Her pose drawn at the clock's `t`, between her last two steps. */
+  pose(t: number): ShipPose { this.t = t; return this.session.pose(this.ship)!; }
+}
+/** Her way at the start (as the page's first ?sail had it), m/s. */
+const START_SPEED = 5 * KNOT;
+/** Added to the test's clock so rounding never holds back a step that is due, s. */
+const CLOCK_HAIR = 1e-9;
 
 /** The page's own start: a moderate breeze from west-south-west, the brig heading north (main.ts). */
 const START = { seed: 1805, windForce: 4, windFrom: 247.5 * DEGREE, x: 0, z: 0, heading: 0 };

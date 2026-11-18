@@ -2,6 +2,7 @@
   "comment": "Layers (CLAUDE.md rule 5). A folder in `pure` may not import any module in `banned`, nor a folder in `renderFolders`. `banEverywhere` lists text that no file under src may contain. `owners`: a field of the game's state and the one file that may change it ({ field, owner, what }); every field of simulation state gets a row when it is made (docs/ARCHITECTURE.md).",
   "pure": [
     "src/sim",
+    "src/net",
     "src/app/bench.ts",
     "src/app/body.ts",
     "src/app/look.ts",
@@ -9,7 +10,7 @@
     "src/app/standpoints.ts",
     "src/app/quality.ts",
     "src/app/orderReport.ts",
-    "src/app/soloMatch.ts",
+    "src/app/pageMatch.ts",
     "src/probe/report.ts",
     "src/probe/waves.ts",
     "src/audio/ambience.ts",

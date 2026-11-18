@@ -1,0 +1,56 @@
+/**
+ * Where a duel starts (implementation plan N3, design decision "The start", built with N3.7): 1,500 m apart, the wind
+ * on the beam of the line between them, both under battle sail and closing; the seed turns the picture and picks the
+ * force from 2 to 6.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { angleDiff } from '@futuremagic/core';
+import { duelStart } from '../src/sim/start.ts';
+import { startMatch } from '../src/sim/state.ts';
+import { meanWind } from '../src/sim/wind.ts';
+import { DUEL_FORCES } from '../src/sim/rules/wind.ts';
+import { START_APART } from '../src/sim/rules/start.ts';
+import { bearingDir, DEGREE } from '../src/sim/units.ts';
+
+const SEEDS = 200;
+
+test('each seed: 1,500 m apart, each heading at the other with the wind square across the line, under battle sail with way on', () => {
+  for (let seed = 0; seed < SEEDS; seed++) {
+    const setup = duelStart(seed);
+    const [a, b] = setup.ships;
+    assert.ok(a && b && setup.ships.length === 2);
+    assert.ok(Math.abs(Math.hypot(b.x - a.x, b.z - a.z) - START_APART) < 1e-9);
+    // Each bow points at the other ship.
+    const [ax, az] = bearingDir(a.heading), [bx, bz] = bearingDir(b.heading);
+    assert.ok(Math.abs(ax * (b.x - a.x) + az * (b.z - a.z) - START_APART) < 1e-6, `seed ${seed}: the first heads at the second`);
+    assert.ok(Math.abs(bx * (a.x - b.x) + bz * (a.z - b.z) - START_APART) < 1e-6, `seed ${seed}: the second heads at the first`);
+    // The wind comes square across both courses, one on each side: neither has the weather gauge.
+    assert.ok(Math.abs(Math.abs(angleDiff(a.heading, setup.windFrom)) - 90 * DEGREE) < 1e-9);
+    assert.ok(Math.abs(angleDiff(a.heading, setup.windFrom) + angleDiff(b.heading, setup.windFrom)) < 1e-9);
+    assert.ok(setup.windForce >= DUEL_FORCES.least && setup.windForce <= DUEL_FORCES.most && Number.isInteger(setup.windForce));
+    for (const s of setup.ships) { assert.equal(s.canvas, 'battle'); assert.ok((s.speed ?? 0) > 0); }
+  }
+});
+
+test('the seed turns the picture all round the compass and picks every force from 2 to 6', () => {
+  const forces = new Set<number>(), quarters = new Set<number>();
+  for (let seed = 0; seed < SEEDS; seed++) {
+    const s = duelStart(seed);
+    forces.add(s.windForce);
+    quarters.add(Math.floor(s.windFrom / (90 * DEGREE)));
+  }
+  assert.deepEqual([...forces].sort(), [2, 3, 4, 5, 6]);
+  assert.equal(quarters.size, 4);
+  assert.deepEqual(duelStart(42), duelStart(42), 'the same seed, the same start');
+});
+
+test('the match made from it has that wind and both ships where the ruling puts them', () => {
+  const setup = duelStart(7), state = startMatch(setup);
+  assert.equal(state.wind.windForce, setup.windForce);
+  assert.ok(Math.abs(angleDiff(meanWind(state.wind, 0).from, setup.windFrom)) < 30 * DEGREE);
+  state.ships.forEach((s, i) => {
+    assert.equal(s.motion.pose.x, setup.ships[i]!.x);
+    assert.equal(s.told.canvas, 'battle');
+  });
+});

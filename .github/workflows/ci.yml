@@ -89,6 +89,14 @@ jobs:
         run: node tools/guards/budget.mjs 120 180 -- npm run walk:check
       - name: Round shot fired as they bear strikes a brig about as often as the design says at 100, 200 and 400 m (N5.2)
         run: node tools/guards/budget.mjs 120 180 -- npm run check:gunnery
+      - name: Two headless browsers play one match through a GameHub stand-in, and the guest takes over when the host leaves (N3.7)
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:room
+      - name: The same against the live GameHub, once the game's app key is a repository variable (N3.7)
+        if: vars.GAMEHUB_KEY != ''
+        env:
+          GAMEHUB_URL: https://games.futuremagic.de
+          GAMEHUB_KEY: ${{ vars.GAMEHUB_KEY }}
+        run: node tools/guards/budget.mjs 120 180 -- npm run check:room
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -4,7 +4,7 @@
  * and what each event of a step says. Pure: no DOM, so it runs in tests; orderPanel.ts puts it on the page.
  *
  * The panel talks to the running match through `OrderSession`, the seam it shares with the two-player session (N3.7):
- * the match on this machine alone (soloMatch.ts) and a room's session both give orders and hand on each step's events.
+ * the page's match (app/pageMatch.ts: the two-player session, alone or in a room) gives orders and hands on each step's events.
  */
 import { angleDiff } from '@futuremagic/core';
 import { giveOrder, headingWords, orderWords, VOCABULARY, type Order, type ShipOrders } from '../sim/orders';

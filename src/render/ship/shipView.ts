@@ -92,7 +92,7 @@ export class ShipView {
   /** Her pose as drawn this frame: between her last two steps. */
   drawn: ShipPose;
   /**
-   * Where her pose comes from when a match sails her (`?sail`, app/soloMatch.ts): her pose at the clock's time. Null:
+   * Where her pose comes from when a match sails her (`?sail`, app/pageMatch.ts): her pose at the clock's time. Null:
    * she floats on her own, lying still where she is.
    */
   poseFrom: ((t: number) => ShipPose) | null = null;
