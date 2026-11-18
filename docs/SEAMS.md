@@ -220,6 +220,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A point of the rig plan in ship space | `src/render/ship/swings.ts#shipPoint` |
 | Handing the moving frames to the rope shader | `src/render/ship/shipMaterials.ts#setShipFrame` |
 | A sail's shape from its numbers (belly, shiver, breathing, folds gathered, rolled on its yard, a reef rolled) and a flag's, on the CPU: the one the sail shader mirrors (N3.10) | `src/render/ship/sailForm.ts#clothAt` |
+| The timber of each mast a sail must hang clear of (shaft, masthead, cap, top, topmast, crosstrees, topgallant mast), as planes in ship space, from the same spar table and timber rules the drawing builds the masts from (N3.10) | `src/sim/ship/mastSolids.ts#mastSolids` |
+| Each sail's clearance table, and the cloth pushed out of the masts' timber on the CPU: the one the sail shader mirrors | `src/render/ship/sailClear.ts#cleared` |
 | How each sail is drawn, from the rig plan: corners, the spars that carry them, belly shape, folds | `src/render/ship/sailForm.ts#sailForms` |
 | The points of a sail lines are made fast to, each with its own moving frame | `src/render/ship/sailForm.ts#sailPoints` |
 | The sails' and flags' grids, with seams, reef bands, edges and the hole map's place per vertex | `src/render/ship/sailGrid.ts#buildSailGrids` |

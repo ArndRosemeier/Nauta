@@ -22,5 +22,9 @@
   {
     "key": "same name: render/crew/crewView.ts#warm + render/crew/nearPool.ts#warm",
     "reason": "The crew view's warm builds the crowd figures' shaders and hands the pool the dresses to warm; the pool's warm dresses its characters in each and gives them to the Stage's warm-up."
+  },
+  {
+    "key": "idiom: [.rng] in render/gunfire.ts + render/smoke.ts + render/spray.ts",
+    "reason": "False alarm: each emitter reads its own seeded generator (this.rng) to scatter its own particles, so `const r = this.rng` starts three different routines. It shows or not as other files change the finder's word weights (it came up with the sails' clearance, N3.10)."
   }
 ]

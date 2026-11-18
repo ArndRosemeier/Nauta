@@ -61,6 +61,18 @@ export const TRESTLE_DEPTH = 0.26;
 export const CROSSTREES_DEPTH = 0.2;
 /** The lower cap's thickness, m (the slice's): the topsail yard is lowered onto it. */
 export const CAP_THICK = 0.22;
+/* The timber of a top and the caps, as the drawing (render/ship/masts.ts) and the sails' clearance of it (render/ship/sailClear.ts) both read it. */
+/** A cap reaches this far beyond the masthead aft and the mast it holds forward, and either side, m. */
+export const CAP_RIM = 0.08;
+/** The trestle trees under a top: their siding, m; the crosstrees across them stand this share of the top's length either side of the mast. */
+export const TRESTLE_SIDED = 0.14;
+export const CROSSTREES_AT = 0.33;
+/** The crosstrees' depth under a top, m (a little shallower than the trestle trees). */
+export const TOP_CROSSTREES_DEEP = 0.21;
+/** A top's rim stands this high over its floor, m. */
+export const TOP_RIM = 0.09;
+/** A topmast's trestle trees reach this far fore and aft of it, m. */
+export const TOPMAST_TRESTLE_REACH = 0.55;
 
 /** A square sail's yard: on which mast, which of the three, length overall, each yardarm (outside the sail's head), diameter at the slings. */
 export type YardLevel = 'course' | 'topsail' | 'topgallant';
