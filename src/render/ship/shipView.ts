@@ -632,7 +632,11 @@ export class ShipView {
 
     // The eye: on board it rides with her, its tilt eased toward level; off her it stands still where she lies.
     this.eye.set(...where.eye);
-    if (where.off) {
+    if (where.world) {
+      // The spectator's free eye: the world's own place, level, the look's yaw the world's.
+      camera.position.copy(this.eye);
+      this.euler.set(0, 0, 0, 'YXZ');
+    } else if (where.off) {
       // Sailed by a match, the eye off her keeps its place beside her as she goes.
       const at = this.poseFrom ? this.drawn : AT;
       camera.position.copy(this.eye).applyAxisAngle(UP, -at.heading).add(new Vector3(at.x, 0, at.z));

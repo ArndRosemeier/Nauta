@@ -169,6 +169,19 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 #standpoints button { min-height: var(--target-small); padding: 0 16px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-over); color: var(--ivory); font: 16px/1 var(--word-font); box-shadow: 0 3px 8px #0006; }
 #standpoints button.on { background: var(--brass-fill); color: var(--on-brass); }
 
+/* Watching a battle (plan N7.8, src/app/spectator.ts): where to keep company, climb and descend, who fights; no orders are given */
+.nt-watch-bar, .nt-watch-arrows, .nt-watch-hint, .nt-watch-caption { display: none; position: fixed; z-index: 5; margin: 0; }
+body.watching:not(.in-menu) .nt-watch-bar { display: flex; gap: 8px; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); }
+.nt-watch-bar button, .nt-watch-arrow { min-height: var(--target-small); min-width: var(--target-small); padding: 0 16px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-over); color: var(--ivory); font: 16px/1 var(--word-font); box-shadow: 0 3px 8px #0006; }
+.nt-watch-bar button.on, .nt-watch-arrow.on { background: var(--brass-fill); color: var(--on-brass); }
+body.watching:not(.in-menu) .nt-watch-arrows { display: flex; flex-direction: column; gap: 10px; right: max(14px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); }
+.nt-watch-arrow { width: var(--target); min-height: var(--target); padding: 0; border-radius: 50%; font-size: 20px; touch-action: none; -webkit-user-select: none; user-select: none; }
+body.watching:not(.in-menu) .nt-watch-hint { display: block; left: 50%; transform: translateX(-50%); top: calc(max(14px, env(safe-area-inset-top)) + 8px); max-width: min(560px, calc(100vw - 180px)); padding: 8px 18px; border: 1px solid var(--brass-faint); border-radius: 22px; background: var(--lacquer-over); color: var(--ivory); font: italic 15px/1.3 var(--word-font); text-align: center; pointer-events: none; }
+body.watching:not(.in-menu) .nt-watch-caption { display: block; right: max(14px, env(safe-area-inset-right)); top: calc(max(14px, env(safe-area-inset-top)) + 8px); padding: 6px 16px; border-radius: 22px; background: var(--lacquer-over); color: var(--ivory-soft); font: 15px/1.2 var(--word-font); pointer-events: none; }
+.nt-watch-hint[hidden], .nt-watch-bar[hidden], .nt-watch-arrows[hidden], .nt-watch-caption[hidden] { display: none !important; }
+/* Nobody is commanded from here: nothing of the order tools shows. */
+body.watching #orders, body.watching .nt-bubbles, body.watching .nt-fan, body.watching .nt-thumb, body.watching .nt-steer-mark, body.watching #reports-button { display: none !important; }
+
 /* ?sail: the order panel (src/app/orderPanel.ts), a working panel until the order fan (N4.4) */
 #orders {
   position: fixed; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); width: min(420px, calc(100% - 28px)); max-height: calc(100% - 100px);

@@ -751,3 +751,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The page's side of the service worker: registering it, keeping the rest while the game is played, a newer version waiting, restarting on it | `src/offline/register.ts#Offline` |
 | The build's file list and the worker made from it (`dist/sw.js`) | `tools/offline/precache.ts#writeWorker` |
 | Whether the page uses the service worker (the deploy yes, any other build with `?sw`, `?nosw` removes it) | `src/offline/plan.ts#offlineMode` |
+| A match of two computer captains and none of mine (a battle watched) | `src/net/duel.ts#DuelSession` |
+| The spectator's free camera: flying by the nearest ship's distance, keeping company with a ship, gliding to a vantage | `src/app/freeCam.ts#FreeCam` |
+| A good place to see one ship from, and both | `src/app/freeCam.ts#vantageOf` |
+| The spectator's controls on the page: arrows to climb, buttons to keep company, the keys; no order given | `src/app/spectator.ts#Spectator` |
+| Who fights in a battle watched, for the caption | `src/app/spectator.ts#watchCaption` |

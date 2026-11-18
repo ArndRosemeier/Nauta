@@ -6,6 +6,7 @@
     "src/app/bench.ts",
     "src/app/body.ts",
     "src/app/look.ts",
+    "src/app/freeCam.ts",
     "src/app/params.ts",
     "src/app/standpoints.ts",
     "src/app/quality.ts",

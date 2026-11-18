@@ -18,6 +18,7 @@ From a cold page to standing on deck in three taps. Nothing here ever feels like
 | **Host a duel** | match setup, then the waiting room with its code |
 | **Join a duel** | enter a code, or pick from the open rooms |
 | **Walk the ship** | on deck at sea with no enemy, free to roam and try orders |
+| **Watch a battle** | match setup with a skill for each captain, then two computer captains fight and the viewer flies a free camera (N7.8) |
 
 Small, in a corner: Settings; the version with "What's new"; language (English, German). Later, when N7.4 exists: "Your first command" above the four.
 
@@ -49,6 +50,7 @@ Small, in a corner: Settings; the version with "What's new"; language (English, 
 - **How you meet.** On even terms is the start already decided: as far apart as the ships close in about three minutes, the wind on the beam of the line between them. Holding the weather position turns that picture so the wind blows from you toward her; she holding it, the other way. With two captains only "even terms" is offered unless the host changes it, and the guest sees what was chosen.
 - **Length.** When the time runs out with neither ship lost, they part at nightfall and the match is drawn. The master warns five minutes before.
 - **Sailing out of the fight.** A duel is fought in sight of each other. When the ships are more than 3 km apart the master says they are losing her. When they have been more than 4 km apart for a full minute the match ends: the ship that opened the distance has broken off the action and loses; if both sailed apart, it is drawn. A computer captain never runs unless he is beaten, and then he strikes.
+- **Watch a battle** (N7.8, Arnd 2026-11-18) takes the same wind, hour, meeting, length and seed, with a skill for the British captain and one for the French (no navy to choose: the British ship is the first, and "you hold the weather gauge" reads "the British hold it"). Nobody is commanded from the view: no orders, no captain's body, no reports. The camera is free (`?watch`, `?watch=master,green`): left thumb or walking keys fly it along the look at a speed that follows the distance to the nearest ship, the arrows at the right or Space and C climb and descend, Shift goes faster; the buttons at the foot glide it to the British ship, the French ship or a place to see both, or leave it where it is. The end card says whose victory it was.
 - **Walk the ship** uses the same settings for wind and hour, with no enemy, no time limit and every order available, so it is also the place to learn her.
 
 ## Addresses

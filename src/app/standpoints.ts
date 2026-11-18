@@ -21,6 +21,11 @@ export interface Standpoint {
   /** Off her: the eye stands still on the water, not riding her pitch, roll and heave. */
   readonly off?: boolean;
   /**
+   * The eye is a place in the world itself (x east, y up, z south, m), not in her space, and the look's yaw is the
+   * world's too (the spectator's free camera, plan N7.8). Always off her.
+   */
+  readonly world?: boolean;
+  /**
    * How the head is held, ship space (a unit up; his body on her deck gives it, app/body.ts). None: a standpoint
    * without a body, whose eye rides a fixed share of her pitch and roll.
    */

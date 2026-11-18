@@ -12,9 +12,9 @@ import type { SimEvent } from '../src/sim/step.ts';
 
 test('terms read back from nothing or junk are the defaults; a seed only as a whole 32-bit number', () => {
   assert.deepEqual(readTerms(null), DEFAULT_TERMS);
-  assert.deepEqual(readTerms({ navy: 'dutch', foe: 'admiral', wind: 'gale', hour: 'noon', meet: 'ahead', minutes: 33, seed: -4 }), DEFAULT_TERMS);
-  assert.deepEqual(readTerms({ navy: 'french', foe: 'master', wind: 'strong', hour: 'dusk', meet: 'lee', minutes: NO_LIMIT, seed: 77 }),
-    { navy: 'french', foe: 'master', wind: 'strong', hour: 'dusk', meet: 'lee', minutes: NO_LIMIT, seed: 77 });
+  assert.deepEqual(readTerms({ navy: 'dutch', foe: 'admiral', skillBritish: 'raw', skillFrench: 5, wind: 'gale', hour: 'noon', meet: 'ahead', minutes: 33, seed: -4 }), DEFAULT_TERMS);
+  assert.deepEqual(readTerms({ navy: 'french', foe: 'master', skillBritish: 'green', skillFrench: 'master', wind: 'strong', hour: 'dusk', meet: 'lee', minutes: NO_LIMIT, seed: 77 }),
+    { navy: 'french', foe: 'master', skillBritish: 'green', skillFrench: 'master', wind: 'strong', hour: 'dusk', meet: 'lee', minutes: NO_LIMIT, seed: 77 });
   assert.equal(readSeed(' 1234 '), 1234);
   for (const v of ['', 'abc', '1.5', '-1', String(2 ** 32), null]) assert.equal(readSeed(v), null, String(v));
 });

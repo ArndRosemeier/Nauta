@@ -6,6 +6,11 @@ import './ui/nauta.css';
 import { readParams, type Params } from './app/params';
 import { BenchRun } from './app/benchRun';
 import { watchLook } from './app/lookInput';
+import { watchWalk } from './app/walkInput';
+import { Spectator, watchCaption } from './app/spectator';
+import type { Hull } from './app/freeCam';
+import { NO_PUSH } from './app/thumbs';
+import { DuelSession } from './net/duel';
 import { MouseTaker, keepBrowserMenusAway } from './app/mouse';
 import { keyCap, onKeyPress } from './app/dom';
 import { standpoint, type Standpoint } from './app/standpoints';
@@ -17,7 +22,7 @@ import { matchMinutes } from './app/terms';
 import { SettingsMenu } from './app/settingsPanel';
 import { words } from './app/words';
 import { walkKeys } from './app/thumbs';
-import type { Settings } from './app/settings';
+import { KEY_ACTIONS, type KeyAction, type Settings } from './app/settings';
 import { Channel } from './audio/channel';
 import { OrderPanel } from './app/orderPanel';
 import { Speech } from './app/speaking';
@@ -65,7 +70,7 @@ import { HalfSmoke } from './render/halfSmoke';
 import { gunsSeen } from './app/gunsSeen';
 import { ShotsSeen, type Flash, type Strike } from './app/shotsSeen';
 import { battery } from './sim/guns/guns';
-import { toWorld, type ShipPose } from './sim/ship/motion';
+import { toShip, toWorld, type ShipPose } from './sim/ship/motion';
 import { shipY, shipZ } from './sim/ship/section';
 import { SeaSound } from './audio/seaSound';
 import { pageEngine } from './audio/pageEngine';
@@ -88,11 +93,13 @@ import { simTime } from './sim/state';
 import { parseOrder } from './sim/orders';
 import { apparentSpeed } from './sim/ship/sailing';
 import { makeWind, meanWind, windAt } from './sim/wind';
-import { followWind, startSea } from './sim/sea/sea';
+import { followWind, startSea, surfaceAt } from './sim/sea/sea';
 import type { Look } from './app/look';
 
 /** The Escape key's code. */
 const ESCAPE = 'Escape';
+/** The actions of the keys that give an order or open a fan: a watcher gives none, so these keys do nothing for him (the others walk, look, work the glass and open the reports). */
+const NOT_ORDER_KEYS: readonly KeyAction[] = ['forward', 'back', 'left', 'right', 'glass', 'reports'];
 /** Where the captain looks at the start: a little above the horizon, toward the morning sun. */
 const START_LOOK: Look = { yaw: -1.2, pitch: 0.12 };
 /** The longest step of time one frame may take, seconds (a tab that slept does not jump the clock). */
@@ -188,9 +195,11 @@ async function start(): Promise<void> {
   // `?walk`: the captain walks her decks with two thumbs (plan N2.3), on the whole brig.
   // The plain address (plan N7.2): the game itself, the captain walking her decks in every match the menu starts.
   const walking = params.walk !== null || params.menu ? new Walking(canvas, params.walk || undefined) : null;
+  // The walking thumb and keys: the captain's, or, watching a battle (plan N7.8), the free camera's.
+  const stick = walking?.input ?? (params.watch ? watchWalk(canvas) : null);
   // `?sail`: the brig under way in a match, where the ship view lays her, commanded from the order panel (plan N3.5);
   // alone at first, or with a second captain in a room (`?room` opens one, `?join=K7Q2ZP` joins one; plan N3.7).
-  const sailing = params.sail || params.room || params.join !== null || params.menu || params.crew !== null;
+  const sailing = params.sail || params.room || params.join !== null || params.menu || params.crew !== null || params.watch !== null;
   const build = params.ship !== null || walking || sailing ? await loadShip(import.meta.env.BASE_URL) : null;
   const ship = build ? new ShipView(build) : null;
   /**
@@ -206,6 +215,8 @@ async function start(): Promise<void> {
   const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match), params.casualties === null ? undefined : (state) => casualtiesOf(state, params.casualties!)) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
+  // `?watch` (plan N7.8): the match is a battle of two computer captains, none of the ships mine.
+  if (match && params.watch) match.useSession(new DuelSession({ build: VERSION, now: matchClock, seed: params.seed ?? undefined, windForce: params.windAsked ? params.wind : undefined, watch: { first: params.watch.british, second: params.watch.french }, minutes: matchMinutes(settings.now.match) }), 'british');
   const other = build && match ? new ShipView(build, 1) : null;
   if (ship && match) ship.poseFrom = () => match.pose(match.ship)!;
   if (other && match) other.poseFrom = () => match.pose(match.other) ?? match.pose(match.ship)!;
@@ -346,7 +357,7 @@ async function start(): Promise<void> {
   sky.redrawEnvironment();
   // Pointers not for looking: the walking thumb's, and a finger the order fan holds.
   let fan: OrderFan | null = null;
-  const leaveView = (e: PointerEvent) => (walking?.input.owns(e) ?? false) || (fan?.owns(e) ?? false);
+  const leaveView = (e: PointerEvent) => (stick?.owns(e) ?? false) || (fan?.owns(e) ?? false);
   // The mouse on a desk: free (drag to look, click a man) or taken for looking by a click on the sea (mouse.ts); never in the menu or under a sheet.
   const mouse = new MouseTaker(canvas, () => !document.body.classList.contains('in-menu') && !document.querySelector('.nt-backdrop'));
   const glassButton = el<HTMLButtonElement>('glass-button');
@@ -354,6 +365,13 @@ async function start(): Promise<void> {
   const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, leaveView, () => (glassInput?.pinching ?? false) || (fan?.holdsLook ?? false),
     (by) => { const s = settings.now; return by === 'mouse' ? { speed: s.mouseSpeed, inverted: s.mouseInverted } : { speed: s.fingerSpeed, inverted: false }; }, () => mouse.taken);
   const glassField = el('glass');
+  // Watching a battle (plan N7.8): the free camera and its controls; while it is active the captain is not drawn and no order is given.
+  const hullsNow = (): Hull[] => (match ? match.state.ships.flatMap((_, i) => { const p = match.pose(i); return p ? [{ x: p.x, z: p.z, heading: p.heading }] : []; }) : []);
+  const spectator = ship && match ? new Spectator({ words: () => words(settings.now.language), push: () => stick?.push() ?? NO_PUSH, desk: () => matchMedia('(hover: hover) and (pointer: fine)').matches, orderKey: (code) => KEY_ACTIONS.some((a) => !NOT_ORDER_KEYS.includes(a) && settings.now.keys[a] === code) }) : null;
+  const watching = (caption: string | null) => {
+    if (!spectator) return;
+    if (caption === null) spectator.leaveBattle(); else input.look = spectator.begin(hullsNow(), caption);
+  };
   /** The scene the address asks for: the hour and the day's pace, the wind and its sea, the eye, the look. */
   const setScene = (p: Params) => {
     sky.hour = p.hour; sky.dayMinutes = p.dayMinutes;
@@ -382,7 +400,7 @@ async function start(): Promise<void> {
     setScene(p);
     sceneFrames = SCENE_FRAMES; sceneDrawn = done;
   });
-  if (ship && !walking) showStandpoints(where, (s) => { where = s; input.look = s.look; });
+  if (ship && !walking && !params.watch) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (walking && ship) window.__nautaWalk = { drive: (forward, strafe, seconds, pitch, yaw) => walking.drive({ forward, strafe }, seconds, ship.drawn, input, pitch, yaw), press: (forward, strafe) => { walking.pressed = forward === undefined ? null : { forward, strafe: strafe ?? 0 }; } };
   let showHud = false;
   // The settings that need no more than the page above: the HUD, the calm view (plan N2.7), the walking thumb and
@@ -390,13 +408,14 @@ async function start(): Promise<void> {
   settings.watch((s) => {
     showHud = s.frameTimes || params.crew !== null;
     hud.style.display = showHud ? 'block' : 'none';
-    if (walking) { walking.body.strength = s.motion; walking.input.layout(walkKeys(s.keys), s.thumb); }
+    if (walking) walking.body.strength = s.motion;
+    stick?.layout(walkKeys(s.keys), s.thumb);
     glassButton.replaceChildren(words(s.language).glass, keyCap(s.keys.glass));
   });
   // The order fan (plan N4.4); the working panel of N3.5 beside it only when asked for (`?panel`).
   const orders = match && params.panel ? new OrderPanel(match) : null;
   /** Where the captain stands on her: his walker's spot; at a standpoint aboard, the quarterdeck; off her, nowhere. */
-  const captainSpot = (): Spot | null => (walking ? spotOf(walking.captain.walker) : where.off ? null : quarterdeck());
+  const captainSpot = (): Spot | null => (spectator?.watching ? null : walking ? spotOf(walking.captain.walker) : where.off ? null : quarterdeck());
   // The men speaking (plan N4.5): bubbles over them for answers, orders passed down, reports and cries, spoken by the
   // men of her crew who have those voices (N4.3): the six the captain addresses, the boatswain, the surgeon.
   const speech = match && ship ? new Speech(document.body, match, settings.now.language, matchClock) : null;
@@ -405,14 +424,14 @@ async function start(): Promise<void> {
   const midshipman = new Midshipman(midshipmanStart());
   if (match && ship && crew) fan = new OrderFan(canvas, {
     session: match,
-    men: () => crew.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight),
+    men: () => (spectator?.watching ? [] : crew.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight)),
     captain: captainSpot,
     bearingLooked: () => lookBearing(input.look, ship.drawn.heading),
     heel: () => ship.drawn.roll,
     closures: () => match.state.ships[match.ship]!.closures,
     midshipman,
     addressed: (who) => crew.addressed(who, pageSeconds()),
-    thumb: (e) => walking?.input.owns(e) ?? false,
+    thumb: (e) => stick?.owns(e) ?? false,
     settings: () => settings.now,
     wording: () => words(settings.now.language),
     taken: () => mouse.taken,
@@ -425,6 +444,8 @@ async function start(): Promise<void> {
   if (speech) new ReportsPanel(speech.log, settings);
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
   let jump = 0, jumped: (() => void) | null = null;
+  /** The captain's body is hidden while a battle is watched (no captain on it). */
+  let captainHidden = false;
   if (match) window.__nautaSail = {
     say: (words) => { const o = parseOrder(words, match.ship); if (typeof o === 'string') return o; match.give(o); return ''; },
     onward: (seconds, draw = true) => new Promise((done) => {
@@ -511,20 +532,25 @@ async function start(): Promise<void> {
       sky.dayMinutes = on ? 0 : skyMinutes;
     },
     firstCommand: (session) => { if (session) first?.start(session); else first?.stop(); },
+    watching,
   }) : null;
   // Her navy's coats and colours (menu.md, "Your navy"): the flags of both ships, his own coat and both crews' dress
   // changed when a match of the other navy begins (the warm-up built both navies' coats, so nothing compiles).
   if (match) {
     let dressed: Navy = 'british';
-    match.onChange(() => {
+    const dress = () => {
       const navy = match.navy;
       setFrenchFlags(navy === 'french', match.herNavy === 'french');
       if (navy === dressed) return;
       dressed = navy;
       void captain?.changeCoat(navy);
       crew?.changeNavy(match.ship === 0 ? navy : match.herNavy);
-    });
+    };
+    match.onChange(dress);
+    // `?watch` began its match before this: the French ship flies her own colours from the start.
+    if (params.watch) dress();
   }
+  if (params.watch) watching(watchCaption(words(settings.now.language), params.watch.british, params.watch.french));
   // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
   // Each part of the sound at the player's level (plan N7.3): the whole is the engine's master volume.
   const shipPart = new Channel(sound.engine), crewPart = new Channel(sound.engine), battlePart = new Channel(sound.engine);
@@ -608,10 +634,16 @@ async function start(): Promise<void> {
       ship.sails.stand(seen?.standing ?? null, seen?.canvas ?? null);
       ship.sails.blow(windAt(wind, ship.drawn.x, ship.drawn.z, seaTime));
       if (jump > 0) ship.sails.follow(jump);
-      if (walking) {
+      if (spectator?.watching) {
+        // Watching a battle (plan N7.8): the free eye in the world, flown by the viewer, carried along with the ships.
+        const flown = spectator.eyeFor(dt, input.look, hullsNow(), (x, z) => surfaceAt(sea, x, z, seaTime).height);
+        where = flown.where; input.look = flown.look;
+      } else if (walking) {
         where = walking.walk(dt, ship.drawn, input);
         walking.swingDoors((id, angle) => ship.setDoor(id, angle));
       }
+      // No captain on a battle's ships: his body is not drawn.
+      if (captain && !!spectator?.watching !== captainHidden) { captainHidden = !captainHidden; captain.group.visible = !captainHidden; }
       // Her damage drawn as the match has it (plan N6.5): holes, bulwarks smashed out, her canvas holed.
       ship.showDamage(scarred?.[0] ?? (match ? match.state.ships[match.ship]?.damage ?? null : null));
       lightThrough(view.hemi);
@@ -644,14 +676,14 @@ async function start(): Promise<void> {
       // The orders: the midshipman on his way, the fan judged anew; the officers drawn; the captain's arm pointing or his hand at his mouth.
       fan?.onFrame(now, dt);
       const arm = fan?.arm;
-      if (captain && walking?.drawnBody) captain.draw(dt, walking.drawnBody, walking.captain.walker, walking.captain.climber, view.camera, arm ? { ...arm, toward: view.camera.getWorldDirection(pointing) } : null);
+      if (captain && walking?.drawnBody && !spectator?.watching) captain.draw(dt, walking.drawnBody, walking.captain.walker, walking.captain.climber, view.camera, arm ? { ...arm, toward: view.camera.getWorldDirection(pointing) } : null);
       // Both crews (N4.3): every man as the match has him, the pool near the captain.
       if (crew && match && between) {
         crew.crews = phase?.crews ?? 2;
         crew.poolInUse = phase && !phase.pool ? 0 : startCrew.pool;
         crew.everyFrame = phase?.everyFrame ?? false;
         crew.noShadows = phase?.noShadows ?? false;
-        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds(), violence: settings.now.violence });
+        crew.animate(dt, { state: between, mine: spectator?.watching ? spectator.nearestShip : match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds(), violence: settings.now.violence });
       }
       jump = 0;
       sky.below = ship.below;
@@ -705,18 +737,20 @@ async function start(): Promise<void> {
     // Her own sound first: it gives the room the sea and the wind are heard through. Sailing, her way is the match's.
     const body = walking?.drawnBody, soles = body ? [body.feet.L, body.feet.R] : null;
     const sailing = match?.state.ships[match.ship] ?? null;
-    const herRoom = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: where.eye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: sailing?.sailing.ahead ?? 0 }) : OPEN_AIR;
+    // The ear in her space: the standpoint's own, or (a free eye in the world, plan N7.8) where it lies on her.
+    const earEye: readonly [number, number, number] = ship && spectator?.watching ? toShip(ship.drawn, where.eye[0], where.eye[1], where.eye[2]) : where.eye;
+    const herRoom = ship && shipSound ? shipSound.aboard(ship.drawn, sea, seaTime, dt, { eye: earEye, off: where.off ?? false, onLadder: walking?.captain.onLadder ?? false, soles, way: sailing?.sailing.ahead ?? 0 }) : OPEN_AIR;
     // Gunfire (N5.6): the reports, shot passing and falling, her own guns jolting the deck under him; deafened by a
     // broadside close by, the rest is heard through a dull room.
-    const gunfire = gunSound && match ? gunSound.roar({ t: seaTime, ear: [ear.x, ear.y, ear.z], earShip: where.eye, aboard: where.off ? -1 : match.ship, below: herRoom.below }, herRoom) : null;
+    const gunfire = gunSound && match ? gunSound.roar({ t: seaTime, ear: [ear.x, ear.y, ear.z], earShip: earEye, aboard: where.off ? -1 : match.ship, below: herRoom.below }, herRoom) : null;
     for (const j of gunfire?.jolts ?? []) walking?.body.jolt(j.x, j.z, j.strength);
     const room = gunfire?.room ?? herRoom;
     if (damageSound && match && ship) {
       const ships = match.state.ships.map((s, i) => ({ pose: (i === match.ship ? ship.drawn : match.pose(i)) ?? ship.drawn, damage: s.damage }));
-      for (const j of damageSound.struck({ t: seaTime, ear: [ear.x, ear.y, ear.z], earShip: where.eye, aboard: where.off ? -1 : match.ship, below: herRoom.below, ships })) walking?.body.jolt(j.x, j.z, j.strength);
+      for (const j of damageSound.struck({ t: seaTime, ear: [ear.x, ear.y, ear.z], earShip: earEye, aboard: where.off ? -1 : match.ship, below: herRoom.below, ships })) walking?.body.jolt(j.x, j.z, j.strength);
     }
     if (crewSound && match) { const mine = match.state.ships[match.ship]; crewSound.drum = !!mine && beatingToQuarters(mine.told, mine.guns); }
-    if (ship && crewSound && match && sailing) crewSound.atWork(sailing, simTime(match.state), ship.drawn, where.eye, room);
+    if (ship && crewSound && match && sailing) crewSound.atWork(sailing, simTime(match.state), ship.drawn, earEye, room);
     else if (ship && crewSound && !still) crewSound.bellAlone(seaTime, ship.drawn, room);
     // Her sails and rigging (N3.9): the rigging by the wind she feels aloft, the canvas as it is drawn; the wind on the
     // ear, aboard her, is the apparent wind too.

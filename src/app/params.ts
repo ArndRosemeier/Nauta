@@ -3,7 +3,7 @@
  * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`, `?glass=12`; two players:
  * `?room`, `?join=K7Q2ZP`, `?key=`, `?hub=`, `?seed=`, `?netcheck`). Pure: it takes the query string.
  */
-import { SKILLS, type Skill } from '../sim/rules/captain';
+import { SKILLS, type Offered, type Skill } from '../sim/rules/captain';
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
@@ -36,6 +36,8 @@ const BENCH_SHORTEST = 5;
 const BENCH_LONGEST = 600;
 /** The computer captain's skill when `?foe` names none. */
 const FOE_SKILL: Skill = 'seasoned';
+/** A captain's skill in `?watch` when the address names none. */
+const WATCH_SKILL: Offered = 'seasoned';
 /** The largest seed the address may name: a whole 32-bit number. */
 const SEED_MOST = 2 ** 32 - 1;
 /**
@@ -45,7 +47,7 @@ const SEED_MOST = 2 ** 32 - 1;
  */
 export const TOOL_SWITCHES = [
   'sail', 'room', 'walk', 'ship', 'slice', 'crew', 'trial', 'bench', 'probe', 'netcheck', 'title', 'rig',
-  'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed', 'scars', 'casualties', 'down',
+  'sea', 'wind', 'eye', 'hour', 'day', 'look', 'yaw', 'pitch', 'brace', 'glass', 'foe', 'seed', 'scars', 'casualties', 'down', 'watch',
 ] as const;
 
 /** Where `?look=` turns the eye: off the sun's (the moon's) bearing, clockwise, and up from level, both rad. */
@@ -115,6 +117,12 @@ export interface Params {
   /** The other ship of a match sailed alone commanded by a computer captain at this skill (`?foe=master`; `?foe` alone: seasoned, plan N7.1); null: she sails on as she started. */
   readonly foe: Skill | null;
   /**
+   * A battle watched from a free camera (`?watch`, plan N7.8): two computer captains fight, the British ship's at the first
+   * skill and the French ship's at the second (`?watch=master,green`; one skill alone is both's; `?watch` alone: both
+   * seasoned); the seed, the wind and the hour are the address's own (`?seed=`, `?wind=`, `?hour=`). null: none.
+   */
+  readonly watch: { readonly british: Offered; readonly french: Offered } | null;
+  /**
    * Powder smoke drawn at half resolution (`?smoke=half`, the trial of N5.5's next step): the scene into a
    * multisampled target of the shared post chain, its depth brought down to half resolution for the smoke; else the
    * smoke is drawn at full resolution in the main pass, straight to the canvas.
@@ -154,12 +162,21 @@ export function readParams(query: string): Params {
     crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'),
     glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
     foe: q.has('foe') ? (SKILLS as readonly string[]).includes(q.get('foe') ?? '') ? (q.get('foe') as Skill) : FOE_SKILL : null,
+    watch: q.has('watch') ? readWatch(q.get('watch') ?? '') : null,
     halfSmoke: q.get('smoke') === 'half',
     scars: q.has('scars') ? Math.round(num('scars', 1, 0, SEED_MOST)) : null,
     casualties: q.has('casualties') ? Math.round(num('casualties', 1, 0, SEED_MOST)) : null,
     down: q.has('down'),
     menu: !TOOL_SWITCHES.some((name) => q.has(name)),
   };
+}
+
+/** `master,green` as the two captains' skills (the British ship's, then the French ship's); one alone is both's; a part missing or not a skill is seasoned. */
+function readWatch(v: string): { british: Offered; french: Offered } {
+  const [first, second] = v.split(',').map((x) => x.trim());
+  const skill = (x: string | undefined, fallback: Offered): Offered => ((SKILLS as readonly string[]).includes(x ?? '') ? (x as Offered) : fallback);
+  const british = skill(first, WATCH_SKILL);
+  return { british, french: skill(second, second === undefined ? british : WATCH_SKILL) };
 }
 
 /** `90,-5` as degrees off the light's bearing and up; a part missing or not a number is 0. */
