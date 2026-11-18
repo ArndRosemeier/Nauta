@@ -1,17 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readParams } from '../src/app/params.ts';
+import { joinLink, readParams } from '../src/app/params.ts';
 import { DEGREE } from '../src/sim/units.ts';
 
 /** A brace the address asks for, degrees. */
 const BRACED = 30;
 
 test('no query: WebGPU, no HUD, a morning that moves', () => {
-  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false });
+  assert.deepEqual(readParams(''), { hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, ship: null, quality: null, eye: 4.5, wind: 4, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false });
 });
 
 test('the query sets the backend, the HUD, the hour, the day length, the eye and the wind', () => {
-  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false });
+  assert.deepEqual(readParams('?hud&hour=17.5&day=0&eye=30&wind=7'), { hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, ship: null, quality: null, eye: 30, wind: 7, look: null, toLight: null, bench: 0, walk: null, motion: null, brace: 0, sail: false, room: false, join: null, key: null, hub: null, seed: null, netcheck: false });
 });
 
 test('nonsense falls back, and numbers are held to their range', () => {
@@ -76,4 +76,19 @@ test('?bench flies for 60 s, or the seconds named within its range', () => {
 test('the address braces her yards round, in degrees, held to a half turn', () => {
   assert.equal(readParams('?brace=30').brace, BRACED * DEGREE);
   assert.equal(readParams('?brace=-30').brace, -BRACED * DEGREE);
+});
+
+test('two players: open a room, join one by its code, another key or server, a seed', () => {
+  const p = readParams('?room&join=K7Q2ZP&key=ghk_x&hub=http://127.0.0.1:8787&seed=12.4&netcheck');
+  assert.equal(p.room, true);
+  assert.equal(p.join, 'K7Q2ZP');
+  assert.equal(p.key, 'ghk_x');
+  assert.equal(p.hub, 'http://127.0.0.1:8787');
+  assert.equal(p.seed, 12);
+  assert.equal(p.netcheck, true);
+  assert.equal(readParams('?join=').join, null);
+});
+
+test('the link a room shows joins it on the same page, with the same key', () => {
+  assert.equal(joinLink('https://arndrosemeier.github.io/Nauta/?sail&room&key=ghk_x', 'K7Q2ZP'), 'https://arndrosemeier.github.io/Nauta/?sail&key=ghk_x&join=K7Q2ZP');
 });

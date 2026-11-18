@@ -9,8 +9,9 @@ import { showVersion } from './app/whatsNew';
 import { Walking } from './app/walking';
 import { QUALITY_LEVELS, QualityChooser, type QualityKnobs } from './app/quality';
 import { showMotionSetting } from './app/motionSetting';
-import { SoloMatch, sparAngles } from './app/soloMatch';
 import { OrderPanel } from './app/orderPanel';
+import { PageMatch, pageSeconds, sparAngles } from './app/pageMatch';
+import { RoomPanel } from './app/roomPanel';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
@@ -21,6 +22,8 @@ import { Furnishings } from './render/ship/furnishings';
 import { loadFittings } from './render/ship/fittings';
 import { furnish } from './sim/ship/furnish';
 import { shipPlan } from './sim/ship/plan';
+import { OtherShipView } from './render/ship/otherShip';
+import { VERSION } from 'virtual:nauta/version';
 import { SeaSound } from './audio/seaSound';
 import { ShipSound } from './audio/shipSound';
 import { CrewSound } from './audio/crewSound';
@@ -76,10 +79,15 @@ async function start(): Promise<void> {
   // `?ship`: the whole brig, built in a worker behind the loading screen (plan N2.4); the sun casts shadows then.
   // `?walk`: the captain walks her decks with two thumbs (plan N2.3), on the whole brig.
   const walking = params.walk !== null ? new Walking(canvas, params.walk || undefined) : null;
-  const ship = params.ship !== null || walking || params.sail ? new ShipView(await loadShip(import.meta.env.BASE_URL)) : null;
-  // `?sail`: the brig under way in a match on this machine, where the ship view lays her, commanded from the order panel (plan N3.5).
-  const match = ship && params.sail ? new SoloMatch({ seed: MATCH_SEED, windForce: params.wind, windFrom: WIND_FROM, x: 0, z: 0, heading: 0 }) : null;
-  if (ship && match) ship.poseFrom = (t) => match.pose(t);
+  // `?sail`: the brig under way in a match, where the ship view lays her, commanded from the order panel (plan N3.5);
+  // alone at first, or with a second captain in a room (`?room` opens one, `?join=K7Q2ZP` joins one; plan N3.7).
+  const sailing = params.sail || params.room || params.join !== null;
+  const build = params.ship !== null || walking || sailing ? await loadShip(import.meta.env.BASE_URL) : null;
+  const ship = build ? new ShipView(build) : null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed) : null;
+  // The other captain's ship, where the match has her (until N3.8 draws her whole).
+  const other = build && match ? new OtherShipView(build) : null;
+  if (ship && match) ship.poseFrom = () => match.pose(match.ship)!;
   let where: Standpoint = standpoint(params.ship ?? '');
   const view = await createView(canvas, ship !== null);
   // Her fittings (plan N2.6): drawn as instances in her frame, each zone's into that zone of her.
@@ -95,7 +103,7 @@ async function start(): Promise<void> {
   // The sea keeps the wind it is given, so it gets a copy of the mean wind, never the one `meanWind` writes into.
   // Sailing, the match's own wind and sea are the page's.
   let wind = match ? match.state.wind : makeWind(MATCH_SEED, params.wind, WIND_FROM), blowing = meanWind(wind, 0);
-  let seaTime = 0, sea = match ? match.state.sea : startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
+  let seaTime = match ? match.frame().time : 0, sea = match ? match.state.sea : startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
   /** The clocks stand still (a scene set for a shot); held: the scene is drawn and nothing is drawn until the next. */
   let still = false, held = false;
   /** Waiting for the scene set by `__nautaScene` to be drawn: frames still to draw, and what to call then. */
@@ -120,6 +128,7 @@ async function start(): Promise<void> {
   if (ship) await view.stage.add(ship.group);
   // Her yards braced as the address asks (`?brace=30`), until the sailing model braces them (N3.3).
   if (ship) for (const id of ship.swingIds) ship.setBrace(id, params.brace);
+  if (other) await view.stage.add(other.group);
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
   const input = watchLook(canvas, walking ? params.look ?? walking.startLook : ship ? where.look : startLook, view.radPerPixel, walking ? (e) => walking.input.owns(e) : undefined);
@@ -157,6 +166,10 @@ async function start(): Promise<void> {
   const orders = match ? new OrderPanel(match) : null;
   // Walking, the calm view's button has the top right corner: the panel stands below it.
   if (orders && walking) el('orders').classList.add('under-motion');
+  if (match) {
+    const rooms = new RoomPanel(params, VERSION, pageSeconds, () => match.session, (s) => match.use(s));
+    match.onChange(() => rooms.refresh());
+  }
   const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k.ropeShadows, k.shipFarFrom); };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());
@@ -187,14 +200,19 @@ async function start(): Promise<void> {
     if (window.__nautaReady && quality.frame(now - last)) apply(quality.knobs);
     last = now;
     const flight = bench?.fly(now);
-    seaTime += dt;
-    meanWind(wind, seaTime, blowing);
     if (match) {
-      match.advance(seaTime);
+      // The match's clock is the page's: the sea, the wind and both ships drawn at the moment the match is drawn at.
+      seaTime = match.frame().time;
+      wind = match.state.wind;
+      meanWind(wind, seaTime, blowing);
       sea = match.state.sea;
       // Her yards, boom and gaff as the crew trims them: the order seen carried out aloft.
       for (const [id, angle] of sparAngles(match.state, match.ship)) ship?.setBrace(id, angle);
-    } else sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
+    } else {
+      seaTime += dt;
+      meanWind(wind, seaTime, blowing);
+      sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
+    }
     if (ship) {
       if (walking) {
         where = walking.walk(dt, ship.drawn, input);
@@ -202,6 +220,7 @@ async function start(): Promise<void> {
       }
       ship.update(sea, seaTime, dt, view.camera, where, input.look, view.sun, sky.lightDirection, sky.gain, view.radPerPixel(), seaView.origin);
       furnished?.update(ship.group, view.camera, sky.lightDirection);
+      other?.show(match && match.other >= 0 ? match.pose(match.other) : null);
       sky.below = ship.below;
       seaView.sheltered = ship.below > 0;
     } else {
@@ -232,7 +251,7 @@ async function start(): Promise<void> {
     if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}${match ? `\n${match.line()}` : ''}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
@@ -242,8 +261,13 @@ async function start(): Promise<void> {
   });
 }
 
-/** `?probe` shows what the device offers instead of the game (plan N0.5); its code loads only when asked for. */
-const run = readParams(location.search).probe ? () => import('./probe/page').then((p) => p.runProbe()) : start;
+/**
+ * `?probe` shows what the device offers instead of the game (plan N0.5), `?netcheck` runs a match through the hub
+ * without drawing (the network check, plan N3.7); their code loads only when asked for.
+ */
+const asked = readParams(location.search);
+const run = asked.probe ? () => import('./probe/page').then((p) => p.runProbe())
+  : asked.netcheck ? () => import('./app/netCheck').then((p) => p.runNetCheck(asked)) : start;
 
 run().catch((err: unknown) => {
   const failed = el('failed');

@@ -1,0 +1,3 @@
+Two captains can now sail in one match: open the game with ?sail and tap "Two players" at the top left, open a room on one device, and on the other tap the room in the list (or open the link the room shows). Each of you commands your own brig.
+The match starts with the two brigs 1,500 m apart, the wind on the beam, both closing; you see the other ship where she really is, in the same waves.
+If the device that opened the room leaves, the other one carries the match on by itself.

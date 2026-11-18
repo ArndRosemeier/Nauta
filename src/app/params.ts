@@ -1,6 +1,7 @@
 /**
  * What the page's address asks for (`?hud&hour=17`, `?eye=30&wind=6`, `?sea=gale`, `?yaw=70&pitch=-10`,
- * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`). Pure: it takes the query string.
+ * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`; two players:
+ * `?room`, `?join=K7Q2ZP`, `?key=`, `?hub=`, `?seed=`, `?netcheck`). Pure: it takes the query string.
  */
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
@@ -31,6 +32,8 @@ export const BENCH_SECONDS = 60;
 /** The shortest and longest flight `?bench=` may ask for, s. */
 const BENCH_SHORTEST = 5;
 const BENCH_LONGEST = 600;
+/** The largest seed the address may name: a whole 32-bit number. */
+const SEED_MOST = 2 ** 32 - 1;
 
 /** Where `?look=` turns the eye: off the sun's (the moon's) bearing, clockwise, and up from level, both rad. */
 export interface LookAtLight {
@@ -71,6 +74,18 @@ export interface Params {
   readonly brace: number;
   /** Sail her by orders (`?sail`, plan N3.5): the brig under way in a match on this machine, and the order panel; with the ship of `?ship` (and `?walk` if asked). */
   readonly sail: boolean;
+  /** Open a room for a second captain at once (`?room`, plan N3.7). */
+  readonly room: boolean;
+  /** Join the room with this code at once (`?join=K7Q2ZP`, the link a room shows); null: none. */
+  readonly join: string | null;
+  /** GameHub's app key for this game (`?key=ghk_...`), when the build has none; null: the build's. */
+  readonly key: string | null;
+  /** Another GameHub server (`?hub=http://127.0.0.1:8787`, the checks' stand-in); null: GameHub itself. */
+  readonly hub: string | null;
+  /** The seed of a match sailed alone (`?seed=7`); null: the game's own. */
+  readonly seed: number | null;
+  /** The network check's bare page (`?netcheck`, tools/net/room.mjs): a match through the hub without drawing. */
+  readonly netcheck: boolean;
 }
 
 export function readParams(query: string): Params {
@@ -92,6 +107,8 @@ export function readParams(query: string): Params {
     motion: q.has('motion') ? num('motion', 1, CALM_LEAST, 1) : null,
     brace: num('brace', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE,
     sail: q.has('sail'),
+    room: q.has('room'), join: q.get('join') || null, key: q.get('key') || null, hub: q.get('hub') || null,
+    seed: q.has('seed') ? Math.round(num('seed', 0, 0, SEED_MOST)) : null, netcheck: q.has('netcheck'),
   };
 }
 
@@ -99,4 +116,14 @@ export function readParams(query: string): Params {
 function readLook(v: string): LookAtLight {
   const [off, up] = v.split(',').map((x) => (x.trim() === '' ? 0 : Number(x))).map((x) => (Number.isFinite(x) ? x : 0));
   return { off: (off ?? 0) * DEGREE, up: (up ?? 0) * DEGREE };
+}
+
+/** The address that brings another device into the room `code`: this page's own address, joining it instead of opening one. */
+export function joinLink(href: string, code: string): string {
+  const url = new URL(href);
+  url.searchParams.delete('room');
+  url.searchParams.set('join', code);
+  // Flags stay flags (`?sail`, not `?sail=`).
+  url.search = url.searchParams.toString().replace(/=(?=&|$)/g, '');
+  return url.toString();
 }

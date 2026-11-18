@@ -69,6 +69,16 @@
       .orders-typed { display: flex; gap: 6px; margin-top: 8px; }
       .orders-input { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 22px; border: 1px solid #ffffff40; background: #0b1a2a; color: #e8eef4; font: 16px/1 system-ui, sans-serif; -webkit-user-select: text; user-select: text; }
       #orders.under-motion { top: calc(max(10px, env(safe-area-inset-top)) + 54px); max-height: calc(100% - 144px); }
+      /* Two players (src/app/roomPanel.ts): the room button top left, and its panel in the what's-new panel's frame. */
+      #room { position: fixed; left: max(10px, env(safe-area-inset-left)); top: max(10px, env(safe-area-inset-top)); min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #ffffff33; background: #0b1a2a99; color: #e8eef4; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+      .room-body h3 { font: 600 14px/1.2 system-ui, sans-serif; margin: 16px 0 6px; opacity: 0.8; }
+      .room-body button { min-height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid #ffffff40; background: #18324acc; color: #e8eef4; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; }
+      .room-body .room-wide { display: block; width: 100%; margin: 8px 0; text-align: left; }
+      .room-row { display: flex; gap: 8px; align-items: center; }
+      .room-code { flex: 1; min-width: 0; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid #ffffff40; background: #0b1a2a; color: #e8eef4; font: 18px/1 ui-monospace, monospace; letter-spacing: 0.2em; text-transform: uppercase; -webkit-user-select: text; user-select: text; }
+      .room-link { flex: 1; min-width: 0; overflow-wrap: anywhere; font: 12px/1.4 ui-monospace, monospace; -webkit-user-select: text; user-select: text; }
+      .room-big { font: 300 40px/1.1 ui-monospace, monospace; letter-spacing: 0.25em; margin: 12px 0; color: #f2c14e; -webkit-user-select: text; user-select: text; }
+      .room-say { font: 13px/1.4 ui-monospace, monospace; opacity: 0.85; white-space: pre-wrap; }
       /* Walking (src/app/walkInput.ts): the left thumb's stick, a ring where it lands and a knob that follows it. */
       #stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid #ffffff40; background: #0b1a2a33; pointer-events: none; display: none; }
       #stick.on { display: block; }

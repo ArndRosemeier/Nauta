@@ -25,7 +25,8 @@
     "plan:draw": "tsx tools/plan/draw.ts",
     "shot:sea": "node tools/shot/sea.mjs",
     "check:shots": "node tools/shot/check.mjs",
-    "walk:check": "tsx tools/walk/everywhere.ts"
+    "walk:check": "tsx tools/walk/everywhere.ts",
+    "check:room": "node tools/net/room.mjs"
   },
   "dependencies": {
     "@futuremagic/audio": "file:vendor/assetgenerator/packages/audio",
