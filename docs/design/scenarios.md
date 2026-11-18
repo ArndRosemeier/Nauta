@@ -20,7 +20,7 @@ Two sides: opposite lines as the duel's, one ship each is exactly `duelStart` (t
 |---|---|---|
 | 1 | Scenario model, `fleetStart`, the dialog and its placement map. Runs what the duel runs (two ships of two sides in two navies); the rest is shown dimmed with the reason | built (PR 152) |
 | 2 | Sim: sides (`SimShip.side`), `foes.ts` (enemies nearest first, her foe), each gun on the nearest enemy its side faces, the end rule by side (`winningSide`), parting between sides. The duel is unchanged. "Target her" waits for stage 6 with its buttons | built |
-| 3 | The computer captain for N (with "Make captains manoeuvre in battle") | open |
+| 3 | The computer captain for N: he sights and fights the nearest enemy of another side (`sightOf`, `captainOrders`, the master's kept order). Choosing a target on purpose and holding it is left to "Make captains manoeuvre in battle" | built |
 | 4 | Netcode: room for up to 8, host runs computer captains, scenario in snapshot and meta, coarse crew for unmanned ships | open |
 | 5 | Rendering: N ship views (one near, the rest far), textures, wakes, crews near the camera | open |
 | 6 | Page and watch: free camera over N ships, end card by side, spectate after your ship is lost | open |

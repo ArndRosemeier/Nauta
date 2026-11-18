@@ -9,6 +9,8 @@ import { startDamage, type Damage } from '../src/sim/damage.ts';
 import { founderTonnes } from '../src/sim/damage/flood.ts';
 import { stepFight, winner, winningSide } from '../src/sim/end.ts';
 import { enemiesOf, enemyPoses, foeOf, lostNow } from '../src/sim/foes.ts';
+import { captainOrders } from '../src/sim/captain/captain.ts';
+import { sightOf } from '../src/sim/captain/sight.ts';
 import { battery, gunAt } from '../src/sim/guns/guns.ts';
 import { PARTING } from '../src/sim/rules/end.ts';
 import { startMatch, type ShipStart, type SimState } from '../src/sim/state.ts';
@@ -85,4 +87,14 @@ test('sailing apart is judged between sides: ships of one side close together do
   assert.deepEqual(r.events.map((e) => e.kind), ['losing']);
   // The same ships, the near one of side 0 staying within reach of side 1: not losing her.
   assert.deepEqual(stepFight(s.fight, s.ships, away(s, [0, PARTING.losing, 0]), 0).events, [], 'the two of side 0 are far apart but each side still has a pair near');
+});
+
+test('a computer captain sights the nearest enemy of another side, and gives orders in a fleet', () => {
+  const s = fleet([0, 0, 1, 1], [[0, 0], [0, 60], [0, 900], [0, 600]]);
+  const sight = sightOf(s, 0, 'master');
+  assert.equal(sight.enemy.z, 600, 'the nearer of the two enemies, not her own side');
+  assert.equal(sightOf(s, 2, 'master').enemy.z, 60, 'and the other side sees the nearer of his');
+  const given = Array.from({ length: 5 }, (_, i) => captainOrders({ ...s, tick: i * 60 }, 0, 'master')).flat();
+  assert.ok(given.length > 0, 'the captain takes his ship in hand');
+  assert.deepEqual(captainOrders(fleet([0], [[0, 0]]), 0, 'master'), [], 'alone there is no enemy to fight');
 });
