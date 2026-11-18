@@ -5,7 +5,7 @@
  * inside her); last, by hand, the other brig's wake (plan N3.8) through the glass once the two have closed. One page:
  * she sails for a while first so her wake lies behind her, then each scene is set with `window.__nautaScene` (`ship=`
  * the standpoint; the match keeps its own clock, so she sails on between pictures).
- * CI takes two of the eight (CI_SHOTS); `all` takes every one, words narrow the set (`npm run check:ship -- shots/ship
+ * CI takes one of the eight (CI_SHOTS); `all` takes every one, words narrow the set (`npm run check:ship -- shots/ship
  * bow`). Writes `<out dir>/<name>.png` (default `shots/ship`).
  * The browser's switches are browser.mjs's (CHROMIUM_PATH, SHOT_GPU, SHOT_SIZE); the quality is fixed at `high`.
  * It fails on any error or warning on the page (browser.mjs), or when a picture does not change between scenes.
@@ -19,15 +19,16 @@ const SHIP_SHOT_SIZE = '800x500';
 /** The match's seed: its start has a force 6 wind (sim/start.ts `duelStart`), the strongest a duel starts in. */
 const SEED = 4;
 /** How long she sails before the first picture, ms: her wake is laid behind her as frames are drawn. */
-const SAIL_FIRST_MS = 20000;
+const SAIL_FIRST_MS = 10000;
 
 /**
- * The pictures CI takes, each a frame of the whole brig (16 s on CI's software GPU): her wake under way from above,
- * and no water inside her. The page took 90 s to get ready on CI (2026-11-18, the crews drawn), so three pictures ran
- * past the step's 180 s; the water along her side (`rail`), the bowsprit, astern and 50 m off go by hand (`all`), as the
- * sea's and the sails' full sets (docs/CHECKS.md, "Browser checks: the rule").
+ * The picture CI takes: a frame of the whole brig (about 60 s on CI's software GPU, the crowd and the sea in view):
+ * her wake under way, from above. The page took 103 s to get ready on CI (2026-11-18, the crews drawn), so two pictures
+ * ran 203 s past the step's 180 s; the berth deck (no water inside her), the water along her side (`rail`), the
+ * bowsprit, astern and 50 m off go by hand (`all`), as the sea's and the sails' full sets (docs/CHECKS.md, "Browser
+ * checks: the rule").
  */
-const CI_SHOTS = ['above', 'berth'];
+const CI_SHOTS = ['above'];
 
 /**
  * The other brig's picture: the match run on (in steps of so many s, at most so long) until the two have closed within
