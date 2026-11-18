@@ -11,10 +11,12 @@
  * cannot sail and faces a ship that can and still has at least `guns` of her guns mounted (the other lies off her bow
  * or stern and rakes her).
  *
- * `out` was 0.3 until the helmsman began bearing away by himself (sails kept filled, ships faster, fights about 2 minutes
- * shorter): 0.4 puts the sheet back where it was (14 of 16 fights 6 to 14 minutes, 13 of 16 matches 10 to 20).
+ * `out` was raised to 0.4 for a day (PR 143, when the helmsman began bearing away by himself and the fights ran about 2
+ * minutes shorter) and put back to 0.3 once the complement was about 80 men (PR 144): beaten means the ship can no longer
+ * fight, not a number tuned to fill a time window. With 0.3 and then 0.4 the 100-duel sheet gave 84 and 82 fights in 6 to 14
+ * minutes and 86 and 91 matches in 10 to 20 (N7.5).
  */
-export const BEATEN = { out: 0.4, crews: 4, water: 0.95, guns: 1 / 2 } as const;
+export const BEATEN = { out: 0.3, crews: 4, water: 0.95, guns: 1 / 2 } as const;
 
 /**
  * Burnt out, lost like a ship sunk: fire holds `spaces` or more spaces below her weather deck at over `size` each, or
