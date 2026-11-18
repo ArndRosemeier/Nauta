@@ -52,9 +52,16 @@ const TEXEL = 4;
  * works alike on WebGPU and WebGL 2.
  */
 export const FRAMES_TEXTURE = new DataTexture(new Float32Array(MOST_FRAMES * FRAME_ROWS * TEXEL), FRAME_ROWS, MOST_FRAMES, RGBAFormat, FloatType);
-FRAMES_TEXTURE.magFilter = NearestFilter;
-FRAMES_TEXTURE.minFilter = NearestFilter;
+nearest(FRAMES_TEXTURE);
 for (let f = 0; f < MOST_FRAMES; f++) setShipFrame(f, new Matrix4());
+
+/** A data texture read texel by texel: no filtering, and uploaded on first use. */
+export function nearest(t: DataTexture): DataTexture {
+  t.magFilter = NearestFilter;
+  t.minFilter = NearestFilter;
+  t.needsUpdate = true;
+  return t;
+}
 
 /** Moving frame `frame` of hers set to `m` (ship space to ship space), for her ropes' shaders. */
 export function setShipFrame(frame: number, m: Matrix4): void {
@@ -176,7 +183,7 @@ function belowDeck(ao) {
 }
 
 /** Where a mesh being crossfaded is not drawn (its share of the screen's dither lies elsewhere). */
-function fading() {
+export function crossfadeMask() {
   const d = hash(screenCoordinate.xy), f = SHIP_OBJECT.fade;
   return step(f.x, d).mul(step(d, f.y.sub(TINY / 2))).greaterThan(1 / 2);
 }
@@ -237,7 +244,7 @@ export function makeWoodMaterial(crossfade = false): MeshStandardNodeMaterial {
   const light = belowDeck(ao);
   m.aoNode = light.sky;
   m.emissiveNode = m.colorNode.mul(light.lamp);
-  if (crossfade) m.maskNode = fading();
+  if (crossfade) m.maskNode = crossfadeMask();
   return m;
 }
 
@@ -255,7 +262,7 @@ export function makeIronMaterial(crossfade = false): MeshStandardNodeMaterial {
   const light = belowDeck(sh.x);
   m.aoNode = light.sky;
   m.emissiveNode = fin.rgb.mul(light.lamp);
-  if (crossfade) m.maskNode = fading();
+  if (crossfade) m.maskNode = crossfadeMask();
   return m;
 }
 
@@ -297,7 +304,7 @@ export function makeCopperMaterial(crossfade = false): MeshStandardNodeMaterial 
   m.colorNode = wet.colour;
   m.metalnessNode = float(1).sub(green);
   m.roughnessNode = wet.rough;
-  if (crossfade) m.maskNode = fading();
+  if (crossfade) m.maskNode = crossfadeMask();
   return m;
 }
 
@@ -344,14 +351,17 @@ export function makeRopeMaterial(): MeshStandardNodeMaterial {
   const fw = attribute('follow', 'vec3'), A = attribute('anchorA', 'vec3'), B = attribute('anchorB', 'vec3');
   const cover = varyingProperty('float', 'vRopeCover');
   const nMoved = varyingProperty('vec3', 'vRopeNormal'), tMoved = varyingProperty('vec3', 'vRopeAlong');
-  m.positionNode = Fn(() => {
-    // Where its ends' frames carry it: rigidly with one, or by the moves of its two ends, blended along it.
+  /** Where its ends' frames carry it: rigidly with one, or by the moves of its two ends, blended along it; its centre line, along and out. */
+  const carriedRope = () => {
     const rigid = step(abs(fw.x.sub(fw.y)), 1 / 2);
     const carried = positionGeometry.add(mix(framed(fw.x, A, 1).sub(A), framed(fw.y, B, 1).sub(B), fw.z));
     const centre = mix(carried, framed(fw.x, positionGeometry, 1), rigid);
     const t = normalize(mix(framed(fw.x, along, 0), framed(fw.y, along, 0), fw.z));
     const n0 = mix(framed(fw.x, normalGeometry, 0), framed(fw.y, normalGeometry, 0), fw.z);
-    const n = normalize(n0.sub(t.mul(dot(n0, t))));
+    return { centre, t, n: normalize(n0.sub(t.mul(dot(n0, t)))) };
+  };
+  m.positionNode = Fn(() => {
+    const { centre, t, n } = carriedRope();
     nMoved.assign(n);
     tMoved.assign(t);
     const radius = r.z;
@@ -359,6 +369,11 @@ export function makeRopeMaterial(): MeshStandardNodeMaterial {
     const w = max(radius, least);
     cover.assign(radius.div(w));
     return centre.add(n.mul(w));
+  })();
+  // Its shadow is the rope as thick as it is: widened by the sun's camera's distance it would throw a band (plan N3.10).
+  m.castShadowPositionNode = Fn(() => {
+    const { centre, n } = carriedRope();
+    return centre.add(n.mul(r.z));
   })();
   // The lay: strands wound round the rope; seen from far the grooves average out.
   const phase = r.x.mul(STRANDS).add(r.y.div(r.z.mul(2 * LAY_PER_DIAMETER)));

@@ -5,28 +5,27 @@
  * climb uses (aloft.ts), the futtock staves, each yard's footropes and stirrups and the jib-boom's horses.
  *
  * Lines made fast to a turning spar follow it on the GPU (rope.ts RopeFollow, swings.ts), so a yard braced round
- * carries its braces, lifts, sheets and gear with it. The sails are N3.10's: until they are drawn, each stands
- * furled, so a line made fast to a sail is drawn to where that corner lies furled: on its yard, down its stay, or
- * brailed in to the mast.
+ * carries its braces, lifts, sheets and gear with it. A line made fast to a sail (a sheet, clewline, buntline,
+ * bowline, halliard) is laid to its point of the sail set flat and is carried by that point's own frame to wherever
+ * the sail is drawn (sailForm.ts `sailPoints`): sheeted home, clewed up, hauled down or furled.
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
 import { footropeY, yardPoint } from '@futuremagic/figure/rigging';
 import type { Ladder } from '@futuremagic/figure/ladder';
-import { MAST_SPARS } from '../../sim/rules/rig';
 import { RATLINE_PITCH, ROPE } from '../../sim/rules/ships';
-import type { LineEnd, RigLine } from '../../sim/ship/lines';
+import type { RigLine } from '../../sim/ship/lines';
 import { sparOf, type RigPlan } from '../../sim/ship/rig';
-import { corner } from '../../sim/ship/sails';
-import { between, distance, onSpar, point, type RigPoint, type Spar } from '../../sim/ship/spars';
+import { between, distance, point, type RigPoint, type Spar } from '../../sim/ship/spars';
 import { shipY } from '../../sim/ship/section';
 import { lathe } from './shapes';
 import { OAK } from './looks';
 import type { Solid } from './solid';
 import { FEW_SIDES, HEMP, TARRED, legFollow, sagging, type RopeFollow, type Ropes } from './rope';
 import { shipPoint, swingOf, type Swing } from './swings';
+import { pointOfEnd, sailForms, sailPoints, type SailForm, type SailPoint } from './sailForm';
 
-/** How far a leg sags at its middle, as a share of its length: a taut shroud or stay, and a running line (light, slack while her sails are furled). */
-const SAG = { standing: 0.003, stay: 0.005, running: 0.025 } as const;
+/** How far a leg sags at its middle, as a share of its length: a taut shroud or stay, a running line, and a leg to a sail (laid with the sail set; it shortens as the sail is clewed up). */
+const SAG = { standing: 0.003, stay: 0.005, running: 0.025, toSail: 0.008 } as const;
 /** A leg is drawn in pieces this long, m, standing and running, near and far, and at most this many. */
 const PIECE = { standing: 3, running: 0.7, far: 3 } as const;
 const MOST_PIECES = 28;
@@ -47,8 +46,6 @@ const BLOCK_PROFILE: readonly (readonly [number, number])[] = [[0, -0.5], [0.55,
 const BLOCK_SIDES = 8;
 /** A via within this of a turning spar's axis is on that spar, m (its radius and a block's). */
 const ON_SPAR = 0.15;
-/** A furled square sail lies on its yard; a furled headsail or staysail is hauled down its stay to this share of its luff; the boom sail is brailed in to the mast. */
-const FURLED_LUFF = 0.12;
 /** Ratlines start this far over the upper deadeyes, m, and sag this much between two shrouds, m. */
 const RATLINE_OVER = 0.3;
 const RATLINE_SAG = 0.012;
@@ -108,7 +105,13 @@ class Rigging {
   /** How many eyes go round each masthead so far, to stack them. */
   private readonly eyesAt = new Map<string, number>();
 
-  constructor(private readonly rig: RigPlan, private readonly swings: readonly Swing[], private readonly t: RiggingTargets) {}
+  private readonly forms: readonly SailForm[];
+  private readonly points: readonly SailPoint[];
+
+  constructor(private readonly rig: RigPlan, private readonly swings: readonly Swing[], private readonly t: RiggingTargets) {
+    this.forms = sailForms(rig);
+    this.points = sailPoints(rig, this.forms, swings.length + 1);
+  }
 
   private frameOfSpar(id: string): number { return swingOf(this.swings, id)?.frame ?? 0; }
 
@@ -121,41 +124,26 @@ class Rigging {
     return 0;
   }
 
-  /** Where a line's end is, and what carries it: a sail's corner where it lies furled (N3.10 sets the sails), a spar, else her hull. */
-  private endKnot(e: LineEnd): Knot {
-    if (e.on === 'sail') return this.furled(e.id, e);
+  /** Where a line's end is, and what carries it: a sail's point (with the sail set flat) and its own frame, a spar, else her hull. */
+  private endKnot(line: RigLine, end: number): Knot {
+    const e = line.ends[end]!;
+    if (e.on === 'sail') {
+      const p = pointOfEnd(this.points, this.forms, line, end);
+      return { at: p.rest.clone(), frame: p.frame };
+    }
     if (e.on === 'spar') return { at: shipPoint(e), frame: this.frameOfSpar(e.id) };
     return { at: shipPoint(e), frame: 0 };
   }
 
-  /** A point of a sail where it lies furled: a square sail on its yard, a headsail or staysail down its stay, the boom sail brailed in to the mast. */
-  private furled(sailId: string, p: RigPoint): Knot {
-    const sail = this.rig.sails.find((s) => s.id === sailId)!;
-    if (sail.kind === 'square') {
-      const yard = sparOf(this.rig, sail.on[0]!), half = yard.length / 2 - yard.yard!.arm;
-      const across = Math.max(-half, Math.min(half, p.across - (yard.heel.across + yard.head.across) / 2));
-      const on = onSpar(yard, yard.length / 2 + across);
-      return { at: shipPoint(point(on.along, on.across, on.height + yard.diameter / 2)), frame: this.frameOfSpar(yard.id) };
-    }
-    if (sail.kind === 'boom') {
-      const boom = sparOf(this.rig, 'boom'), gaff = sparOf(this.rig, 'gaff'), g = this.rig.masts.main;
-      const h = Math.max(boom.heel.height, Math.min(gaff.heel.height, p.height));
-      return { at: shipPoint(point(g.lowerAt(h) - MAST_SPARS.main.lower.partners / 2, 0, h)), frame: 0 };
-    }
-    const tack = corner(sail, 'tack'), head = corner(sail, 'head'), luff = distance(tack, head);
-    const s = Math.max(0, Math.min(1, ((p.along - tack.along) * (head.along - tack.along) + (p.height - tack.height) * (head.height - tack.height)) / (luff * luff)));
-    return { at: shipPoint(between(tack, head, s * FURLED_LUFF)), frame: 0 };
-  }
-
   /** A line: its knots from the upper or working end to where it is set up or belayed, each leg sagging, a block at each turn. */
   drawLine(line: RigLine): void {
-    const knots: Knot[] = [this.endKnot(line.ends[0])];
+    const knots: Knot[] = [this.endKnot(line, 0)];
     for (const v of line.via) knots.push({ at: shipPoint(v), frame: this.frameNear(v) });
     const foot = this.t.feet.get(line.id);
     const last = line.ends[1];
     if (foot) knots.push({ at: foot.at, frame: 0 });
     else if (last.on === 'belay') knots.push({ at: shipPoint(point(last.along, last.across, last.height + LINE_OFF_PIN)), frame: 0 });
-    else knots.push(this.endKnot(last));
+    else knots.push(this.endKnot(line, 1));
     // A futtock shroud hangs from its plate under the top's deadeye.
     if (line.kind === 'futtock shroud') {
       const plate = this.t.feet.get(`${line.ends[0].id}:plate`);
@@ -166,9 +154,10 @@ class Rigging {
     for (let i = 1; i < knots.length - 1; i++) knots[i] = this.spread(knots[i]!);
 
     const pts: Vector3[] = [], follow: RopeFollow[] = [];
-    const share = line.standing ? (line.kind === 'stay' ? SAG.stay : SAG.standing) : SAG.running;
+    const first = this.swings.length + 1;
     for (let i = 0; i < knots.length - 1; i++) {
       const a = knots[i]!, b = knots[i + 1]!, len = a.at.distanceTo(b.at);
+      const share = line.standing ? (line.kind === 'stay' ? SAG.stay : SAG.standing) : a.frame >= first || b.frame >= first ? SAG.toSail : SAG.running;
       const pieces = this.t.far ? Math.max(1, Math.min(FAR_PIECES, Math.ceil(len / PIECE.far)))
         : Math.max(line.standing ? 1 : 2, Math.min(MOST_PIECES, Math.ceil(len / (line.standing ? PIECE.standing : PIECE.running))));
       const leg = sagging(a.at, b.at, share * len, pieces), f = legFollow(a.frame, a.at, b.frame, b.at, leg.length);
@@ -199,7 +188,13 @@ class Rigging {
 
   /** A block at a turn of a line, its length along the pull of the two legs, its sheave across them. */
   private block(k: Knot, from: Vector3, to: Vector3, diameter: number): void {
-    const a = from.clone().sub(k.at).normalize(), b = to.clone().sub(k.at).normalize();
+    // A leg of no length (a sheet's clew sheeted home to its block) leads on straight through the block.
+    const a = from.clone().sub(k.at), b = to.clone().sub(k.at);
+    if (b.lengthSq() < SAME_PLACE * SAME_PLACE) b.copy(a).negate();
+    if (a.lengthSq() < SAME_PLACE * SAME_PLACE) a.copy(b).negate();
+    if (a.lengthSq() < SAME_PLACE * SAME_PLACE) { a.copy(UP); b.copy(UP).negate(); }
+    a.normalize();
+    b.normalize();
     let y = a.clone().add(b);
     let z = new Vector3().crossVectors(a, b);
     if (z.lengthSq() < SAME_PLACE * SAME_PLACE) z = new Vector3().crossVectors(a, Math.abs(a.y) < 1 / 2 ? UP : ACROSS);

@@ -10,6 +10,8 @@ import { SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, makeDeepMaterial, makeSeaMaterial 
 import { SOLID_ATTRIBUTES, SOLID_STRIDES } from './ship/solid';
 import { ROPE_ATTRIBUTES, ROPE_STRIDES } from './ship/rope';
 import { DROP_ATTRIBUTE, DROP_STRIDE, FLING_ATTRIBUTE, makeSprayMaterial } from './spray';
+import { SAIL_ATTRIBUTES, SAIL_STRIDES } from './ship/sailGrid';
+import { makeSailMaterial } from './ship/sailMaterial';
 import { makeCopperMaterial, makeGlowMaterial, makeIronMaterial, makeRopeMaterial, makeWoodMaterial } from './ship/shipMaterials';
 import { fitted } from './ship/fitted';
 
@@ -25,7 +27,7 @@ export const defineKind = kinds.define.bind(kinds);
 
 /** Numbers per vertex of the game's own attributes. */
 const STRIDES: Readonly<Record<string, number>> = {
-  [SEA_TILE_ATTRIBUTE]: SEA_TILE_STRIDE, [DROP_ATTRIBUTE]: DROP_STRIDE, [FLING_ATTRIBUTE]: DROP_STRIDE, ...SOLID_STRIDES, ...ROPE_STRIDES,
+  [SEA_TILE_ATTRIBUTE]: SEA_TILE_STRIDE, [DROP_ATTRIBUTE]: DROP_STRIDE, [FLING_ATTRIBUTE]: DROP_STRIDE, ...SOLID_STRIDES, ...ROPE_STRIDES, ...SAIL_STRIDES,
 };
 
 /** Sets an attribute of the game's own kinds on the Stage's stand-in of 3 vertices (StageOptions.attribute). */
@@ -81,3 +83,9 @@ export const SHIP_ROPE = defineKind('ship rope', ROPE_ATTRIBUTES, makeRopeMateri
 export const FITTED_WOOD = defineKind('fitted wood', SOLID_ATTRIBUTES, () => fitted(makeWoodMaterial()), SHADOWED);
 export const FITTED_IRON = defineKind('fitted iron', SOLID_ATTRIBUTES, () => fitted(makeIronMaterial()), SHADOWED);
 export const FITTED_GLOW = defineKind('fitted glow', SOLID_ATTRIBUTES, () => fitted(makeGlowMaterial()), NO_SHADOW);
+/**
+ * Her sails and flags (plan N3.10): grids shaped on the GPU from each sail's numbers (sailMaterial.ts), canvas and
+ * bunting with the light through them; all in one draw. The far ship's crossfade draws them dithered.
+ */
+export const SHIP_SAILS = defineKind('ship sails', SAIL_ATTRIBUTES, () => makeSailMaterial(), SHADOWED);
+export const SHIP_SAILS_FADING = defineKind('ship sails fading', SAIL_ATTRIBUTES, () => makeSailMaterial(true), SHADOWED);

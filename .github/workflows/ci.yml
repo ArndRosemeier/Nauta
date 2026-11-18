@@ -105,6 +105,10 @@ jobs:
         run: node tools/guards/budget.mjs 120 180 -- npm run check:room
       - name: The ship and the water together, under way (N2.5)
         run: node tools/guards/budget.mjs 120 180 -- npm run check:ship
+      - name: The sails set, on every point of sail, through a tack, taken in; the far ship's (N3.10)
+        env:
+          SHOT_TIMEOUT: 170000
+        run: node tools/guards/budget.mjs 120 180 -- npm run shot:sails -- shots/sails
       - uses: actions/upload-artifact@v4
         if: always()
         with:

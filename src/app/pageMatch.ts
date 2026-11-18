@@ -8,13 +8,12 @@
 import type { Order } from '../sim/orders';
 import type { ShipPose } from '../sim/ship/motion';
 import { rigPlan } from '../sim/ship/rig';
-import { sailsStanding } from '../sim/ship/sailing';
-import { windAt } from '../sim/wind';
-import { simTime, type SimState } from '../sim/state';
+import type { SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
 import { MS_PER_SECOND } from '../sim/units';
 import { DuelSession, type Drawn } from '../net/duel';
 import type { OrderSession } from './orderReport';
+import { sailsSeen } from './sailsSeen';
 
 /** The page's clock, s: what every session on the page runs by. */
 export const pageSeconds = (): number => performance.now() / MS_PER_SECOND;
@@ -108,8 +107,6 @@ export class PageMatch implements OrderSession {
  * by the drawing, which knows only its own.
  */
 export function sparAngles(state: SimState, ship: number): [id: string, angle: number][] {
-  const s = state.ships[ship];
-  if (!s) return [];
-  const pose = s.motion.pose, sails = rigPlan().sails;
-  return sailsStanding(s.sailing, windAt(state.wind, pose.x, pose.z, simTime(state))).flatMap((st, i) => sails[i]!.on.map((id): [string, number] => [id, st.angle]));
+  const standing = sailsSeen(state, ship)?.standing ?? [], sails = rigPlan().sails;
+  return standing.flatMap((st, i) => sails[i]!.on.map((id): [string, number] => [id, st.angle]));
 }

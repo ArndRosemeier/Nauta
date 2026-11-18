@@ -20,6 +20,7 @@ import { Vector3 } from 'three/webgpu';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { MOST_FRAMES, shipPoint, swingMatrix, swingsOf } from '../src/render/ship/swings.ts';
 import { LINE_OFF_PIN } from '../src/render/ship/rigging.ts';
+import { sailForms, sailPoints } from '../src/render/ship/sailForm.ts';
 
 /** How close a curve through the readings must come to them, m. */
 const ON_READING = 1e-9;
@@ -209,5 +210,7 @@ test('her yards brace round and her boom and gaff swing: each in its own frame, 
     used.add(follow[i]!); used.add(follow[i + 1]!);
     assert.ok(follow[i + 2]! >= 0 && follow[i + 2]! <= 1);
   }
-  assert.deepEqual([...used].sort((a, b) => a - b), [0, ...SWINGS.map((w) => w.frame)]);
+  // Lines made fast to a sail follow its points' frames (N3.10), numbered after the spars'.
+  const points = sailPoints(RIG, sailForms(RIG), SWINGS.length + 1);
+  assert.deepEqual([...used].sort((a, b) => a - b), [0, ...SWINGS.map((w) => w.frame), ...points.map((p) => p.frame)]);
 });
