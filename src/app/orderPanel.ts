@@ -15,9 +15,9 @@ const PANEL_EVERY_MS = 250;
 /** The answers kept on the panel, newest last. */
 const HEARD_LINES = 6;
 /** Who the buttons' groups are for, in the order shown. */
-const GROUPS = ['master', 'first lieutenant', 'gunner'] as const;
+const GROUPS = ['master', 'first lieutenant', 'gunner', 'carpenter'] as const;
 /** Each group's heading. */
-const GROUP_NAMES: Readonly<Record<(typeof GROUPS)[number], string>> = { master: 'Master', 'first lieutenant': 'First lieutenant', gunner: 'Gunner' };
+const GROUP_NAMES: Readonly<Record<(typeof GROUPS)[number], string>> = { master: 'Master', 'first lieutenant': 'First lieutenant', gunner: 'Gunner', carpenter: 'Carpenter' };
 
 export class OrderPanel {
   private readonly status = make('pre', 'orders-status');

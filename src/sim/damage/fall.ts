@@ -68,6 +68,12 @@ function makeTies(): Ties {
 }
 const tiesOf = (): Ties => (ties ??= makeTies());
 
+/** Whether a line is made fast to, or holds or works, a spar that is down: knotting it again would hold nothing. */
+export function lostWith(standing: Standing, line: number): boolean {
+  const t = tiesOf(), serves = t.serves[line]!;
+  return t.lineSpars[line]!.some((s) => standing.down[s]) || (serves >= 0 && standing.down[serves]!);
+}
+
 /** The spar (rig plan place) a part (`sparParts` place) is of. */
 export const sparOfPart = (part: number): number => tiesOf().spar.get(sparParts()[part]!.spar)!;
 

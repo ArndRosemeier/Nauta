@@ -137,7 +137,7 @@
     {
       "field": "told",
       "owner": "src/sim/orders.ts",
-      "what": "what a ship has been told to do: her course or full and by, her canvas, hove to, masts aback, the acts still to be done and the orders being carried out (N3.4); at quarters, the shot, the aim, how her guns fire and the captain's word (N5.3a)"
+      "what": "what a ship has been told to do: her course or full and by, her canvas, hove to, masts aback, the acts still to be done and the orders being carried out (N3.4); at quarters, the shot, the aim, how her guns fire and the captain's word (N5.3a); the orders for her life: the pumps, fire party and wreckage parties and what the carpenter's crew does first (N6.3)"
     },
     {
       "field": "waysClosed",
@@ -308,6 +308,11 @@
       "field": "blownUp",
       "owner": "src/sim/damage.ts",
       "what": "a ship's magazine has gone up (N6.2)"
+    },
+    {
+      "field": "plugged",
+      "owner": "src/sim/damage.ts",
+      "what": "the holes the carpenter's crew has plugged (N6.3)"
     }
   ]
 }

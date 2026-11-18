@@ -41,6 +41,8 @@ export interface GunneryDeck {
   readonly told: ShipOrders;
   /** Her crew after this step's work (who stands at the guns), her sailing (her way, added to her shot) and her pose. */
   readonly crew: Crew;
+  /** The men out of the quarter bill (damage.ts `outOf`): not counted at their guns. */
+  readonly out?: ReadonlySet<number>;
   readonly sailing: Sailing;
   readonly pose: ShipPose;
   /** The enemy's pose, or null when there is none to fire at. */
@@ -84,7 +86,7 @@ function offSide(pose: ShipPose, side: number, muzzle: Vec, target: Vec): boolea
 export function stepGunnery(d: GunneryDeck): Gunnery {
   const told = d.told;
   if (!told.quarters && secured(d.guns)) return { guns: d.guns, fired: [], spent: false };
-  const places = battery(), men = handsAtGuns(d.crew);
+  const places = battery(), men = handsAtGuns(d.crew, undefined, d.out ?? null);
   const target = d.enemy && told.quarters ? aimPoint(d.enemy, d.pose, told.aim) : null;
   const lays: (Lay | null)[] = places.map(() => null);
   const wants = places.map((place, i): GunWant => {

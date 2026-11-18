@@ -78,7 +78,8 @@ test('the buttons give every order of the vocabulary, each canvas, mast, shot an
   assert.deepEqual(buttons.filter((b) => b.to === 'gunner').map((b) => b.label), [
     'round shot', 'chain shot', 'grape shot', 'aim at the hull', 'aim at the rigging', 'aim at the deck', 'fire as they bear', 'hold for my word', 'fire', 'cease firing',
   ]);
-  assert.deepEqual(buttons.filter((b) => b.to === 'first lieutenant').map((b) => b.label).slice(-2), ['beat to quarters', 'stand down']);
+  assert.deepEqual(buttons.filter((b) => b.to === 'first lieutenant').map((b) => b.label).slice(-5), ['beat to quarters', 'stand down', 'hands to the pumps', 'fire party', 'clear the wreckage']);
+  assert.deepEqual(buttons.filter((b) => b.to === 'carpenter').map((b) => b.label), ['plug the shot holes', 'man the pumps']);
   assert.deepEqual(STEER_POINTS.map((_, i) => Math.round(steerPoint(i) / DEGREE)), [0, 45, 90, 135, 180, 225, 270, 315]);
 });
 

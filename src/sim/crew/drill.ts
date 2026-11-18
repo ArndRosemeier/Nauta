@@ -15,7 +15,7 @@
  * where it stands.
  */
 import {
-  GANGS, HELM_PARTS, JOBS, STATIONS_PARTS, WHEEL, type BySail, type Gang, type JobName, type Part,
+  GANGS, HELM_PARTS, JOBS, REPAIRS, STATIONS_PARTS, WHEEL, type BySail, type DrillJob, type Gang, type JobName, type Part, type RepairName,
 } from '../rules/crew';
 import { HANGING, type LineKind, type YardLevel } from '../rules/rig';
 import type { Act } from '../orders';
@@ -43,6 +43,8 @@ export interface JobWork {
   readonly places: readonly string[];
   /** The parts of the ship that man it, in the order they are sent. */
   readonly parts: readonly Part[];
+  /** A repair (rules/crew.ts `REPAIRS`): manned by a count of men (`need` men), of these ranks, or taken from the guns by the quarter bill; done at its task's own spot. */
+  readonly repair?: { readonly ranks: readonly string[] | null; readonly bill: boolean };
 }
 
 /** A job's number for a sail's yard (or the number itself). */
@@ -76,10 +78,10 @@ function yardPlaces(yard: string): string[] {
 }
 
 /** The jobs done by men out on the yard; the rest are hauled from the deck. */
-const ON_THE_YARD: readonly JobName[] = ['loose', 'furl', 'reef'];
+const ON_THE_YARD: readonly DrillJob[] = ['loose', 'furl', 'reef'];
 
 /** A job of a sail: its hands and work for the sail's yard, at the pins of its lines of the job's kinds (or along its yard), by its gang aloft (on the yard) or on deck. */
-function sailWork(job: JobName, sail: Sail): JobWork {
+function sailWork(job: DrillJob, sail: Sail): JobWork {
   const row = JOBS[job], level = yardOf(sail)?.level ?? null, gang = GANGS[gangOf(sail)], aloft = ON_THE_YARD.includes(job);
   let places = aloft ? yardPlaces(yardOf(sail)!.id) : pins(ofKinds(sailLines(sail), row.lines));
   // A sail with none of the job's lines (a headsail run down by its own weight) is worked at its halliard.
@@ -115,7 +117,7 @@ export function shareAt(job: JobName, toDo: number, work: number): number | null
 }
 
 /** A job's work found from scratch (`jobWork` keeps it). */
-function findWork(job: JobName, on: number): JobWork {
+function findWork(job: DrillJob, on: number): JobWork {
   const rig = rigPlan();
   switch (job) {
     case 'helm': return { need: bySail(JOBS.helm.hands, null), work: bySail(JOBS.helm.work, null), places: [WHEEL], parts: HELM_PARTS };
@@ -136,8 +138,18 @@ function findWork(job: JobName, on: number): JobWork {
 
 const works = new Map<string, JobWork>();
 
+/** Whether a job is a repair (rules/crew.ts `REPAIRS`), not one of the sailing drill's. */
+export const isRepair = (job: JobName): job is RepairName => Object.hasOwn(REPAIRS, job);
+
+/** What a repair takes: the same whatever it is done on (its spot is its task's). */
+const repairWork = new Map<RepairName, JobWork>(Object.entries(REPAIRS).map(([job, r]) => [job as RepairName, {
+  need: r.men, work: r.work, places: [], parts: r.who !== 'bill' && 'parts' in r.who ? r.who.parts : [],
+  repair: { ranks: r.who !== 'bill' && 'ranks' in r.who ? r.who.ranks : null, bill: r.who === 'bill' },
+}]));
+
 /** What a job takes (its hands, work, places and parts), from its name and what it is done on; kept once found (a cache, not state). */
 export function jobWork(job: JobName, on: number): JobWork {
+  if (isRepair(job)) return repairWork.get(job)!;
   const key = `${job}:${on}`;
   let w = works.get(key);
   if (!w) { w = findWork(job, on); works.set(key, w); }

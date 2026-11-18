@@ -191,6 +191,9 @@ export function isStanding(order: Order, told: ShipOrders): boolean {
     case 'aim': return told.aim === order.at;
     case 'bear': case 'hold': case 'cease': return told.quarters && told.firing === order.kind;
     case 'fire': return told.word;
+    case 'pumps': case 'fires': case 'wreckage': return told[order.kind] !== null;
+    case 'plug': return told.carpenter === 'plug';
+    case 'pumping': return told.carpenter === 'pump';
     default: return told.given.some((g) => g.order.kind === order.kind);
   }
 }
