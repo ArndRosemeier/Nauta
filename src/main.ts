@@ -384,7 +384,7 @@ async function start(): Promise<void> {
   const hullsNow = (): Hull[] => (match ? match.state.ships.flatMap((_, i) => { const p = match.pose(i); return p ? [{ x: p.x, z: p.z, heading: p.heading }] : []; }) : []);
   const spectator = ship && match ? new Spectator({ hulls: hullsNow, spoken: () => words(settings.now.language), push: () => stick?.push() ?? NO_PUSH, desk: () => matchMedia('(hover: hover) and (pointer: fine)').matches, orderKey: (code) => KEY_ACTIONS.some((a) => !NOT_ORDER_KEYS.includes(a) && settings.now.keys[a] === code) }) : null;
   if (spectator) window.__nautaWatch = {
-    company: (to) => spectator.choose(to),
+    company: (to) => spectator.keepCompanyWith(to),
     flyFor: (seconds, push = {}, look = {}) => {
       input.look = { yaw: look.yaw ?? input.look.yaw, pitch: look.pitch ?? input.look.pitch };
       spectator.forced = { push: { forward: push.forward ?? 0, strafe: push.strafe ?? 0 }, climb: push.climb ?? 0, boost: push.boost ?? false };

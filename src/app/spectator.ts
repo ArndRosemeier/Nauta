@@ -124,7 +124,7 @@ export class Spectator {
   relabel(): void {
     const say = this.page.spoken();
     const companyButton = (name: Company, label: string) => {
-      const b = makeButton(label, () => this.choose(name));
+      const b = makeButton(label, () => this.keepCompanyWith(name));
       b.classList.toggle('on', name === this.company);
       this.buttons.set(name, b);
       return b;
@@ -149,7 +149,7 @@ export class Spectator {
   }
 
   /** A button chosen (or the key beside it): where the eye keeps company, and gliding there for a ship or both. */
-  choose(to: Company): void {
+  keepCompanyWith(to: Company): void {
     this.company = to;
     this.cam.parted();
     for (const [name, b] of this.buttons) b.classList.toggle('on', name === to);
