@@ -28,8 +28,6 @@ const { page } = game;
 await page.addStyleTag({ content: '#version,#orders,#room{display:none!important}' });
 const view = (name) => page.click(`#standpoints button:text-is("${name}")`);
 await view(STANDPOINT.far);
-// The match's clock stopped: slow software frames would let it run on between aiming and the picture.
-await page.evaluate(() => window.__nautaSail.stop(true));
 const problems = [];
 const sail = (fn, arg) => page.evaluate(([f, a]) => window.__nautaSail[f](a), [fn, arg]);
 /** One frame drawn, with nothing run on. */

@@ -1,0 +1,25 @@
+# What both slow-check jobs need before their checks (docs/CHECKS.md): Node, the packages, Playwright's own Chromium
+# and the build. Playwright's Chromium, not the runner's Chrome: the runner's Chrome took 98 s to ready the page where
+# Playwright's Chromium takes 14 s on a machine as large. Kept between runs.
+name: Slow checks' setup
+description: Node, npm ci, Playwright's Chromium (CHROMIUM_PATH) and npm run build
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: npm
+    - run: npm ci
+      shell: bash
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+    - name: Playwright's Chromium
+      shell: bash
+      run: |
+        npx playwright install chromium
+        echo "CHROMIUM_PATH=$(node -e "import('playwright').then((p) => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
+    - run: npm run build
+      shell: bash

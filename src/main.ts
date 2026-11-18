@@ -92,7 +92,8 @@ declare global {
     /**
      * Sailing (`?sail`), for the browser checks: `say` an order in words (as the order panel takes them; answers why
      * not, or ''), and run the match `onward` by so many seconds at once (the sails as drawn catch up with it on the next
-     * frame), resolving once that frame is drawn, or at once when `draw` is false; `sails`: how her sails are drawn
+     * frame), resolving once that frame is drawn, then holding the page until the next (no frame drawn beside the
+     * picture), or at once when `draw` is false; `sails`: how her sails are drawn
      * (set, furled, aback, shivering); `aback`: how many of her sails the match has aback now; `windFrom`: the
      * bearing the mean wind blows from, degrees (tools/shot/sails.mjs).
      */
@@ -102,8 +103,6 @@ declare global {
       aimAtOther: () => number;
       /** How far apart the two ships' middles are as the match stands, m; -1: no other ship. */
       apart: () => number;
-      /** Stops the match's clock (true; only `onward` runs it on, so slow software frames do not) or lets it run again. */
-      stop: (on: boolean) => void;
       /** The glass at the eye at once, drawn out to `power`, or lowered (null); and what the HUD says of the other ship. */
       glass: (power: number | null) => void;
       other: () => { drawn: number; near: boolean; apart: number; draws: number; mine: number } | null;
@@ -124,9 +123,13 @@ async function start(): Promise<void> {
   const sailing = params.sail || params.room || params.join !== null;
   const build = params.ship !== null || walking || sailing ? await loadShip(import.meta.env.BASE_URL) : null;
   const ship = build ? new ShipView(build) : null;
-  /** Seconds the browser checks have run the match on ahead of the page's clock (`__nautaSail.onward`), and the page's clock where they stopped it (`__nautaSail.stop`; null: running). */
-  let ahead = 0, stopped: number | null = null;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => (stopped ?? pageSeconds()) + ahead, params.windAsked ? params.wind : null) : null;
+  /**
+   * Seconds the browser checks have run the match on ahead of the page's clock (`__nautaSail.onward`). Once a check runs
+   * it on, the page's clock stands (`pinned`, the page's seconds then): only the check's jumps move the match, so it is
+   * in the same state at each picture on a fast machine and a slow one.
+   */
+  let ahead = 0, pinned: number | null = null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => (pinned ?? pageSeconds()) + ahead, params.windAsked ? params.wind : null) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   const other = build && match ? new ShipView(build, 1) : null;
@@ -164,7 +167,7 @@ async function start(): Promise<void> {
   // Sailing, the match's own wind and sea are the page's.
   let wind = match ? match.state.wind : makeWind(MATCH_SEED, params.wind, WIND_FROM), blowing = meanWind(wind, 0);
   let seaTime = match ? match.frame().time : 0, sea = match ? match.state.sea : startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
-  /** The clocks stand still (a scene set for a shot); held: the scene is drawn and nothing is drawn until the next. */
+  /** The clocks stand still (a scene set for a shot); held: the scene (or a check's jump, `__nautaSail.onward`) is drawn and nothing is drawn until the next. */
   let still = false, held = false;
   /** Waiting for the scene set by `__nautaScene` to be drawn: frames still to draw, and what to call then. */
   let sceneFrames = 0, sceneDrawn: (() => void) | null = null;
@@ -268,9 +271,12 @@ async function start(): Promise<void> {
     say: (words) => { const o = parseOrder(words, match.ship); if (typeof o === 'string') return o; match.give(o); return ''; },
     onward: (seconds, draw = true) => new Promise((done) => {
       // The match runs on piece by piece, each pumped at once: one jump of minutes would leave it running late instead.
+      pinned ??= pageSeconds();
       for (let left = seconds; left > 0; left -= JUMP_PIECE) { ahead += Math.min(JUMP_PIECE, left); match.frame(); }
       jump += seconds;
-      if (draw) jumped = done; else done();
+      // Drawn: the frames start again for the one that catches up, and hold after it, as for a scene set for a shot (no
+      // frame is drawn beside the picture; on the checks' software GPU each costs seconds).
+      if (draw) { jumped = done; held = false; last = performance.now(); } else done();
     }),
     sails: () => ship!.sails.summary(),
     aback: () => sailsSeen(match.state, match.ship)?.standing.filter((st) => st.aback).length ?? 0,
@@ -287,10 +293,6 @@ async function start(): Promise<void> {
     apart: () => {
       const a = match.pose(match.ship), b = match.other >= 0 ? match.pose(match.other) : null;
       return a && b ? Math.hypot(a.x - b.x, a.z - b.z) : -1;
-    },
-    stop: (on) => {
-      if (on && stopped === null) stopped = pageSeconds();
-      else if (!on && stopped !== null) { ahead -= pageSeconds() - stopped; stopped = null; }
     },
     glass: (power) => {
       if (!glass) return;
@@ -451,7 +453,7 @@ async function start(): Promise<void> {
     bench?.worked(performance.now() - now);
     trial?.measured(now, performance.now() - now, crew?.stats.ms ?? 0, view.renderer.info.render.drawCalls);
     frames++;
-    if (jumped && jump === 0) { jumped(); jumped = null; }
+    if (jumped && jump === 0) { jumped(); jumped = null; held = true; }
     if (sceneDrawn && --sceneFrames <= 0) { sceneDrawn(); sceneDrawn = null; held = true; }
     if (showHud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
