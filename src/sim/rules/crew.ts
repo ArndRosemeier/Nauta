@@ -3,7 +3,7 @@
  * bill that tells each man where he stands and what part of the ship he works, the jobs an order comes to (the hands
  * each needs, the work it takes, where it is done) and how an order travels down to the men. Read by src/sim/crew/.
  *
- * **First proposals for gate G4.** The complement is the Cruizer class's 121 (ship.md); how it is split follows the
+ * **First proposals for gate G4.** The complement is a reduced fighting complement of 80 (ship.md, design ruling 2026-11-18; the class carried 121); how it is split follows the
  * usual establishment of an 18-gun brig-sloop about 1805 (a commander, two lieutenants, a master, the warrant officers,
  * about twenty marines, eight boys, the rest seamen and landsmen), not one ship's muster book. The hands and seconds of
  * each job are tuned for pace (fun before realism, nauta-plan.md), so that a full crew takes about the times N3.4's
@@ -73,7 +73,7 @@ const IDLER = 0.6;
 const BOY = 0.4;
 
 /**
- * The brig's people, 121 officers, men and boys (ship.md). The captain is the player: he is on the roster and stands
+ * The brig's people, 80 officers, men and boys (ship.md: the reduced fighting complement). The captain is the player: he is on the roster and stands
  * on the quarterdeck, and is never sent. Topmen: the captain of each top and three men have their post in their top
  * (a lookout and the first to lay out), the rest stand at the guns. Marines stand along the quarterdeck rails, the
  * boys by the magazine and the hatches the powder comes up.
@@ -83,24 +83,18 @@ export const ROSTER: readonly RankRow[] = [
   { rank: 'first lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], paces: QUARTERDECK_WALKS.starboard },
   { rank: 'second lieutenant', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
   { rank: 'master', count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'] },
-  { rank: "master's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-wheel'], idle: ['station-bunk'] },
-  { rank: 'midshipman', count: 2, part: 'officers', skill: ABLE, posts: ['station-quarterdeck', 'station-waist'], idle: ['station-quarterdeck', 'station-bunk'] },
+  { rank: 'midshipman', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], idle: ['station-quarterdeck'] },
   { rank: 'surgeon', count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
-  { rank: "surgeon's mate", count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
-  { rank: 'purser', count: 1, part: 'officers', skill: IDLER, posts: ['station-surgeon'] },
-  { rank: "captain's clerk", count: 1, part: 'officers', skill: IDLER, posts: ['station-quarterdeck'], idle: ['station-bunk'] },
   { rank: 'gunner', count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
   { rank: 'boatswain', count: 1, part: 'officers', skill: ABLE, posts: ['station-quarterdeck'], paces: QUARTERDECK_WALKS.larboard },
   { rank: 'carpenter', count: 1, part: 'officers', skill: ABLE, posts: ['station-pumps'], idle: ['station-bunk'] },
-  { rank: "boatswain's mate", count: 2, part: 'officers', skill: ABLE, posts: ['station-waist', 'pin-bow-pins-s6'], idle: ['station-bunk'] },
+  { rank: "boatswain's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-waist'], idle: ['station-bunk'] },
   { rank: "gunner's mate", count: 1, part: 'officers', skill: ABLE, posts: ['station-magazine'] },
   { rank: "carpenter's mate", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-workshop-a'] },
   { rank: 'quartermaster', count: 4, part: 'helm', skill: ABLE, posts: ['station-wheel'], idle: ['station-wheel', 'station-wheel', 'station-bunk'] },
   { rank: 'cook', count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-fore-ladder-foot'], idle: ['station-galley-cook'] },
-  { rank: "captain's steward", count: 1, part: 'idlers', skill: IDLER, posts: ['ladder-companion-ladder-foot'] },
   { rank: 'sailmaker', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-sailroom-bench'] },
-  { rank: 'armourer', count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-bunk'] },
-  { rank: "carpenter's crew", count: 2, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-workshop-b', 'station-workshop-c'] },
+  { rank: "carpenter's crew", count: 1, part: 'idlers', skill: IDLER, posts: ['station-pumps'], idle: ['station-workshop-b'] },
   // The marines (design ruling 2026-11-18: the quarterdeck is the captain's). Before quarters two sentries aft by the
   // taffrail, one at the cabin door, the rest in the waist or below on the berth deck; at quarters the two stay aft,
   // six go to the tops, six to the forecastle and five line the waist's engaged side.
@@ -108,30 +102,27 @@ export const ROSTER: readonly RankRow[] = [
   { rank: 'corporal of marines', count: 1, part: 'marines', skill: MARINE, posts: ['station-sentries'], quarters: ['station-sentries'] },
   { rank: 'drummer', count: 1, part: 'officers', skill: MARINE, posts: ['station-quarterdeck'], idle: ['station-bunk'] },
   {
-    rank: 'private of marines', count: 17, part: 'marines', skill: MARINE,
-    posts: ['station-sentries', 'station-cabin-door', ...Array<string>(7).fill('station-marines-waist'), ...Array<string>(8).fill('station-marines-below')],
-    idle: ['station-sentries', 'station-cabin-door', ...Array<string>(15).fill('station-bunk')],
-    quarters: [
-      'station-sentries', ...Array<string>(4).fill('station-marines-*'),
-      'top-fore-s', 'top-fore-p', 'top-fore-s', 'top-main-s', 'top-main-p', 'top-main-s', ...Array<string>(6).fill('station-forecastle'),
-    ],
+    rank: 'private of marines', count: 6, part: 'marines', skill: MARINE,
+    posts: ['station-sentries', 'station-cabin-door', ...Array<string>(2).fill('station-marines-waist'), ...Array<string>(2).fill('station-marines-below')],
+    idle: ['station-sentries', 'station-cabin-door', ...Array<string>(4).fill('station-bunk')],
+    quarters: ['station-sentries', 'station-marines-*', 'top-fore-s', 'top-main-s', ...Array<string>(2).fill('station-forecastle')],
   },
-  { rank: 'boy', count: 8, part: 'boys', skill: BOY, posts: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-after-ladder-head', 'ladder-magazine-ladder-head'], idle: ['station-magazine', 'station-bunk'] },
+  { rank: 'boy', count: 5, part: 'boys', skill: BOY, posts: ['station-magazine', 'ladder-fore-ladder-head', 'ladder-after-ladder-head', 'ladder-magazine-ladder-head'], idle: ['station-magazine', 'station-bunk'] },
   { rank: 'captain of the foretop', count: 1, part: 'foretop', skill: PETTY, posts: ['top-fore-s'] },
   { rank: 'fore topman', count: 3, part: 'foretop', skill: ABLE, posts: ['top-fore-p', 'top-fore-s', 'top-fore-p'], idle: ['station-bunk'] },
-  { rank: 'fore topman', count: 6, part: 'foretop', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'fore topman', count: 4, part: 'foretop', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
   { rank: 'captain of the maintop', count: 1, part: 'maintop', skill: PETTY, posts: ['top-main-s'] },
   { rank: 'main topman', count: 3, part: 'maintop', skill: ABLE, posts: ['top-main-p', 'top-main-s', 'top-main-p'], idle: ['station-bunk'] },
-  { rank: 'main topman', count: 8, part: 'maintop', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'main topman', count: 4, part: 'maintop', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
   { rank: 'captain of the forecastle', count: 1, part: 'forecastle', skill: PETTY, posts: 'guns', idle: ['station-bunk'] },
-  { rank: 'forecastle man', count: 11, part: 'forecastle', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'forecastle man', count: 6, part: 'forecastle', skill: ABLE, posts: 'guns', idle: ['station-bunk'] },
   { rank: 'captain of the afterguard', count: 1, part: 'afterguard', skill: PETTY, posts: 'guns', idle: ['station-bunk'] },
-  { rank: 'afterguard', count: 11, part: 'afterguard', skill: ORDINARY, posts: 'guns', idle: ['station-bunk'] },
-  { rank: 'waister', count: 19, part: 'waist', skill: LANDSMAN, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'afterguard', count: 6, part: 'afterguard', skill: ORDINARY, posts: 'guns', idle: ['station-bunk'] },
+  { rank: 'waister', count: 17, part: 'waist', skill: LANDSMAN, posts: 'guns', idle: ['station-bunk'] },
 ];
 
 /** How many she carries (ship.md): the roster adds up to it (tested). */
-export const COMPLEMENT = 121;
+export const COMPLEMENT = 80;
 
 /**
  * The jobs an order comes to (crew/drill.ts): what each is, where it is done, how many hands it needs and how many
@@ -170,14 +161,14 @@ export interface JobRow {
 
 export const JOBS: Readonly<Record<DrillJob, JobRow>> = {
   helm: { what: 'the helm put over', hands: 1, work: 1.5, lines: null },
-  stations: { what: 'the hands at the braces and headsail sheets', hands: 12, work: 2, lines: ['brace', 'sheet'] },
-  brace: { what: "a mast's yards swung round", hands: 8, work: 8, lines: ['brace'] },
-  loose: { what: 'a square sail loosed on its yard', hands: { course: 4, topsail: 4, topgallant: 2 }, work: { course: 6, topsail: 8, topgallant: 5 }, lines: null },
-  sheet: { what: 'a square sail sheeted home and hoisted', hands: { course: 8, topsail: 10, topgallant: 4 }, work: { course: 6, topsail: 8, topgallant: 5 }, lines: ['sheet', 'tack', 'halliard'] },
-  clew: { what: 'a square sail clewed up', hands: { course: 6, topsail: 4, topgallant: 2 }, work: { course: 6, topsail: 6, topgallant: 4 }, lines: ['clewgarnet', 'clewline', 'buntline'] },
-  furl: { what: 'a square sail furled on its yard', hands: { course: 4, topsail: 4, topgallant: 2 }, work: { course: 12, topsail: 12, topgallant: 8 }, lines: null },
-  reef: { what: 'a reef taken in or shaken out on the yard', hands: { course: 4, topsail: 4, topgallant: 2 }, work: { course: 12, topsail: 14, topgallant: 8 }, lines: null },
-  hoist: { what: 'a fore-and-aft sail hoisted and sheeted', hands: 4, work: 5, lines: ['halliard', 'sheet', 'outhaul'] },
+  stations: { what: 'the hands at the braces and headsail sheets', hands: 10, work: 2, lines: ['brace', 'sheet'] },
+  brace: { what: "a mast's yards swung round", hands: 6, work: 8, lines: ['brace'] },
+  loose: { what: 'a square sail loosed on its yard', hands: { course: 3, topsail: 3, topgallant: 2 }, work: { course: 6, topsail: 8, topgallant: 5 }, lines: null },
+  sheet: { what: 'a square sail sheeted home and hoisted', hands: { course: 6, topsail: 8, topgallant: 3 }, work: { course: 6, topsail: 8, topgallant: 5 }, lines: ['sheet', 'tack', 'halliard'] },
+  clew: { what: 'a square sail clewed up', hands: { course: 5, topsail: 3, topgallant: 2 }, work: { course: 6, topsail: 6, topgallant: 4 }, lines: ['clewgarnet', 'clewline', 'buntline'] },
+  furl: { what: 'a square sail furled on its yard', hands: { course: 3, topsail: 3, topgallant: 2 }, work: { course: 12, topsail: 12, topgallant: 8 }, lines: null },
+  reef: { what: 'a reef taken in or shaken out on the yard', hands: { course: 3, topsail: 3, topgallant: 2 }, work: { course: 12, topsail: 14, topgallant: 8 }, lines: null },
+  hoist: { what: 'a fore-and-aft sail hoisted and sheeted', hands: 2.5, work: 5, lines: ['halliard', 'sheet', 'outhaul'] },
   douse: { what: 'a fore-and-aft sail hauled down or brailed', hands: 2, work: 4, lines: ['downhaul', 'brail'] },
 };
 
@@ -259,15 +250,15 @@ export interface RepairRow {
   readonly who: RepairHands;
 }
 
-/** The six the quarter bill posts at the pumps: the carpenter's crew (rules above). */
-export const CARPENTERS: readonly string[] = ['carpenter', "carpenter's mate", 'sailmaker', 'armourer', "carpenter's crew"];
+/** The four the quarter bill posts at the pumps: the carpenter's crew (rules above). */
+export const CARPENTERS: readonly string[] = ['carpenter', "carpenter's mate", 'sailmaker', "carpenter's crew"];
 /** The work of a job that lasts while it is needed (the pumps, a fire): it is dropped when no longer wanted, not finished. */
 export const STANDING_WORK = 3600;
 
 export const REPAIRS: Readonly<Record<RepairName, RepairRow>> = {
   plug: { what: 'a shot hole plugged', men: 2, work: 60, who: { ranks: CARPENTERS } },
   fish: { what: 'a wounded spar fished', men: 2, work: 90, who: { ranks: ['carpenter', "carpenter's mate"] } },
-  splice: { what: 'a cut line knotted and spliced', men: 3, work: 60, who: { ranks: ['boatswain', "boatswain's mate"] } },
+  splice: { what: 'a cut line knotted and spliced', men: 2, work: 60, who: { ranks: ['boatswain', "boatswain's mate"] } },
   tackle: { what: 'the relieving tackles rigged', men: 4, work: 90, who: { parts: HELM_PARTS } },
   cut: { what: 'the wreckage cut away', men: 6, work: 60, who: { parts: ['forecastle'] } },
   pump: { what: 'hands at the pumps', men: 8, work: STANDING_WORK, who: 'bill' },
@@ -280,7 +271,7 @@ export const REPAIRS: Readonly<Record<RepairName, RepairRow>> = {
  * How many plugging parties of two the carpenter's crew makes: one (the carpenter and his mate) unasked, every pair when
  * the carpenter is told to plug first or the first lieutenant's pump hands free them, none when told to pump first.
  */
-export const PLUG_PARTIES = { unasked: 1, all: 3 } as const;
+export const PLUG_PARTIES = { unasked: 1, all: 2 } as const;
 /** At most this many parties carry the wounded below at once; the others wait where they lie until one is free. */
 export const CARRY_PARTIES = 4;
 /** Holes plugged: those in her planking up to this far above her waterline (m), which her roll and the sea bring under. */

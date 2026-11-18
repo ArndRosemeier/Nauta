@@ -31,7 +31,7 @@ What is new: the hull form, the structure, the decks below, the rig, the sails, 
 | Draught | about 3.5 m, deeper aft; fixed from the draught |
 | Weight afloat | about 450 to 500 t, fixed from the lines (N2.1's 3 % test) |
 | Burthen | 382 tons |
-| Crew | 121 officers, men and boys |
+| Crew | 80 officers, men and boys: a reduced fighting complement (the class carried 121; design ruling 2026-11-18, Arnd: fewer men give the authentic feel and a lighter deck). Gun crews of four, reloads 15 % slower than a crew of six would give; sail jobs about 20 % fewer hands; the pump, fire and repair parties keep their sizes (the guns pay for the cut) |
 | Guns | 16 × 32-pounder carronades on slides, 8 a side; 2 × long 6-pounders in the foremost ports, shifted to the bow as chasers |
 | Rig | brig: two square-rigged masts, a fore-and-aft main boom sail, headsails on a bowsprit and jib-boom |
 | Sails | fore and main course, topsail, topgallant (6 square sails); main boom sail; fore topmast staysail, jib, flying jib; two staysails between the masts. 11 in all. No studding sails or royals in the first game |

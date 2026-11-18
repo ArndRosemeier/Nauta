@@ -51,24 +51,25 @@ export interface GunRow {
  * The brig's two kinds (ship.md; design decisions for N5): the 32-pounder carronade on its slide, 8 a side, and the
  * long 6-pounder on its truck carriage, one a side in the foremost ports. Both elevate from 5° down to 11° up. The
  * carronade's slide pivots at the port and trains with its tackles, so it slews faster than the long gun, which is
- * levered round by handspikes.
+ * levered round by handspikes. Their reloads are the crew of four's (design ruling 2026-11-18, the reduced complement: about
+ * 15 % slower than the crew of six, 35 and 30 s).
  */
 export const GUNS: Readonly<Record<GunKind, GunRow>> = {
   carronade: {
     what: '32-pounder carronade', train: 30 * DEGREE, depress: 5 * DEGREE, elevate: 11 * DEGREE,
-    reload: 35, recoil: 1.5, runIn: 6, trainRate: 5 * DEGREE, elevateRate: 2 * DEGREE,
+    reload: 40, recoil: 1.5, runIn: 6, trainRate: 5 * DEGREE, elevateRate: 2 * DEGREE,
   },
   long6: {
     what: 'long 6-pounder', train: 20 * DEGREE, depress: 5 * DEGREE, elevate: 11 * DEGREE,
-    reload: 30, recoil: 1.5, runIn: 6, trainRate: 3 * DEGREE, elevateRate: 2 * DEGREE,
+    reload: 35, recoil: 1.5, runIn: 6, trainRate: 3 * DEGREE, elevateRate: 2 * DEGREE,
   },
 };
 
 /**
  * Short hands (the design decision): a gun's full crew is a man at each of her crew places (the plan's `crew`); with
  * men missing, her handwork (the drill's hand steps, and laying her) stretches in proportion to the hands missing: each
- * missing share of her crew adds that share of the time, times STRETCH. So with two of five men missing a reload's
- * handwork takes 1.4 times as long. More men than her places do not hurry her.
+ * missing share of her crew adds that share of the time, times STRETCH. So with one of four men missing a reload's
+ * handwork takes 1.33 times as long. More men than her places do not hurry her.
  */
 export const STRETCH = 1;
 /** With fewer men than this at a gun she stops: no drill, no laying, no firing (one man cannot run out a gun). */

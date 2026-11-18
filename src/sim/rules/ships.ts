@@ -519,7 +519,7 @@ export const GUN_FOOTPRINT: Readonly<Record<GunKind, { readonly inboard: number;
 };
 /** A gun's crew places, m: [inboard from her side, along her from the gun's middle] (the captain of the gun behind it, the rest at the tackles either side). */
 export const GUN_CREW: readonly (readonly [inboard: number, along: number])[] = [
-  [2.4, 0], [1.0, 0.85], [1.0, -0.85], [1.7, 0.85], [1.7, -0.85],
+  [2.4, 0], [1.0, 0.85], [1.0, -0.85], [1.7, 0.85],
 ];
 /** Where a powder boy stands to hand over his cartridge at a gun (m inboard of her side, m along the gun's port): by her captain, between her crew and the next gun's. */
 export const POWDER_BOY: readonly [inboard: number, along: number] = [2.4, -1.0];
@@ -602,7 +602,6 @@ export const STATIONS: readonly StationRow[] = [
   { id: 'sailroom-bench', name: 'the sail room', who: 'the sailmaker', orders: [], space: 'sailroom', along: 11.9, across: -2.5 },
   { id: 'workshop-a', name: "the fore hold, the carpenter's stores", who: "the carpenter's mate", orders: [], space: 'fore-hold', along: 12.5, across: 0.45 },
   { id: 'workshop-b', name: "the fore hold, the carpenter's stores", who: "the carpenter's crew", orders: [], space: 'fore-hold', along: 13.4, across: 0.45 },
-  { id: 'workshop-c', name: "the fore hold, the carpenter's stores", who: "the carpenter's crew", orders: [], space: 'fore-hold', along: 13.4, across: -0.45 },
   ...BUNK_STATIONS,
 ];
 /**
@@ -660,7 +659,7 @@ export const LOADS: readonly (readonly [what: string, tonnes: number, height: nu
   ['boats on the skids and at the davits', 2.5, 7.4],
   ['water for ten weeks, in casks', 53, 2.3],
   ['provisions for ten weeks, in casks and bins', 17, 2.7],
-  ['121 men and their hammocks, bags and chests', 13.3, 4.6],
+  ['80 men and their hammocks, bags and chests', 13.3, 4.6],
   ["boatswain's, carpenter's and gunner's stores, spare sails", 10, 3.6],
   ['galley stove, coals and wood', 4, 4],
   ['ballast: iron pigs and shingle', 65, 1.5],

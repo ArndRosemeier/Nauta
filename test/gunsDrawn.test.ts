@@ -29,7 +29,7 @@ const PACK = decodePack(new Uint8Array(readFileSync('public/ship/fittings.fmpk')
 const MATCH: SimState = startMatch({ seed: SEED, windForce: 3, windFrom: 0, ships: [{ x: 0, z: 0, heading: 0 }, { x: 200, z: 0, heading: 0 }] });
 const SHIP: SimShip = MATCH.ships[0]!;
 /** A full crew a gun, and the steps a reload takes them at most. */
-const FULL = 5;
+const FULL = 4;
 const RELOAD_STEPS = 40 * STEPS_PER_SECOND;
 const NONE = () => Number.NaN;
 const NEAR = 1e-9;

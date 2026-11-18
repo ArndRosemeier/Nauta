@@ -1,0 +1,2 @@
+The brig now sails with about 80 men instead of 121: fewer on deck, still a full crew at every job. Gun crews are four men, so a gun is loaded a little slower.
+Try it: ?sail, order quarters and plain sail and watch the deck.
