@@ -31,6 +31,13 @@ test('every kind of plain value comes back bit for bit', () => {
   sameBits(value, decode(encode(value)));
 });
 
+test('a number of whole thousandths travels short and comes back the very same bits; one that is not stays a double', () => {
+  const places = [8.74, -3.558, 0.001, -0.5, 14.4478, 123456.789, 0.1, 0.7, 1 / 3, 14.44780641152, 2 ** 31 / 1000, 1e-9];
+  for (const x of places) assert.ok(Object.is(decode(encode(x)), x), String(x));
+  assert.ok(encode(8.74).length < encode(14.44780641152).length, 'thousandths are short');
+  assert.ok(Object.is(decode(encode(-0)), -0));
+});
+
 test('the bytes do not depend on the order fields were made in, so neither does the hash', () => {
   const a = { x: 1.5, y: [1, { p: 2, q: 3 }], z: 'z' };
   const b = { z: 'z', y: [1, { q: 3, p: 2 }], x: 1.5 };

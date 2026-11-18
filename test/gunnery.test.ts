@@ -17,6 +17,7 @@ import { step, type SimEvent } from '../src/sim/step.ts';
 import { DEGREE, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { meanWind } from '../src/sim/wind.ts';
 import { eventWords } from '../src/app/orderReport.ts';
+import { musterCrew } from './support/muster.ts';
 import { EACH, MODERATE, SEED } from './support/orders.ts';
 
 /** How far off her starboard beam the enemy lies, m: well inside the carronades' reach. */
@@ -40,7 +41,7 @@ const READY: Battery = (() => {
 function duel(guns: Battery = startGuns()): SimState {
   const at = toWorld(startMotion(0, 0, 0).pose, RANGE, 0, 0);
   const s = startMatch({ seed: SEED, windForce: MODERATE, windFrom: 0, ships: [{ x: 0, z: 0, heading: 0 }, { x: at[0], z: at[2], heading: 0 }] });
-  return { ...s, ships: s.ships.map((ship, i) => (i === 0 ? { ...ship, guns } : ship)) };
+  return { ...s, ships: s.ships.map((ship, i) => (i === 0 ? { ...ship, guns, crew: musterCrew() } : { ...ship, crew: musterCrew() })) };
 }
 const STILL = Object.freeze(duel());
 const LOADED = Object.freeze(duel(READY));

@@ -6,8 +6,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { encode } from '../src/sim/codec.ts';
-import { startCrew, type Crew } from '../src/sim/crew/crew.ts';
+import { type Crew } from '../src/sim/crew/crew.ts';
 import { brigRoster } from '../src/sim/crew/roster.ts';
+import { musterCrew } from './support/muster.ts';
 import {
   ANGLE_UNIT, battery, cannotFire, dismountGun, drillPace, drillSeconds, fireGun, gunAt, gunCount, handsAtGuns, handWork, laidAt,
   standingWants, startGuns, stepGuns, withinArcs, type Battery, type Gun, type GunWant,
@@ -135,7 +136,7 @@ test('laying goes at her rate within her arcs, slower short-handed, not while sh
 });
 
 test('the men at each gun are read from the crew: the quarter bill stands two or three at each gun', () => {
-  const crew = startCrew(), men = handsAtGuns(crew);
+  const crew = musterCrew(), men = handsAtGuns(crew);
   assert.equal(men.length, battery().length);
   assert.ok(men.every((n) => n >= 2 && n <= 3), men.join(' '));
   // A man sent away is no longer at his gun; one standing at a gun place that is not his post counts there.
@@ -149,7 +150,7 @@ test('the men at each gun are read from the crew: the quarter bill stands two or
 });
 
 test('a battery with no orders stands still; it is plain whole numbers, a few bytes a gun', () => {
-  const guns = startGuns(), men = handsAtGuns(startCrew());
+  const guns = startGuns(), men = handsAtGuns(musterCrew());
   assert.equal(stepGuns(guns, men, standingWants(guns)), guns);
   assert.ok(guns.every(Number.isInteger));
   assert.ok(encode(guns).length < 100, `${encode(guns).length} bytes housed`);

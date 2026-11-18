@@ -121,8 +121,8 @@ export function startCrew(roster: readonly Man[] = brigRoster()): Crew {
 /** Whether two spots are the same. */
 export const sameSpot = (a: Spot, b: Spot): boolean => a.space === b.space && a.along === b.along && a.across === b.across;
 
-/** Where a man stands (his post when `stands` is null), or set out from when on his way. */
-const standing = (h: Hand, m: Man): Spot => h.going?.path.from ?? h.stands ?? placeSpot(m.post);
+/** Where a man stands (his home place when `stands` is null), or set out from when on his way. */
+const standing = (h: Hand, m: Man): Spot => h.going?.path.from ?? h.stands ?? placeSpot(m.home);
 
 let posts: Map<string, number> | null = null;
 /** A crew place's spot by id and the height of its floor or surface, m above her base (kept: places do not move). */
@@ -134,23 +134,23 @@ export function placeAt(id: string): { spot: Spot; height: number } {
   return { spot, height: h };
 }
 
-/** Where a man is now (on his way, standing where he got to, or at his post `post`) and the height he stands at, m above her base. */
-export function manAt(hand: Hand, post: string): { spot: Spot; height: number } {
+/** Where a man is now (on his way, standing where he got to, or at his home place `home`, `Man.home`) and the height he stands at, m above her base. */
+export function manAt(hand: Hand, home: string): { spot: Spot; height: number } {
   if (hand.going) { const w = goingAt(hand.going); return { spot: w, height: w.height }; }
-  return hand.stands ? { spot: hand.stands, height: heightAt(routeNetwork(), hand.stands) } : placeAt(post);
+  return hand.stands ? { spot: hand.stands, height: heightAt(routeNetwork(), hand.stands) } : placeAt(home);
 }
 
-/** Where a man must be: the place of his task, or his post. */
+/** Where a man must be: the place of his task, or his home place. */
 function target(i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Task>): Spot {
   const t = byMan.get(i);
-  if (!t) return placeSpot(roster[i]!.post);
+  if (!t) return placeSpot(roster[i]!.home);
   if (t.at) return t.at;
   const places = jobWork(t.job, t.on).places;
   return placeSpot(places[t.hands.indexOf(i) % places.length]!);
 }
 
 /**
- * Where a man with no task goes: his post; at quarters, a man at no gun to his place at quarters (`Man.quarters`), a gun's man stands to his pair's gun on the side she fights
+ * Where a man with no task goes: his home place (`Man.home`: where he stands by); at quarters, a man at no gun to his place at quarters (`Man.quarters`), a gun's man stands to his pair's gun on the side she fights
  * (roster.ts `quartersPlace`), at his post when she fights both sides (his pair split), and where he stands or is
  * going while neither side bears, if that is at one of his pair's guns.
  */
@@ -159,7 +159,8 @@ function restPlace(i: number, h: Hand, roster: readonly Man[], quarters: Engaged
   // A man at no gun with a place at quarters (the marines): there, on the side she fights; while neither or both
   // sides bear, the men take the sides in turn.
   if (quarters !== undefined && marine !== null) return atQuartersOf(marine, typeof quarters === 'number' ? quarters : SIDES[i % SIDES.length]!);
-  if (quarters === undefined || quarters === 'both' || roster[i]!.gun === null) return post;
+  if (quarters === undefined) return roster[i]!.home;
+  if (quarters === 'both' || roster[i]!.gun === null) return post;
   if (quarters !== 'none') return quartersPlace(i, quarters, roster) ?? post;
   const at = h.going?.path.to ?? h.stands;
   if (!at) return post;
@@ -364,8 +365,8 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
   let c = strikeOut(syncRepairs(syncTasks(crew, told, deck), deck.repairs ?? [], deck.tick), out, roster);
   // An act with nothing left to do (its sail already stands as told) is done at once.
   const idle = told.acts.filter((a) => !c.tasks.some((t) => t.act === a.id)).map((a) => a.id);
-  // Nothing to do and every man at his post (unless she fights a side at quarters: then the gun crews stand to it).
-  if (c.tasks.length === 0 && typeof deck.quarters !== 'number' && c.men.every((h) => h.going === null && h.stands === null)) return { crew: c, done: idle, events: [], sails: [], mended: [] };
+  // Nothing to do and every man at home (unless she is at quarters: then the gun crews stand to their posts).
+  if (c.tasks.length === 0 && deck.quarters === undefined && c.men.every((h) => h.going === null && h.stands === null)) return { crew: c, done: idle, events: [], sails: [], mended: [] };
   const events: CrewEvent[] = [];
   let tasks = manTasks(c.tasks, c.men, roster, deck.tick, out);
   const byMan = new Map(tasks.flatMap((t) => t.hands.map((i) => [i, t] as const)));
@@ -378,7 +379,7 @@ export function stepCrew(crew: Crew, told: ShipOrders, deck: Deck, roster: reado
     const going = moved.goings[i] ?? null;
     if (going) return { ...h, going };
     const end = h.going.path.to;
-    return { stands: sameSpot(end, placeSpot(roster[i]!.post)) ? null : end, going: null, blocked: null };
+    return { stands: sameSpot(end, placeSpot(roster[i]!.home)) ? null : end, going: null, blocked: null };
   });
   men = carried(tasks, men, roster);
   tasks = work(tasks, men, roster, byMan, deck.tick, events);

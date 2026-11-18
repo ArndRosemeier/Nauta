@@ -155,7 +155,7 @@ export class CrewWatch {
     this.hauling(s, out);
     this.bell(s, out);
     if (s.drum) {
-      const d = manAt(s.ship.crew.men[this.drummer]!, this.roster[this.drummer]!.post);
+      const d = manAt(s.ship.crew.men[this.drummer]!, this.roster[this.drummer]!.home);
       out.beds.push(this.bed(s, DRUM, DRUM.id, DRUM.gain, d.spot, d.height, DRUM_HEIGHT, DRUM_GLIDE));
     }
     return out;
@@ -212,7 +212,7 @@ export class CrewWatch {
     while (this.calls.length > 0 && s.t >= this.callFree) {
       const w = this.calls.shift()!;
       if (s.t - w.wanted > CALL_STALE) continue;
-      const b = manAt(s.ship.crew.men[this.boatswain]!, this.roster[this.boatswain]!.post);
+      const b = manAt(s.ship.crew.men[this.boatswain]!, this.roster[this.boatswain]!.home);
       out.shots.push(this.shot(s, w.call, w.gain, b.spot, b.height, PIPE_HEIGHT, 0));
       this.callFree = s.t + w.call.seconds + CALL_GAP;
     }

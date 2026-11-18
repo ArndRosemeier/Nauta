@@ -7,7 +7,9 @@
  * whatever order their fields were made in, and the hash of the bytes is the hash of the value.
  *
  * **Exact.** A whole number that fits 32 bits travels as a zigzag varint (one to five bytes); every other number,
- * -0, NaN and the infinities included, as its 8 bytes of IEEE double. Decoding gives back the very same bits.
+ * -0, NaN and the infinities included, as its 8 bytes of IEEE double, except a number that is a whole count of
+ * thousandths (a place of her plan: 8.74 m), which travels as that count, a zigzag varint. Decoding gives back the
+ * very same bits.
  *
  * **What it carries:** numbers, strings, booleans, null, arrays and plain objects. A key whose value is `undefined`
  * is left out, as JSON does; anything else (functions, typed arrays, maps, class instances) is refused, so no state
@@ -27,7 +29,7 @@ export type Plain = number | string | boolean | null | readonly Plain[] | { read
 type Fields = { readonly [key: string]: unknown };
 
 /** The tag byte before each value. */
-const enum Tag { Null, False, True, Int, Double, Text, List, Record }
+const enum Tag { Null, False, True, Int, Double, Text, List, Record, Thousandths }
 
 /** Bits of a byte, and of a varint's byte that carry its number (the top bit says "more follows"). */
 const BYTE = 8;
@@ -40,6 +42,8 @@ const WORD_BYTES = 4;
 /** The largest and smallest whole numbers sent as a varint (32-bit signed). */
 const INT_MOST = 0x7fffffff;
 const INT_LEAST = -0x80000000;
+/** A number sent as a count of thousandths is that count over this. */
+const THOUSANDTHS = 1000;
 /** The first size of the writer's buffer, bytes; it doubles when full. */
 const FIRST_BUFFER = 1024;
 /** Hex digits of one 32-bit lane of the hash. */
@@ -107,6 +111,17 @@ function isInt(x: number): boolean {
   return Number.isInteger(x) && x >= INT_LEAST && x <= INT_MOST && !Object.is(x, -0);
 }
 
+/** Whether a number is exactly a whole count of thousandths within 32 bits (the count over 1000 gives the very same bits back): the count, else null. */
+function thousandths(x: number): number | null {
+  const n = Math.round(x * THOUSANDTHS);
+  return n >= INT_LEAST && n <= INT_MOST && n / THOUSANDTHS === x && !Object.is(x, -0) ? n : null;
+}
+
+/** A 32-bit whole number as a zigzag varint: small negative numbers stay short. */
+function zigzag(n: number): number {
+  return (n << 1) ^ (n >> (BYTE * WORD_BYTES - 1));
+}
+
 /** Every key used anywhere in `value`, into `table` in the order first met (sorted within each object). */
 function gatherKeys(value: unknown, table: Map<string, number>, path: string): void {
   if (value === null || typeof value !== 'object') return;
@@ -127,8 +142,10 @@ function writeValue(w: Writer, value: unknown, table: Map<string, number>, path:
     case 'number':
       if (isInt(value)) {
         w.byte(Tag.Int);
-        // Zigzag: small negative numbers stay short.
-        w.varint((value << 1) ^ (value >> (BYTE * WORD_BYTES - 1)));
+        w.varint(zigzag(value));
+      } else if (thousandths(value) !== null) {
+        w.byte(Tag.Thousandths);
+        w.varint(zigzag(thousandths(value)!));
       } else {
         w.byte(Tag.Double);
         w.double(value);
@@ -226,6 +243,10 @@ function readValue(r: Reader, keys: readonly string[]): Plain {
     case Tag.Int: {
       const u = r.varint();
       return (u >>> 1) ^ -(u & 1);
+    }
+    case Tag.Thousandths: {
+      const u = r.varint();
+      return ((u >>> 1) ^ -(u & 1)) / THOUSANDTHS;
     }
     case Tag.Double: return r.double();
     case Tag.Text: return r.text();

@@ -23,11 +23,12 @@ import { duelStart } from '../src/sim/start.ts';
 import { step, type SimEvent } from '../src/sim/step.ts';
 import { SECONDS_PER_MINUTE, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { holesUnder } from './support/damage.ts';
+import { musterCrew } from './support/muster.ts';
 
 /** Two ships lying still in a calm 300 m apart, the first with the damage `damage`. */
 function pair(damage: Partial<Damage> = {}, minutes?: number): SimState {
   const s = startMatch({ seed: 9, windForce: 0, windFrom: 0, minutes, ships: [{ x: 0, z: 0, heading: Math.PI / 2, canvas: 'bare' }, { x: 0, z: 300, heading: Math.PI / 2, canvas: 'bare' }] });
-  return { ...s, ships: s.ships.map((sh, i) => (i === 0 ? { ...sh, damage: { ...startDamage(), ...damage } } : sh)) };
+  return { ...s, ships: s.ships.map((sh, i) => (i === 0 ? { ...sh, crew: musterCrew(), damage: { ...startDamage(), ...damage } } : { ...sh, crew: musterCrew() })) };
 }
 
 /** One step with `orders`: the state after and its events. */

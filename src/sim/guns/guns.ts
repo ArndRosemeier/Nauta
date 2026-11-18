@@ -157,7 +157,7 @@ export function handsAtGuns(crew: Crew, roster: readonly Man[] = brigRoster(), s
   const at = gunsByPlace(), out = battery().map(() => 0);
   crew.men.forEach((h, i) => {
     if (h.going || struck?.has(i)) return;
-    const g = at.get(h.stands ? spotKey(h.stands) : roster[i]!.post);
+    const g = at.get(h.stands ? spotKey(h.stands) : roster[i]!.home);
     if (g !== undefined) out[g]!++;
   });
   return out;

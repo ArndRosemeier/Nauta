@@ -87,8 +87,9 @@ function broadsideByOrders(): void {
   }
 }
 
-/** The crews at quarters in a whole match (orders.md): the most each part may take, s (crossing the deck smartly is about 5 s). */
+/** The crews at quarters in a whole match (orders.md): the most each part may take, s: crossing the deck smartly is about 5 s; beating to quarters from standing by in the waist, on the forecastle and below (design ruling 2026-11-18) about 30 s. */
 const MANNED_WITHIN = 20;
+const MUSTERED_WITHIN = 40;
 /** How near a gun with her whole crew reloads to the table's time, s. */
 const RELOAD_SLACK = 1;
 /** The longest the gun crews' check runs, s. */
@@ -101,7 +102,7 @@ const ABEAM = 150;
  * `ABEAM` off the first's starboard beam; she beats to quarters and fires as they bear. Her pairs' crews go to the
  * starboard guns, and a gun there reloads in the table's time with her whole crew; then the enemy is put on her
  * larboard beam (at once: a stand-in for the sailing that brings her there, which the computer captains' check
- * covers), and the crews cross the deck. Fails if a side is not manned within `MANNED_WITHIN` of coming to bear, or a
+ * covers), and the crews cross the deck. Fails if the first side is not manned within `MUSTERED_WITHIN` of the order, or the other within `MANNED_WITHIN` of coming to bear, or a
  * reload strays.
  */
 function crewsAtQuarters(): void {
@@ -131,7 +132,7 @@ function crewsAtQuarters(): void {
   const man = secs(at.bore, at.manned), reload = secs(at.fired, at.ready), cross = secs(at.crossBore, at.crossed);
   const row = GUNS[battery()[Math.max(0, gun)]!.gun];
   console.log(`crews at quarters: starboard manned ${man.toFixed(1)} s after it bore; a ${row.what} reloaded in ${reload.toFixed(1)} s (table ${row.reload} s); crossed to larboard in ${cross.toFixed(1)} s after it bore`);
-  if (!(man <= MANNED_WITHIN)) problems.push(`crews: the starboard guns manned ${man.toFixed(1)} s after that side bore`);
+  if (!(man <= MUSTERED_WITHIN)) problems.push(`crews: the starboard guns manned ${man.toFixed(1)} s after quarters were beaten`);
   if (!(Math.abs(reload - row.reload) <= RELOAD_SLACK)) problems.push(`crews: a gun with her whole crew reloaded in ${reload.toFixed(1)} s, the table says ${row.reload} s`);
   if (!(cross <= MANNED_WITHIN)) problems.push(`crews: the crews crossed to larboard ${cross.toFixed(1)} s after it bore`);
 }

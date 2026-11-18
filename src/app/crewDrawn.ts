@@ -101,9 +101,9 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
     const w = goingAt(hand.going);
     return { along: w.along, across: w.across, height: w.height, space: w.space, yaw: Math.atan2(w.facing[1], -w.facing[0]), way: w.way === null ? null : goingRoute(hand.going).legs[hand.going.leg]?.kind ?? null, moving: true };
   }
-  const at = manAt(hand, m.post), own = !task && !hand.stands ? postSpots().get(man) : undefined;
+  const at = manAt(hand, m.home), own = !task && !hand.stands ? postSpots().get(man) : undefined;
   let { along, across } = own ?? at.spot, yaw = FORWARD, height = own?.height ?? at.height;
-  const place = task ? placeOf(task, man) : hand.stands ? null : { id: m.post, rank: 0 };
+  const place = task ? placeOf(task, man) : hand.stands ? null : { id: m.home, rank: 0 };
   const kind = place ? crewPlaces().get(place.id)?.kind : undefined;
   if (kind && FACING_OUT.has(kind)) yaw = across >= 0 ? QUARTER : -QUARTER;
   if (task && place && place.rank > 0 && HAULING.has(task.job)) {
@@ -122,7 +122,7 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
 interface Stand { readonly along: number; readonly across: number; readonly height: number }
 
 /**
- * Where each man of the roster stands at his post when the match has him there: the first man of each post on it,
+ * Where each man of the roster stands at his home place when the match has him there: the first man of each post on it,
  * then the others on the nearest clear points about theirs (`AROUND`, along the side first; those who share the
  * captain's post 2 m from him), each a step from every man placed
  * before him (some places of her plan lie closer than that: a pin beside a gun's place). Worked out once: the roster
@@ -132,11 +132,11 @@ function postSpots(): Map<number, Stand> {
   if (posted) return posted;
   const net = routeNetwork(), roster = brigRoster(), out = new Map<number, Stand>(), taken: Spot[] = [], first = new Set<string>();
   const clear = (p: Spot, gap: number) => taken.every((t) => floorApart(t, p) >= gap - TINY);
-  const captain = placeSpot(roster[CAPTAIN]!.post);
+  const captain = placeSpot(roster[CAPTAIN]!.home);
   const put = (i: number) => {
-    const spot = placeSpot(roster[i]!.post), inboard = spot.across >= 0 ? -1 : 1, aloft = net.surfaces.get(spot.space);
+    const spot = placeSpot(roster[i]!.home), inboard = spot.across >= 0 ? -1 : 1, aloft = net.surfaces.get(spot.space);
     // The officers who share his post keep their distance from the captain (the quarterdeck is his: design ruling 2026-11-18).
-    const room = i !== CAPTAIN && roster[i]!.post === roster[CAPTAIN]!.post ? CAPTAIN_ROOM : 0;
+    const room = i !== CAPTAIN && roster[i]!.home === roster[CAPTAIN]!.home ? CAPTAIN_ROOM : 0;
     // On a yard the places are its own; in a top or on the crosstrees, the men a half step apart round the place.
     if (aloft && aloft.kind !== 'top' && aloft.kind !== 'crosstrees') return;
     for (const gap of aloft ? [SPREAD / 2] : [SPREAD, SPREAD / 2]) {
@@ -152,7 +152,7 @@ function postSpots(): Map<number, Stand> {
       }
     }
   };
-  const firsts = roster.map((m, i) => (first.has(m.post) ? -1 : (first.add(m.post), i))).filter((i) => i >= 0);
+  const firsts = roster.map((m, i) => (first.has(m.home) ? -1 : (first.add(m.home), i))).filter((i) => i >= 0);
   for (const i of firsts) put(i);
   roster.forEach((_, i) => { if (!firsts.includes(i)) put(i); });
   return (posted = out);
