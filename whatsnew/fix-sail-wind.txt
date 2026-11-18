@@ -1,0 +1,1 @@
+?sail now sails in the wind the address names: ?sail&wind=7 gives a near gale, ?sail&sea=calm a calm. Without it the match keeps its own weather.

@@ -27,8 +27,9 @@ export class PageMatch implements OrderSession {
   private readonly heard = new Set<(events: readonly SimEvent[]) => void>();
   private readonly changed = new Set<() => void>();
 
-  constructor(build: string, seed: number | null, now = pageSeconds) {
-    this.current = this.attach(new DuelSession({ build, now, seed: seed ?? undefined }));
+  /** `windForce`: the address's wind (`?wind=`), over the start's own; null: the start's. */
+  constructor(build: string, seed: number | null, now = pageSeconds, windForce: number | null = null) {
+    this.current = this.attach(new DuelSession({ build, now, seed: seed ?? undefined, windForce: windForce ?? undefined }));
     this.drawnNow = this.current.drawn();
     setInterval(() => this.current.pump(), PUMP_MS);
   }
