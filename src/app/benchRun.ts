@@ -5,6 +5,7 @@
  */
 import { BENCH_SETTLE_SECONDS, benchPose, frameStats, statsLines, type BenchPose } from './bench';
 import { formatBytes } from '../probe/report';
+import { makeButton } from './button';
 import { MS_PER_SECOND } from '../sim/units';
 
 /** How often the live line and the memory are read, ms. */
@@ -99,11 +100,7 @@ export class BenchRun {
     ].join('\n');
     window.__nautaBench = text;
     this.el.textContent = text;
-    const again = document.createElement('button');
-    again.type = 'button';
-    again.textContent = 'Run again';
-    again.addEventListener('click', () => this.restart());
-    this.el.append('\n', again);
+    this.el.append('\n', makeButton('Run again', () => this.restart()));
   }
 
   private restart(): void {

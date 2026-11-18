@@ -28,6 +28,25 @@ export interface QualityKnobs {
   readonly shipFarFrom: number;
   /** A ship's wake map (render/wakeMap.ts, N2.5): 2 fills the near level and the far one (the long wake out to 256 m), 1 the near only (128 m). */
   readonly wakeLevels: number;
+  /** The crew's levels of detail and animation rates (plan N4.0, src/app/crewLevels.ts). */
+  readonly crew: CrewKnobs;
+}
+
+/** What a quality level sets for the crew (plan N4.0): how many men get detail, out to where, and how often each animates. */
+export interface CrewKnobs {
+  /** At most this many men are drawn above Actors' one-draw crowd level, the nearest seen. */
+  readonly detailed: number;
+  /** Out to here a man in view is drawn in full detail (Actors' "Full", fingers and all), m; 0: never. */
+  readonly fullTo: number;
+  /** Out to here in Actors' "Medium" level (the base mesh, garments at half their triangles), m; beyond, the crowd level. */
+  readonly mediumTo: number;
+  /** Out to each distance a man in view is animated every `steps[i]`-th frame, m; beyond the last, every `steps[last]`-th. */
+  readonly stepsTo: readonly number[];
+  readonly steps: readonly number[];
+  /** Men not seen (out of view, or in a room of hers not drawn) animate every this many frames. */
+  readonly hiddenStep: number;
+  /** Out to here from the eye a man casts the sun's shadow, m. */
+  readonly shadowTo: number;
 }
 
 export interface QualityLevel extends QualityKnobs {
@@ -41,10 +60,10 @@ export interface QualityLevel extends QualityKnobs {
  * rig's rope shadows and how near another ship turns to her far version.
  */
 export const QUALITY_LEVELS: readonly QualityLevel[] = [
-  { name: 'high', renderScale: 1, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2 },
-  { name: 'medium', renderScale: 0.8, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2 },
-  { name: 'low', renderScale: 0.65, seaCells: 8, fineSeaBands: 2, fineSeaSize: 256, ropeShadows: false, shipFarFrom: 100, wakeLevels: 2 },
-  { name: 'lowest', renderScale: 0.5, seaCells: 8, fineSeaBands: 2, fineSeaSize: 128, ropeShadows: false, shipFarFrom: 80, wakeLevels: 1 },
+  { name: 'high', renderScale: 1, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, crew: { detailed: 12, fullTo: 5, mediumTo: 16, stepsTo: [12, 40], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 25 } },
+  { name: 'medium', renderScale: 0.8, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, crew: { detailed: 8, fullTo: 4, mediumTo: 12, stepsTo: [10, 35], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 20 } },
+  { name: 'low', renderScale: 0.65, seaCells: 8, fineSeaBands: 2, fineSeaSize: 256, ropeShadows: false, shipFarFrom: 100, wakeLevels: 2, crew: { detailed: 6, fullTo: 0, mediumTo: 10, stepsTo: [8, 30], steps: [1, 3, 6], hiddenStep: 12, shadowTo: 15 } },
+  { name: 'lowest', renderScale: 0.5, seaCells: 8, fineSeaBands: 2, fineSeaSize: 128, ropeShadows: false, shipFarFrom: 80, wakeLevels: 1, crew: { detailed: 4, fullTo: 0, mediumTo: 6, stepsTo: [6, 25], steps: [2, 4, 8], hiddenStep: 16, shadowTo: 10 } },
 ];
 
 /** The frame rate a level must hold. */

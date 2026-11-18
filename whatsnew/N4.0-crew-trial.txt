@@ -1,0 +1,3 @@
+Add ?crew to the address: 240 men stand on the brig and where the enemy's deck would be, all animated, to find out what a full crew costs on the iPad. The mustering takes a while behind the loading screen.
+Tap "Run the crew trial" at the top right and do not touch the screen for about a minute: it measures the frame without the crew, with one crew and with both, and leaves the numbers on the screen to read off.
+?crew=aboard puts both crews on her own decks instead. If the page closes itself while mustering, add &men=60 for fewer men per crew.

@@ -3,6 +3,7 @@
  * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`; two players:
  * `?room`, `?join=K7Q2ZP`, `?key=`, `?hub=`, `?seed=`, `?netcheck`). Pure: it takes the query string.
  */
+import { CREW_SIZE } from './crew';
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
@@ -86,6 +87,15 @@ export interface Params {
   readonly seed: number | null;
   /** The network check's bare page (`?netcheck`, tools/net/room.mjs): a match through the hub without drawing. */
   readonly netcheck: boolean;
+  /**
+   * The crew trial (`?crew`, plan N4.0): 240 men on her, the other crew where her twin would lie off her bow
+   * (`?crew` or `?crew=twin`) or on her own deck too (`?crew=aboard`); null: no crew.
+   */
+  readonly crew: 'twin' | 'aboard' | null;
+  /** Men in each crew (`?men=60`): fewer than the full 120 where a whole crew of characters does not fit the tablet's memory. */
+  readonly men: number;
+  /** Start the crew trial's measured run at once (`?trial`), instead of on its button. */
+  readonly trial: boolean;
 }
 
 export function readParams(query: string): Params {
@@ -98,7 +108,7 @@ export function readParams(query: string): Params {
   return {
     hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
     dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
-    ship: q.get('ship') ?? q.get('slice'), quality: q.get('quality'), walk: q.get('walk'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(force),
+    ship: q.get('ship') ?? q.get('slice') ?? (q.has('crew') ? '' : null), quality: q.get('quality'), walk: q.get('walk'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(force),
     look: q.has('yaw') || q.has('pitch')
       ? { yaw: num('yaw', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE, pitch: num('pitch', 0, -PITCH_LIMIT / DEGREE, PITCH_LIMIT / DEGREE) * DEGREE }
       : null,
@@ -109,6 +119,7 @@ export function readParams(query: string): Params {
     sail: q.has('sail'),
     room: q.has('room'), join: q.get('join') || null, key: q.get('key') || null, hub: q.get('hub') || null,
     seed: q.has('seed') ? Math.round(num('seed', 0, 0, SEED_MOST)) : null, netcheck: q.has('netcheck'),
+    crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'), men: Math.round(num('men', CREW_SIZE, 1, CREW_SIZE)),
   };
 }
 
