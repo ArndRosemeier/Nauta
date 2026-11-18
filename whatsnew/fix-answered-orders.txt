@@ -1,0 +1,1 @@
+Behind the scenes: when the master takes an order but has something to say ("wearing round, sir", "she will not lie 225"), the game now knows it as an answer, not a refusal. The Orders panel in ?sail looks the same; the crew's speech bubbles will use it.

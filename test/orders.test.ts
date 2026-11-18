@@ -1,8 +1,8 @@
 /**
  * The captain's orders (implementation plan N3.4): every order parses from its words and back; orders she cannot take
- * are refused with a reason as an event; a course closer than close-hauled is answered and changed; a course on the
- * other tack is reached by wearing, never through the wind, and the master says so; heaving to takes in and backs what
- * the design says. Short rules on one brig in a whole match (sea and wind), a few simulated seconds each. Carried out
+ * are refused with a reason as an event; a course closer than close-hauled is answered (an `answered` event with its
+ * code) and changed; a course on the other tack is reached by wearing, never through the wind, and the master says so;
+ * heaving to takes in and backs what the design says. Short rules on one brig in a whole match (sea and wind), a few simulated seconds each. Carried out
  * over minutes (she wears round, tacks, lies still hove to, gets under way again) they are scenarios of
  * `npm run check:sailing`; the crew carrying the orders out is in test/ordersCrew.test.ts.
  */
@@ -19,7 +19,7 @@ import { rigPlan } from '../src/sim/ship/rig.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import { DEGREE } from '../src/sim/units.ts';
 import { steadyWind } from './support/sail.ts';
-import { EACH, FROM, MODERATE, SEED, reasons, run, underWay, windFrom } from './support/orders.ts';
+import { EACH, FROM, MODERATE, SEED, answers, reasons, run, underWay, windFrom } from './support/orders.ts';
 
 /** On the beam in a moderate breeze, settled: built once for the file (states are plain data, never changed). */
 const BEAM = Object.freeze(underWay(MODERATE, 90));
@@ -94,28 +94,31 @@ test('a course closer than close-hauled is answered: she will not lie it, and st
   const s = BEAM, from = windFrom(s);
   // 30° to the east of the wind: on her own (larboard) tack.
   const r = run(s, 1, [{ kind: 'steer', ship: 0, heading: from + 30 * DEGREE }]);
-  assert.match(reasons(r.events)[0]!, new RegExp(`will not lie ${headingWords(from + 30 * DEGREE)}: full and by on the larboard tack, ${headingWords(from + CLOSE_HAULED)}$`));
+  assert.deepEqual(reasons(r.events), [], 'taken, not refused');
+  assert.match(answers(r.events)[0]!, new RegExp(`^will not lie: she will not lie ${headingWords(from + 30 * DEGREE)}: full and by on the larboard tack, ${headingWords(from + CLOSE_HAULED)}$`));
   assert.deepEqual(r.state.ships[0]!.told.helm, { heading: 0, by: -1 });
   const helm = helmAct(r.state);
   assert.ok(Math.abs(angleDiff(helm.heading, from + CLOSE_HAULED)) < 1e-9 && helm.turn === 0, 'the helmsman is told close-hauled, the short way');
   // On the other side of the wind's eye, the nearer tack is the other one: she wears round to it.
-  assert.match(reasons(run(s, 1, [{ kind: 'steer', ship: 0, heading: from - 30 * DEGREE }]).events)[0]!, /starboard tack, \d{3}, wearing round/);
+  assert.match(answers(run(s, 1, [{ kind: 'steer', ship: 0, heading: from - 30 * DEGREE }]).events)[0]!, /^will not lie: .*starboard tack, \d{3}, wearing round$/);
   // Coming up a point at a time stops at close-hauled the same way.
   let up = run(s, 1, [{ kind: 'steer', ship: 0, heading: from + 90 * DEGREE }]).state;
   up = run(up, 1, [EACH.up, EACH.up]).state;
   assert.ok(Math.abs(angleDiff(up.ships[0]!.told.helm.heading, from + 90 * DEGREE - 2 * POINT)) < 1e-9, 'two points up from the beam');
-  assert.match(reasons(run(up, 1, [EACH.up]).events)[0]!, /will not lie/);
+  assert.match(answers(run(up, 1, [EACH.up]).events)[0]!, /^will not lie: /);
 });
 
 test('a course on the other tack is reached by wearing, never through the wind, and the master says so; tack takes her through it', () => {
   // On the larboard tack heading east (the wind from the north), 270 lies on the other tack: the helm turns her away
   // from the wind (to starboard, through south), and the course is still taken.
   const wear = run(BEAM, 1, [{ kind: 'steer', ship: 0, heading: 270 * DEGREE }]);
-  assert.deepEqual(reasons(wear.events), ['wearing round, sir: 270 lies on the other tack']);
+  assert.deepEqual(reasons(wear.events), []);
+  assert.deepEqual(answers(wear.events), ['wearing round: wearing round, sir: 270 lies on the other tack']);
   assert.deepEqual(wear.state.ships[0]!.told.given.map((g) => g.order.kind), ['steer']);
   assert.deepEqual(helmAct(wear.state), { heading: 270 * DEGREE, turn: 1 });
   // A course on her own tack is simply taken.
-  assert.deepEqual(reasons(run(BEAM, 1, [{ kind: 'steer', ship: 0, heading: 120 * DEGREE }]).events), []);
+  const own = run(BEAM, 1, [{ kind: 'steer', ship: 0, heading: 120 * DEGREE }]).events;
+  assert.deepEqual([...reasons(own), ...answers(own)], []);
   // Tack: full and by on the other tack, the helm turning her up through the wind (to larboard), the hands at their stations first.
   const tack = run(BEAM, 1, [EACH.tack]).state.ships[0]!;
   assert.deepEqual(tack.told.helm, { heading: 0, by: 1 });

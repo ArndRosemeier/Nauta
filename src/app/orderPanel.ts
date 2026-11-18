@@ -48,7 +48,7 @@ export class OrderPanel {
     document.body.append(panel);
     session.on('events', (events) => {
       for (const e of events) {
-        const words = eventWords(e, session.state, session.ship);
+        const words = eventWords(e, session.ship);
         if (words) this.hear(words);
       }
     });

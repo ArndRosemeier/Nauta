@@ -134,21 +134,12 @@ export function clockWords(tick: number): string {
   return `${pad(Math.floor(seconds / SECONDS_PER_MINUTE))}:${pad(seconds % SECONDS_PER_MINUTE)}`;
 }
 
-/** Two orders alike (as given and as kept in `told.given`, perhaps sent between machines). */
-const sameOrder = (a: Order, b: Order): boolean => orderWords(a) === orderWords(b) && a.ship === b.ship;
-
-/**
- * What an event of my ship says on the panel, or null when it is not about her. A refused order whose order she
- * kept (`told.given` in `state`, the state after the event's step) was taken with words: the master's answer.
- */
-export function eventWords(e: SimEvent, state: SimState, ship: number): string | null {
+/** What an event of my ship says on the panel, or null when it is not about her: an order refused is crossed, one taken with words gives the master's answer. */
+export function eventWords(e: SimEvent, ship: number): string | null {
   const at = clockWords(e.tick);
   switch (e.kind) {
-    case 'refused': {
-      if (e.order.ship !== ship) return null;
-      const taken = state.ships[ship]?.told.given.some((g) => g.tick === e.tick && sameOrder(g.order, e.order));
-      return taken ? `${at} ${orderWords(e.order)}: ${e.reason}` : `${at} ✗ ${orderWords(e.order)}: ${e.reason}`;
-    }
+    case 'refused': return e.order.ship === ship ? `${at} ✗ ${orderWords(e.order)}: ${e.reason}` : null;
+    case 'answered': return e.ship === ship ? `${at} ${orderWords(e.order)}: ${e.reason}` : null;
     case 'done': return e.ship === ship ? `${at} ✓ ${orderWords(e.order)}: done` : null;
     case 'tacked': return e.ship === ship ? `${at} she has come through the wind` : null;
     case 'wore': return e.ship === ship ? `${at} she has worn round` : null;

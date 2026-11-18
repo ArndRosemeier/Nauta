@@ -113,8 +113,7 @@ test('orders from another machine are checked: junk is refused or dropped, never
   send({ kind: 'orders', orders: 'all' });
   send({ kind: 'orders', orders: [null, { seq: 'x' }, { seq: 1, order: 'tack' }, { seq: 2, order: { kind: 'steer', heading: 'north' } }, { seq: 3, order: { kind: 'steer', ship: 0, heading: 2, extra: 'x'.repeat(1000) } }, { seq: 3, order: { kind: 'tack' } }, { seq: 4, order: { kind: 'sail', canvas: { a: 1 } } }] });
   assert.doesNotThrow(() => room.run(STEPS_PER_SECOND));
-  // (A course that makes her wear is answered in words too, as taken: not one of the refusals here.)
-  const refused = heard.filter((e) => e.kind === 'refused' && !/^wearing round/.test(e.reason)).map((e) => e.kind === 'refused' && [e.order.ship, e.reason]);
+  const refused = heard.filter((e) => e.kind === 'refused').map((e) => e.kind === 'refused' && [e.order.ship, e.reason]);
   assert.equal(refused.length, 3);
   for (const r of refused) assert.equal((r as [number, string])[0], 1, 'named to the sender\'s ship');
   assert.match(String(refused[0]), /no order ""/);

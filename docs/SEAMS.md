@@ -287,7 +287,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | An order in its own words | `src/sim/orders.ts#orderWords` |
 | A compass course in words (`090`) | `src/sim/orders.ts#headingWords` |
 | Why an order is no order at all (an untrusted order from another machine) | `src/sim/orders.ts#malformed` |
-| Giving a ship an order: taken, refused with its reason, or answered and changed (a course she will not lie); what she is told and the acts for the crew | `src/sim/orders.ts#giveOrder` |
+| Giving a ship an order: taken, refused with its reason, or taken with words (an `answered` event with its code: a course she will not lie, wearing round); what she is told and the acts for the crew | `src/sim/orders.ts#giveOrder` |
 | Carrying out a ship's orders each step: the acts the crew finished done to her sailing, orders done reported, full and by following the wind | `src/sim/orders.ts#carryOut` |
 | What she is told after missing stays (the master bears away on the old tack) | `src/sim/orders.ts#heard` |
 | A ship's orders at the start | `src/sim/orders.ts#startOrders` |

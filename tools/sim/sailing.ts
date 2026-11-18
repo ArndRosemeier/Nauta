@@ -129,7 +129,7 @@ function events(s: SimState, seconds: number, order: Order): { state: SimState; 
 }
 const fromOf = (s: SimState) => meanWind(s.wind, simTime(s)).from;
 const kindsOf = (seen: { e: SimEvent }[]) => seen.map(({ e }) => e.kind);
-const answers = (seen: { e: SimEvent }[]) => seen.flatMap(({ e }) => (e.kind === 'refused' ? [e.reason] : []));
+const answers = (seen: { e: SimEvent }[]) => seen.flatMap(({ e }) => (e.kind === 'answered' ? [e.reason] : []));
 const she = (s: SimState) => s.ships[0]!.sailing;
 const degrees = (a: number) => `${(a / DEGREE).toFixed(0)}°`;
 /** How near a course she must come, rad, and how fast she must be going to count as under way, m/s. */

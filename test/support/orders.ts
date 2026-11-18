@@ -37,6 +37,8 @@ export function run(s: SimState, seconds: number, orders: readonly Order[] = [],
 export const windFrom = (s: SimState): number => meanWind(s.wind, simTime(s)).from;
 export const kinds = (events: { e: SimEvent }[]) => events.map(({ e }) => e.kind);
 export const reasons = (events: { e: SimEvent }[]) => events.flatMap(({ e }) => (e.kind === 'refused' ? [e.reason] : []));
+/** The master's answers to orders taken with words, code and words. */
+export const answers = (events: { e: SimEvent }[]) => events.flatMap(({ e }) => (e.kind === 'answered' ? [`${e.code}: ${e.reason}`] : []));
 
 /** One order of each kind of the vocabulary, for ship 0. */
 export const EACH: Readonly<Record<OrderKind, Order>> = {
