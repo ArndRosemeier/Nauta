@@ -1,8 +1,8 @@
-# What both slow-check jobs need before their checks (docs/CHECKS.md): Node, the packages, Playwright's own Chromium
-# and the build. Playwright's Chromium, not the runner's Chrome: the runner's Chrome took 98 s to ready the page where
+# What both slow-check jobs need before their checks (docs/CHECKS.md): Node, the packages, Playwright's own Chromium,
+# the character pack (the officers of the order fan stand on every match's page, N4.4) and the build. Playwright's Chromium, not the runner's Chrome: the runner's Chrome took 98 s to ready the page where
 # Playwright's Chromium takes 14 s on a machine as large. Kept between runs.
 name: Slow checks' setup
-description: Node, npm ci, Playwright's Chromium (CHROMIUM_PATH) and npm run build
+description: Node, npm ci, Playwright's Chromium (CHROMIUM_PATH), npm run packs and npm run build
 runs:
   using: composite
   steps:
@@ -21,5 +21,12 @@ runs:
       run: |
         npx playwright install chromium
         echo "CHROMIUM_PATH=$(node -e "import('playwright').then((p) => console.log(p.chromium.executablePath()))")" >> "$GITHUB_ENV"
+    # The crew's character pack (plan N4.0), as the deploy takes it (pages.yml): the Actors release's archive kept per version.
+    - uses: actions/cache@v4
+      with:
+        path: node_modules/.cache/actors
+        key: actors-packs-${{ hashFiles('package-lock.json') }}
+    - run: npm run packs
+      shell: bash
     - run: npm run build
       shell: bash
