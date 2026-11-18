@@ -13,6 +13,10 @@
  * filling to get under way again, and the order panel's eight compass points from a start under way, each reached
  * or answered with full and by.
  *
+ * Then every set sail drawing (design decisions for N3): in steady sailing, full and by and on every course the master
+ * accepts from close-hauled to a run, in every wind and canvas, no set sail lies aback or shivers (sailing.ts
+ * `sailsStanding`, what the drawing shows). Prints the angle she lies full and by, and her speed there.
+ *
  *   npm run check:sailing
  */
 import {
@@ -24,8 +28,8 @@ import type { Order } from '../../src/sim/orders.ts';
 import { NO_WAY } from '../../src/sim/rules/orders.ts';
 import { JOBS, PASSED } from '../../src/sim/rules/crew.ts';
 import { rigPlan } from '../../src/sim/ship/rig.ts';
-import { canvasFor } from '../../src/sim/ship/sailing.ts';
-import { meanWind } from '../../src/sim/wind.ts';
+import { canvasFor, sailsStanding } from '../../src/sim/ship/sailing.ts';
+import { meanWind, windAt } from '../../src/sim/wind.ts';
 import { simTime } from '../../src/sim/state.ts';
 import { STEER_POINTS, steerPoint } from '../../src/app/orderReport.ts';
 import { angleDiff } from '@futuremagic/core';
@@ -209,6 +213,44 @@ function orderScenarios(): string[] {
   return out;
 }
 console.log(`orders: ${orderScenarios().join('; ')}`);
+
+/** Every set sail drawing: the courses given (off the wind, degrees; 0 for full and by), and how long she settles before and is watched after, s. */
+const DRAWING_COURSES = [0, 75, 90, 120, 150, 180];
+const DRAWING_CANVASES: readonly CanvasName[] = ['battle', 'plain', 'all'];
+const DRAWING_SETTLE = 90;
+const DRAWING_WATCH = 120;
+/** A start a little off the course, as if she had just come round to it, m/s. */
+const DRAWING_START_SPEED = 2;
+
+/** Sailed on a course in steady sailing: her mean angle off the wind (rad) and speed (m/s), and the sails seen aback or shivering, with the share of the time. */
+function drawing(force: number, canvas: CanvasName, off: number): { off: number; speed: number; lifting: string[]; share: number } {
+  const start = startMatch({ seed: SEED, windForce: force, windFrom: FROM, ships: [{ x: 0, z: 0, heading: FROM + (off || CLOSE_HAULED / DEGREE) * DEGREE, canvas, speed: DRAWING_START_SPEED }] });
+  const order: Order = off ? { kind: 'steer', ship: 0, heading: FROM + off * DEGREE } : { kind: 'by', ship: 0 };
+  const lifting = new Set<string>();
+  let angle = 0, speed = 0, bad = 0, n = 0;
+  run(run(start, DRAWING_SETTLE, undefined, [order]), DRAWING_WATCH, (s) => {
+    const p = s.ships[0]!.motion.pose, wind = windAt(s.wind, p.x, p.z, simTime(s));
+    const seen = sailsStanding(she(s), wind).filter((x) => x.area > 0 && (x.aback || x.shivering));
+    for (const x of seen) lifting.add(`${x.id} ${x.aback ? 'aback' : 'shivering'}`);
+    if (seen.length) bad++;
+    angle += Math.abs(angleDiff(she(s).heading, fromOf(s)));
+    speed += she(s).ahead;
+    n++;
+  });
+  return { off: angle / n, speed: speed / n, lifting: [...lifting], share: bad / n };
+}
+
+const lies: string[] = [];
+for (const force of FORCES) {
+  for (const canvas of DRAWING_CANVASES) {
+    for (const off of DRAWING_COURSES) {
+      const d = drawing(force, canvas, off);
+      if (!off) lies.push(`${force} ${canvas} ${degrees(d.off)} ${(d.speed / KNOT).toFixed(1)} kn`);
+      if (d.lifting.length) problems.push(`force ${force}, ${canvas} sail, ${off ? `${off}° off the wind` : 'full and by'}: ${d.lifting.join(', ')} (${(100 * d.share).toFixed(1)} % of the time)`);
+    }
+  }
+}
+console.log(`every set sail drawing on ${DRAWING_COURSES.length} courses × ${FORCES.length} winds × ${DRAWING_CANVASES.length} canvases; full and by (force, canvas, off the wind, speed): ${lies.join('; ')}`);
 console.log(`sailing: ${FORCES.length} winds × ${CANVASES.length} canvases, ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 for (const p of problems) console.log(`PROBLEM: ${p}`);
 process.exit(problems.length ? 1 : 0);

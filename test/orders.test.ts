@@ -14,9 +14,10 @@ import {
 } from '../src/sim/orders.ts';
 import { HOVE_TO_IN, POINT } from '../src/sim/rules/orders.ts';
 import { CLOSE_HAULED } from '../src/sim/rules/sailing.ts';
-import { startSailing } from '../src/sim/ship/sailing.ts';
+import { closestOff, startSailing } from '../src/sim/ship/sailing.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
-import { startMatch, type SimState } from '../src/sim/state.ts';
+import { simTime, startMatch, type SimState } from '../src/sim/state.ts';
+import { meanWind } from '../src/sim/wind.ts';
 import { DEGREE } from '../src/sim/units.ts';
 import { steadyWind } from './support/sail.ts';
 import { EACH, FROM, MODERATE, SEED, answers, reasons, run, underWay, windFrom } from './support/orders.ts';
@@ -95,17 +96,29 @@ test('a course closer than close-hauled is answered: she will not lie it, and st
   // 30° to the east of the wind: on her own (larboard) tack.
   const r = run(s, 1, [{ kind: 'steer', ship: 0, heading: from + 30 * DEGREE }]);
   assert.deepEqual(reasons(r.events), [], 'taken, not refused');
-  assert.match(answers(r.events)[0]!, new RegExp(`^will not lie: she will not lie ${headingWords(from + 30 * DEGREE)}: full and by on the larboard tack, ${headingWords(from + CLOSE_HAULED)}$`));
+  // The master names where her set sails hold her full: as close as she lies, never closer than close-hauled.
+  const lies = closestOff(s.ships[0]!.sailing, meanWind(s.wind, simTime(s)), -1);
+  assert.ok(lies >= CLOSE_HAULED);
+  assert.match(answers(r.events)[0]!, new RegExp(`^will not lie: she will not lie ${headingWords(from + 30 * DEGREE)}: full and by on the larboard tack, ${headingWords(from + lies)}$`));
   assert.deepEqual(r.state.ships[0]!.told.helm, { heading: 0, by: -1 });
   const helm = helmAct(r.state);
   assert.ok(Math.abs(angleDiff(helm.heading, from + CLOSE_HAULED)) < 1e-9 && helm.turn === 0, 'the helmsman is told close-hauled, the short way');
   // On the other side of the wind's eye, the nearer tack is the other one: she wears round to it.
   assert.match(answers(run(s, 1, [{ kind: 'steer', ship: 0, heading: from - 30 * DEGREE }]).events)[0]!, /^will not lie: .*starboard tack, \d{3}, wearing round$/);
   // Coming up a point at a time stops at close-hauled the same way.
-  let up = run(s, 1, [{ kind: 'steer', ship: 0, heading: from + 90 * DEGREE }]).state;
-  up = run(up, 1, [EACH.up, EACH.up]).state;
-  assert.ok(Math.abs(angleDiff(up.ships[0]!.told.helm.heading, from + 90 * DEGREE - 2 * POINT)) < 1e-9, 'two points up from the beam');
-  assert.match(answers(run(up, 1, [EACH.up]).events)[0]!, /^will not lie: /);
+  let up = run(s, 1, [{ kind: 'steer', ship: 0, heading: from + 90 * DEGREE }]).state, points = 0;
+  for (;;) {
+    const r = run(up, 1, [EACH.up]);
+    if (answers(r.events).length) {
+      assert.match(answers(r.events)[0]!, /^will not lie: /);
+      break;
+    }
+    up = r.state;
+    points++;
+    assert.ok(Math.abs(angleDiff(up.ships[0]!.told.helm.heading, from + 90 * DEGREE - points * POINT)) < 1e-9, `${points} points up from the beam`);
+    assert.ok(90 * DEGREE - points * POINT >= CLOSE_HAULED, 'taken only where she lies');
+  }
+  assert.ok(points >= 1, 'a point up from the beam is taken');
 });
 
 test('a course on the other tack is reached by wearing, never through the wind, and the master says so; tack takes her through it', () => {

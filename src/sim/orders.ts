@@ -26,7 +26,7 @@ import { BY_FOLLOW, HOVE_TO_CHECK, HOVE_TO_IN, HOVE_TO_MAST, NO_WAY, POINT } fro
 import type { MastName } from './rules/rig';
 import { CLOSE_HAULED, type CanvasName } from './rules/sailing';
 import { rigPlan } from './ship/rig';
-import { canvasFor, layAback, MASTS, setSail, steerTo, type Sailing, type SailingEvent } from './ship/sailing';
+import { canvasFor, closestOff, layAback, MASTS, setSail, steerTo, type Sailing, type SailingEvent } from './ship/sailing';
 import { sailShare, type SailSetting } from './ship/sails';
 import { wrapBearing } from './units';
 import type { Wind } from './wind';
@@ -257,9 +257,9 @@ function tackOf(heading: number, from: number, otherwise: number): number {
   return d === 0 || Math.abs(d) === Math.PI ? otherwise : Math.sign(d);
 }
 
-/** Close-hauled on a tack (+1 starboard), a compass bearing, rad. */
-function closeHauled(tack: number, from: number): number {
-  return wrapBearing(from - tack * CLOSE_HAULED);
+/** Close-hauled on a tack (+1 starboard), a compass bearing, rad: `off` the wind (the nearest the helmsman is told; he steers by the sails from there). */
+function closeHauled(tack: number, from: number, off = CLOSE_HAULED): number {
+  return wrapBearing(from - tack * off);
 }
 
 /** The heading she has been told: the course, or close-hauled now. */
@@ -303,16 +303,17 @@ const refuse = (told: ShipOrders, reason: string): OrderAnswer => ({ told, reaso
 
 /**
  * The helm told to steer `heading` (compass bearing, rad): the short way on the tack she is on, by wearing onto the
- * other, and then the master answers "wearing round" (taken, with words). Closer than close-hauled, the master answers
- * that she will not lie it and steers full and by on the nearer tack instead (design decisions for N3).
+ * other, and then the master answers "wearing round" (taken, with words). Closer than she lies with every set sail
+ * full (sailing.ts `closestOff`), the master answers that she will not lie it and steers full and by on the nearer tack
+ * instead (design decisions for N3).
  */
 function steer(told: ShipOrders, s: Sailing, order: Order, heading: number, now: OrderMoment): OrderAnswer {
   const from = now.wind.from, tack = tackOf(s.heading, from, s.sides[0]!), to = tackOf(heading, from, tack);
-  const turn = to === tack ? 0 : -tack;
-  if (Math.abs(angleDiff(heading, from)) < CLOSE_HAULED - BY_FOLLOW) {
-    const by = closeHauled(to, from);
-    const reason = `she will not lie ${headingWords(heading)}: full and by on the ${TACK_NAMES[to]} tack, ${headingWords(by)}${turn ? ', wearing round' : ''}`;
-    return tell(told, order, now.tick, { helm: { heading: 0, by: to } }, [{ kind: 'helm', heading: by, turn }], false, { reason, code: 'will not lie' });
+  const turn = to === tack ? 0 : -tack, off = closestOff(s, now.wind, to);
+  if (Math.abs(angleDiff(heading, from)) < off - BY_FOLLOW) {
+    // The helmsman is told close-hauled and steers by the sails from there: the master names where they will hold her.
+    const reason = `she will not lie ${headingWords(heading)}: full and by on the ${TACK_NAMES[to]} tack, ${headingWords(closeHauled(to, from, off))}${turn ? ', wearing round' : ''}`;
+    return tell(told, order, now.tick, { helm: { heading: 0, by: to } }, [{ kind: 'helm', heading: closeHauled(to, from), turn }], false, { reason, code: 'will not lie' });
   }
   // Wearing for a course she can lie, the master says so too (design decision for N3), so the long way round is never a surprise.
   const wearing: Said = turn ? { reason: `wearing round, sir: ${headingWords(heading)} lies on the other tack`, code: 'wearing round' } : NOTHING_SAID;
@@ -392,7 +393,7 @@ export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: Order
     }
     case 'wear': {
       if (s.ahead < NO_WAY) return refuse(told, 'she has no way on her');
-      const mirror = wrapBearing(2 * from - base), close = Math.abs(angleDiff(mirror, from)) < CLOSE_HAULED || told.helm.by !== 0;
+      const mirror = wrapBearing(2 * from - base), close = Math.abs(angleDiff(mirror, from)) < closestOff(s, now.wind, -tack) || told.helm.by !== 0;
       const helm = close ? { heading: 0, by: -tack } : { heading: mirror, by: 0 };
       return tell(told, order, now.tick, { helm }, [{ kind: 'helm', heading: toldHeading(helm, from), turn: -tack }], false);
     }

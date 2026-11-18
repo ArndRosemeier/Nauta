@@ -75,14 +75,17 @@ export interface YardRow {
   /** How far it braces round from square either way, rad (the lee shrouds and backstays stop it). Estimated. */
   readonly brace: number;
 }
-/** Her yards (Steel's brig; the main yard ship.md's 17 m). Lower yards brace 38°, topsail yards 42°, topgallant yards 45°. */
+/**
+ * Her yards (Steel's brig; the main yard ship.md's 17 m). Lower yards brace 44°, topsail yards 46°, topgallant yards 48°:
+ * braced sharp up about four points off the keel, so close-hauled her sails stand full (sailing.ts `closestOff`).
+ */
 export const YARDS: readonly YardRow[] = [
-  { id: 'fore-yard', name: 'fore yard', mast: 'fore', level: 'course', length: 15.2, arm: 0.75, diameter: 0.34, brace: 0.66 },
-  { id: 'fore-topsail-yard', name: 'fore topsail yard', mast: 'fore', level: 'topsail', length: 11.4, arm: 0.9, diameter: 0.24, brace: 0.73 },
-  { id: 'fore-topgallant-yard', name: 'fore topgallant yard', mast: 'fore', level: 'topgallant', length: 7.3, arm: 0.4, diameter: 0.15, brace: 0.79 },
-  { id: 'main-yard', name: 'main yard', mast: 'main', level: 'course', length: 16.9, arm: 0.85, diameter: 0.37, brace: 0.66 },
-  { id: 'main-topsail-yard', name: 'main topsail yard', mast: 'main', level: 'topsail', length: 12.5, arm: 1.0, diameter: 0.26, brace: 0.73 },
-  { id: 'main-topgallant-yard', name: 'main topgallant yard', mast: 'main', level: 'topgallant', length: 8.0, arm: 0.45, diameter: 0.16, brace: 0.79 },
+  { id: 'fore-yard', name: 'fore yard', mast: 'fore', level: 'course', length: 15.2, arm: 0.75, diameter: 0.34, brace: 0.77 },
+  { id: 'fore-topsail-yard', name: 'fore topsail yard', mast: 'fore', level: 'topsail', length: 11.4, arm: 0.9, diameter: 0.24, brace: 0.80 },
+  { id: 'fore-topgallant-yard', name: 'fore topgallant yard', mast: 'fore', level: 'topgallant', length: 7.3, arm: 0.4, diameter: 0.15, brace: 0.84 },
+  { id: 'main-yard', name: 'main yard', mast: 'main', level: 'course', length: 16.9, arm: 0.85, diameter: 0.37, brace: 0.77 },
+  { id: 'main-topsail-yard', name: 'main topsail yard', mast: 'main', level: 'topsail', length: 12.5, arm: 1.0, diameter: 0.26, brace: 0.80 },
+  { id: 'main-topgallant-yard', name: 'main topgallant yard', mast: 'main', level: 'topgallant', length: 8.0, arm: 0.45, diameter: 0.16, brace: 0.84 },
 ];
 /**
  * Where a yard hangs, m: the lower yards are slung under the lower mast's hounds; a topsail yard is hoisted to just
