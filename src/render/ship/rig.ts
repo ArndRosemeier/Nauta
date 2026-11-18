@@ -9,7 +9,7 @@ import { Matrix4, Vector3 } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import { CHANNEL } from '../../sim/rules/rig';
 import { CHAIN_PLATE_FOOT, DEADEYE, MAIN_CHANNEL, MAIN_SHROUDS, PIN_RAIL, PLANKING, ROPE } from '../../sim/rules/ships';
-import { hullHalfBreadth, waistDeck } from '../../sim/ship/hull';
+import { hullHalfBreadth, sideTop, waistDeck } from '../../sim/ship/hull';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { rigPlan, sparOf, type RigPlan } from '../../sim/ship/rig';
 import { SIDES, type Deadeye } from '../../sim/ship/spars';
@@ -165,24 +165,36 @@ function chainPlate(out: ZoneParts, d: Deadeye, lower: Vector3, dir: Vector3): v
   rod(out.iron, foot.clone().setX(footX - d.side * CHAIN_PLATE.thick), foot.clone().setX(footX + d.side * CHAIN_PLATE.thick), BOLT.radius, BOLT.sides, IRON);
 }
 
-/** A side's channels and stools: one timber under each run of deadeyes, from her planking out past them. */
-function channels(out: ZoneParts, eyes: readonly Deadeye[]): void {
+/** A channel as a timber: her side, the places along her it spans, its height (centre) and thickness, and how far it reaches in from her centreline and out from it, m. */
+export interface ChannelBoard { readonly side: number; readonly aft: number; readonly fore: number; readonly h: number; readonly thick: number; readonly inner: number; readonly outer: number }
+
+/**
+ * A side's channels and stools: one timber under each run of deadeyes, from her planking out past them. Where her side
+ * comes down to the waist from a raised deck's (N2.12) the timber's inner edge is read at her side's top, not above it,
+ * or it would find no hull there and reach in to her centreline.
+ */
+export function channelBoards(eyes: readonly Deadeye[]): ChannelBoard[] {
   const sorted = [...eyes].sort((a, b) => a.along - b.along);
   const runs: Deadeye[][] = [];
   for (const d of sorted) {
     const last = runs[runs.length - 1];
-    // A run parts where her side steps up to a raised deck's (N2.12): each channel lies under its own rail.
+    // A run parts where her side steps up to a raised deck's: each channel lies under its own rail.
     if (last && d.along - last[last.length - 1]!.along < CHANNEL_GAP && Math.abs(d.height - last[last.length - 1]!.height) < CHANNEL_STEP) last.push(d);
     else runs.push([d]);
   }
-  for (const run of runs) {
-    const side = run[0]!.side, aft = run[0]!.along - CHANNEL_BEYOND.aft, fore = run[run.length - 1]!.along + CHANNEL_BEYOND.fore;
+  return runs.map((run) => {
+    const aft = run[0]!.along - CHANNEL_BEYOND.aft, fore = run[run.length - 1]!.along + CHANNEL_BEYOND.fore;
     const top = Math.min(...run.map((d) => d.height)) - CHANNEL.seatUp, mid = (aft + fore) / 2;
     const thick = MAIN_CHANNEL.thick, h = top - thick / 2;
-    const planked = (a: number) => hullHalfBreadth(a, h) + PLANKING.side;
+    const planked = (a: number) => hullHalfBreadth(a, Math.min(h, sideTop(a) - thick)) + PLANKING.side;
     const outer = Math.max(...run.map((d) => Math.abs(d.across))) + CHANNEL.seatIn;
-    const inner = Math.min(planked(aft), planked(fore), planked(mid));
-    box(out.wood, new Matrix4().setPosition(side * (inner + outer) / 2, shipY(h), shipZ(mid)), [outer - inner, thick, fore - aft], BLACK, BEVEL, 2);
+    return { side: run[0]!.side, aft, fore, h, thick, inner: Math.min(planked(aft), planked(fore), planked(mid)), outer };
+  });
+}
+
+function channels(out: ZoneParts, eyes: readonly Deadeye[]): void {
+  for (const c of channelBoards(eyes)) {
+    box(out.wood, new Matrix4().setPosition(c.side * (c.inner + c.outer) / 2, shipY(c.h), shipZ((c.aft + c.fore) / 2)), [c.outer - c.inner, c.thick, c.fore - c.aft], BLACK, BEVEL, 2);
   }
 }
 

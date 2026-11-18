@@ -35,6 +35,7 @@ import { openControls, showControlsOnce } from './controlsCard';
 import { words, type WordKey } from './words';
 import { LANGUAGES } from './settings';
 import { oneOf } from './kept';
+import type { Offline } from '../offline/register';
 
 /** How a captain is named to the other player. */
 const CAPTAIN = 'Captain';
@@ -78,6 +79,8 @@ export interface MenuHooks {
   readonly now: () => number;
   /** The page's sound (the theme under the menu). */
   readonly engine: AudioEngine;
+  /** The game kept for use without a network: a newer version waiting is offered on the main screen. */
+  readonly offline: Offline;
   /** The sky set: the hour it stands at, and real minutes a whole day takes. */
   sky(hour: number, dayMinutes: number): void;
   /** The match's clock stopped (the pause, alone) or running on. */
@@ -113,6 +116,8 @@ export class Menu {
       if (events.some((e) => e.kind === 'end')) this.fightOver();
     });
     h.settings.watch((now, before) => { if (before && before.language !== now.language) this.redraw(); });
+    // The main screen is the one place a newer version is offered: it shows the offer once the worker has finished installing.
+    h.offline.whenChanged(() => { if (!this.screen.hidden) this.redraw(); });
     document.body.append(this.screen);
     this.screen.hidden = true;
     document.body.classList.add('in-menu');
@@ -211,13 +216,15 @@ export class Menu {
       choice('joinDuel', 'joinDuelHelp', () => this.joinScreen());
       choice('walkShip', 'walkShipHelp', () => this.sail('walk'));
       const news = menuButton(unseenVersion() ? 'nt-link fresh' : 'nt-link', `Nauta ${versionLabel} · ${say.whatsNew}`, () => openWhatsNew(say, () => news.classList.remove('fresh')));
+      // A newer version of the game is installed and waits: one tap restarts on it (offline/register.ts), never in the middle of a match.
+      const update = this.h.offline.updateReady ? menuButton('nt-link fresh', say.updateReady, () => this.h.offline.restart()) : null;
       const lang = make('div', 'nt-choice menu-language');
       for (const l of LANGUAGES) {
         const b = menuButton(l === this.h.settings.now.language ? 'on' : '', say[l === 'en' ? 'english' : 'german'], () => this.h.settings.change({ language: l }));
         lang.append(b);
       }
       const foot = make('footer', 'menu-foot');
-      foot.append(news, lang);
+      foot.append(news, ...(update ? [update] : []), lang);
       this.screen.replaceChildren(plate, choices, foot);
     };
     this.redraw = drawScreen;

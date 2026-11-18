@@ -135,7 +135,7 @@ test('the near pool takes the men who matter first, then the nearest seen within
   assert.equal(poolLevel({ ...knobs, fullTo: 0 }, 0, MEDIUM), MEDIUM);
 });
 
-const calm: FaceWhy = { job: null, aloft: false, sinceStruck: Infinity, fighting: false, harm: null, shouting: false, ended: null };
+const calm: FaceWhy = { job: null, aloft: false, sinceStruck: Infinity, fighting: false, harm: null, sinceHurt: Infinity, shouting: false, ended: null };
 
 test('a face shows what is happening to the man, the strongest feeling winning, and comes and goes at its own pace', () => {
   assert.deepEqual(facesNow(calm), []);

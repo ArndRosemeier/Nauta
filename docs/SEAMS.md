@@ -369,6 +369,12 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A man as a full character, looking as his crowd figure does | `src/app/crewLooks.ts#fullLook` |
 | What a man wears and his build as a key (alike men differ in colour only) | `src/app/crewLooks.ts#wearing` |
 | What a man's face shows: the causes from the simulation, the table, one frame of it | `src/app/faces.ts#FACES` |
+| What the violence setting shows at each level (blood, stains, the killed on deck or taken below, the trail) | `src/app/violence.ts#SHOWN` |
+| The blood about a man struck down (pools, drops, spatter), seeded | `src/app/violence.ts#bloodOf` |
+| A shirt colour stained toward blood, how far a hurt stains it, how much of the killed is taken below at mild | `src/app/violence.ts#stained` |
+| Blood on a ship's decks: dishes of paint written on the page, falls kept so a level change shows them all | `src/render/crew/blood.ts#Blood` |
+| A man being carried below: held between his two bearers | `src/app/crewDrawn.ts#carryOf` |
+| A stand-in for a fight's casualties (`?sail&casualties=`), to look at the men under fire | `src/app/scars.ts#casualtiesOf` |
 | The crew trial's phases and its result's lines | `src/app/crewTrial.ts#trialLines` |
 | The crew trial on the page: its button, phases, result on screen | `src/app/crewTrialRun.ts#CrewTrialRun` |
 | The crews drawn: crowd figures for both crews, the near pool handed out, men placed with their ships and animated by the knobs; the voices' men as speakers | `src/render/crew/crewView.ts#CrewView` |
@@ -710,7 +716,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What each order key gives | `src/app/fanOrders.ts#KEY_ORDERS` |
 | Whether her guns wait for the captain's word (the Fire! button shows) | `src/app/fanOrders.ts#waitingForWord` |
 | Which drawn man a finger points at on the view | `src/app/fanOrders.ts#manAt` |
-| The order fan on the page: tap or press a man, the midshipman, the keys, steer there; the captain's arm | `src/app/orderFan.ts#OrderFan` |
+| The order fan on the page: tap or press a man, a card of the officer row, the midshipman, the keys, steer there; the captain's arm | `src/app/orderFan.ts#OrderFan` |
+| Everyone the captain commands as cards (rank, what each is for, out of voice or not); their words | `src/app/fanOrders.ts#officerCards` |
+| The officer row on the page: an icon, rank and role for each man, always on screen, a tap opens his fan | `src/app/officerRow.ts#OfficerRow` |
 | The drawn officer of a rank among the men on the view | `src/app/fanOrders.ts#manOnScreen` |
 | The first match: its settings, the first lieutenant's course of lessons and tips, what each asks and when it is done (pure) | `src/app/lessons.ts#Lessons` |
 | What of hers is heard, as the lessons key it | `src/app/lessons.ts#heardKeys` |
@@ -740,3 +748,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A key's small cap beside what it does, shown only where a mouse points | `src/app/dom.ts#keyCap` |
 | The key that gives what a fan's item gives (its cap on the tag) | `src/app/fanOrders.ts#keyOfItem` |
 | A press on the screen, and whether its lift makes a tap or a click | `src/app/press.ts#isTap` |
+| Which files of a build the service worker keeps, which it must hold before it takes over, and the order the rest is fetched in | `src/offline/plan.ts#nextFill` |
+| A file kept for use without a network: its address and hash (a changed file is a new key, an unchanged one is kept across builds) | `src/offline/plan.ts#keyOf` |
+| The page's side of the service worker: registering it, keeping the rest while the game is played, a newer version waiting, restarting on it | `src/offline/register.ts#Offline` |
+| The build's file list and the worker made from it (`dist/sw.js`) | `tools/offline/precache.ts#writeWorker` |
+| Whether the page uses the service worker (the deploy yes, any other build with `?sw`, `?nosw` removes it) | `src/offline/plan.ts#offlineMode` |

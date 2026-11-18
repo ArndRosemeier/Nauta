@@ -12,7 +12,8 @@ import { MASTS } from '../sim/ship/sailing';
 import { isStanding, wouldRefuse } from './orderReport';
 import type { KeyAction } from './settings';
 import type { WordKey } from './words';
-import { TAKERS, type Officer, type Taker } from './officers';
+import { OFFICERS, TAKERS, inVoice, postOf, type Officer, type Taker } from './officers';
+import type { Spot } from '../sim/ship/plan';
 
 /** What choosing an item does. */
 export type FanAct =
@@ -133,6 +134,28 @@ export function fanItems(who: Officer, state: SimState, ship: number): readonly 
 export const RANK_WORDS: Readonly<Record<Officer, WordKey>> = {
   master: 'rankMaster', 'first lieutenant': 'rankFirst', gunner: 'rankGunner', carpenter: 'rankCarpenter', lookout: 'rankLookout', midshipman: 'rankMidshipman',
 };
+
+/** What each man is for, in a few words (the officer row's line under his rank). */
+export const ROLE_WORDS: Readonly<Record<Officer, WordKey>> = {
+  master: 'roleMaster', 'first lieutenant': 'roleFirst', gunner: 'roleGunner', carpenter: 'roleCarpenter', lookout: 'roleLookout', midshipman: 'roleMidshipman',
+};
+
+/** One man of the officer row: who, and whether his orders go by the midshipman now (the captain's voice does not reach him). */
+export interface OfficerCard {
+  readonly who: Officer;
+  readonly rank: WordKey;
+  readonly role: WordKey;
+  readonly far: boolean;
+}
+
+/**
+ * Everyone the captain can command, each as a card of the officer row (Arnd 2026-11-18: "give me everybody that I can
+ * command as an icon with a small description below"), in the order the midshipman offers them. A man out of the
+ * captain's voice is `far`: his orders go by the midshipman (the midshipman himself is always at hand).
+ */
+export function officerCards(captain: Spot | null): OfficerCard[] {
+  return OFFICERS.map((who) => ({ who, rank: RANK_WORDS[who], role: ROLE_WORDS[who], far: who !== 'midshipman' && !inVoice(captain, postOf(who)) }));
+}
 
 /** The orders an item gives, itself or through its ring. */
 function ordersOf(item: FanItem, ship: number): Order[] {

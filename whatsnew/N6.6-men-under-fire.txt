@@ -1,0 +1,3 @@
+The wounded are now carried below by two men, the fire and pump parties stand round their work, and a man who is hit shows pain, which passes if he is only lightly hurt.
+New in Settings, Violence: mild takes the killed below out of sight; plain (the default) shows blood on the deck and on the shirts; unsparing shows much more of it.
+Try it: open ?sail&casualties=3 and look about the waist and the quarterdeck, then change Violence in Settings.

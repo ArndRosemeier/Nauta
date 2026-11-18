@@ -45,6 +45,8 @@ export interface PoolChar {
   level: number;
   clip: string | null;
   shadow: boolean;
+  /** How far his shirt is stained as shown (app/violence.ts); starts again from nothing when he is dressed for another man. */
+  stain: number;
   /** Seconds he still looks at the captain. */
   looking: number;
   /** Words he is to say once shown, and until when (page seconds). */
@@ -61,7 +63,7 @@ export class NearPool {
       const place = new Group();
       place.add(ch.object);
       place.visible = false;
-      return { ch, place, full: i < full, man: null, shown: false, dressing: null, as: null, wears: null, leaving: 0, level: MEDIUM, clip: null, shadow: true, looking: 0, words: null, face: {}, units: {} };
+      return { ch, place, full: i < full, man: null, shown: false, dressing: null, as: null, wears: null, leaving: 0, level: MEDIUM, clip: null, shadow: true, stain: 0, looking: 0, words: null, face: {}, units: {} };
     });
   }
 
@@ -133,6 +135,7 @@ export class NearPool {
     const dressed = p.as === man;
     p.man = man;
     p.dressing = man;
+    if (!dressed) p.stain = 0;
     p.as = man;
     p.wears = wears;
     void (dressed ? Promise.resolve() : p.ch.set(look)).then(async () => {

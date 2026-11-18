@@ -18,10 +18,10 @@ export function shotSize(fallback = '1280x800') {
   return { width, height };
 }
 
-/** The build served and a browser started; `close` ends both. */
-export async function openBrowser() {
-  const server = await preview({ preview: { port: 5302, strictPort: false }, logLevel: 'silent' });
-  const base = server.resolvedUrls.local[0];
+/** The build served and a browser started; `close` ends both. `own`: another server to use instead, `{ base, close }` (tools/offline/serve.mjs). */
+export async function openBrowser(own = null) {
+  const server = own ?? await preview({ preview: { port: 5302, strictPort: false }, logLevel: 'silent' });
+  const base = own ? own.base : server.resolvedUrls.local[0];
   const gpu = !!process.env.SHOT_GPU;
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || undefined,

@@ -77,8 +77,11 @@ interface DressRow {
   /** Garments recoloured per man, in up to three groups (Actors' `tints`). */
   readonly tints: readonly (readonly string[])[];
 }
+/** A seaman's shirt: the garment, and its place among the tint groups of his dress (stained by the violence setting, app/violence.ts). */
+export const SHIRT_GARMENT = 'navy-shirt';
+export const SHIRT_GROUP = 1;
 const SEAMEN_HAIR = ['hair-short02', 'hair-short-messy', 'hair-short-curls'];
-const SLOPS_TINTS = [['navy-slops', 'navy-slops-striped'], ['navy-shirt'], ['navy-neckerchief']];
+const SLOPS_TINTS = [['navy-slops', 'navy-slops-striped'], [SHIRT_GARMENT], ['navy-neckerchief']];
 export const DRESSES: Readonly<Record<Dress, DressRow>> = {
   captain: { presets: { british: 'navy-rn-captain', french: 'navy-fr-captain' }, builds: ['middling'], hats: [], hair: ['hair-swept-back'], tints: [] },
   officer: { presets: { british: 'navy-rn-lieutenant', french: 'navy-fr-officer' }, builds: ['middling', 'tall'], hats: [], hair: ['hair-swept-back'], tints: [] },

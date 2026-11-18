@@ -48,14 +48,15 @@ import { shipPlan } from './sim/ship/plan';
 import { Spyglass } from './app/glass';
 import { watchGlass } from './app/glassInput';
 import { earthDrop } from './render/earth';
-import { VERSION } from 'virtual:nauta/version';
+import { DEV, VERSION } from 'virtual:nauta/version';
+import { Offline } from './offline/register';
 import { SprayView } from './render/spray';
 import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
 import { setFrenchFlags } from './render/ship/sailMaterial';
 import type { Navy } from './app/crewLooks';
 import { SHIPS_DRAWN, lightThrough } from './render/ship/shipMaterials';
-import { goingDown, scarsOf } from './app/scars';
+import { casualtiesOf, goingDown, scarsOf } from './app/scars';
 import { GunfireView, fallInSea } from './render/gunfire';
 import { SmokeView, useSmokeDepth } from './render/smoke';
 import { FireView } from './render/fireView';
@@ -153,6 +154,8 @@ declare global {
       other: () => { drawn: number; near: boolean; apart: number; draws: number; mine: number } | null;
       /** Seconds since a gun of ship `index` was last seen to fire (Infinity: none yet): checks catch a broadside as it comes. */
       firedAgo: (index: number) => number;
+      /** The eye put at `eye` (her space) looking `yaw` and `pitch` (rad), for checks that stand beside something (tools/shot/men.mjs). */
+      eyeAt: (eye: [number, number, number], yaw: number, pitch: number) => void;
     };
     /**
      * Walking (`?walk`), for shots: the captain pushed by the left thumb (`forward`, `strafe`: -1..1) for so many
@@ -164,6 +167,8 @@ declare global {
       open: (who: Officer, choose?: string[]) => string; lightUp: (id: string) => void;
       /** Where the officers are on the view now, CSS px from its top left (the checks put the mouse on one). */
       men: () => readonly { who: Officer; x: number; y: number; seen: boolean }[];
+      /** Where each card of the officer row is on the screen, CSS px (the checks click one). */
+      cards: () => readonly { who: Officer; x: number; y: number }[];
     };
     /** The crews drawn (N4.3), for the browser checks: what they hold and where. */
     __nautaCrew?: CrewView;
@@ -179,6 +184,8 @@ async function start(): Promise<void> {
   const visit: Partial<Settings> = { ...(params.quality ? { quality: params.quality } : {}), ...(params.motion !== null ? { motion: params.motion } : {}), ...(params.hud ? { frameTimes: true } : {}) };
   const settings = new SettingsStore(visit);
   const canvas = el<HTMLCanvasElement>('view'), hud = el('hud'), loading = el('loading');
+  // The game kept on the device for use without a network (plan N7.6): begun once the game has started, so its fetches never compete with the start.
+  const offline = new Offline(!DEV, titleWaits);
   // `?ship`: the whole brig, built in a worker behind the loading screen (plan N2.4); the sun casts shadows then.
   // `?walk`: the captain walks her decks with two thumbs (plan N2.3), on the whole brig.
   // The plain address (plan N7.2): the game itself, the captain walking her decks in every match the menu starts.
@@ -198,7 +205,7 @@ async function start(): Promise<void> {
   let pausedAt: number | null = null, paused = 0;
   /** The match's clock, s: the page's less the pauses, or where the browser checks have run it to. The bubbles keep it too. */
   const matchClock = (): number => (pinned ?? pausedAt ?? pageSeconds()) - paused + ahead;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match)) : null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, matchClock, params.windAsked ? params.wind : null, params.foe, matchMinutes(settings.now.match), params.casualties === null ? undefined : (state) => casualtiesOf(state, params.casualties!)) : null;
   // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
   // far level beyond, sunk by the earth's curve far off.
   const other = build && match ? new ShipView(build, 1) : null;
@@ -415,7 +422,7 @@ async function start(): Promise<void> {
   mouse.whenTakenOrFreed((taken) => { if (!taken) fan?.freed(); });
   fan?.onSent((e) => speech?.sent(e));
   const pointing = new Vector3();
-  if (fan && crew) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id), men: () => crew.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) }; }
+  if (fan && crew) { const f = fan; window.__nautaFan = { open: (who, choose) => f.openForCheck(who, choose), lightUp: (id) => f.lightUp(id), cards: () => f.cardsForCheck(), men: () => crew.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) }; }
   // Every line the men said, in a sheet opened by the Reports tag or its key (Arnd, 2026-11-18).
   if (speech) new ReportsPanel(speech.log, settings);
   /** Seconds of the last jump the sails as drawn are still to catch up with, and what to call when the frame after is drawn. */
@@ -459,6 +466,7 @@ async function start(): Promise<void> {
       if (power !== null) glass.power = power;
     },
     other: () => (other?.group.visible ? { drawn: other.trianglesDrawn, near: other.nearDrawn, apart: Math.round(other.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null),
+    eyeAt: (eye, yaw, pitch) => { where = { name: 'check', eye, look: { yaw, pitch } }; input.look = { yaw, pitch }; },
     firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
   };
   if (match && !params.menu) {
@@ -497,7 +505,7 @@ async function start(): Promise<void> {
     officersSeen: () => crew?.onScreen(view.camera, canvas.clientWidth, canvas.clientHeight) ?? [], wording: () => words(settings.now.language),
   }) : null;
   const menu = params.menu && match ? new Menu({
-    params, build: VERSION, settings, settingsMenu, match, now: matchClock, engine: sound.engine,
+    params, build: VERSION, settings, settingsMenu, match, now: matchClock, engine: sound.engine, offline,
     sky: (hour, dayMinutes) => { sky.hour = hour; sky.dayMinutes = skyMinutes = dayMinutes; },
     pause: (on) => {
       if (on && pausedAt === null) pausedAt = pageSeconds();
@@ -645,7 +653,7 @@ async function start(): Promise<void> {
         crew.poolInUse = phase && !phase.pool ? 0 : startCrew.pool;
         crew.everyFrame = phase?.everyFrame ?? false;
         crew.noShadows = phase?.noShadows ?? false;
-        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds() });
+        crew.animate(dt, { state: between, mine: match.ship, camera: view.camera, knobs: quality.knobs.crew, zoom: glass?.magnification ?? 1, midshipman: midshipman.where(), captain: captainSpot(), now: pageSeconds(), violence: settings.now.violence });
       }
       jump = 0;
       sky.below = ship.below;
@@ -732,10 +740,11 @@ async function start(): Promise<void> {
     if (showHud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''}${other?.group.visible ? ` · other ship ${Math.round(other.trianglesDrawn / THOUSAND)}k drawn` : ''}${glass?.up ? ` · glass ×${glass.power.toFixed(0)}` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''}${other?.group.visible ? ` · other ship ${Math.round(other.trianglesDrawn / THOUSAND)}k drawn` : ''}${glass?.up ? ` · glass ×${glass.power.toFixed(0)}` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}\n${offline.line(formatBytes)}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;
+      void offline.start();
       // The title fades into the deck (plan N7.7), or with the menu to come asks for a tap first (N7.2).
       if (menu) menu.ready(); else handOver();
     }
@@ -758,6 +767,11 @@ function crewLine(crew: CrewView, musterSeconds: number, held: ReturnType<CrewVi
     + `pack ${formatBytes(pack)} fetched · mustered in ${musterSeconds.toFixed(1)} s · figures ${formatBytes(held.figures)} + atlas ${formatBytes(held.atlas)} · pool ${formatBytes(held.pool)} · workbench ${formatBytes(held.workbench)} · GPU memory ${formatBytes(gpuBytes)}${performance.memory ? ` · heap ${formatBytes(performance.memory.usedJSHeapSize)}` : ''}`;
 }
 
+/** Whether the title still waits for its tap: a newer version of the game may restart the page now (offline/register.ts). */
+function titleWaits(): boolean {
+  return document.getElementById('loading') !== null;
+}
+
 /**
  * `?probe` shows what the device offers instead of the game (plan N0.5), `?netcheck` runs a match through the hub
  * without drawing (the network check, plan N3.7); their code loads only when asked for.
@@ -767,7 +781,7 @@ keepBrowserMenusAway();
 const asked = readParams(location.search);
 // `?title`: the title alone (title/boot.ts), nothing behind it.
 const titleAlone = new URLSearchParams(location.search).has('title');
-const run = titleAlone ? () => Promise.resolve() : asked.probe ? () => import('./probe/page').then((p) => p.runProbe())
+const run = titleAlone ? () => { void new Offline(!DEV, titleWaits).start(); return Promise.resolve(); } : asked.probe ? () => import('./probe/page').then((p) => p.runProbe())
   : asked.netcheck ? () => import('./app/netCheck').then((p) => p.runNetCheck(asked)) : start;
 
 run().catch((err: unknown) => {
