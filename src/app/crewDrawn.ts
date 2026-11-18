@@ -10,7 +10,7 @@
 import { Rng, deriveSeed } from '@futuremagic/core';
 import type { SimShip } from '../sim/state';
 import { harmOf } from '../sim/damage';
-import { manAt, taskOf, type Task } from '../sim/crew/crew';
+import { manAt, sameSpot, taskOf, type Task } from '../sim/crew/crew';
 import { goingAt, goingRoute } from '../sim/crew/going';
 import { jobWork } from '../sim/crew/drill';
 import { brigRoster, crewPlaces, placeSpot, type Man } from '../sim/crew/roster';
@@ -322,12 +322,21 @@ const isDown = (ship: SimShip, man: number): boolean => {
   return harm === 'killed' || harm === 'badly';
 };
 
+let powderSpots: readonly Spot[] | null = null;
+/** Whether a man is on his way to a gun with a cartridge: a powder boy bound for a gun's powder place (rules/crew.ts POWDER_SECONDS). */
+function bearsPowder(hand: SimShip['crew']['men'][number]): boolean {
+  const to = hand.going?.path.to;
+  if (!to) return false;
+  powderSpots ??= [...crewPlaces().values()].filter((p) => p.kind === 'powder');
+  return powderSpots.some((p) => sameSpot(p, to));
+}
+
 /** The motion a man plays: lying if struck down, on his way walking or running, at work by his job, at his gun by her drill (N5.4b), else busy at his home place. */
 function clipOf(ship: SimShip, man: number, m: Man, task: Task | null, at: At, seed: number, gun: GunWork | null): string {
   if (isDown(ship, man)) return LYING;
   const hand = ship.crew.men[man]!;
   if (at.bunked && !task) return SLEEPING;
-  if (at.moving) return task?.job === 'carry' ? JOB_CLIPS.carry : hand.going?.haste === 'smart' ? RUNNING : WALKING;
+  if (at.moving) return task?.job === 'carry' || bearsPowder(hand) ? JOB_CLIPS.carry : hand.going?.haste === 'smart' ? RUNNING : WALKING;
   if (task) return task.began === null ? standToClip(m, seed) : JOB_CLIPS[task.job];
   // At his gun he works the drill (gunDrill.ts); the steps that give his part no work, he stands to.
   const work = gun && gunClip(gun);

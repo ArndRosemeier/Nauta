@@ -30,6 +30,8 @@ export interface Man {
   readonly bunk: Bunk | null;
   /** The two places he paces between while she is not at quarters (his `home` is the first), or null. */
   readonly paces: readonly [string, string] | null;
+  /** A powder boy's number among the boys (0 up), or null: he carries cartridges to the guns at quarters (`restPlace`). */
+  readonly powderBoy: number | null;
 }
 
 let places: ReadonlyMap<string, CrewPlace> | null = null;
@@ -75,9 +77,9 @@ export function brigRoster(): readonly Man[] {
   const atGuns = gunPlaces(), pairs = [...new Set(atGuns.map((g) => g.pair))];
   const free = new Map(pairs.map((p) => [p, atGuns.filter((g) => g.pair === p)]));
   const men: Man[] = [];
-  let next = 0;
+  let next = 0, boys = 0;
   // His home: the row's `idle` place in turn; a man who sleeps below has the placeholder until the bunks are shared out.
-  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null; paces: readonly [string, string] | null } => ({ home: row.paces ? row.paces[0] : row.idle ? row.idle[k % row.idle.length]! : post, bunk: null, paces: row.paces ?? null });
+  const homeOf = (row: (typeof ROSTER)[number], k: number, post: string): { home: string; bunk: Bunk | null; paces: readonly [string, string] | null; powderBoy: number | null } => ({ home: row.paces ? row.paces[0] : row.idle ? row.idle[k % row.idle.length]! : post, bunk: null, paces: row.paces ?? null, powderBoy: row.part === 'boys' ? boys++ : null });
   for (const row of ROSTER) {
     for (let k = 0; k < row.count; k++) {
       if (row.posts !== 'guns') {

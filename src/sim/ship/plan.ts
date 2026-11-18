@@ -9,7 +9,7 @@
  */
 import {
   BELAY_HEIGHT, BERTH_BEAM, BODY, BREAK_LADDERS, BREAKS, BERTH_HEADROOM, BULWARK, CEILING, CELL, CREW_PAST_GUN, DECK_BEAM, DOOR, DOORS, FITTINGS, FORE_SHROUDS, FRAME_DEPTH,
-  GUN_CREW, GUN_FOOTPRINT, LADDER, LADDERS, LEAST_PASSAGE, MAIN_SHROUDS, MASTS, OPEN_JOINS, OPENINGS, PARTNERS, PIN_CLEAR_OF_PORT, PIN_RAIL,
+  GUN_CREW, GUN_FOOTPRINT, POWDER_BOY, POWDER_BOY_AT, LADDER, LADDERS, LEAST_PASSAGE, MAIN_SHROUDS, MASTS, OPEN_JOINS, OPENINGS, PARTNERS, PIN_CLEAR_OF_PORT, PIN_RAIL,
   PLANKING, PORT_GUNS, PORTS, RAILS, SPACES, STATIONS, WAY_STANDOFF, onRaisedDeck,
   type GunKind, type Level, type OpeningKind, type SpaceRow,
 } from '../rules/ships';
@@ -136,7 +136,7 @@ export interface Belay {
 /** A crew place: where a man stands for a task, and what it is for. */
 export interface CrewPlace extends Spot {
   readonly id: string;
-  readonly kind: 'gun' | 'pin' | 'ladder' | 'shroud' | 'station' | 'top' | 'yard';
+  readonly kind: 'gun' | 'powder' | 'pin' | 'ladder' | 'shroud' | 'station' | 'top' | 'yard';
   readonly of: string;
 }
 
@@ -436,6 +436,12 @@ function makeBelays(): Belay[] {
 function makePlaces(guns: readonly GunPlace[], belays: readonly Belay[], ways: readonly Way[], stations: readonly Station[]): CrewPlace[] {
   const out: CrewPlace[] = [];
   for (const g of guns) g.crew.forEach((c, k) => out.push({ id: `gun-${g.id}-${k + 1}`, kind: 'gun', of: g.id, ...c }));
+  // Where a powder boy hands his cartridge over, behind each gun's captain (a chase gun is served from its crew's own places).
+  for (const g of guns) {
+    if (g.chase) continue;
+    const [inboard, off] = POWDER_BOY_AT[g.port] ?? POWDER_BOY;
+    out.push({ id: `powder-${g.id}`, kind: 'powder', of: g.id, space: 'deck', along: g.along + off, across: g.side * (insideBreadth(g.along, sheer(g.along)) - inboard) });
+  }
   for (const b of belays) {
     // A man hauling stands a stride from his pin, on its open side.
     const along = b.along + b.toward[0] * PIN_STANDOFF, across = b.across + b.toward[1] * PIN_STANDOFF;

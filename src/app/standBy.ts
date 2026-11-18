@@ -22,6 +22,8 @@ const AT_GUN = ['push', 'interact', 'crouch', 'arms folded', 'interact', 'push',
 const ARMED = ['pistol idle', 'pistol idle', 'pistol aim up'] as const;
 /** Anyone else told off to his place at quarters: alert, glancing about, a word to his neighbour. */
 const ALERT = ['arms folded', 'nod', 'arms folded', 'shake head', 'talk'] as const;
+/** A powder boy at his gun, handing the cartridge over to her captain and looking for the next. */
+const HANDING = ['pick up', 'interact', 'pick up'] as const;
 /** The midshipman at the captain's side: attentive, glancing about, ready to be sent off. */
 const ATTENTIVE = ['arms folded', 'nod', 'shake head'] as const;
 
@@ -44,7 +46,7 @@ export function standByClip(m: Man, seed: number): string {
 
 /** The clip of a man at his place at quarters, or waiting there for his work to begin: ready at his gun, arms at hand, or alert. */
 export function standToClip(m: Man, seed: number): string {
-  const clips = m.gun !== null ? AT_GUN : m.part === 'marines' ? ARMED : ALERT;
+  const clips = m.gun !== null ? AT_GUN : m.part === 'marines' ? ARMED : m.part === 'boys' ? HANDING : ALERT;
   return clips[seed % clips.length]!;
 }
 
@@ -53,5 +55,5 @@ export const attentiveClip = (seed: number): string => ATTENTIVE[seed % ATTENTIV
 
 /** Every clip a man standing by or standing to can play (the crowd bakes them). */
 export const STAND_BY_CLIPS: readonly string[] = [
-  ...new Set([STEERING, ON_WATCH, TINKERING, ...TALKING, ...CLEANING, ...AT_GUN, ...ARMED, ...ALERT, ...ATTENTIVE]),
+  ...new Set([STEERING, ON_WATCH, TINKERING, ...TALKING, ...CLEANING, ...AT_GUN, ...ARMED, ...HANDING, ...ALERT, ...ATTENTIVE]),
 ];

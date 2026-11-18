@@ -521,6 +521,10 @@ export const GUN_FOOTPRINT: Readonly<Record<GunKind, { readonly inboard: number;
 export const GUN_CREW: readonly (readonly [inboard: number, along: number])[] = [
   [2.4, 0], [1.0, 0.85], [1.0, -0.85], [1.7, 0.85], [1.7, -0.85],
 ];
+/** Where a powder boy stands to hand over his cartridge at a gun (m inboard of her side, m along the gun's port): by her captain, between her crew and the next gun's. */
+export const POWDER_BOY: readonly [inboard: number, along: number] = [2.4, -1.0];
+/** Ports whose boy stands elsewhere, where that place is not clear (a hatch coaming, a ladder): their own inboard and along (the walk check in test/crew.test.ts finds every place walkable). */
+export const POWDER_BOY_AT: Readonly<Record<string, readonly [inboard: number, along: number]>> = { A: [2.4, 1.0], H: [3.0, -1.0] };
 /**
  * At a gun by a break of her raised decks (N2.12), the men whose places would stand on the other deck or at its edge
  * stand on the gun's other side instead, this much farther inboard than their own places, m: beside the gun captain.
