@@ -88,8 +88,14 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her section's outline by girth, planked or ceiled | `src/sim/ship/section.ts#sectionOutline` |
 | Ship space: heights above her base, metres forward of the mainmast | `src/sim/ship/section.ts#shipY` |
 | The weather deck's height across her (its camber) | `src/sim/ship/section.ts#deckY` |
-| The plane of the water under her footprint | `src/sim/ship/standIn.ts#waterPlane` |
-| Her stand-in motion: easing toward the water (until N2.2) | `src/sim/ship/standIn.ts#followWater` |
+| The simulation's fixed step (30 a second) | `src/sim/units.ts#STEP_SECONDS` |
+| Her floating: one step of heave, pitch and roll on the sea, pushed by the water's pressure on her hull and pulled by her weight; heading and speed given | `src/sim/ship/motion.ts#stepMotion` |
+| Putting her on the water still, at the draught's waterline and trim | `src/sim/ship/motion.ts#startMotion` |
+| Her body afloat: pressure points, mass, centre of gravity, inertia | `src/sim/ship/motion.ts#shipBody` |
+| Her rotation at a pose (ship space to the world) | `src/sim/ship/motion.ts#poseRotation` |
+| A point of ship space in the world at her pose | `src/sim/ship/motion.ts#toWorld` |
+| Where ship space's origin stands at her pose (where a drawing of her is placed) | `src/sim/ship/motion.ts#shipOrigin` |
+| Her pose between two steps, for drawing | `src/sim/ship/motion.ts#poseBetween` |
 | A smooth curve through readings that never overshoots (monotone cubic) | `src/sim/curve.ts#monotoneCurve` |
 | A straight-line curve through readings | `src/sim/curve.ts#linearCurve` |
 | Her moulded half-breadth anywhere on her hull (the fair surface through the table of offsets) | `src/sim/ship/hull.ts#hullHalfBreadth` |
@@ -102,6 +108,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The underside of the weather deck's planking | `src/sim/ship/hull.ts#weatherDeckUnderside` |
 | The draught's sloping load waterline | `src/sim/ship/hull.ts#designWaterline` |
 | Her displaced volume below a waterline | `src/sim/ship/hull.ts#displacedVolume` |
+| Her centre of buoyancy along her below a waterline | `src/sim/ship/hull.ts#buoyancyAlong` |
 | Simpson's rule: points and weights | `src/sim/ship/hull.ts#simpsonPoints` |
 | Her hull as one closed surface | `src/sim/ship/hull.ts#hullMesh` |
 | The brig's plan, built once: spaces, openings, ways, bulkheads, guns, pins, crew places, stations, mast steps, damage cells | `src/sim/ship/plan.ts#shipPlan` |

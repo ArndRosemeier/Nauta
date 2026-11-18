@@ -1,12 +1,13 @@
 /**
- * The slice drawn and riding the sea (plan N2.0): her meshes, one per kind, in a group posed by the stand-in motion
- * (sim/ship/standIn.ts), the eye carried with her, the sun's shadow map fitted round her, the lantern's flicker,
+ * The slice drawn and riding the sea (plan N2.0): her meshes, one per kind, in a group posed by her floating
+ * (sim/ship/motion.ts, stepped at the simulation's fixed rate and drawn between steps), the eye carried with her, the sun's shadow map fitted round her, the lantern's flicker,
  * and the sea kept out of her hull. N2.4 replaces the slice with the whole ship; this view stays.
  */
 import { Color, Euler, Group, Matrix4, Mesh, Quaternion, Vector3, type DirectionalLight, type PerspectiveCamera } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import type { SeaState } from '../../sim/sea/sea';
-import { followWater, restingPose, waterPlane, type StandInPose } from '../../sim/ship/standIn';
+import { poseBetween, shipOrigin, startMotion, stepMotion, type ShipMotion, type ShipPose } from '../../sim/ship/motion';
+import { STEP_SECONDS } from '../../sim/units';
 import { DECK_AT_SIDE, LOAD_WATERLINE } from '../../sim/rules/ships';
 import { halfBreadth, shipY } from '../../sim/ship/section';
 import type { Look } from '../../app/look';
@@ -18,8 +19,11 @@ import type { SliceParts } from './slice';
 import type { Kind } from '@futuremagic/stage';
 import type { Gathered } from './gathered';
 
-/** Where she lies: her middle on the sea and her heading (bow north). */
+/** Where she lies: her middle on the sea and her heading (bow north), lying still (no sailing yet). */
 const AT = { x: 0, z: 0, heading: 0 } as const;
+const COURSE = { heading: AT.heading, speed: 0 } as const;
+/** Steps one frame may catch up; after a longer stall (a hidden tab) she jumps to the clock instead. */
+const MOST_STEPS = 8;
 /** How much of her pitch and roll the eye takes: a man on deck keeps his head nearer level than the deck. */
 const RIDE = 0.65;
 /** The sun's shadow map: its texels, how far round her middle it reaches (m), how far off the sun's camera stands. */
@@ -48,7 +52,13 @@ const FLICKER_SEED = 1797;
 export class ShipView {
   /** Her meshes in ship space; it goes in through `stage.add`. */
   readonly group = new Group();
-  pose: StandInPose = restingPose();
+  /** Her pose as drawn this frame: between her last two steps. */
+  drawn: ShipPose;
+  private motion: ShipMotion = startMotion(AT.x, AT.z, AT.heading);
+  private previous: ShipMotion = this.motion;
+  /** The shared clock's time of her last step (NaN until the first frame). */
+  private stepped = Number.NaN;
+  private readonly origin: [number, number, number] = [0, 0, 0];
   /** How far the eye is below her deck, 0..1, for the light (the sky rig's `inside`). */
   below = 0;
   private readonly inverse = new Matrix4();
@@ -60,6 +70,7 @@ export class ShipView {
   private time = 0;
 
   constructor(private readonly parts: SliceParts) {
+    this.drawn = this.motion.pose;
     const add = (kind: Kind, g: Gathered, shadow: { cast: boolean; receive: boolean }) => {
       const m = new Mesh(g.geometry(), kind.make());
       m.name = kind.name;
@@ -101,11 +112,11 @@ export class ShipView {
    */
   update(sea: SeaState, t: number, dt: number, camera: PerspectiveCamera, where: Standpoint, look: Look, sun: DirectionalLight, sunDir: Vector3, gain: number, radPerPixel: number, seaOrigin: Vector3): void {
     this.time += dt;
-    this.pose = followWater(this.pose, waterPlane(sea, AT.x, AT.z, AT.heading, t), dt);
+    this.float(sea, t);
     const g = this.group;
-    g.position.set(AT.x, this.pose.heave, AT.z);
+    g.position.set(...shipOrigin(this.drawn, this.origin));
     // Pitch: bow up turns her about +x the other way (bow is -z); roll to starboard turns her about -z the other way.
-    this.euler.set(this.pose.pitch, -AT.heading, -this.pose.roll, 'YXZ');
+    this.euler.set(this.drawn.pitch, -this.drawn.heading, -this.drawn.roll, 'YXZ');
     g.quaternion.setFromEuler(this.euler);
     g.updateMatrixWorld(true);
     this.inverse.copy(g.matrixWorld).invert();
@@ -113,7 +124,7 @@ export class ShipView {
     // The eye rides with her, its tilt eased toward level.
     this.eye.set(...where.eye);
     camera.position.copy(this.eye).applyMatrix4(g.matrixWorld);
-    this.euler.set(this.pose.pitch * RIDE, -AT.heading, -this.pose.roll * RIDE, 'YXZ');
+    this.euler.set(this.drawn.pitch * RIDE, -this.drawn.heading, -this.drawn.roll * RIDE, 'YXZ');
     this.ride.setFromEuler(this.euler);
     this.euler.set(look.pitch, look.yaw, 0, 'YXZ');
     this.look.setFromEuler(this.euler);
@@ -136,6 +147,17 @@ export class ShipView {
     SHIP_INPUTS.glow.value.copy(FLAME).multiplyScalar(GLOW_STRENGTH * f);
     SEA_CUT.toShip.value.copy(this.inverse).multiply(new Matrix4().makeTranslation(seaOrigin.x, seaOrigin.y, seaOrigin.z));
   }
+
+  /** Her floating stepped up to the clock at the fixed rate, and her pose drawn one step behind it, between steps. */
+  private float(sea: SeaState, t: number): void {
+    if (!(t - this.stepped < MOST_STEPS * STEP_SECONDS)) this.stepped = t - STEP_SECONDS;
+    while (this.stepped + STEP_SECONDS <= t) {
+      this.previous = this.motion;
+      this.motion = stepMotion(this.motion, sea, this.stepped, COURSE);
+      this.stepped += STEP_SECONDS;
+    }
+    this.drawn = poseBetween(this.previous.pose, this.motion.pose, (t - this.stepped) / STEP_SECONDS);
+  }
 }
 
 /** The sun casts the shadow her decks and rig throw: set before the warm-up (it is part of every lit shader's key). */
@@ -149,4 +171,5 @@ export function shadowingSun(sun: DirectionalLight): void {
   c.updateProjectionMatrix();
   sun.shadow.bias = SHADOW_BIAS;
   sun.shadow.normalBias = SHADOW_NORMAL_BIAS;
+
 }

@@ -23,3 +23,7 @@ export function wrapBearing(bearing: number): number {
 
 /** Acceleration of gravity at the sea's surface, m/s². */
 export const GRAVITY = 9.81;
+
+/** The simulation's fixed step (implementation plan, budgets: 30 steps a second), and its length, s. */
+export const STEPS_PER_SECOND = 30;
+export const STEP_SECONDS = 1 / STEPS_PER_SECOND;
