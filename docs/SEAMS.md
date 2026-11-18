@@ -171,6 +171,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Building the ship in a worker at load | `src/render/ship/loadShip.ts#loadShip` |
 | Every buffer of a build, to send it without a copy | `src/render/ship/ship.ts#shipBuffers` |
 | A build's typed arrays made into a geometry | `src/render/ship/gathered.ts#geometryOf` |
+| A piece of a mesh named so its triangles can be told apart later (a spar that can fall, N6.5) | `src/render/ship/gathered.ts#Gathered` (tagged) |
 | Her zones: which spaces are drawn together, the outside | `src/render/ship/zones.ts#zoneOfSpaces` |
 | The zone a place in her lies in | `src/render/ship/zones.ts#zoneAt` |
 | The zone under a place on a deck | `src/render/ship/zones.ts#zoneUnder` |
@@ -197,16 +198,24 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her rooms: floors, ceiling, bulkheads, doors, ladders, lanterns | `src/render/ship/rooms.ts#buildRooms` |
 | Her damage map's layout (N6.5 writes into it) | `src/render/ship/damageMap.ts#DAMAGE_REGIONS` |
 | Where a point of a damaged surface lies in the damage map | `src/render/ship/damageMap.ts#damageTexel` |
-| The marks a ship's damage leaves on her damage map: holes inside and out, panels stove in, bulwarks and rails smashed out (N6.5) | `src/render/ship/damageMarks.ts#HullMarks` |
+| The marks a ship's damage leaves on her damage map: holes inside and out, panels stove in, bulwarks and rails smashed out, decks charred by her fires (N6.5) | `src/render/ship/damageMarks.ts#HullMarks` |
 | The holes and splits a ship's damage leaves in her sails' hole map (N6.5) | `src/render/ship/damageMarks.ts#SailMarks` |
 | One ship's damage written into her blocks of the damage maps, and whether she must draw holed | `src/render/ship/damageView.ts#DamageView` |
 | A ship's damage drawn as the match has it, her outside and sails holed once cut (N6.5) | `src/render/ship/shipView.ts#ShipView` |
 | The daylight seen through a shot hole from inside her | `src/render/ship/shipMaterials.ts#lightThrough` |
 | A stand-in for a fight's damage to look at (`?scars=3`) | `src/app/scars.ts#scarsOf` |
+| A stand-in for the other ship going down off her beam, to look at (`?sail&down`) | `src/app/scars.ts#goingDown` |
+| The water in her drawn: one surface level with the world out to the inside of her sides (N6.5) | `src/render/ship/waterInside.ts#WaterInside`, `waterSurface` |
+| What floats after a ship goes down: whether she has, and her loose wood coming up and drifting (N6.5) | `src/render/flotsam.ts#FlotsamView`, `goneDown` |
 | Her masts and rigging from the rig plan: spars, deadeyes, channels, every line, pins and coils (N3.6) | `src/render/ship/rig.ts#buildRigs` |
 | Her spars turned from the spar table: masts, tops, trestle and cross trees, caps, yards, bowsprit, jib-boom, boom, gaff | `src/render/ship/masts.ts#drawSpars` |
 | Every line of the rig plan drawn by its sag, with its blocks, ratlines, futtock staves, footropes and stirrups | `src/render/ship/rigging.ts#buildRigging` |
 | Her spars that turn (yards, boom, gaff) as moving frames: pivot, axis, limit | `src/render/ship/swings.ts#swingsOf` |
+| Every spar's moving frame, the standing spars' after the sails' points (N6.5) | `src/render/ship/swings.ts#sparFramesOf` |
+| How a broken spar goes over the side: what it takes, the break, where it comes to lie | `src/render/ship/wreck.ts#fallShape` |
+| The wreck's matrix: falling, lying alongside, cut away and drifting astern | `src/render/ship/wreck.ts#wreckMatrix` |
+| The triangles a fall takes out of her outside, and what is left | `src/render/ship/wreck.ts#takeFallen`, `keptIndex` |
+| Her spars drawn going over the side and what is made fast to them (N6.5) | `src/render/ship/shipView.ts#ShipView.showDamage` (showFalls, moveWrecks) |
 | A turning spar's frame from its brace or swing angle and hoist | `src/render/ship/swings.ts#swingMatrix` |
 | A point of the rig plan in ship space | `src/render/ship/swings.ts#shipPoint` |
 | Handing the moving frames to the rope shader | `src/render/ship/shipMaterials.ts#setShipFrame` |
@@ -306,6 +315,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The ring on a carronade's cascabel her breeching is rove through | `src/render/ship/gunPlaces.ts#cascabelRing` |
 | Gunfire drawn: muzzle flashes and first puffs, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
 | Powder smoke: poured from the ports as guns fire, drifting with the wind, swelling and thinning, lit by the day and the flashes (N5.5) | `src/render/smoke.ts#SmokeView` |
+| Fire drawn: each fire's flames on its floor and out of its vent, its black smoke, poured into the smoke's fire rings, seeded (N6.5) | `src/render/fireView.ts#FireView` |
+| Where a fire in a space of the plan is seen: its floor, its reach, the weather-deck opening it vents by | `src/render/fireView.ts#fireSeat` |
+| A fire's puff (soot or flame) put into the smoke's rings, apart from the guns' (N6.5) | `src/render/smoke.ts#SmokeView` (pourPuff) |
 | How many puffs of smoke a gun pours at a quality level, and how dense each is, so the smoke hides as much at every level | `src/render/smoke.ts#puffsPoured` |
 | Smoke drawn at half resolution behind `?smoke=half`: the scene's multisampled depth halved, the smoke drawn against it and blended over the frame by depth (N5.5 trial) | `src/render/halfSmoke.ts#HalfSmoke` |
 | Balls falling in the sea: a column of spray and white water in the nearest ship's wake map | `src/render/gunfire.ts#fallInSea` |

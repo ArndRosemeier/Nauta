@@ -54,10 +54,12 @@ import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
 import { setFrenchFlags } from './render/ship/sailMaterial';
 import type { Navy } from './app/crewLooks';
-import { lightThrough } from './render/ship/shipMaterials';
-import { scarsOf } from './app/scars';
+import { SHIPS_DRAWN, lightThrough } from './render/ship/shipMaterials';
+import { goingDown, scarsOf } from './app/scars';
 import { GunfireView, fallInSea } from './render/gunfire';
 import { SmokeView, useSmokeDepth } from './render/smoke';
+import { FireView } from './render/fireView';
+import { FlotsamView } from './render/flotsam';
 import { HalfSmoke } from './render/halfSmoke';
 import { gunsSeen } from './app/gunsSeen';
 import { ShotsSeen, type Flash, type Strike } from './app/shotsSeen';
@@ -202,6 +204,8 @@ async function start(): Promise<void> {
   const other = build && match ? new ShipView(build, 1) : null;
   if (ship && match) ship.poseFrom = () => match.pose(match.ship)!;
   if (other && match) other.poseFrom = () => match.pose(match.other) ?? match.pose(match.ship)!;
+  // `?down` (N6.5): the other ship goes down off her beam from the start, a stand-in to look at a ship sinking and what floats after.
+  if (other && match && params.down) other.poseFrom = (t) => goingDown(match.pose(match.ship)!, match.pose(match.other) ?? match.pose(match.ship)!, t);
   // The spyglass (plan N3.8), held steady against her motion as the hands can.
   const glass = ship ? new Spyglass(MATCH_SEED, params.glass) : null;
   if (ship) ship.steadying = glass;
@@ -271,6 +275,10 @@ async function start(): Promise<void> {
   const fireDrawn = match ? new GunfireView(GUNFIRE.make(), SHOT_IN_FLIGHT.make()) : null;
   // Powder smoke (N5.5): poured from the ports as the guns fire, drifting with the wind.
   const smoke = match ? new SmokeView(SMOKE.make()) : null;
+  // Fire (N6.5): flames and soot where she burns, poured into the smoke's ring.
+  const burning = smoke ? new FireView(smoke) : null;
+  // What floats after a ship goes down (N6.5): her loose wood coming up where she sank.
+  const flotsam = match ? new FlotsamView(SHIPS_DRAWN) : null;
   const shots = match ? new ShotsSeen() : null;
   if (match && shots) match.on('events', (events) => shots.take(events));
   if (match && crew) match.on('events', (events) => crew.onEvents(events));
@@ -280,7 +288,7 @@ async function start(): Promise<void> {
   await herGuns?.ready();
   const fittingGroups = [furnished, herFittings].flatMap((f) => (f ? [...f.zones.values()].map((d) => d.group) : []));
   const gunGroups = [guns, herGuns].flatMap((g) => (g ? [g.draws.group] : []));
-  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(fireDrawn ? [fireDrawn.bits, fireDrawn.balls] : []), ...(smoke && !halfSmoke ? [smoke.mesh] : []), ...fittingGroups, ...gunGroups]);
+  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(fireDrawn ? [fireDrawn.bits, fireDrawn.balls] : []), ...(smoke && !halfSmoke ? [smoke.mesh] : []), ...(flotsam ? [flotsam.mesh] : []), ...fittingGroups, ...gunGroups]);
   // The crews' shaders, a few men at each level of detail wearing between them all the crew wears, at full speed
   // behind the loading screen (docs/SHADERS.md rule 5), as MasterWorld warms its townsfolk.
   // The cap stays open (share 1) until the crews are in: before the first frame no frame frees a slot.
@@ -316,6 +324,7 @@ async function start(): Promise<void> {
   const scarred = params.scars !== null ? [scarsOf(params.scars, 0), scarsOf(params.scars, 1)] as const : null;
   if (other) await view.stage.add(other.group);
   if (spray) await view.stage.add(spray.mesh);
+  if (flotsam) await view.stage.add(flotsam.mesh);
   if (fireDrawn) { await view.stage.add(fireDrawn.bits); await view.stage.add(fireDrawn.balls); }
   if (smoke && halfSmoke && view.post) {
     capTo(1); // its shaders are new to the cap, which no frame opens before the first
@@ -660,6 +669,17 @@ async function start(): Promise<void> {
       const bow = ship.bow(way);
       const from = [{ slams: ship.slams, bow }, ...(other && herWater ? [{ slams: other.slams, bow: other.bow(herWay) }] : [])];
       spray.show(from, windAt(wind, bow.stem[0], bow.stem[2], seaTime, gust), seaTime, dt, seaView.origin);
+    }
+    // Going down (N6.5): what floats after each ship that has sunk.
+    if (match && flotsam) {
+      if (ship) flotsam.show(0, ship.drawn, sea, seaTime, seaView.origin);
+      if (other && match.other >= 0) flotsam.show(1, other.drawn, sea, seaTime, seaView.origin);
+    }
+    // Fire (N6.5): her fires' flames and soot, poured before the smoke is shown so they are drawn this frame.
+    if (match && burning) {
+      const mine = scarred?.[0] ?? match.state.ships[match.ship]?.damage, hers = scarred?.[1] ?? (match.other >= 0 ? match.state.ships[match.other]?.damage : undefined);
+      if (ship && mine) burning.burn(0, mine.fires, ship.drawn, seaTime);
+      if (other && hers) burning.burn(1, hers.fires, other.drawn, seaTime);
     }
     // Gunfire (N5.4a): flashes and first puffs at the muzzles, the balls in flight, splashes where they fall (spray
     // and white water on the sea), splinters where they strike.

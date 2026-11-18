@@ -20,7 +20,7 @@ import { RUDDER_ID, rudderMatrix } from '../src/render/ship/stern.ts';
 import { RUDDER } from '../src/sim/rules/sailing.ts';
 import { Vector3 } from 'three/webgpu';
 import { rigPlan } from '../src/sim/ship/rig.ts';
-import { MOST_FRAMES, RIG_FRAMES, shipPoint, swingMatrix, swingsOf } from '../src/render/ship/swings.ts';
+import { MOST_FRAMES, RIG_FRAMES, shipPoint, sparFramesOf, swingMatrix, swingsOf } from '../src/render/ship/swings.ts';
 import { gunFrame, lidFrame } from '../src/render/ship/gunPlaces.ts';
 import { battery } from '../src/sim/guns/guns.ts';
 import { LINE_OFF_PIN } from '../src/render/ship/rigging.ts';
@@ -218,8 +218,11 @@ test('her yards brace round and her boom and gaff swing: each in its own frame, 
   const points = sailPoints(RIG, sailForms(RIG), SWINGS.length + 1);
   // The breechings follow their carronades' carriages, the lanyards their lids (N5.4a), after the rig's frames.
   const carronades = battery().flatMap((g, i) => (g.gun === 'carronade' ? [gunFrame(i)] : [])), lids = shipPlan().guns.map((_, j) => lidFrame(j));
-  assert.deepEqual([...used].sort((a, b) => a - b), [0, ...SWINGS.map((w) => w.frame), ...points.map((p) => p.frame), ...carronades, ...lids]);
-  assert.ok(Math.max(...lids) < MOST_FRAMES && Math.max(...points.map((p) => p.frame)) < RIG_FRAMES, 'every frame fits its block of the frames texture');
+  // The spars that stand carry what is made fast to them when they fall (N6.5): their frames come last of the rig's.
+  const standing = [...sparFramesOf(RIG).values()].filter((f) => f > SWINGS.length), onStanding = [...used].filter((f) => standing.includes(f));
+  assert.deepEqual([...used].filter((f) => !standing.includes(f)).sort((a, b) => a - b), [0, ...SWINGS.map((w) => w.frame), ...points.map((p) => p.frame), ...carronades, ...lids]);
+  assert.ok(onStanding.length >= standing.length - 1, `ropes follow ${onStanding.length} of ${standing.length} standing spars`);
+  assert.ok(Math.max(...lids) < MOST_FRAMES && Math.max(...points.map((p) => p.frame)) < Math.min(...standing) && Math.max(...standing) < RIG_FRAMES, 'every frame fits its block of the frames texture');
 });
 
 test('her stern is built: its inside faces the deck above her after end, and her rudder, near and far, turns with her helm', () => {

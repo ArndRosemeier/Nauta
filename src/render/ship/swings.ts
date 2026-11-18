@@ -51,6 +51,19 @@ export function swingsOf(rig: RigPlan): Swing[] {
   return out;
 }
 
+/**
+ * Every spar's moving frame by its id (plan N6.5): a turning spar's own (`swingsOf`), and each spar that stands (the
+ * masts, the bowsprit, the jib-boom, the dolphin striker) one of the last of the rig's frames, after the sails' points:
+ * still (her hull's) until it falls, then carrying what is made fast to it over the side.
+ */
+export function sparFramesOf(rig: RigPlan): ReadonlyMap<string, number> {
+  const swings = swingsOf(rig), standing = rig.spars.filter((s) => !swings.some((w) => w.id === s.id));
+  return new Map([
+    ...swings.map((w) => [w.id, w.frame] as const),
+    ...standing.map((s, k) => [s.id, RIG_FRAMES - standing.length + k] as const),
+  ]);
+}
+
 /** The turning spar a spar is, or null. */
 export const swingOf = (swings: readonly Swing[], spar: Spar | string): Swing | null => swings.find((w) => w.id === (typeof spar === 'string' ? spar : spar.id)) ?? null;
 
