@@ -1,0 +1,2 @@
+The game now works without a network once it has been loaded once: add it to the home screen on the iPad, open it, and a minute later it starts even in flight mode.
+A newer version downloads only the files that changed, and is offered on the main screen as "A new version is ready · restart".

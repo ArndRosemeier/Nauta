@@ -41,7 +41,9 @@
     "shot:fan": "node tools/shot/fan.mjs",
     "shot:menu": "node tools/shot/menu.mjs",
     "shot:damage": "node tools/shot/damage.mjs",
-    "shot:crew": "node tools/shot/crew.mjs"
+    "shot:crew": "node tools/shot/crew.mjs",
+    "check:offline": "node --import tsx tools/offline/check.mjs",
+    "check:transfer": "node --import tsx tools/offline/transfer.mjs"
   },
   "dependencies": {
     "@actors/core": "https://github.com/ArndRosemeier/Actors/releases/download/v0.37.0/actors-core-0.37.0.tgz",

@@ -740,3 +740,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A key's small cap beside what it does, shown only where a mouse points | `src/app/dom.ts#keyCap` |
 | The key that gives what a fan's item gives (its cap on the tag) | `src/app/fanOrders.ts#keyOfItem` |
 | A press on the screen, and whether its lift makes a tap or a click | `src/app/press.ts#isTap` |
+| Which files of a build the service worker keeps, which it must hold before it takes over, and the order the rest is fetched in | `src/offline/plan.ts#nextFill` |
+| A file kept for use without a network: its address and hash (a changed file is a new key, an unchanged one is kept across builds) | `src/offline/plan.ts#keyOf` |
+| The page's side of the service worker: registering it, keeping the rest while the game is played, a newer version waiting, restarting on it | `src/offline/register.ts#Offline` |
+| The build's file list and the worker made from it (`dist/sw.js`) | `tools/offline/precache.ts#writeWorker` |
+| Whether the page uses the service worker (the deploy yes, any other build with `?sw`, `?nosw` removes it) | `src/offline/plan.ts#offlineMode` |
