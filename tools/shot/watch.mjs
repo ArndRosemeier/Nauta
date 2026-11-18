@@ -2,8 +2,8 @@
  * A battle watched from the free camera (plan N7.8), by hand: `npm run shot:watch [-- <out dir> [menu]]` (run `npm run
  * build` first; not part of CI's slow checks). With `menu` it is the plain address instead: the main screen with its new
  * choice, the setup (in German too), the battle begun from the menu, the captain's pause and the end card. One page of `?watch=master,seasoned`, the match run on only by the check
- * (`__nautaSail.onward`) and the eye flown by it (`__nautaWatch`, no frames drawn in between): the first view of both
- * ships, the eye glided to each ship's quarter, flown in close, then, once they have closed and fired, both again and a
+ * (`__nautaSail.onward`) and the eye flown by it (`__nautaWatch`, no frames drawn in between): the first view (over the British ship's shoulder,
+ * the French far off), the eye glided to each ship's quarter, flown in close, then, once they have closed and fired, both again and a
  * ship from above. Prints where the eye is and how far each ship is; fails if the page throws, the eye is not where a
  * button should put it, or no gun is fired.
  */
@@ -71,7 +71,7 @@ const GLIDE = 6;
   };
   const glideTo = async (to) => { await frame(); await watch('company', to); return watch('flyFor', GLIDE); };
   
-  await shot('start-both', JSON.stringify(await watch('flyFor', 0)));
+  await shot('start', JSON.stringify(await watch('flyFor', 0)));
   let apart = await page.evaluate(() => window.__nautaSail.apart());
   for (let waited = 0; waited < CLOSING.most && apart > CLOSING.near; waited += CLOSING.step) {
     await run(CLOSING.step);
@@ -95,7 +95,15 @@ const GLIDE = 6;
   await shot('french-quarter', JSON.stringify(at));
   // Flown in close: forward toward her, slowly, until a few metres off her side.
   at = await watch('flyFor', 3, { forward: 1 });
-  await shot('french-close', JSON.stringify(at));
+  // The pool dresses one man at a time: frames until some of her men are full characters (the other ship's, not the British).
+  let pooled = [0, 0];
+  for (let n = 0; n < 60 && !(pooled[1] > 0); n++) {
+    await frame();
+    await page.waitForTimeout(300);
+    pooled = await page.evaluate(() => window.__nautaCrew.pooledByShip());
+  }
+  if (!(pooled[1] > 0)) problems.push(`no French man is drawn as a full character near her (pool ${JSON.stringify(pooled)})`);
+  await shot('french-close', `${JSON.stringify(at)} pool ${JSON.stringify(pooled)}`);
   // High over both: straight up.
   at = await watch('flyFor', 8, { climb: 1, boost: true }, { pitch: -1.2 });
   await shot('from-above', JSON.stringify(at));
