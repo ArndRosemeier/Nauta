@@ -37,7 +37,7 @@ import type { LoggedOrders } from '../sim/replay';
 import { aloneStart, duelStart, type StartTerms } from '../sim/start';
 import { hashState, startMatch, type MatchSetup, type SimState } from '../sim/state';
 import { step, type SimEvent } from '../sim/step';
-import { STEPS_PER_SECOND } from '../sim/units';
+import { MINUTES_PER_HOUR, STEPS_PER_SECOND } from '../sim/units';
 import {
   cleanOrder, GAME, makeSnapshot, MOST_ORDERS, MOST_PLAYERS, PROTOCOL, roomRefusal, roomTerms, snapshotState,
   type Ack, type Captains, type Delta, type GivenOrder, type Intent, type RoomMeta, type RoomTerms, type Snapshot,
@@ -99,6 +99,8 @@ export interface DuelOptions {
   readonly terms?: StartTerms;
   /** A match played alone with her alone at sea, no enemy (menu.md, "Walk the ship"). */
   readonly alone?: boolean;
+  /** The sandbox's day clock: the hour of the day (0 up to 24) a match played alone starts at, so her crew keeps the day's watches (sim/day.ts); none: no day clock. */
+  readonly hour?: number;
   /**
    * A match watched (the spectator's, plan N7.8): both ships commanded by computer captains at these skills, the first
    * ship's and the second's, and no captain of mine at all. It takes the place of `foe`.
@@ -196,7 +198,8 @@ export class DuelSession {
     if (!this.hub) {
       this.role = 'solo';
       const seed = options.seed ?? SOLO_SEED;
-      const start = options.setup ?? this.timed(options.alone ? aloneStart(seed, this.terms) : duelStart(seed, this.terms));
+      const planned = options.setup ?? this.timed(options.alone ? aloneStart(seed, this.terms) : duelStart(seed, this.terms));
+      const start = options.alone && options.hour !== undefined ? { ...planned, dayStart: options.hour * MINUTES_PER_HOUR } : planned;
       const second = this.foe ? crewedBy(start, FOE_SHIP, this.foe) : start;
       const crewed = this.first ? crewedBy(second, FIRST_SHIP, this.first) : second;
       const state = startMatch(options.windForce === undefined ? crewed : { ...crewed, windForce: options.windForce });

@@ -58,6 +58,8 @@ export interface SimState {
   readonly flying: readonly Flying[];
   /** How the fight stands: when the light fails, who is beaten, and its end once over (end.ts owns it). */
   readonly fight: Fight;
+  /** The game minute of the day (0 to 1,439) at tick 0 in the sandbox, whose crew keeps the day's watches (day.ts), or null: a fight or duel has no day clock. */
+  readonly dayStart: number | null;
 }
 
 /**
@@ -83,6 +85,8 @@ export interface MatchSetup {
   readonly ships: readonly ShipStart[];
   /** How long the match may last before it is drawn, minutes (a match setting; rules/end.ts `MATCH_MINUTES` if not given). */
   readonly minutes?: number;
+  /** The sandbox's day clock: the game minute of the day the match starts at (day.ts); none: a fight, with no day clock. */
+  readonly dayStart?: number;
 }
 
 /** The shared clock of a state, s: the time the next step starts at. */
@@ -113,6 +117,7 @@ export function startMatch(setup: MatchSetup): SimState {
     })),
     flying: [],
     fight: startFight(setup.ships.length, setup.minutes),
+    dayStart: setup.dayStart ?? null,
   };
 }
 

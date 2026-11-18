@@ -90,6 +90,7 @@ import { formatBytes } from './probe/report';
 import { Vector3 } from 'three/webgpu';
 import { DEGREE, MS_PER_SECOND, STEPS_PER_SECOND, apartOnWater, bearingTo, wrapBearing } from './sim/units';
 import { simTime } from './sim/state';
+import { dayElapsed } from './sim/day';
 import { parseOrder } from './sim/orders';
 import { apparentSpeed } from './sim/ship/sailing';
 import { makeWind, meanWind, windAt } from './sim/wind';
@@ -776,7 +777,7 @@ async function start(): Promise<void> {
       const ships = match.state.ships.map((s, i) => ({ pose: (i === match.ship ? ship.drawn : match.pose(i)) ?? ship.drawn, damage: s.damage }));
       for (const j of damageSound.struck({ t: seaTime, ear: [ear.x, ear.y, ear.z], earShip: earEye, aboard: where.off ? -1 : match.ship, below: herRoom.below, ships })) walking?.body.jolt(j.x, j.z, j.strength);
     }
-    if (crewSound && match) { const mine = match.state.ships[match.ship]; crewSound.drum = !!mine && beatingToQuarters(mine.told, mine.guns); }
+    if (crewSound && match) { const mine = match.state.ships[match.ship]; crewSound.drum = !!mine && beatingToQuarters(mine.told, mine.guns); crewSound.day = dayElapsed(match.state.dayStart, match.state.tick); }
     if (ship && crewSound && match && sailing) crewSound.atWork(sailing, simTime(match.state), ship.drawn, earEye, room);
     else if (ship && crewSound && !still) crewSound.bellAlone(seaTime, ship.drawn, room);
     // Her sails and rigging (N3.9): the rigging by the wind she feels aloft, the canvas as it is drawn; the wind on the

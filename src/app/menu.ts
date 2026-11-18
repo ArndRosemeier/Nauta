@@ -10,6 +10,7 @@ import type { AudioEngine } from '@futuremagic/audio/web';
 import { DuelSession, type DuelHub } from '../net/duel';
 import { MOST_PLAYERS, roomTerms, type RoomTerms } from '../net/wire';
 import { SKILLS, type Offered } from '../sim/rules/captain';
+import { DAY_REAL_MINUTES } from '../sim/rules/day';
 import { MEETINGS, WIND_CHOICE_NAMES, type Meeting, type WindChoice } from '../sim/start';
 import { HOURS_PER_DAY, MINUTES_PER_HOUR, SECONDS_PER_MINUTE } from '../sim/units';
 import { beginOnTap, handOver, titleTheme } from '../title/title';
@@ -300,14 +301,15 @@ export class Menu {
    * French ship's, none of the ships mine, the British the first (plan N7.8).
    */
   private sail(kind: 'alone' | 'walk' | 'watch', fresh = false): void {
-    const t = this.terms, seed = (fresh ? null : t.seed) ?? newSeed(Date.now(), this.seeds++);
+    const t = this.terms, seed = (fresh ? null : t.seed) ?? newSeed(Date.now(), this.seeds++), hour = hourOf(t.hour, seed);
     const s = kind === 'alone'
       ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), foe: t.foe, minutes: matchMinutes(t) })
       : kind === 'watch'
         ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), watch: { first: t.skillBritish, second: t.skillFrench }, minutes: matchMinutes(t) })
-        : new DuelSession({ build: this.h.build, now: this.h.now, seed, alone: true, terms: startTerms(t), minutes: QUIET_MINUTES });
+        : new DuelSession({ build: this.h.build, now: this.h.now, seed, alone: true, hour, terms: startTerms(t), minutes: QUIET_MINUTES });
     this.run(s, kind === 'walk' ? { kind } : { kind, terms: t, seed }, kind === 'watch' ? 'british' : undefined);
-    this.h.sky(hourOf(t.hour, seed), MATCH_DAY_MINUTES);
+    // The sandbox has its own day: the sky runs at the sim's day clock's pace, so what the sky shows is the hour her crew keeps.
+    this.h.sky(hour, kind === 'walk' ? DAY_REAL_MINUTES : MATCH_DAY_MINUTES);
     this.aboard();
   }
 
