@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BODY, DOOR, LADDER, LEAST_HATCH, OPENINGS, PORTS, QUARTERDECK, SPACES } from '../src/sim/rules/ships.ts';
+import { BODY, DECK_CROSSING, DOOR, LADDER, LEAST_HATCH, OPENINGS, PORTS, QUARTERDECK, SPACES } from '../src/sim/rules/ships.ts';
+import { rigObstacles, rigPlan, rigWalk } from '../src/sim/ship/rig.ts';
 import { floorAt, floorsUnder, insideBreadth, overheadAt, sectionGirth, shipPlan, type Space } from '../src/sim/ship/plan.ts';
 import { nodeAt, reachable, walkGraph, WALK_CELL } from '../src/sim/ship/walk.ts';
 import { HULL_AFT, HULL_FORE, sheer } from '../src/sim/ship/hull.ts';
@@ -144,4 +145,29 @@ test('every floor under a place is found, lowest first: hold, berth deck, weathe
   assert.ok(floors[0]! < floors[1]! && floors[1]! < floors[2]!);
   const s: Space = space('deck');
   assert.ok(floorAt(s, 0, 0) > floorAt(s, 0, 3), 'the weather deck is cambered');
+});
+
+test('a way across the weather deck\'s centreline at least every 6 m, each 0.7 m clear, one forward of the foremast', () => {
+  const deck = space('deck'), withRig = rigWalk(plan, BODY), step = WALK_CELL / 2;
+  const solids = [...plan.obstacles, ...rigObstacles(rigPlan(plan))].filter((o) => o.level === 'weather' && o.port < 0 && o.starboard > 0);
+  // Where a body's middle stands on the centreline, in runs along her: the ways across.
+  const ways: { from: number; to: number }[] = [];
+  for (let a = deck.aft; a <= deck.fore; a += step) {
+    if (nodeAt(withRig, { space: 'deck', along: a, across: 0 }) < 0) continue;
+    const last = ways[ways.length - 1];
+    if (last && a - last.to <= step * 1.5) last.to = a; else ways.push({ from: a, to: a });
+  }
+  assert.ok(ways.length > 0);
+  for (const w of ways) {
+    const middle = (w.from + w.to) / 2;
+    const aft = Math.max(deck.aft, ...solids.filter((o) => o.fore <= middle).map((o) => o.fore));
+    const fore = Math.min(deck.fore, ...solids.filter((o) => o.aft >= middle).map((o) => o.aft));
+    assert.ok(fore - aft >= DECK_CROSSING.width - 1e-9, `the way across at ${middle.toFixed(2)} is ${(fore - aft).toFixed(2)} m clear`);
+  }
+  for (let i = 1; i < ways.length; i++) {
+    const shut = ways[i]!.from - ways[i - 1]!.to;
+    assert.ok(shut <= DECK_CROSSING.every, `no way across from ${ways[i - 1]!.to.toFixed(2)} to ${ways[i]!.from.toFixed(2)} m forward of the mainmast`);
+  }
+  const foremast = plan.obstacles.find((o) => o.id === 'foremast-weather')!;
+  assert.ok(ways.some((w) => w.from > foremast.fore), 'a way across forward of the foremast');
 });

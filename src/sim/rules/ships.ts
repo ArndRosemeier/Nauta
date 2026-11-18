@@ -421,16 +421,30 @@ export interface FittingRow {
   readonly fore: number;
   readonly across: readonly [number, number];
 }
-/** Her fittings in the way, along her from the deck plans; across, a sloop's usual sizes. */
+/**
+ * The fife rails' places that make the ways across her deck (ship.md, "Crossing the deck": a way 0.7 m wide across
+ * the centreline at least every 6 m, one forward of the foremast), m forward of the mainmast: the main fife rail on
+ * the main bitts' after face, 0.48 m abaft the mainmast, leaving the way between it and the skylight; the foremast's
+ * fore fife rail 0.25 m before the mast, leaving the way between it and the bowsprit's heel.
+ */
+export const MAIN_FIFE_AT = -0.89;
+/** The ways across her weather deck's centreline (ship.md, "Crossing the deck"): each this wide clear, m, and no more than `every` m of centreline without one. */
+export const DECK_CROSSING = { width: 0.7, every: 6 } as const;
+export const FORE_FIFE_FORE_AT = 15.3;
+/**
+ * Her fittings in the way, along her from the deck plans; across, a sloop's usual sizes. The store scuttle stands to
+ * port over the sail room, off the centreline, leaving the way across between the galley chimney and the fore bitts
+ * (over the dry store it would close the port gangway at the fore bitts).
+ */
 export const FITTINGS: readonly FittingRow[] = [
   { id: 'wheel', name: 'wheel', level: 'weather', aft: -9.02, fore: -8.28, across: [-0.7, 0.7] },
   { id: 'binnacle', name: 'binnacle', level: 'weather', aft: -8.1, fore: -7.8, across: [-0.25, 0.25] },
   { id: 'capstan', name: 'capstan', level: 'weather', aft: -4.44, fore: -3.11, across: [-0.65, 0.65] },
-  { id: 'main-bitts', name: 'main bitts and pumps', level: 'weather', aft: -1.19, fore: 1.17, across: [-1.0, 1.0] },
+  { id: 'main-bitts', name: 'main bitts and pumps', level: 'weather', aft: MAIN_FIFE_AT, fore: 1.17, across: [-1.0, 1.0] },
   { id: 'chimney', name: 'gratings and galley chimney', level: 'weather', aft: 11.15, fore: 12.51, across: [-0.6, 0.6] },
-  { id: 'store-scuttle', name: 'store scuttle', level: 'weather', aft: 12.57, fore: 13.19, across: [-0.35, 0.35] },
+  { id: 'store-scuttle', name: 'store scuttle', level: 'weather', aft: 11.6, fore: 12.22, across: [-2.05, -1.35] },
   { id: 'fore-bitts', name: 'fore bitts', level: 'weather', aft: 13.26, fore: 13.41, across: [-1.0, 1.0] },
-  { id: 'fore-partners', name: 'foremast partners and fife rail', level: 'weather', aft: 13.66, fore: 15.88, across: [-0.7, 0.7] },
+  { id: 'fore-partners', name: 'foremast partners and fife rail', level: 'weather', aft: 13.66, fore: FORE_FIFE_FORE_AT, across: [-0.7, 0.7] },
   { id: 'bins-p', name: "boatswain's bins", level: 'berth', aft: 7.01, fore: 10.92, across: [-SIDE, -3.4] },
   { id: 'bins-s', name: "carpenter's bins", level: 'berth', aft: 7.01, fore: 10.92, across: [3.4, SIDE] },
   { id: 'stove', name: 'galley stove', level: 'berth', aft: 11.99, fore: 12.57, across: [-0.5, 0.5] },
@@ -466,14 +480,14 @@ export type RailRow =
 export const RAILS: readonly RailRow[] = [
   { id: 'main-pins', kind: 'pin rail', mast: 'main', aft: -4.2, fore: -0.2 },
   { id: 'fore-pins', kind: 'pin rail', mast: 'fore', aft: 10.9, fore: 14.6 },
-  { id: 'main-fife', kind: 'fife rail', mast: 'main', at: -1.19, pins: [-1.05, -0.8, 0.8, 1.05], toward: -1 },
+  { id: 'main-fife', kind: 'fife rail', mast: 'main', at: MAIN_FIFE_AT, pins: [-1.05, -0.8, 0.8, 1.05], toward: -1 },
   { id: 'fore-fife', kind: 'fife rail', mast: 'fore', at: 13.26, pins: [-1.0, -0.85, 0.85, 1.0], toward: -1 },
   // The rig plan (N3.2) belays every running line on a pin of its own (about 100): the bulwark carries pins from the
   // taffrail to the bow, between the ports, and the foremast's fife rail has pins on its fore side too.
   { id: 'quarter-pins', kind: 'pin rail', mast: 'main', aft: -11.36, fore: -4.6 },
   { id: 'waist-pins', kind: 'pin rail', mast: 'main', aft: 0.1, fore: 10.6 },
   { id: 'bow-pins', kind: 'pin rail', mast: 'fore', aft: 14.92, fore: 19.1 },
-  { id: 'fore-fife-fore', kind: 'fife rail', mast: 'fore', at: 15.88, pins: [-1.15, -1.0, -0.85, 0.85, 1.0, 1.15], toward: 1 },
+  { id: 'fore-fife-fore', kind: 'fife rail', mast: 'fore', at: FORE_FIFE_FORE_AT, pins: [-1.15, -1.0, -0.85, 0.85, 1.0, 1.15], toward: 1 },
 ];
 /** A fife rail's pins stand this high over the deck, m. */
 export const BELAY_HEIGHT = 0.9;
