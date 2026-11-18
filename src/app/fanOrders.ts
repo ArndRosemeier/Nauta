@@ -6,7 +6,7 @@
  * first whom the message is for, then that man's own fan. Also: which drawn man a finger points at, and the order
  * keys. Pure: the fan on the page is orderFan.ts.
  */
-import type { GunsOrder, LifeOrder, Order, PlainOrder } from '../sim/orders';
+import type { GunsOrder, KeepOrder, LifeOrder, Order, PlainOrder, SoundOrder } from '../sim/orders';
 import type { SimState } from '../sim/state';
 import { MASTS } from '../sim/ship/sailing';
 import { isStanding, wouldRefuse } from './orderReport';
@@ -47,8 +47,10 @@ export const FAN_MOST = 6;
 export const FAN_DEPTH = 2;
 
 const order = (id: string, word: WordKey, o: Order, detail: WordKey | null = null): FanItem => ({ id, word, detail, act: { kind: 'order', order: o } });
-const plain = (kind: PlainOrder['kind'] | GunsOrder['kind'] | LifeOrder['kind']): Order => ({ kind, ship: 0 } as Order);
+const plain = (kind: PlainOrder['kind'] | GunsOrder['kind'] | LifeOrder['kind'] | KeepOrder['kind'] | SoundOrder['kind']): Order => ({ kind, ship: 0 } as Order);
 
+/** The master's ring "Keep her": his standing helm orders (orders.md "The fans as built"). */
+const KEEP: readonly FanItem[] = [order('by', 'fanBy', plain('by')), order('follow', 'fanFollow', plain('follow')), order('abeam', 'fanAbeam', plain('abeam'))];
 /** The master's ring "About": through the wind, or round before it. */
 const ABOUT: readonly FanItem[] = [order('tack', 'fanTack', plain('tack')), order('wear', 'fanWear', plain('wear'))];
 /** The first lieutenant's ring "Make sail": the three settings of sail. */
@@ -102,8 +104,8 @@ export function fanItems(who: Officer, state: SimState, ship: number): readonly 
       { id: 'steer', word: 'fanSteer', detail: null, act: { kind: 'steer there' } },
       order('up', 'fanUp', plain('up'), 'fanPoint'),
       order('away', 'fanAway', plain('away'), 'fanPoint'),
-      order('by', 'fanBy', plain('by')),
       { id: 'about', word: 'fanAbout', detail: 'fanAboutDetail', act: { kind: 'ring', items: ABOUT } },
+      { id: 'keep', word: 'fanKeep', detail: 'fanKeepDetail', act: { kind: 'ring', items: KEEP } },
       order('heave', 'fanHeave', plain('heave')),
     ];
     case 'first lieutenant': return [
@@ -121,7 +123,7 @@ export function fanItems(who: Officer, state: SimState, ship: number): readonly 
       order('hold', 'fanHold', plain('hold'), 'fanHoldDetail'),
       order('cease', 'fanCease', plain('cease')),
     ];
-    case 'carpenter': return [order('plug', 'fanPlug', plain('plug')), order('pumping', 'fanPumping', plain('pumping'))];
+    case 'carpenter': return [order('sound', 'fanSound', plain('sound')), order('plug', 'fanPlug', plain('plug')), order('pumping', 'fanPumping', plain('pumping'))];
     case 'lookout': return [{ id: 'look-out', word: 'fanLookOut', detail: null, act: { kind: 'look out' } }];
     case 'midshipman': return TAKERS.filter((t) => fanItems(t, state, ship).length > 0).map((t) => ({ id: `to-${t}`, word: RANK_WORDS[t], detail: null, act: { kind: 'to', who: t } }));
   }

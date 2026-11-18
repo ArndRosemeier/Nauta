@@ -44,6 +44,7 @@ export const answers = (events: { e: SimEvent }[]) => events.flatMap(({ e }) => 
 export const EACH: Readonly<Record<OrderKind, Order>> = {
   steer: { kind: 'steer', ship: 0, heading: 120 * DEGREE },
   up: { kind: 'up', ship: 0 }, away: { kind: 'away', ship: 0 }, by: { kind: 'by', ship: 0 },
+  follow: { kind: 'follow', ship: 0 }, abeam: { kind: 'abeam', ship: 0 }, sound: { kind: 'sound', ship: 0 },
   tack: { kind: 'tack', ship: 0 }, wear: { kind: 'wear', ship: 0 }, heave: { kind: 'heave', ship: 0 },
   sail: { kind: 'sail', ship: 0, canvas: 'plain' }, shorten: { kind: 'shorten', ship: 0 },
   back: { kind: 'back', ship: 0, mast: 'main' }, fill: { kind: 'fill', ship: 0 },

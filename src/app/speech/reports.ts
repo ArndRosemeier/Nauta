@@ -9,8 +9,9 @@
 import { angleDiff } from '@futuremagic/core';
 import { sparParts } from '../../sim/damage/meet';
 import type { LostHow } from '../../sim/end';
+import { founderTonnes } from '../../sim/damage/flood';
+import { WATER_MARKS, type Notice } from '../../sim/notices';
 import type { Order } from '../../sim/orders';
-import type { Notice } from '../../sim/notices';
 import { POINT } from '../../sim/rules/orders';
 import { LOAD_WATERLINE } from '../../sim/rules/ships';
 import { rigPlan } from '../../sim/ship/rig';
@@ -106,6 +107,12 @@ const sideTerm = (side: number): Term => (side > 0 ? 'starboard' : 'larboard');
 const report = (voice: Voice, ship: number, line: Line, terms?: Readonly<Record<string, Term>>): Say => (terms ? { voice, ship, line, kind: 'report', terms } : { voice, ship, line, kind: 'report' });
 const cry = (voice: Voice, ship: number, line: Line, terms?: Readonly<Record<string, Term>>): Say => ({ ...report(voice, ship, line, terms), kind: 'cry' });
 
+/** The carpenter's answer to "Sound the well" by the water in her, t: below the first of the water marks he reports (notices.ts `WATER_MARKS`) near dry, then by each mark passed. */
+export function soundingLine(water: number): Line {
+  const full = founderTonnes(), passed = WATER_MARKS.filter((m) => water > m * full).length;
+  return `sounded ${passed}` as Line;
+}
+
 /** The water mark from which the carpenter cries out (sim/notices.ts `WATER_MARKS`: she is settling). */
 const WATER_CRY = 2;
 
@@ -123,7 +130,7 @@ export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
       const answer: Say = { voice: takerOf(e.order), ship, line: ayeLine(e.order), kind: 'answer', ...(terms ? { terms } : {}) };
       return pass ? [answer, { voice: 'boatswain', ship, line: pass, kind: 'pass', delay: PASS_DELAY, ...(terms ? { terms } : {}) }] : [answer];
     }
-    case 'answered': return mine ? [{ voice: takerOf(e.order), ship, line: e.code, kind: 'answer' }] : [];
+    case 'answered': return mine ? [{ voice: takerOf(e.order), ship, line: e.code === 'sounded' ? soundingLine(e.amount ?? 0) : e.code, kind: 'answer' }] : [];
     case 'refused':
       if (e.order.ship !== ship || e.code === 'no such order' || e.code === 'no ship') return [];
       return [{ voice: takerOf(e.order), ship, line: e.code, kind: 'answer' }];

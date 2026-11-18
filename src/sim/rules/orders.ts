@@ -37,3 +37,9 @@ export const HOVE_TO_IN: readonly string[] = ['fore-course', 'main-course', 'boo
 export const HOVE_TO_MAST: MastName = 'main';
 /** The mast laid aback too until her way is off, to stop her, then filled again. */
 export const HOVE_TO_CHECK: MastName = 'fore';
+
+/**
+ * How often the master looks at her when he steers by a standing order (steer for her, her on the beam), s: he gives
+ * a new course when hers has moved a turn (captain/helm.ts `TURN_AT`), as a good master watches her over the bow.
+ */
+export const MASTER_LOOK = 4;

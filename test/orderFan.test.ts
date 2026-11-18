@@ -32,10 +32,10 @@ test('every man offers at most six orders and at most one more ring', () => {
     assert.ok(items.length <= FAN_MOST, `${who}: ${items.length}`);
     assert.ok(depth(items) <= FAN_DEPTH, `${who} goes ${depth(items)} rings deep`);
   }
-  assert.deepEqual(ids(fanItems('master', UNDER_WAY, 0)), ['steer', 'up', 'away', 'by', 'about', 'heave']);
+  assert.deepEqual(ids(fanItems('master', UNDER_WAY, 0)), ['steer', 'up', 'away', 'about', 'keep', 'heave']);
   assert.deepEqual(ids(fanItems('first lieutenant', UNDER_WAY, 0)), ['sail', 'shorten', 'back', 'quarters', 'life', 'strike']);
   assert.deepEqual(ids(fanItems('gunner', UNDER_WAY, 0)), ['shot', 'aim', 'bear', 'hold', 'cease']);
-  assert.deepEqual(ids(fanItems('carpenter', UNDER_WAY, 0)), ['plug', 'pumping']);
+  assert.deepEqual(ids(fanItems('carpenter', UNDER_WAY, 0)), ['sound', 'plug', 'pumping']);
   // The midshipman offers the men who have orders now, and each order goes to the man who takes it.
   assert.deepEqual(ids(fanItems('midshipman', UNDER_WAY, 0)), ['to-master', 'to-first lieutenant', 'to-gunner', 'to-carpenter', 'to-lookout']);
   const orderOf = (i: FanItem): Order[] => (i.act.kind === 'order' ? [i.act.order] : i.act.kind === 'ring' ? i.act.items.flatMap(orderOf) : []);

@@ -97,8 +97,23 @@ export interface LifeOrder {
 }
 export type LifeKind = LifeOrder['kind'];
 
+/**
+ * The master's standing helm orders (orders.md "Keep her", N5.3b): steer for her, keep her on the beam at the range
+ * now. They stand until another helm order; the master steers by them himself (captain/helm.ts `masterOrder`, the
+ * computer captain's own steering), so she is put about or worn round as the chase needs.
+ */
+export interface KeepOrder {
+  readonly kind: 'follow' | 'abeam';
+  readonly ship: number;
+}
+/** Sound the well: the carpenter answers with the water in her. */
+export interface SoundOrder {
+  readonly kind: 'sound';
+  readonly ship: number;
+}
+
 /** An order to one ship, named by her place in `SimState.ships`. Plain data, sent between machines as it is. */
-export type Order = SailingOrder | GunneryOrder | LifeOrder;
+export type Order = SailingOrder | GunneryOrder | LifeOrder | KeepOrder | SoundOrder;
 export type OrderKind = Order['kind'];
 
 /** The kinds of the gunnery orders. */
@@ -109,6 +124,9 @@ export const isGunnery = (order: Order): order is GunneryOrder => GUNNERY_KINDS.
 const LIFE_KINDS: readonly OrderKind[] = ['pumps', 'fires', 'wreckage', 'plug', 'pumping', 'strike'];
 /** Whether an order is one of the orders for her life. */
 export const isLife = (order: Order): order is LifeOrder => LIFE_KINDS.includes(order.kind);
+
+/** Whether an order is one of the master's standing helm orders (steer for her, her on the beam). */
+export const isKeep = (order: Order): order is KeepOrder => order.kind === 'follow' || order.kind === 'abeam';
 
 /** One word of the vocabulary: who takes it (docs/design/orders.md), what it does, and what more it names. */
 export interface OrderWord {
@@ -124,6 +142,8 @@ export const VOCABULARY: readonly OrderWord[] = [
   { kind: 'up', to: 'master', what: 'come up a point toward the wind; repeated, the points add up', takes: null },
   { kind: 'away', to: 'master', what: 'bear away a point off the wind; repeated, the points add up', takes: null },
   { kind: 'by', to: 'master', what: 'full and by: as close to the wind as she will lie, following it as it shifts', takes: null },
+  { kind: 'follow', to: 'master', what: 'steer for her: he heads for where she will be, tacking or wearing as he must, until told another course', takes: null },
+  { kind: 'abeam', to: 'master', what: 'keep her on the beam: he holds her abeam on the side she lies on, at the range now, until told another course', takes: null },
   { kind: 'tack', to: 'master', what: 'through the wind onto the other tack, full and by', takes: null },
   { kind: 'wear', to: 'master', what: 'round before the wind onto the other tack, as far off the wind as she was', takes: null },
   { kind: 'heave', to: 'master', what: 'heave to: courses hauled up, boom sail brailed, main yards aback, helm down; she stops', takes: null },
@@ -145,6 +165,7 @@ export const VOCABULARY: readonly OrderWord[] = [
   { kind: 'strike', to: 'first lieutenant', what: 'strike the colours: she gives up the fight; he asks "Strike, sir?" and it must be given again within 10 s', takes: null },
   { kind: 'plug', to: 'carpenter', what: 'plug the shot holes: all his crew plugs first, then pumps', takes: null },
   { kind: 'pumping', to: 'carpenter', what: 'man the pumps: all his crew pumps first, and plugs when the pumps are manned by others', takes: null },
+  { kind: 'sound', to: 'carpenter', what: 'sound the well: he reports the water in her', takes: null },
 ];
 
 /** The words each order is given by, the first for each its own (`orderWords`); fixed parts of the order beside them. */
@@ -156,6 +177,8 @@ const PHRASES: readonly { readonly words: string; readonly order: Partial<Order>
   { words: 'bear away a point', order: { kind: 'away' } },
   { words: 'bear off', order: { kind: 'away' } },
   { words: 'full and by', order: { kind: 'by' } },
+  { words: 'steer for her', order: { kind: 'follow' } },
+  { words: 'keep her on the beam', order: { kind: 'abeam' } },
   { words: 'tack', order: { kind: 'tack' } },
   { words: 'ready about', order: { kind: 'tack' } },
   { words: 'go about', order: { kind: 'tack' } },
@@ -192,6 +215,7 @@ const PHRASES: readonly { readonly words: string; readonly order: Partial<Order>
   { words: 'strike', order: { kind: 'strike' } },
   { words: 'plug the shot holes', order: { kind: 'plug' } },
   { words: 'man the pumps', order: { kind: 'pumping' } },
+  { words: 'sound the well', order: { kind: 'sound' } },
 ];
 
 /** Words left out when an order is read ("come up a point, sir" is "come up"; "back the main" is "back main"). */
@@ -297,6 +321,8 @@ export type FireMode = 'cease' | 'bear' | 'hold';
 export interface ShipOrders {
   /** The course or full and by, as told (the helmsman has it once its act is done). */
   readonly helm: Helm;
+  /** A standing helm order the master steers by himself (steer for her, her on the beam at a range, m), or null. */
+  readonly keep: Keep | null;
   /** The canvas ordered (hove to, the sails in `HOVE_TO_IN` stay in until she fills). */
   readonly canvas: CanvasName;
   readonly hove: boolean;
@@ -327,6 +353,9 @@ export interface ShipOrders {
   readonly struck: boolean;
 }
 
+/** The master's standing helm order: steer for her, or keep her on the beam at `range`, m (the range when it was given). */
+export type Keep = { readonly kind: 'follow' } | { readonly kind: 'abeam'; readonly range: number };
+
 /** What the carpenter's crew is told to do first. */
 export type CarpenterFirst = 'plug' | 'pump';
 
@@ -337,7 +366,7 @@ const START_AIM: AimName = 'hull';
 /** A ship's orders at the start: steering her heading under the canvas she starts with, nothing aback, nothing to do. */
 export function startOrders(heading: number, canvas: CanvasName): ShipOrders {
   return {
-    helm: { heading: wrapBearing(heading), by: 0 }, canvas, hove: false, backed: MASTS.map(() => false), acts: [], given: [], serial: 0,
+    helm: { heading: wrapBearing(heading), by: 0 }, keep: null, canvas, hove: false, backed: MASTS.map(() => false), acts: [], given: [], serial: 0,
     quarters: false, shot: START_SHOT, aim: START_AIM, firing: 'cease', word: false, pumps: null, fires: null, wreckage: null, carpenter: null, strike: null, struck: false,
   };
 }
@@ -347,28 +376,33 @@ export function startOrders(heading: number, canvas: CanvasName): ShipOrders {
  * she will not lie, steered full and by instead, or one she reaches only by wearing. The code is what the phrase book
  * (N4.5) turns into his words; the reason is those words in English for now (the order panel).
  */
-export type AnswerCode = 'will not lie' | 'wearing round' | 'strike, sir?';
+export type AnswerCode = 'will not lie' | 'wearing round' | 'strike, sir?' | 'sounded';
 
 /** Why an order is refused, as a code for the phrase book (N4.5): the reason gives it in English for now. */
 export type RefusalCode =
   | 'no such order' | 'no ship' | 'full and by already' | 'no way' | 'in stays' | 'hove to already' | 'canvas already'
   | 'carries it already' | 'bare poles' | 'aback already' | 'drawing' | 'not at quarters' | 'at quarters already'
   | 'loading it already' | 'laid there already' | 'firing so already' | 'not held' | 'word given' | 'not firing'
-  | 'sent already' | 'first already' | 'fight over';
+  | 'sent already' | 'first already' | 'fight over' | 'no enemy' | 'keeping so already';
 
 /**
  * What giving an order comes to: what she has now been told, the answer in words ('' when simply taken) and its code:
  * taken (`code` null, or an `AnswerCode` when taken with words), or refused (`told` comes back unchanged).
  */
 export type OrderAnswer =
-  | { readonly refused: false; readonly told: ShipOrders; readonly reason: string; readonly code: AnswerCode | null }
+  | { readonly refused: false; readonly told: ShipOrders; readonly reason: string; readonly code: AnswerCode | null; readonly amount?: number }
   | { readonly refused: true; readonly told: ShipOrders; readonly reason: string; readonly code: RefusalCode };
 
-/** What an order is given against: the tick of the step, the mean wind there (its `from` is what the master judges by) and the match's force. */
+/**
+ * What an order is given against: the tick of the step, the mean wind there (its `from` is what the master judges by)
+ * and the match's force; the range to the enemy, m (absent or null: none in sight), and the water in her, t (the well).
+ */
 export interface OrderMoment {
   readonly tick: number;
   readonly wind: Wind;
   readonly force: number;
+  readonly enemy?: number | null;
+  readonly water?: number;
 }
 
 /** Her tack for a heading in a wind from `from`: +1 the wind on her starboard side, -1 on her larboard; `otherwise` dead ahead or astern. */
@@ -489,6 +523,7 @@ export function malformed(order: Order): string {
     case 'up': case 'away': case 'by': case 'tack': case 'wear': case 'heave': case 'shorten': case 'fill': return '';
     case 'quarters': case 'stand': case 'bear': case 'hold': case 'fire': case 'cease': return '';
     case 'pumps': case 'fires': case 'wreckage': case 'plug': case 'pumping': case 'strike': return '';
+    case 'follow': case 'abeam': case 'sound': return '';
     default: return `there is no order "${(order as { kind: string }).kind}"`;
   }
 }
@@ -503,6 +538,38 @@ export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: Order
   if (bad) return refuse(told, 'no such order', bad);
   if (isGunnery(order)) return gunnery(told, order);
   if (isLife(order)) return life(told, order, now.tick);
+  if (order.kind === 'sound') return sound(told, now.water ?? 0);
+  if (isKeep(order)) return keep(told, order, now);
+  const answer = sailing(told, s, order, now);
+  // A helm order of the captain's own ends a standing one (the master steers as told now).
+  return !answer.refused && told.keep && HELM_KINDS.has(order.kind) ? { ...answer, told: { ...answer.told, keep: null } } : answer;
+}
+
+/** The orders that tell the helm (and so end the master's standing "Keep her"). */
+const HELM_KINDS: ReadonlySet<OrderKind> = new Set<OrderKind>(['steer', 'up', 'away', 'by', 'tack', 'wear', 'heave']);
+
+/** A helm order the master gives himself to keep a standing order (steer for her, her on the beam): taken as any, the standing order kept. */
+export function masterSteers(told: ShipOrders, s: Sailing, order: SailingOrder, now: OrderMoment): OrderAnswer {
+  const answer = sailing(told, s, order, now);
+  return answer.refused ? answer : { ...answer, told: { ...answer.told, keep: told.keep } };
+}
+
+/** Steer for her, or keep her on the beam at the range now: it stands until another helm order. Not with no enemy in sight, nor hove to. */
+function keep(told: ShipOrders, order: KeepOrder, now: OrderMoment): OrderAnswer {
+  if (now.enemy === undefined || now.enemy === null) return refuse(told, 'no enemy', 'there is no ship in sight to steer by');
+  if (told.hove) return refuse(told, 'hove to already', 'she is hove to: fill first');
+  if (order.kind === 'follow' && told.keep?.kind === 'follow') return refuse(told, 'keeping so already', 'he steers for her already');
+  const kept: Keep = order.kind === 'follow' ? { kind: 'follow' } : { kind: 'abeam', range: now.enemy };
+  return { refused: false, told: { ...told, keep: kept }, ...NOTHING_SAID };
+}
+
+/** Sound the well: nothing changes; the carpenter answers with the water in her, t (`amount`). */
+function sound(told: ShipOrders, water: number): OrderAnswer {
+  return { refused: false, told, reason: `${water.toFixed(1)} t of water in her`, code: 'sounded', amount: water };
+}
+
+/** A sailing order (N3.4): the helm, the canvas, a mast aback. */
+function sailing(told: ShipOrders, s: Sailing, order: SailingOrder, now: OrderMoment): OrderAnswer {
   const from = now.wind.from, tack = tackOf(s.heading, from, s.sides[0]!), base = toldHeading(told.helm, from);
   const baseTack = tackOf(base, from, tack);
   switch (order.kind) {

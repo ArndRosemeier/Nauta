@@ -33,6 +33,8 @@ export const PHRASES = {
   'aye.steer': p(['Aye aye, sir. Bring her round.', 'Aye aye, sir, as you point.'], ['Jawohl, Herr Kapitän. Wir drehen.', 'Jawohl, Kurs wie gezeigt.']),
   'aye.up': p(['Up a point, sir.', 'Luff a point, sir.'], ['Einen Strich anluven, Herr Kapitän.', 'Anluven, einen Strich.']),
   'aye.away': p(['Off a point, sir.', 'Bear away a point, sir.'], ['Einen Strich abfallen, Herr Kapitän.', 'Abfallen, einen Strich.']),
+  'aye.follow': p(['Steer for her, sir. Aye aye.', 'After her, sir!'], ['Auf sie zu, Herr Kapitän. Jawohl.', 'Hinter ihr her, Herr Kapitän!']),
+  'aye.abeam': p(['Keep her on the beam, sir. Aye aye.', 'Abeam it is, sir, at this distance.'], ['Sie querab halten, Herr Kapitän. Jawohl.', 'Jawohl, querab, auf diesen Abstand.']),
   'aye.by': p(['Full and by, sir.', 'Full and by it is, sir.'], ['Hoch am Wind, Herr Kapitän.', 'So hoch sie geht, Herr Kapitän.']),
   'aye.tack': p(['Aye aye, sir. Ready about!', 'Ready about, sir!'], ['Jawohl! Klar zur Wende!', 'Klar zur Wende, Herr Kapitän!']),
   'aye.wear': p(['Aye aye, sir. Stand by to wear ship!', 'Wear ship, sir!'], ['Jawohl! Klar zum Halsen!', 'Halsen, Herr Kapitän!']),
@@ -73,6 +75,12 @@ export const PHRASES = {
   // ---- Answers with words (orders.ts AnswerCode) ----
   'will not lie': p(["She won't lie that course, sir. Full and by.", "Too close, sir. I'll keep her full and by."], ['So hoch liegt sie nicht, Herr Kapitän. Hoch am Wind.', 'Zu hoch, Herr Kapitän. Ich halte sie hoch am Wind.']),
   'wearing round': p(['Wearing round, sir.', "She'll go round before it, sir."], ['Wir halsen herum, Herr Kapitän.', 'Sie geht vor dem Wind herum, Herr Kapitän.']),
+  'aye.sound': p(['Sounding the well, sir.', 'I will sound her, sir.'], ['Ich peile die Bilge, Herr Kapitän.', 'Jawohl, wird gepeilt.']),
+  // The well sounded (orders.ts 'sounded'; reports.ts picks the line by the water in her, notices.ts WATER_MARKS).
+  'sounded 0': p(['The well is near dry, sir.', 'Sounded the well, sir. Hardly a foot.'], ['Die Bilge ist fast trocken, Herr Kapitän.', 'Gepeilt, Herr Kapitän. Kaum ein Fuß.']),
+  'sounded 1': p(['Two feet in the well, sir. The pumps hold it.', 'Some water in her, sir. Nothing the pumps cannot hold.'], ['Zwei Fuß in der Bilge, Herr Kapitän. Die Pumpen halten es.', 'Etwas Wasser, Herr Kapitän. Die Pumpen schaffen das.']),
+  'sounded 2': p(["Four feet in the well, sir, and gaining.", "The water's gaining, sir. Four feet."], ['Vier Fuß in der Bilge, Herr Kapitän, und es steigt.', 'Das Wasser steigt, Herr Kapitän. Vier Fuß.']),
+  'sounded 3': p(["Six feet and more, sir! She's settling!"], ['Sechs Fuß und mehr, Herr Kapitän! Sie sackt weg!']),
   'strike, sir?': p(['Strike, sir? Our colours?', 'Strike, sir? Say it again, and I will.'], ['Streichen, Herr Kapitän? Unsere Flagge?', 'Streichen, Herr Kapitän? Sagen Sie es noch einmal.']),
   // ---- Refusals (orders.ts RefusalCode): why not ----
   'full and by already': p(["She's full and by now, sir."], ['Sie liegt schon hoch am Wind, Herr Kapitän.']),
@@ -94,6 +102,8 @@ export const PHRASES = {
   'not firing': p(["We're not firing, sir."], ['Wir feuern nicht, Herr Kapitän.']),
   'sent already': p(["They're at it, sir."], ['Die sind schon dabei, Herr Kapitän.']),
   'first already': p(["That's what they do first, sir."], ['Das tun sie schon zuerst, Herr Kapitän.']),
+  'no enemy': p(["There's no ship to steer by, sir."], ['Da ist kein Schiff, Herr Kapitän.']),
+  'keeping so already': p(["I'm steering for her, sir."], ['Ich halte schon auf sie zu, Herr Kapitän.']),
   'fight over': p(["It's over, sir."], ['Es ist vorbei, Herr Kapitän.']),
   // ---- Reports: her sailing, the wind ----
   'tacked': p(["She's about, sir.", 'Round she comes, sir. Full and by.'], ['Sie ist herum, Herr Kapitän.', 'Herum, Herr Kapitän. Hoch am Wind.']),

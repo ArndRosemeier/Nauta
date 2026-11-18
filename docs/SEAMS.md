@@ -320,6 +320,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A state as bytes, and back | `src/sim/state.ts#encodeState` |
 | The state's hash (two machines with the same hash have the same state) | `src/sim/state.ts#hashState` |
 | One step of the match: orders in, the next state and events out | `src/sim/step.ts#step` |
+| What an order is given against: tick, wind, force, the range to the enemy, the water in her | `src/sim/step.ts#orderMoment` |
 | What a ship can be ordered: the sailing vocabulary (steer, come up, bear away, full and by, tack, wear, heave to, the sail settings, back, fill) | `src/sim/orders.ts#Order` |
 | What happened in a step (for drawing, sound and the interface) | `src/sim/step.ts#SimEvent` |
 | Running a match on through a log of orders (a guest, a replay, the tests) | `src/sim/replay.ts#replay` |
@@ -617,6 +618,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The master's order that brings her head toward a wanted heading (a course, full and by, a tack, or wearing round) | `src/sim/captain/helm.ts#helmOrder` |
 | The heading nearest a wanted one she can steer on a tack | `src/sim/captain/helm.ts#sailableOn` |
 | Keeping station alongside her: the main topsail aback when she drops astern, filled when she is abreast | `src/sim/captain/helm.ts#stationOrder` |
+| Where the master wants her head for a standing order (steer for her, her on the beam) | `src/sim/captain/helm.ts#keptHeading` |
+| The master's own helm order for a standing order, every few seconds | `src/sim/captain/helm.ts#masterOrder` |
+| A helm order the master gives himself, the standing order kept | `src/sim/orders.ts#masterSteers` |
+| Whether an order is a standing helm order | `src/sim/orders.ts#isKeep` |
 | The computer captain's three levels of skill and the tactics they share | `src/sim/rules/captain.ts#SKILL` |
 | A match played alone against a computer captain (`?foe=`) | `src/net/duel.ts#DuelOptions` |
 | The player's settings: what they are, defaults, bounds, read back from what the device kept (N7.3) | `src/app/settings.ts#readSettings` |
@@ -641,6 +646,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The phrase book: what the men say, by line, in English and German, with variants and a French crew's turns of phrase | `src/app/speech/phrases.ts#PHRASES` |
 | A line of the phrase book in words, its terms filled | `src/app/speech/phrases.ts#phraseWords` |
 | The reports table: who says what for an event, a notice or the midshipman sent | `src/app/speech/reports.ts#saysOf` |
+| The carpenter's answer to Sound the well, by the water in her | `src/app/speech/reports.ts#soundingLine` |
 | Which bubbles are on the view and for how long (four at most, cries first, nothing late) | `src/app/speech/bubbles.ts#BubbleQueue` |
 | How long a bubble takes to read | `src/app/speech/bubbles.ts#readSeconds` |
 | The bubbles drawn over the men, or at the screen's edge | `src/app/bubbleLayer.ts#BubbleLayer` |
