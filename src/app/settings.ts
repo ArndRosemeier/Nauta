@@ -9,7 +9,7 @@
 import { MOTION_START, MOTION_STEPS } from '../sim/rules/body';
 import { QUALITY_LEVELS } from './quality';
 import { DEFAULT_TERMS, readTerms, type MatchTerms } from './terms';
-import { isRecord, oneOf } from './kept';
+import { isRecord, oneOf } from '../sim/kept';
 
 /** The quality setting: `auto` measures frame time and chooses (quality.ts), or a level by its name. */
 export type QualitySetting = 'auto' | string;

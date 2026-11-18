@@ -1,0 +1,3 @@
+One dialog now sets up every battle: "Set up a battle" on the main screen replaces Fight alone, Host a duel and Watch a battle.
+Add up to eight ships, give each a side, a navy and a captain (you, a player, or a computer), and drag the ships on the sea chart to place them.
+For now a battle still runs with two ships; the dialog tells you what is coming.

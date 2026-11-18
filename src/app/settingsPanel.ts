@@ -206,8 +206,8 @@ export function row(name: string, help: string | null, control: HTMLElement): HT
   return r;
 }
 
-/** A choice of a few, one line of words with the chosen one marked. */
-export function choiceRow(name: string, help: string | null, options: readonly string[], chosen: number, picked: (i: number) => void): HTMLElement {
+/** A choice of a few as the control alone (a brass rule of words, the chosen one marked; `chosen` -1: none yet). */
+export function choice(name: string, options: readonly string[], chosen: number, picked: (i: number) => void): HTMLElement {
   const box = make('div', 'nt-choice');
   box.setAttribute('role', 'radiogroup');
   box.setAttribute('aria-label', name);
@@ -223,7 +223,12 @@ export function choiceRow(name: string, help: string | null, options: readonly s
     box.append(b);
     return b;
   });
-  return row(name, help, box);
+  return box;
+}
+
+/** A choice of a few, one line of words with the chosen one marked. */
+export function choiceRow(name: string, help: string | null, options: readonly string[], chosen: number, picked: (i: number) => void): HTMLElement {
+  return row(name, help, choice(name, options, chosen, picked));
 }
 
 /** A slider from `least` to `most` in steps of `step`, its value written beside it by `text`. */

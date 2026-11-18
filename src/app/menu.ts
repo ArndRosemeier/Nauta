@@ -9,7 +9,8 @@
 import type { AudioEngine } from '@futuremagic/audio/web';
 import { DuelSession, type DuelHub } from '../net/duel';
 import { MOST_PLAYERS, roomTerms, type RoomTerms } from '../net/wire';
-import { SKILLS, type Offered } from '../sim/rules/captain';
+import type { Offered } from '../sim/rules/captain';
+import { limitOf, navyOfShip, playOf, youFirst, type Scenario } from '../sim/scenario';
 import { DAY_REAL_MINUTES } from '../sim/rules/day';
 import { MEETINGS, WIND_CHOICE_NAMES, type Meeting, type WindChoice } from '../sim/start';
 import { HOURS_PER_DAY, MINUTES_PER_HOUR, SECONDS_PER_MINUTE } from '../sim/units';
@@ -21,6 +22,8 @@ import type { PageMatch } from './pageMatch';
 import type { Params } from './params';
 import { CODE_LENGTH, shareRow, waitingRooms } from './roomPanel';
 import { openSheet, rose, type Sheet } from './sheet';
+import { LIMIT_WORDS, scenarioParts } from './scenarioDialog';
+import { placementMap, type MapSelection } from './placementMap';
 import type { SettingsMenu } from './settingsPanel';
 import { choiceRow, row } from './settingsPanel';
 import type { SettingsStore } from './settingsStore';
@@ -36,8 +39,31 @@ import { openControls, showControlsOnce } from './controlsCard';
 import { watchCaption } from './spectator';
 import { words, type WordKey } from './words';
 import { LANGUAGES } from './settings';
-import { oneOf } from './kept';
+import { oneOf } from '../sim/kept';
 import type { Offline } from '../offline/register';
+
+/** The navy of the ship the player commands first: hers when I play, else the first ship's (the duel runs the first ship in the first navy, the other in the other). */
+const firstNavyOf = (sc: Scenario): Navy => navyOfShip(youFirst(sc), 0);
+/** The dialog's top: the ways to start from, the placement map and the ships, in two columns where there is room (nauta.css `.scn-cols`). */
+function scenarioColumns(presets: HTMLElement, map: HTMLElement, ships: HTMLElement): HTMLElement {
+  const cols = make('div', 'scn-cols');
+  presets.classList.add('scn-area-presets');
+  map.classList.add('scn-area-map');
+  ships.classList.add('scn-area-ships');
+  cols.append(presets, map, ships);
+  return cols;
+}
+
+/** The skill of a ship's computer captain (a seasoned one for a ship no computer commands, which the dialog never starts). */
+const computerSkill = (s: Scenario['ships'][number]): Offered => (s.command.kind === 'computer' ? s.command.skill : 'seasoned');
+/** The skills of the British and the French captain in a battle watched (the duel has one of each navy), for the caption. */
+function watchedSkills(sc: Scenario): [Offered, Offered] {
+  const skill = (navy: Navy): Offered => {
+    const i = sc.ships.findIndex((_, k) => navyOfShip(sc, k) === navy), c = sc.ships[i]?.command;
+    return c?.kind === 'computer' ? c.skill : 'seasoned';
+  };
+  return [skill('british'), skill('french')];
+}
 
 /** How a captain is named to the other player. */
 const CAPTAIN = 'Captain';
@@ -58,7 +84,6 @@ const SEED_DIGITS = 10;
 
 type Say = Readonly<Record<WordKey, string>>;
 
-const SKILL_WORDS: Readonly<Record<Offered, WordKey>> = { green: 'skillGreen', seasoned: 'skillSeasoned', master: 'skillMaster' };
 const NAVY_WORDS: Readonly<Record<Navy, WordKey>> = { british: 'british', french: 'french' };
 const WIND_WORDS: Readonly<Record<WindChoice, WordKey>> = { drawn: 'asItComes', light: 'windLight', fresh: 'windFresh', strong: 'windStrong' };
 const HOUR_WORDS: Readonly<Record<HourChoice, WordKey>> = { drawn: 'asItComes', dawn: 'dawn', day: 'day', dusk: 'dusk', moon: 'moonlight' };
@@ -111,6 +136,8 @@ export class Menu {
   private playing: Playing = { kind: 'quiet' };
   private readonly tally = new Tally();
   private seeds = 0;
+  /** The ship picked on the placement map (-1: none), kept while the dialog is drawn again after each change. */
+  private readonly mapPick: MapSelection = { index: -1 };
   private endTimer = 0;
   /** The room being entered (opened or joined) and not yet left. */
   private pendingRoom: DuelSession | null = null;
@@ -160,7 +187,7 @@ export class Menu {
    * Runs `s` from now on: the session before closed if it was a room's, the end card's count started afresh. `firstNavy`:
    * the first ship's navy (mine alone or hosting; the host's when I joined).
    */
-  private run(s: DuelSession, playing: Playing, firstNavy: Navy = this.terms.navy): void {
+  private run(s: DuelSession, playing: Playing, firstNavy: Navy = firstNavyOf(this.terms.scenario)): void {
     const before = this.h.match.session;
     if (before !== s && before.role !== 'solo') before.close();
     clearTimeout(this.endTimer);
@@ -169,7 +196,7 @@ export class Menu {
     this.playing = playing;
     this.h.match.useSession(s, firstNavy);
     this.h.firstCommand(playing.kind === 'first' ? s : null);
-    this.h.watching(playing.kind === 'watch' ? watchCaption(this.wordsNow, playing.terms.skillBritish, playing.terms.skillFrench) : null);
+    this.h.watching(playing.kind === 'watch' ? watchCaption(this.wordsNow, ...watchedSkills(playing.terms.scenario)) : null);
   }
 
   /** Her alone at sea on a quiet morning, hove to: the sea behind the main screen. */
@@ -220,11 +247,9 @@ export class Menu {
         choices.append(b);
       };
       choice('firstCommand', 'firstCommandHelp', () => this.first());
-      choice('fightAlone', 'fightAloneHelp', () => this.setup('alone'), true);
-      choice('hostDuel', 'hostDuelHelp', () => this.setup('host'));
+      choice('scenarioTitle', 'scenarioHelp', () => this.setup(), true);
       choice('joinDuel', 'joinDuelHelp', () => this.joinScreen());
       choice('walkShip', 'walkShipHelp', () => this.sail('walk'));
-      choice('watchBattle', 'watchBattleHelp', () => this.setup('watch'));
       const news = menuButton(unseenVersion() ? 'nt-link fresh' : 'nt-link', `Nauta ${versionLabel} · ${say.whatsNew}`, () => openWhatsNew(say, () => news.classList.remove('fresh')));
       // A newer version of the game is installed and waits: one tap restarts on it (offline/register.ts), never in the middle of a match.
       const update = this.h.offline.updateReady ? menuButton('nt-link fresh', say.updateReady, () => this.h.offline.restart()) : null;
@@ -241,41 +266,49 @@ export class Menu {
     drawScreen();
   }
 
-  /** The match setup (alone, hosting, or a battle to watch): every line with its default, one tap on the button at its foot starts. */
-  private setup(kind: 'alone' | 'host' | 'watch'): void {
+  /**
+   * The setup of a battle: the scenario (its ships, sides, navies and captains) and the match's other terms, every line
+   * with its default, so one tap on the button at its foot starts. What the scenario makes of it: a match against a
+   * computer captain, a battle watched, or a room for the players who will join.
+   */
+  private setup(): void {
     this.screen.hidden = true;
     const drawScreen = () => {
-      const say = this.wordsNow, t = this.terms;
-      const sheet = this.open('menu-setup', say.theMatch, () => this.main());
+      const say = this.wordsNow, t = this.terms, sc = t.scenario, play = playOf(sc), limit = limitOf(sc);
+      const scrolled = this.sheet?.body.scrollTop ?? 0;
+      const sheet = this.open('menu-setup', say.scenarioTitle, () => this.main());
+      if (this.mapPick.index >= sc.ships.length) this.mapPick.index = -1;
       const pick = <T extends string | number>(name: WordKey, help: WordKey | null, of: readonly T[], label: (v: T) => string, now: T, set: (v: T) => void) =>
         choiceRow(say[name], help ? say[help] : null, of.map(label), of.indexOf(now), (i) => set(of[i]!));
-      const navy = pick('yourNavy', 'navyHelp', NAVIES, (n) => say[NAVY_WORDS[n]], t.navy, (navy) => this.setTerms({ navy }));
       const seed = make('input', 'menu-seed');
       seed.inputMode = 'numeric';
       seed.maxLength = SEED_DIGITS;
       seed.placeholder = say.newEach;
       seed.value = t.seed === null ? '' : String(t.seed);
       seed.addEventListener('change', () => { this.setTerms({ seed: readSeed(seed.value) }); seed.value = this.terms.seed === null ? '' : String(this.terms.seed); });
-      const skillRow = (name: WordKey, now: Offered, set: (s: Offered) => void) => pick(name, null, SKILLS, (s) => say[SKILL_WORDS[s]], now, set);
-      const watch = kind === 'watch';
+      const watch = play === 'watch';
+      const change = (scenario: Scenario) => { this.setTerms({ scenario }); drawScreen(); };
+      const parts = scenarioParts(say, sc, change);
       sheet.body.append(
-        ...(watch ? [] : [navy]),
-        ...(kind === 'alone' ? [skillRow('otherCaptain', t.foe, (foe) => this.setTerms({ foe }))] : []),
-        ...(watch ? [skillRow('britishCaptain', t.skillBritish, (skillBritish) => this.setTerms({ skillBritish })), skillRow('frenchCaptain', t.skillFrench, (skillFrench) => this.setTerms({ skillFrench }))] : []),
+        scenarioColumns(parts.presets, placementMap(say, sc, { wind: t.wind, meet: t.meet }, this.mapPick, change), parts.ships),
+        make('div', 'nt-section', say.theMatch),
         pick('wind', 'windHelp', WIND_CHOICE_NAMES, (w) => say[WIND_WORDS[w]], t.wind, (wind) => this.setTerms({ wind })),
         pick('hour', 'hourHelp', HOURS, (h) => say[HOUR_WORDS[h]], t.hour, (hour) => this.setTerms({ hour })),
         pick('meet', watch ? null : 'meetHelp', MEETINGS, (m) => say[(watch ? WATCH_MEET_WORDS : MEET_WORDS)[m]], t.meet, (meet) => this.setTerms({ meet })),
         pick('matchLength', 'matchLengthHelp', LENGTHS, (m) => lengthWords(m, say), t.minutes, (minutes) => this.setTerms({ minutes })),
         row(say.seed, say.seedHelp, seed),
       );
-      const go = menuButton('nt-button menu-go', kind === 'alone' ? say.beatToQuarters : kind === 'watch' ? say.beginTheBattle : say.openTheRoom, () => {
+      const go = menuButton('nt-button menu-go', play === 'alone' ? say.beatToQuarters : watch ? say.beginTheBattle : say.openTheRoom, () => {
         this.setTerms({ seed: readSeed(seed.value) });
-        if (kind === 'host') void this.host(); else this.sail(kind);
+        if (play === 'room') void this.host(); else this.sail(play);
       });
+      go.disabled = limit !== null;
       const back = menuButton('nt-link', say.back, () => this.main());
       const foot = make('div', 'menu-sheet-foot');
       foot.append(back, go);
+      if (limit) sheet.body.append(make('p', 'nt-note scn-limit', say[LIMIT_WORDS[limit]]));
       sheet.body.append(foot);
+      sheet.body.scrollTop = scrolled;
     };
     this.redraw = drawScreen;
     drawScreen();
@@ -303,11 +336,11 @@ export class Menu {
   private sail(kind: 'alone' | 'walk' | 'watch', fresh = false): void {
     const t = this.terms, seed = (fresh ? null : t.seed) ?? newSeed(Date.now(), this.seeds++), hour = hourOf(t.hour, seed);
     const s = kind === 'alone'
-      ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), foe: t.foe, minutes: matchMinutes(t) })
+      ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), foe: computerSkill(youFirst(t.scenario).ships[1]!), minutes: matchMinutes(t) })
       : kind === 'watch'
-        ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), watch: { first: t.skillBritish, second: t.skillFrench }, minutes: matchMinutes(t) })
+        ? new DuelSession({ build: this.h.build, now: this.h.now, seed, terms: startTerms(t), watch: { first: computerSkill(t.scenario.ships[0]!), second: computerSkill(t.scenario.ships[1]!) }, minutes: matchMinutes(t) })
         : new DuelSession({ build: this.h.build, now: this.h.now, seed, alone: true, hour, terms: startTerms(t), minutes: QUIET_MINUTES });
-    this.run(s, kind === 'walk' ? { kind } : { kind, terms: t, seed }, kind === 'watch' ? 'british' : undefined);
+    this.run(s, kind === 'walk' ? { kind } : { kind, terms: t, seed }, kind === 'watch' ? navyOfShip(t.scenario, 0) : undefined);
     // The sandbox has its own day: the sky runs at the sim's day clock's pace, so what the sky shows is the hour her crew keeps.
     this.h.sky(hour, kind === 'walk' ? DAY_REAL_MINUTES : MATCH_DAY_MINUTES);
     this.aboard();
@@ -326,7 +359,7 @@ export class Menu {
   /** Hosts a room with the terms: its match runs from the moment it is open (both tapping Ready is still to come). */
   private async host(): Promise<void> {
     const t = this.terms, hour = hourOf(t.hour, newSeed(Date.now(), this.seeds++));
-    const shown: RoomTerms = { wind: t.wind, hour, meet: t.meet, minutes: t.minutes, navy: t.navy };
+    const shown: RoomTerms = { wind: t.wind, hour, meet: t.meet, minutes: t.minutes, navy: firstNavyOf(t.scenario) };
     const s = new DuelSession({ hub: this.connect(), build: this.h.build, now: this.h.now, terms: startTerms(t), minutes: matchMinutes(t) });
     await this.enterRoom(s, '', () => s.create(CAPTAIN, shown));
   }
@@ -349,7 +382,7 @@ export class Menu {
       if (s.role === 'refused') throw new Error(s.problem);
       if (this.pendingRoom !== s) { s.close(); return; }
       const terms = s.roomTerms;
-      this.run(s, { kind: 'duel', session: s }, terms ? oneOf(terms.navy, NAVIES, this.terms.navy) : this.terms.navy);
+      this.run(s, { kind: 'duel', session: s }, terms ? oneOf(terms.navy, NAVIES, firstNavyOf(this.terms.scenario)) : firstNavyOf(this.terms.scenario));
       this.watchRounds(s);
       if (terms) this.h.sky(terms.hour, MATCH_DAY_MINUTES);
       this.waitingRoom(s, null, code);

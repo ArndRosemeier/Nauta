@@ -367,11 +367,60 @@ body.in-menu #orders, body.in-menu #glass-button, body.in-menu #stick, body.in-m
 
 /* The menu's sheets: the match setup, joining, the waiting room, the captain's pause, the end card */
 .menu-sheet .nt-body { gap: 6px; }
-.menu-setup.nt-sheet { width: min(760px, 100%); }
 .menu-sheet-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
 .menu-sheet-foot .nt-link { margin: 0; align-self: center; }
 .menu-go { min-height: var(--target); padding: 0 28px; border-color: var(--brass-line); background: var(--brass-fill); color: var(--on-brass); font: 400 19px/1 var(--title-font); letter-spacing: 0.14em; text-transform: uppercase; }
 .menu-go:active { background: var(--brass); }
+.menu-go:disabled { opacity: 0.45; }
+.menu-go:disabled:active { background: var(--brass-fill); }
+/* The scenario dialog (src/app/scenarioDialog.ts, placementMap.ts): the ways to start from, the chart and the ships in two columns where there is room */
+.menu-setup.nt-sheet { width: min(1120px, 100%); --side-0: #d6b25e; --side-1: #5ea3d1; --side-2: #c2564b; --side-3: #72b07c; }
+.scn-cols { display: grid; gap: 4px 28px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'presets' 'map' 'ships'; }
+@media (min-width: 1000px) { .scn-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'presets map' 'ships map'; align-items: start; } .scn-area-map { position: sticky; top: 0; } }
+.scn-area-presets { grid-area: presets; border-bottom: 0; }
+.scn-area-map { grid-area: map; }
+.scn-area-ships { grid-area: ships; }
+.scn-ships { display: flex; flex-direction: column; gap: 10px; margin: 6px 0; }
+.scn-ship { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px 10px 16px; border: 1px solid var(--brass-faint); border-left: 6px solid var(--side); border-radius: 12px; background: var(--lacquer-deep); }
+.scn-ship.side-0 { --side: var(--side-0); }
+.scn-ship.side-1 { --side: var(--side-1); }
+.scn-ship.side-2 { --side: var(--side-2); }
+.scn-ship.side-3 { --side: var(--side-3); }
+.scn-no { width: 28px; font: 400 22px/1 var(--title-font); color: var(--side); text-align: center; }
+.scn-side button { min-width: 48px; padding: 0 12px; }
+.scn-ship .scn-out { margin-left: auto; width: 44px; height: 44px; }
+.scn-ship .scn-out:disabled { opacity: 0.3; }
+.scn-command { flex: 1 1 100%; }
+.scn-command button { flex: 1 1 0; min-width: 0; padding: 0 8px; }
+.scn-add { align-self: flex-start; margin-top: 6px; }
+.scn-add:disabled { opacity: 0.4; }
+/* The chart: a sea chart on lacquer, brass lines, the wind from the top */
+.scn-map { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.scn-chart { display: block; width: 100%; height: auto; border: 1px solid var(--brass-line); border-radius: 12px; box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-dim); touch-action: none; -webkit-user-select: none; user-select: none; cursor: crosshair; }
+.scn-water { fill: #0d2433; }
+.scn-grid { stroke: var(--brass-faint); stroke-width: 1; stroke-dasharray: 2 6; }
+.scn-gridtext { fill: var(--ivory-soft); font: italic 12px var(--word-font); }
+.scn-wind path { fill: none; stroke: var(--brass); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.scn-wind text { fill: var(--brass); font: 400 12px var(--title-font); letter-spacing: 0.16em; text-transform: uppercase; }
+.scn-rose { color: var(--brass-dim); opacity: 0.85; }
+.scn-scale { fill: none; stroke: var(--ivory-soft); stroke-width: 1.5; }
+.scn-between line { stroke: var(--ivory-soft); stroke-width: 1; stroke-dasharray: 4 5; opacity: 0.7; }
+.scn-between text { fill: var(--ivory-soft); font: italic 13px var(--word-font); }
+.scn-vessel { cursor: grab; --c: var(--side-0); }
+.scn-vessel.side-1 { --c: var(--side-1); }
+.scn-vessel.side-2 { --c: var(--side-2); }
+.scn-vessel.side-3 { --c: var(--side-3); }
+.scn-hull { fill: var(--c); stroke: var(--lacquer-deep); stroke-width: 1.5; }
+.scn-vessel.yours .scn-hull { stroke: var(--ivory); stroke-width: 2.5; }
+.scn-vessel.picked .scn-hull { stroke: var(--brass); stroke-width: 3; }
+.scn-vesselno { fill: var(--lacquer-deep); font: 700 14px var(--word-font); pointer-events: none; }
+.scn-stem, .scn-handle { display: none; }
+.scn-vessel.picked .scn-stem { display: block; stroke: var(--brass); stroke-width: 2; }
+.scn-vessel.picked .scn-handle { display: block; fill: var(--brass); stroke: var(--lacquer-deep); stroke-width: 2; cursor: grab; }
+.scn-hint { margin: 4px 2px 0; }
+.scn-reset { margin-top: 4px; }
+.scn-reset:disabled { opacity: 0.4; }
+.scn-limit { padding: 8px 14px; border: 1px solid var(--signal); border-radius: 10px; color: var(--ivory); }
 .menu-pause .nt-button { margin: 4px 0; min-height: var(--target); }
 .menu-pause .nt-button.on { border-color: var(--signal); color: var(--signal); }
 .menu-seed { width: 11em; min-height: var(--target-small); padding: 0 16px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-deep); color: var(--ivory); font: 18px/1 var(--word-font); font-variant-numeric: lining-nums tabular-nums; -webkit-user-select: text; user-select: text; }

@@ -747,7 +747,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | One ship alone at sea (walking her, the sea behind the menu) | `src/sim/start.ts#aloneStart` |
 | A room's host's choices in its meta (shown in the list, the guest's sky) | `src/net/wire.ts#roomTerms` |
 | Whether the address is the game with its menu or a working tool | `src/app/params.ts#TOOL_SWITCHES` |
-| A kept value read back: a plain object, one of a few | `src/app/kept.ts#oneOf` |
+| A kept value read back: a plain object, one of a few | `src/sim/kept.ts#oneOf` |
 | The rooms waiting, as buttons from GameHub's lobby; a room's link to share | `src/app/roomPanel.ts#waitingRooms` |
 | The title asking for the tap that begins once the game is ready; its theme on and off | `src/title/title.ts#beginOnTap` |
 | The mouse taken for looking (pointer lock) or free; a plain click on the view takes it, a sheet or Escape frees it | `src/app/mouse.ts#MouseTaker` |
@@ -767,3 +767,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A good place to see one ship from, and both | `src/app/freeCam.ts#vantageOf` |
 | The spectator's controls on the page: arrows to climb, buttons to keep company, the keys; no order given | `src/app/spectator.ts#Spectator` |
 | Who fights in a battle watched, for the caption | `src/app/spectator.ts#watchCaption` |
+| The scenario: its ships, sides, navies, captains and the places put by hand, and every edit of it | `src/sim/scenario.ts` |
+| What the simulation and the page can run of a scenario yet (the one place a stage lifts a limit) | `src/sim/scenario.ts#limitOf` |
+| Where the ships of a scenario's sides start, and the places the placement map shows | `src/sim/start.ts#fleetStart`, `src/sim/start.ts#defaultPlaces` |
+| The placement map's chart: its frame, gridlines, snapping and the room between hulls | `src/app/placement.ts` |
+| The placement map drawn and dragged (a sea chart, a ship moved, a ship turned by her handle) | `src/app/placementMap.ts#placementMap` |
+| The scenario dialog's ways to start from, ship cards and the sides' navies | `src/app/scenarioDialog.ts#scenarioParts` |
