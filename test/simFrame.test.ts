@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { replay } from '../src/sim/replay.ts';
-import { TOP_SPEED } from '../src/sim/rules/ships.ts';
+import { canvasFor } from '../src/sim/ship/sailing.ts';
 import { decodeState, encodeState, hashState, simTime, startMatch, type SimState } from '../src/sim/state.ts';
 import { step, type SimEvent } from '../src/sim/step.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
@@ -39,7 +39,7 @@ test('the same setup and orders give the same hash every second, and the ships d
 
 test('another order, another seed or another wind gives another state', () => {
   const end = firstRun().at(-1);
-  const changed = script.map((e, i) => (i === 0 ? { ...e, orders: e.orders.map((o) => ({ ...o, speed: o.speed / 2 })) } : e));
+  const changed = script.map((e, i) => (i === 0 ? { ...e, orders: e.orders.map((o) => ({ kind: 'course' as const, ship: o.ship, heading: 2, turn: 0 })) } : e));
   assert.notEqual(hashes(duel(SEED), changed).at(-1), end);
   assert.notEqual(hashes(duel(SEED + 1)).at(-1), end);
   assert.notEqual(hashes(duel(SEED, 3)).at(-1), end);
@@ -66,33 +66,42 @@ test('the clock is a count of steps, 30 a second', () => {
   assert.equal(simTime(s), 1);
   // A step changes nothing in the state it was given.
   const before = encodeState(s);
-  step(s, [{ kind: 'course', ship: 0, heading: 1, speed: 3 }]);
+  step(s, [{ kind: 'course', ship: 0, heading: 1, turn: 0 }]);
   assert.deepEqual(encodeState(s), before);
 });
 
-test('an order sets the ship\'s course at once; one she cannot take is refused with its reason as an event', () => {
+test('orders are taken at once; one she cannot take is refused with its reason as an event', () => {
   const s = duel(SEED);
   const { state, events } = step(s, [
-    { kind: 'course', ship: 1, heading: 2 * Math.PI + 1, speed: 4 },
-    { kind: 'course', ship: 2, heading: 0, speed: 1 },
-    { kind: 'course', ship: 0, heading: Number.NaN, speed: 1 },
-    { kind: 'course', ship: 0, heading: 0, speed: TOP_SPEED * 2 },
-    { kind: 'course', ship: 0, heading: 0, speed: -1 },
+    { kind: 'course', ship: 1, heading: 2 * Math.PI + 1, turn: -1 },
+    { kind: 'course', ship: 2, heading: 0, turn: 0 },
+    { kind: 'course', ship: 0, heading: Number.NaN, turn: 0 },
+    { kind: 'course', ship: 0, heading: 0, turn: 2 },
+    { kind: 'canvas', ship: 0, canvas: 'plain' },
+    { kind: 'canvas', ship: 0, canvas: 'royals' as 'all' },
+    { kind: 'back', ship: 1, mast: 'main', aback: true },
+    { kind: 'back', ship: 1, mast: 'mizzen' as 'main', aback: true },
   ]);
-  assert.ok(Math.abs(state.ships[1]!.course.heading - 1) < 1e-12 && state.ships[1]!.course.speed === 4);
-  assert.deepEqual(state.ships[0]!.course, s.ships[0]!.course);
-  assert.deepEqual(events.map((e: SimEvent) => [e.kind, e.tick, e.order.ship]), [['refused', 0, 2], ['refused', 0, 0], ['refused', 0, 0], ['refused', 0, 0]]);
-  assert.match(events[0]!.reason, /no ship 2/);
-  assert.match(events[2]!.reason, /speed/);
-  // Two orders for one ship in a step: the later one stands.
-  const twice = step(s, [{ kind: 'course', ship: 0, heading: 1, speed: 1 }, { kind: 'course', ship: 0, heading: 2, speed: 2 }]).state;
-  assert.equal(twice.ships[0]!.course.speed, 2);
+  const one = state.ships[1]!.sailing, zero = state.ships[0]!.sailing;
+  assert.ok(Math.abs(one.steer.heading - 1) < 1e-12 && one.steer.turn === -1, 'the heading wrapped, the turn kept');
+  assert.deepEqual(one.backed, [false, true]);
+  assert.deepEqual(zero.canvas, canvasFor('plain', s.wind.windForce));
+  assert.deepEqual(zero.steer, s.ships[0]!.sailing.steer);
+  const refused = events.filter((e: SimEvent) => e.kind === 'refused');
+  assert.deepEqual(refused.map((e) => [e.tick, e.order.ship, e.order.kind]), [[0, 2, 'course'], [0, 0, 'course'], [0, 0, 'course'], [0, 0, 'canvas'], [0, 1, 'back']]);
+  assert.match(refused[0]!.reason, /no ship 2/);
+  assert.match(refused[2]!.reason, /starboard/);
+  assert.match(refused[3]!.reason, /no canvas "royals"/);
+  assert.match(refused[4]!.reason, /no mast "mizzen"/);
+  // Two orders for one ship in a step: the later one stands (both bear away from the wind, so she is not in stays).
+  const twice = step(s, [{ kind: 'course', ship: 0, heading: 5, turn: 0 }, { kind: 'course', ship: 0, heading: 4, turn: 0 }]).state;
+  assert.equal(twice.ships[0]!.sailing.steer.heading, 4);
 });
 
 test('a match starts with the sea up under its wind and each ship still on her line', () => {
   const s = startMatch({ seed: 3, windForce: 4, windFrom: 0, ships: [{ x: 10, z: 20, heading: 1 }] });
   assert.equal(s.ships.length, 1);
-  assert.deepEqual([s.ships[0]!.motion.pose.x, s.ships[0]!.motion.pose.z, s.ships[0]!.course.speed], [10, 20, 0]);
+  assert.deepEqual([s.ships[0]!.motion.pose.x, s.ships[0]!.motion.pose.z, s.ships[0]!.sailing.ahead, s.ships[0]!.sailing.heading], [10, 20, 0, 1]);
   assert.equal(s.sea.seaLayers.length, 1);
   assert.equal(s.wind.windForce, 4);
   assert.notEqual(s.sea.seaSeed, s.wind.windSeed);

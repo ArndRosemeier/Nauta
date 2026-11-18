@@ -9,7 +9,7 @@ import {
 } from 'three/webgpu';
 import { Rng } from '@futuremagic/core';
 import type { SeaState } from '../../sim/sea/sea';
-import { poseBetween, shipOrigin, startMotion, stepMotion, type ShipMotion, type ShipPose } from '../../sim/ship/motion';
+import { lyingStill, poseBetween, shipOrigin, startMotion, stepMotion, type ShipMotion, type ShipPose } from '../../sim/ship/motion';
 import { STEP_SECONDS } from '../../sim/units';
 import { shipPlan } from '../../sim/ship/plan';
 import { LOAD_WATERLINE } from '../../sim/rules/ships';
@@ -31,7 +31,7 @@ import { shipY } from '../../sim/ship/section';
 
 /** Where she lies: her middle on the sea and her heading (bow north), lying still (no sailing yet). */
 const AT = { x: 0, z: 0, heading: 0 } as const;
-const COURSE = { heading: AT.heading, speed: 0 } as const;
+const STILL = lyingStill(AT.heading);
 /** Steps one frame may catch up; after a longer stall (a hidden tab) she jumps to the clock instead. */
 const MOST_STEPS = 8;
 /** How much of her pitch and roll the eye takes: a man on deck keeps his head nearer level than the deck. */
@@ -292,7 +292,7 @@ export class ShipView {
     if (!(t - this.stepped < MOST_STEPS * STEP_SECONDS)) this.stepped = t - STEP_SECONDS;
     while (this.stepped + STEP_SECONDS <= t) {
       this.previous = this.motion;
-      this.motion = stepMotion(this.motion, sea, this.stepped, COURSE);
+      this.motion = stepMotion(this.motion, sea, this.stepped, STILL);
       this.stepped += STEP_SECONDS;
     }
     this.drawn = poseBetween(this.previous.pose, this.motion.pose, (t - this.stepped) / STEP_SECONDS);

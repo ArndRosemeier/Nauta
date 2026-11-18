@@ -6,12 +6,14 @@ import { WIND_PRESETS } from '../src/sim/rules/wind.ts';
 import { startSea, type SeaState } from '../src/sim/sea/sea.ts';
 import type { WaveSet } from '../src/sim/sea/waves.ts';
 import { designWaterline } from '../src/sim/ship/hull.ts';
-import { poseBetween, poseRotation, shipOrigin, startMotion, stepMotion, toWorld, type ShipMotion } from '../src/sim/ship/motion.ts';
+import { lyingStill, poseBetween, poseRotation, shipOrigin, startMotion, stepMotion, toWorld, type ShipMotion } from '../src/sim/ship/motion.ts';
 import { DEGREE, STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { pace } from './support/pace.ts';
 
 const SEED = 1805;
-const STILL = { heading: 0, speed: 0 };
+const STILL = lyingStill(0);
+/** A sail's heeling moment for the test, kN·m. */
+const HEELING = 1000;
 /** A gale's sea (the strongest wind the game sails in). */
 const gale = startSea(SEED, { speed: beaufortSpeed(WIND_PRESETS.length - 1), toward: 0.4 }, 0);
 
@@ -85,16 +87,19 @@ test("her roll period is in the table's range", () => {
 });
 
 test('two runs agree bit for bit', () => {
-  const course = { heading: 0.8, speed: 4 };
+  const course = { ...lyingStill(0.8), ahead: 4, rollMoment: 300 };
   const a = run(startMotion(10, -20, 0.8), gale, 50, 30, course), b = run(startMotion(10, -20, 0.8), gale, 50, 30, course);
   assert.deepEqual(a, b);
   assert.deepEqual(JSON.parse(JSON.stringify(a)), a, 'her state is plain data');
 });
 
-test('she goes ahead along her heading at her speed, and her frame turns with her', () => {
-  const east = { heading: 90 * DEGREE, speed: 3 };
+test('she goes ahead along her heading at her speed and sideways at her leeway, and her frame turns with her', () => {
+  const east = { ...lyingStill(90 * DEGREE), ahead: 3 };
   const m = run(startMotion(0, 0, east.heading), flat, 0, 10, east);
   assert.ok(Math.abs(m.pose.x - 30) < 1e-6 && Math.abs(m.pose.z) < 1e-6, `at ${m.pose.x}, ${m.pose.z}`);
+  // Heading east, her leeway (to starboard) carries her south (+z).
+  const drift = run(startMotion(0, 0, east.heading), flat, 0, 10, { ...east, ahead: 0, leeway: 0.5 });
+  assert.ok(Math.abs(drift.pose.x) < 1e-6 && Math.abs(drift.pose.z - 5) < 1e-6, `at ${drift.pose.x}, ${drift.pose.z}`);
   // Her bow (ship space -z) lies east of her stern, her starboard side (+x) south of her port side.
   const bow = toWorld(m.pose, 0, 0, -10), stern = toWorld(m.pose, 0, 0, 10), port = toWorld(m.pose, -3, 0, 0), starboard = toWorld(m.pose, 3, 0, 0);
   assert.ok(bow[0] > stern[0] + 19 && starboard[2] > port[2] + 5.9);
@@ -110,6 +115,14 @@ test('she goes ahead along her heading at her speed, and her frame turns with he
   // Rolled to starboard her starboard side is lower.
   const rolled = { ...m.pose, roll: 0.1 };
   assert.ok(toWorld(rolled, 3, 0, 0)[1] < toWorld(rolled, -3, 0, 0)[1]);
+});
+
+test('her sails\' moment heels her to its side and holds her there', () => {
+  const heeled = (moment: number) => run(startMotion(0, 0, 0), flat, 0, 40, { ...STILL, rollMoment: moment }).pose.roll;
+  // About 1000 kN·m, the heeling of battle sail on a beam reach in a fresh breeze: a few degrees to starboard.
+  const starboard = heeled(HEELING), larboard = heeled(-HEELING);
+  assert.ok(starboard > 2 * DEGREE && starboard < 10 * DEGREE, `${(starboard / DEGREE).toFixed(1)}°`);
+  assert.ok(Math.abs(starboard + larboard) < 0.2 * DEGREE, 'the same either way');
 });
 
 test('her pose between two steps runs from one to the other, the heading the short way round', () => {

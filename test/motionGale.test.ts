@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { beaufortSpeed } from '../src/sim/rules/beaufort.ts';
 import { WIND_PRESETS } from '../src/sim/rules/wind.ts';
 import { startSea } from '../src/sim/sea/sea.ts';
-import { startMotion, stepMotion, type ShipMotion } from '../src/sim/ship/motion.ts';
+import { lyingStill, startMotion, stepMotion, type ShipMotion } from '../src/sim/ship/motion.ts';
 import { DEGREE, STEP_SECONDS, STEPS_PER_SECOND } from '../src/sim/units.ts';
 
 const SEED = 1805;
@@ -18,7 +18,7 @@ const gale = startSea(SEED, { speed: beaufortSpeed(STRONGEST), toward: 0.4 }, 0)
 /** Ten simulated minutes in the strongest preset, in four parts (one test may take 2 s), her heading swinging round. */
 const GALE_PARTS = 4;
 const GALE_MINUTES = 10;
-const galeCourse = (part: number) => ({ heading: part * 1.7, speed: 3 });
+const galeCourse = (part: number) => ({ ...lyingStill(part * 1.7), ahead: 3 });
 let galeState: ShipMotion = startMotion(0, 0, 0);
 const galeMost = { roll: 0, pitch: 0, heave: 0 };
 for (let part = 0; part < GALE_PARTS; part++) {

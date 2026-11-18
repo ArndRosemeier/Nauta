@@ -9,18 +9,17 @@
 import { deriveSeed } from '@futuremagic/core';
 import { decode, encode, hashBytes } from './codec';
 import { startSea, type SeaState } from './sea/sea';
-import { startMotion, type Course, type ShipMotion } from './ship/motion';
+import { startMotion, type ShipMotion } from './ship/motion';
+import { startSailing, type Sailing } from './ship/sailing';
+import type { CanvasName } from './rules/sailing';
 import { STEPS_PER_SECOND } from './units';
-import { makeWind, meanWind, type WindState } from './wind';
+import { makeWind, meanWind, windAt, type WindState } from './wind';
 
-/** One ship of the match: how she lies on the water (motion.ts owns it), and the course she holds. */
+/** One ship of the match: how she lies on the water (motion.ts owns it), and how she sails (sailing.ts owns it). */
 export interface SimShip {
   readonly motion: ShipMotion;
-  /**
-   * Her heading (compass bearing, rad) and speed through the water (m/s), as last ordered. The stand-in until the
-   * sailing model (N3.3) owns heading and speed and works them out of the wind; changed only in step.ts.
-   */
-  readonly course: Course;
+  /** Her heading, way, helm, canvas and yards: the sailing model's state. */
+  readonly sailing: Sailing;
 }
 
 /** The whole match. Changed only by `step` (and made by `startMatch`); rules.json `owners` names each field's owner. */
@@ -37,11 +36,16 @@ export interface SimState {
   readonly ships: readonly SimShip[];
 }
 
-/** Where a ship is put on the water at the start: her centre (x, z, m) and her heading (compass bearing, rad). */
+/**
+ * Where a ship is put on the water at the start: her centre (x, z, m) and her heading (compass bearing, rad); her way
+ * ahead (m/s, still if not given) and her canvas (battle sail if not given).
+ */
 export interface ShipStart {
   readonly x: number;
   readonly z: number;
   readonly heading: number;
+  readonly speed?: number;
+  readonly canvas?: CanvasName;
 }
 
 /** What a match starts from. How the ships are placed (distance, who has the wind) is the caller's: an open design question. */
@@ -68,7 +72,10 @@ export function startMatch(setup: MatchSetup): SimState {
     tick: 0,
     wind,
     sea: startSea(deriveSeed(seed, 'sea'), { speed, toward }, 0),
-    ships: setup.ships.map((s) => ({ motion: startMotion(s.x, s.z, s.heading), course: { heading: s.heading, speed: 0 } })),
+    ships: setup.ships.map((s) => ({
+      motion: startMotion(s.x, s.z, s.heading),
+      sailing: startSailing(s, windAt(wind, s.x, s.z, 0), setup.windForce),
+    })),
   };
 }
 
