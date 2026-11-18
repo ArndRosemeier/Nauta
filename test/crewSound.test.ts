@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { bellStrikes, CrewWatch, pullLoudness, type CrewHeard, type CrewShot } from '../src/audio/crewHearing.ts';
 import {
-  BELL, BELL_EVERY, BELLS_A_WATCH, CALL_GAP, CARRY_ON, DRUM, HAUL_CALL, HAUL_PERIOD, HAUL_PULL, HAUL_SPREAD, ORDER_CALLS,
+  LIFE_CALLS, BELL, BELL_EVERY, BELLS_A_WATCH, CALL_GAP, CARRY_ON, DRUM, HAUL_CALL, HAUL_PERIOD, HAUL_PULL, HAUL_SPREAD, ORDER_CALLS,
   RUN_STEP, STILL_CALL, SWING_PULLS, THROUGH_DECK,
 } from '../src/audio/crewTuning.ts';
 import { openShip } from '../src/sim/crew/closures.ts';
@@ -77,12 +77,14 @@ const calls = (shots: readonly Heard[]) => shots.filter((s) => s.id.startsWith('
 const index = JSON.parse(readFileSync(new URL('../public/sound/index.json', import.meta.url), 'utf8')) as { sounds: Record<string, { files: string[]; seconds: number[] }> };
 
 test('every order has its call, the hands\' orders each their own, and every call is a take of the game as long as the tuning says', () => {
-  // The gunnery orders take no sailing hands and are not piped (the drum beats to quarters); the orders for her life are not piped yet (N6.8).
+  // The gunnery orders take no sailing hands and are not piped (the drum beats to quarters); the first lieutenant's parties for her life have their own calls (LIFE_CALLS, N6.8), the carpenter's orders and striking none.
   const sailing = VOCABULARY.flatMap((w) => (Object.hasOwn(ORDER_CALLS, w.kind) ? [w.kind as keyof typeof ORDER_CALLS] : []));
   assert.deepEqual(VOCABULARY.filter((w) => !sailing.includes(w.kind as keyof typeof ORDER_CALLS)).map((w) => w.kind), ['quarters', 'stand', 'shot', 'aim', 'bear', 'hold', 'fire', 'cease', 'pumps', 'fires', 'wreckage', 'strike', 'plug', 'pumping'], 'every sailing order has a call');
   const hands = sailing.filter((k) => VOCABULARY.find((w) => w.kind === k)!.to === 'first lieutenant' || ['tack', 'wear', 'heave'].includes(k));
   assert.equal(new Set(hands.map((k) => ORDER_CALLS[k].id)).size, hands.length, 'no two orders of the hands share a call');
-  for (const c of [...Object.values(ORDER_CALLS), HAUL_CALL, STILL_CALL, CARRY_ON]) {
+  const piped = [...hands.map((k) => ORDER_CALLS[k].id), ...Object.values(LIFE_CALLS).map((c) => c.id)];
+  assert.equal(new Set(piped).size, piped.length, 'the parties for her life each their own call too');
+  for (const c of [...Object.values(ORDER_CALLS), ...Object.values(LIFE_CALLS), HAUL_CALL, STILL_CALL, CARRY_ON]) {
     const entry = index.sounds[c.id];
     assert.ok(entry, `${c.id} is made`);
     assert.ok(Math.abs(entry.seconds[0]! - c.seconds) < 0.15, `${c.id}: ${entry.seconds[0]} s made, ${c.seconds} s in the tuning`);
@@ -113,6 +115,13 @@ test('an order is piped from the boatswain as it is taken; two orders one after 
   const station = placeSpot('station-quarterdeck'), there = toWorld(BASE.motion.pose, station.across, 0, -station.along), at = piped[0]!.at;
   assert.ok(Math.hypot(at[0] - there[0], at[2] - there[2]) < 1, `piped by the capstan (${at.map((v) => v.toFixed(1))})`);
   assert.equal(piped[0]!.bus, 'body', 'on deck, heard close');
+});
+
+test("the first lieutenant's parties for her life are piped as they are ordered; the carpenter's orders are not", () => {
+  const r = calls(listen([{ tick: 3, order: { kind: 'pumps', ship: 0 } }, { tick: 4, order: { kind: 'plug', ship: 0 } }, { tick: 5, order: { kind: 'fires', ship: 0 } }], 5).shots);
+  assert.deepEqual(r.map((s) => s.id), [LIFE_CALLS.pumps.id, LIFE_CALLS.fires.id]);
+  assert.ok(Math.abs(r[0]!.t - 3 * STEP_SECONDS) < 1e-9, 'piped in the frame it is ordered');
+  assert.deepEqual(calls(listen([{ tick: 0, order: { kind: 'wreckage', ship: 0 } }], 1).shots), [], 'ordered before hearing began: not piped');
 });
 
 test('what follows is piped: Carry On when the hands are done, Haul Away, the braces and Carry On as she comes round, the Still when she misses stays', () => {

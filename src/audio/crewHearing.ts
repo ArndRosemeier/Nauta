@@ -27,7 +27,7 @@ import {
   BELL, BELL_ABAFT_FOREMAST, BELL_EVERY, BELL_GAP, BELL_HEIGHT, BELL_PAIR_GAP, BELLS_A_WATCH, CALL_GAP, CALL_STALE, CARRY_ON,
   CROWD_BEDS, CROWD_FULL, CROWD_GAIN, CROWD_GLIDE, CROWD_REACH, CROWD_REF, DRUM, DRUM_GLIDE, DRUM_HEIGHT, FEET_HEIGHT,
   HAULING, HAUL_HEIGHT, HAUL_LEAST, HAUL_PERIOD, HAUL_PULL, HAUL_SPREAD,
-  NEAR_FEET, NEAR_REACH, ORDER_CALLS, PIPED_DONE, PIPE_HEIGHT, RUN_STEP, RUN_STRIDE, SAILED_CALLS, SHORT_HANDED_AGAIN,
+  LIFE_CALLS, LIFE_PARTIES, NEAR_FEET, NEAR_REACH, ORDER_CALLS, PIPED_DONE, PIPE_HEIGHT, RUN_STEP, RUN_STRIDE, SAILED_CALLS, SHORT_HANDED_AGAIN,
   SHORT_HANDED_GAIN, STRIKES_A_PAIR, SWING_PERIOD, SWING_PULLS, THROUGH_DECK, WALK_GAIN, WALK_STRIDE, type PipeCall,
 } from './crewTuning';
 import { clearHeard, type Heard, type PlacedBed, type PlacedShot } from './heard';
@@ -128,6 +128,8 @@ export class CrewWatch {
   private callFree = -Infinity;
   /** The highest order id already piped (null: not looked yet: what was given before sound began is not piped). */
   private piped: number | null = null;
+  /** When each of the first lieutenant's parties for her life was ordered as last piped (null: not looked yet). */
+  private parties: (number | null)[] | null = null;
   /** When each kind of order was last piped again for more hands, s. */
   private readonly again = new Map<string, number>();
   private readonly feet = new Map<number, Feet>();
@@ -167,9 +169,14 @@ export class CrewWatch {
     return out;
   }
 
-  /** Every order taken since the last look waits for its call, in the order given. */
+  /** Every order taken since the last look waits for its call, in the order given (the parties for her life first). */
   private takeOrders(s: CrewScene): void {
-    const given = s.ship.told.given;
+    const told = s.ship.told, given = told.given;
+    LIFE_PARTIES.forEach((k, i) => {
+      const at = told[k];
+      if (this.parties && at !== null && at !== this.parties[i]) this.wait(LIFE_CALLS[k], LIFE_CALLS[k].gain, at * STEP_SECONDS);
+    });
+    this.parties = LIFE_PARTIES.map((k) => told[k]);
     const top = given.reduce((m, g) => Math.max(m, g.id), -1);
     if (this.piped === null) { this.piped = top; return; }
     for (const g of given) if (g.id > this.piped) this.wait(ORDER_CALLS[g.order.kind], ORDER_CALLS[g.order.kind].gain, g.tick * STEP_SECONDS);

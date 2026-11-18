@@ -63,3 +63,10 @@ NODE_USE_ENV_PROXY=1 node vendor/assetgenerator/packages/audio/tools/make.mjs --
   `rng` and `wav` now shared with pipe.mjs in `wav.mjs`). The near take was asked for again for a brighter crack; the
   second was no brighter and the first was kept. Far takes needed `quiet` 0.06 (their silences were noisy). A transcriber
   heard no speech in any take. About $1.50.
+- 2026-11-18 (N6.8, the sound of damage): a ball smashing into timber close by (six) and far off (six), splinters flying
+  (four), a ball striking a gun (six), a line parting (six), a sail torn (six), a mast going (three), a magazine going
+  up (two); beds of fire (two takes), the sea rushing in at a hole (two) and a ship breaking up. The line parting came out
+  in too few pieces and was asked for again "clearly spaced" with `gap` 0.5; the fire beds were nearly all below 150 Hz
+  (a roar the iPad's speakers would not play) and were asked for again as bright crackling with no low roar. Three
+  more boatswain's calls synthesised by pipe.mjs: hands to the pumps, fire party, clear the wreckage. A transcriber
+  heard no speech in any take. Under $0.10.
