@@ -6,7 +6,7 @@
  */
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { TIMEOUT, openBrowser, openGame, shotSize, snap } from './browser.mjs';
+import { TIMEOUT, drag, frames, openBrowser, openGame, shotSize, snap } from './browser.mjs';
 
 const args = process.argv.slice(2);
 if (args.length < 2 || args.length % 2) {
@@ -14,25 +14,17 @@ if (args.length < 2 || args.length % 2) {
   process.exit(2);
 }
 const { width, height } = shotSize();
-const drag = process.env.SHOT_DRAG ? process.env.SHOT_DRAG.split(',').map(Number) : null;
+const dragBy = process.env.SHOT_DRAG ? process.env.SHOT_DRAG.split(',').map(Number) : null;
 
 const served = await openBrowser();
 let failed = false;
 for (let i = 0; i < args.length; i += 2) {
   const query = args[i], out = args[i + 1];
   mkdirSync(dirname(out), { recursive: true });
-  const game = await openGame(served, query, { width, height }, !!drag);
+  const game = await openGame(served, query, { width, height }, !!dragBy);
   const { page, context } = game;
-  if (drag) {
-    // A finger put down in the middle, moved in steps and lifted: the same pointer events a tablet sends.
-    const x = width / 2, y = height / 2, steps = 8;
-    const touch = (type, px, py) => page.evaluate(([t, a, b]) => {
-      document.getElementById('view').dispatchEvent(new PointerEvent(t, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: a, clientY: b, bubbles: true }));
-    }, [type, px, py]);
-    await touch('pointerdown', x, y);
-    for (let s = 1; s <= steps; s++) await touch('pointermove', x + (drag[0] * s) / steps, y + (drag[1] * s) / steps);
-    await touch('pointerup', x + drag[0], y + drag[1]);
-  }
+  // The frames after the drag: the picture shows the look it moved.
+  if (dragBy) { await drag(page, { width, height }, dragBy); await frames(page); }
   await page.waitForTimeout(Number(process.env.SHOT_WAIT ?? 0));
   await snap(page, out);
   const hud = (await page.textContent('#hud', { timeout: TIMEOUT })) ?? '';
