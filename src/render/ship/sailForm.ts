@@ -24,6 +24,7 @@ import { sparOf, type RigPlan } from '../../sim/ship/rig';
 import { corner, type Sail } from '../../sim/ship/sails';
 import type { RigLine } from '../../sim/ship/lines';
 import { shipPoint, type Swing } from './swings';
+import { CLEAR_FLOATS, cleared } from './sailClear';
 
 /** What a row draws: a square sail, a fore-and-aft sail, a flag (the row's first texel's w). */
 export const SQUARE = 0;
@@ -32,7 +33,9 @@ export const FLAG = 2;
 
 /** Numbers per texel, and texels per row of the sails' state (sailMaterial.ts SAIL_TEXTURE). */
 export const TEXEL = 4;
-export const ROW_TEXELS = 10;
+/** Texels of a row's shape (its numbers, `ROW`); the clearance table follows. */
+export const SHAPE_TEXELS = 10;
+export const ROW_TEXELS = SHAPE_TEXELS + CLEAR_FLOATS / TEXEL;
 /** Floats per row. */
 export const ROW_FLOATS = TEXEL * ROW_TEXELS;
 /**
@@ -50,6 +53,8 @@ export const ROW = {
   middle: 24, uKeep: 25, vKeep: 26, taken: 27, rollUp: 28, roll: 31,
   luff: 32, folds: 33, foldDepth: 34, rollRadius: 35, foldU: 36, foldV: 37, yardRadius: 38, stream: 39,
   fly: 7, wave: 11, waves: 33, waveRate: 34, taper: 32,
+  /** The masts' timber the sail keeps clear of (sailClear.ts), written once, to the row's end. */
+  clear: SHAPE_TEXELS * TEXEL,
 } as const;
 
 // --- The shape's own numbers, shared with the shader (sailMaterial.ts).
@@ -260,6 +265,8 @@ export function clothAt(row: ArrayLike<number>, u: number, v: number, t: number,
   const radius = row[R.rollRadius]! * (ROLL_ENDS + (1 - ROLL_ENDS) * half(u)), roll = row[R.roll]! * square;
   if (roll > 0) out.lerp(rolled(headAt, rollUp, belly, row[R.yardRadius]!, radius, vs, new Vector3()), roll);
   if (taken > NONE && v < taken) rolled(headAt, rollUp, belly, row[R.yardRadius]!, radius * REEF_ROLL, v / taken, out);
+  // Held clear of the masts' timber (sailClear.ts), last, so a rolled bunt and a sail aback keep clear too.
+  cleared(row, R.clear, out);
   return out;
 }
 

@@ -1,6 +1,6 @@
 /**
  * What is seen of gunfire (plan N5.4a), from the step's events and the shots in flight in the state: each gun's
- * flash and first puff at her muzzle the instant she fires, every ball along its path while it flies, a splash where a
+ * flash, first puff and burning wad at her muzzle the instant she fires, every ball along its path while it flies, a splash where a
  * ball touches the sea (each skip and the last plunge), and a flash of splinters where shot strikes a ship. The
  * drawing (render/gunfire.ts, render/spray.ts, the sea's wake maps) shows what this hands it; a shot's whole flight is
  * in its event (N5.2), so nothing but what is still to be seen is kept. Pure.
@@ -18,7 +18,7 @@ import { GONE, type Hit } from '../sim/damage';
 import type { SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
 import { STEP_SECONDS } from '../sim/units';
-import { SHOT } from '../sim/rules/guns';
+import { PATH_STEP, SHOT } from '../sim/rules/guns';
 import { battery } from '../sim/guns/guns';
 
 /** A sight older than this is not handed over, s: everything it draws is over by then (a puff, a splash's drops). */
@@ -35,6 +35,8 @@ export interface Flash {
   readonly gun: number;
   readonly at: Vec;
   readonly dir: Vec;
+  /** How fast the shot leaves the muzzle, m/s. */
+  readonly speed: number;
   readonly shot: Shot['shot'];
 }
 
@@ -104,7 +106,7 @@ export class ShotsSeen {
     this.lastFired.set(`${e.ship}|${e.gun}`, t);
     if (!ball || ball.path.length < 2) return;
     const [a, b] = [ball.path[0]!, ball.path[1]!], d = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) || 1;
-    this.flashes.push({ t, ship: e.ship, gun: e.gun, at: a, dir: [(b[0] - a[0]) / d, (b[1] - a[1]) / d, (b[2] - a[2]) / d], shot: e.fired.shot });
+    this.flashes.push({ t, ship: e.ship, gun: e.gun, at: a, dir: [(b[0] - a[0]) / d, (b[1] - a[1]) / d, (b[2] - a[2]) / d], speed: d / PATH_STEP, shot: e.fired.shot });
     this.onWay.set(key(e.ship, e.gun, e.tick), {
       t, fired: e, size: SHOT[e.fired.shot].diameter[battery()[e.gun]!.gun], stopped: e.fired.balls.map(() => Infinity), touched: e.fired.balls.map(() => 0),
     });

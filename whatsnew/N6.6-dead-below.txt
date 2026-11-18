@@ -1,0 +1,3 @@
+The men killed in a fight are now carried below to the hold by two shipmates, after the wounded, at every Violence setting, so the deck is cleared by what you see.
+At mild, the fallen man is first covered with a sheet of canvas, and the canvas goes below with him.
+Try it: open ?sail&casualties=3 and watch the waist for a minute.

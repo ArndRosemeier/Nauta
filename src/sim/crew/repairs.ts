@@ -8,8 +8,8 @@
  * crew pumps, being at the pumps by the quarter bill), and when nothing leaks fish the spar part with the most wounds;
  * the boatswain and his mates knot and splice cut lines, the standing rigging that holds a spar first; the
  * quartermasters rig the relieving tackles when her steering is shot away; and each badly wounded man is carried below
- * by the two nearest waisters, at most `CARRY_PARTIES` at once, the rest waiting where they lie. The killed stay where
- * they fell.
+ * by the two nearest waisters, then each man killed down to the hold (design ruling 2026-11-18), at most `CARRY_PARTIES`
+ * at once, the rest waiting where they lie.
  *
  * **On order**, once the order has come down to the men (rules/crew.ts `PASSED`): hands to the pumps (eight men from
  * the guns while there is water in her or a hole leaks; it frees the carpenter's whole crew to plug), fire party
@@ -30,6 +30,7 @@ import { rectCentre, shipPlan, spacesById, type Spot } from '../ship/plan';
 import { rigPlan } from '../ship/rig';
 import { STEPS_PER_SECOND } from '../units';
 import { manAt, NO_ACT, sameSpot, type Crew, type Repair } from './crew';
+import { deadSpot } from './dead';
 import { nodeOfSpot, routeNetwork } from './network';
 import { brigRoster, crewPlaces, placeSpot, type Man } from './roster';
 
@@ -112,10 +113,10 @@ function pick(crew: Crew, jobs: readonly RepairName[], ordered: readonly number[
   return [...ordered.filter((x) => under.has(x)), ...ordered.filter((x) => !under.has(x))].slice(0, limit);
 }
 
-/** Whether a man lies below with the surgeon: carried there, or posted there. */
-function below(crew: Crew, man: number, roster: readonly Man[]): boolean {
+/** Whether a man lies below where he is carried: with the surgeon if he is wounded, in the hold if he was killed. */
+function below(crew: Crew, man: number, roster: readonly Man[], killed: boolean): boolean {
   const h = crew.men[man]!;
-  return !h.going && sameSpot(h.stands ?? placeSpot(roster[man]!.home), placeSpot(SURGEON));
+  return !h.going && sameSpot(h.stands ?? placeSpot(roster[man]!.home), killed ? deadSpot(man) : placeSpot(SURGEON));
 }
 
 /** A ship nothing has struck: nothing to repair. */
@@ -166,10 +167,10 @@ export function repairsDue(d: Damage, told: ShipOrders, crew: Crew, tick: number
     for (const part of pick(crew, ['fish'], worst, 1)) out.push({ job: 'fish', on: part, at: fishSpot(part) });
   }
 
-  // The badly wounded carried below, as many at once as there are parties.
-  const badly = HARMS.indexOf('badly');
-  const wounded = d.hurt.flatMap((h) => { const man = Math.floor(h / HARMS.length); return h % HARMS.length === badly && !below(crew, man, roster) ? [man] : []; });
-  for (const man of pick(crew, ['fetch', 'carry'], wounded, CARRY_PARTIES)) out.push({ job: 'fetch', on: man, at: manAt(crew.men[man]!, roster[man]!.home).spot });
+  // The badly wounded carried below to the surgeon, then the killed to the hold, as many at once as there are parties.
+  const badly = HARMS.indexOf('badly'), killed = HARMS.indexOf('killed');
+  const hurtBy = (harm: number) => d.hurt.flatMap((h) => { const man = Math.floor(h / HARMS.length); return h % HARMS.length === harm && !below(crew, man, roster, harm === killed) ? [man] : []; });
+  for (const man of pick(crew, ['fetch', 'carry'], [...hurtBy(badly), ...hurtBy(killed)], CARRY_PARTIES)) out.push({ job: 'fetch', on: man, at: manAt(crew.men[man]!, roster[man]!.home).spot });
 
   return out.length > 0 ? out : NONE;
 }

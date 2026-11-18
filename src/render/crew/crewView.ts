@@ -26,7 +26,7 @@ import { brigRoster, type Man } from '../../sim/crew/roster';
 import { heightAt, routeNetwork } from '../../sim/crew/network';
 import type { Whereabouts } from '../../sim/crew/going';
 import { taskOf } from '../../sim/crew/crew';
-import { STAND_BY_CLIPS } from '../../app/standBy';
+import { STAND_BY_CLIPS, attentiveClip } from '../../app/standBy';
 import { apartOnWater } from '../../sim/units';
 import { harmOf } from '../../sim/damage';
 import type { Harm } from '../../sim/rules/damage';
@@ -41,14 +41,16 @@ import {
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
 import { facesNow, stepFace } from '../../app/faces';
+import { GUN_CLIP_NAMES, gunClip, gunStrains, gunWork } from '../../app/gunDrill';
 import { VOICES, type Point3, type Speaker, type Voice } from '../../app/speech/speakers';
 import type { CrewKnobs } from '../../app/quality';
 import { pageSeconds } from '../../app/pageMatch';
 import { EYE } from '../../app/standpoints';
-import { stainOf, stained, takenBelow, TRAIL_EVERY, SHOWN } from '../../app/violence';
+import { stainOf, stained, coveredOf, TRAIL_EVERY, SHOWN } from '../../app/violence';
 import type { Violence } from '../../app/settings';
 import { NearPool, type PoolChar } from './nearPool';
 import { Blood } from './blood';
+import { Shrouds } from './shroud';
 import { geometryBytes } from '../bytes';
 
 /** Actors' crowd level: all the workbench draws (it only bakes the figures). */
@@ -85,9 +87,8 @@ const STRUCK_NEAR = 6;
 /** A man just hurt matters (the near pool takes him, so his face is a living one) this long, s, if he is within this far of the eye, m. */
 const HURT_MATTERS = 10;
 const HURT_REACH = 15;
-/** The clip a walking midshipman plays, and standing. */
+/** The clip a walking midshipman plays. */
 const WALK = 'walk';
-const STAND = 'idle';
 
 /** One man of either crew. */
 interface Drawn {
@@ -115,16 +116,14 @@ interface Drawn {
   harm: Harm | null;
   hurtAt: number;
   fellAt: number;
-  /** How far his shirt is stained now (violence.ts), and how much of him is taken below (0..1, mild). */
+  /** How far his shirt is stained now (violence.ts), and how far the canvas is laid over him (0..1, mild). */
   stain: number;
-  gone: number;
+  covered: number;
   /** Where the last drop fell when he was carried (her space), for the trail. */
   dripped: { x: number; z: number } | null;
   /** A new hurt to lay blood for once he is placed (he has a place to bleed on), and whether he has been placed. */
   fresh: Harm | null;
   placed: boolean;
-  /** How much of him is faded out as drawn now (`gone` as last applied). */
-  faded: number;
 }
 
 /** How the trial draws the other crew (`?crew`, plan N4.0): on her own deck (`aboard`), or off her bow at `offset` (ship space, m). */
@@ -180,6 +179,8 @@ export class CrewView {
   private readonly officerMen: number[];
   /** The blood on each ship's decks (violence.ts). */
   private readonly blood: Blood[];
+  /** The sheets over the killed at the mild level, on each ship. */
+  private readonly shrouds: Shrouds[];
   /** Men who matter now (speaking, addressed) until a page second. */
   private readonly matters = new Map<number, number>();
   /** When the pool last began dressing a man, page seconds. */
@@ -189,6 +190,7 @@ export class CrewView {
   private time = 0;
   private mine = 0;
   private lastCamera: Camera | null = null;
+  private lastState: SimState | null = null;
   private readonly eye = new Vector3();
   private readonly local = new Vector3();
   private readonly world = new Vector3();
@@ -215,9 +217,10 @@ export class CrewView {
     }
     this.all = rosters.flatMap((roster, ship) => roster.map((m, man) => {
       const seed = manSeed(ship, man);
-      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, gone: 0, dripped: null, fresh: null, placed: false, faded: 0 };
+      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false };
     }));
     this.byShip = rosters.map((_, s) => this.all.filter((d) => d.ship === s));
+    this.shrouds = rosters.map((_, s) => new Shrouds(this.groups[s]!));
     this.blood = rosters.map((_, s) => { const b = new Blood(); b.attach(this.groups[s]!); return b; });
     for (const v of VOICES) this.voices.set(v, voiceMan(v, rosters[0]));
     this.officerMen = OFFICERS.map((o) => this.voices.get(o)!);
@@ -236,7 +239,7 @@ export class CrewView {
     const workbench = await Character.load({ pack: `${base}${PACK}`, renderer, materials: nodeMaterials, worker: new HumanWorker(), catalog: packCatalog, clipLibraries: false, levels: [CROWD_LEVEL] });
     const kinds = crowdKinds(workbench.catalog, rosters);
     note(`baking ${kinds.length} kinds of men`);
-    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, LYING, WALK, 'jog', 'idle'])];
+    const clips = [...new Set([...Object.values(JOB_CLIPS), ...STAND_BY_CLIPS, ...GUN_CLIP_NAMES, LYING, WALK, 'jog', 'idle'])];
     const figures = await buildCrowdFigures(workbench, { material: createNodeCrowdFigureMaterial, builds: { ...BUILDS }, kinds, clips, once: ONCE_CLIPS, fps: BAKE_FPS });
     note('the officers come on deck');
     const pool = await NearPool.load(renderer, `${base}${PACK}`, workbench, knobs.pool, knobs.poolFull, fullLook(workbench.catalog, figureOf(0, 1, rosters[0]![1]!)));
@@ -308,6 +311,7 @@ export class CrewView {
     this.frame++;
     this.time += dt;
     this.mine = fr.mine;
+    this.lastState = fr.state.to;
     this.lastCamera = fr.camera;
     const k = fr.knobs, s = this.stats;
     s.placed = 0; s.drawn = 0;
@@ -349,8 +353,17 @@ export class CrewView {
   }
 
   /** Her men now hurt, where they are drawn (her space): for the browser checks, which stand near one (tools/shot/men.mjs). */
-  hurtMen(ship: number): { man: number; harm: Harm; space: string; x: number; y: number; z: number; clip: string | null; shown: boolean; seen: boolean }[] {
-    return (this.byShip[ship] ?? []).flatMap((d) => (d.harm && d.placed ? [{ man: d.man, harm: d.harm, space: d.at.space, x: d.at.x, y: d.at.y, z: d.at.z, clip: d.clip, shown: d.shown, seen: d.seen }] : []));
+  hurtMen(ship: number): { man: number; harm: Harm; space: string; x: number; y: number; z: number; clip: string | null; shown: boolean; seen: boolean; covered: number; shroud: { x: number; y: number; z: number; scale: number } | null }[] {
+    return (this.byShip[ship] ?? []).flatMap((d) => (d.harm && d.placed ? [{ man: d.man, harm: d.harm, space: d.at.space, x: d.at.x, y: d.at.y, z: d.at.z, clip: d.clip, shown: d.shown, seen: d.seen, covered: d.covered, shroud: this.shrouds[ship]!.shownAt(d.man) }] : []));
+  }
+
+  /** Her men now at a gun with what the drill has them doing, where they are drawn (her space): for the browser checks, which stand beside a gun crew (tools/shot/guns.mjs `drill`). */
+  gunMen(ship: number): { man: number; gun: number; part: string; step: string; working: boolean; want: string | null; clip: string | null; x: number; y: number; z: number; shown: boolean; seen: boolean }[] {
+    const state = this.lastState?.ships[ship];
+    return (this.byShip[ship] ?? []).flatMap((d) => {
+      const w = state ? gunWork(state, d.man, d.m) : null;
+      return w && d.placed ? [{ man: d.man, gun: w.gun, part: w.part, step: w.step, working: w.working, want: gunClip(w), clip: d.clip, x: d.at.x, y: d.at.y, z: d.at.z, shown: d.shown, seen: d.seen }] : [];
+    });
   }
 
   /** The key of a man among both crews (the pool and the speakers know him by it). */
@@ -393,7 +406,7 @@ export class CrewView {
       d.harm = harm;
       if (harm === null) { d.hurtAt = Infinity; d.fellAt = Infinity; }
     }
-    d.gone = takenBelow(level, d.harm, at - d.fellAt);
+    d.covered = coveredOf(level, d.harm, at - d.fellAt);
   }
 
   /** The men carried below at the unsparing level leave a drop every few metres, under their bearers' feet. */
@@ -422,7 +435,7 @@ export class CrewView {
     d.distance = Math.hypot(at.x - eye.x, at.y + BODY_MIDDLE - eye.y, at.z - eye.z);
     // A man the match puts where the captain's eye is (it does not keep the captain clear) is not drawn: he is not seen inside out.
     const inEye = apartOnWater(at, eye) < EYE_CLEAR && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT;
-    d.shown = this.crews > d.ship && !inEye && d.gone < 1 && (view ? view.zoneGroupOf(at.space).visible : !belowDeck(at.space));
+    d.shown = this.crews > d.ship && !inEye && (view ? view.zoneGroupOf(at.space).visible : !belowDeck(at.space));
     d.placed = true;
     if (d.fresh) {
       // Where he fell, if it is a deck (not aloft): the blood the violence setting shows (blood.ts).
@@ -432,7 +445,10 @@ export class CrewView {
     this.local.set(at.x, at.y + BODY_MIDDLE, at.z).applyMatrix4(this.groups[d.ship]!.matrixWorld);
     d.seen = d.shown && this.frustum.intersectsSphere(this.sphere.set(this.local, BODY_RADIUS));
     d.step = stepAt(fr.knobs, d.distance, d.seen);
-    if (!d.shown) { this.hideMan(d); return; }
+    // Mild: the killed are covered, and the canvas goes with him (shroud.ts); once it is over him he is not drawn.
+    if (d.shown && d.covered > 0) this.shrouds[d.ship]!.set(d.man, at.x, at.y, at.z, at.yaw, d.covered);
+    else this.shrouds[d.ship]!.clear(d.man);
+    if (!d.shown || d.covered >= 1) { this.hideMan(d); return; }
     if (!d.crowd) this.showMan(d);
     const c = d.crowd!;
     this.turn.setFromAxisAngle(UP, at.yaw);
@@ -444,10 +460,9 @@ export class CrewView {
     }
     const dressed = d.distance <= fr.knobs.dressTo + (d.dressed ? DRESS_STICK : 0);
     if (dressed !== d.dressed) { d.dressed = dressed; this.figures.setLook(c, { show: dressed ? d.figure.show : [] }); }
-    // The violence setting: his shirt stained by his hurt, and (mild) the killed carried below, out of sight by a fade.
+    // The violence setting: his shirt stained by his hurt.
     const stain = d.figure.tints.length > SHIRT_GROUP ? stainOf(fr.violence, d.harm) : 0;
     if (stain !== d.stain) { d.stain = stain; this.figures.setLook(c, { tints: this.tintsOf(d) }); }
-    if (d.gone !== d.faded) { d.faded = d.gone; this.figures.fade(c, 1 - d.gone); }
   }
 
   /** A man's tint colours with his shirt as stained as the setting shows it. */
@@ -467,7 +482,7 @@ export class CrewView {
       at.yaw = Math.atan2(w.facing[1], -w.facing[0]);
       const standing = w.share === 0 && w.way === null;
       if (standing && fr.captain && floorApart(fr.captain, w) < FACE_CAPTAIN) at.yaw = Math.atan2(fr.captain.across - at.x, shipZ(fr.captain.along) - at.z);
-      at.clip = standing ? STAND : WALK;
+      at.clip = standing ? attentiveClip(d.seed) : WALK;
       return;
     }
     const ship = fr.state.to.ships[d.ship]!, hand = ship.crew.men[d.man]!;
@@ -480,7 +495,6 @@ export class CrewView {
     const f = d.figure;
     d.crowd = this.figures.add(f.kind, { skin: skinToneColor(f.skinTone), hair: f.hairColour, tints: this.tintsOf(d), show: d.dressed ? f.show : [] });
     d.clip = null;
-    d.faded = 0;
     const p = this.pool.of(this.key(d));
     if (p?.shown) this.figures.fade(d.crowd, 0);
   }
@@ -497,7 +511,7 @@ export class CrewView {
     const mine = this.byShip[fr.mine] ?? [], size = this.crews > 0 ? this.poolInUse : 0;
     const at = fr.state.to.tick / STEPS_PER_SECOND;
     // A man just hurt matters too (plan "Faces": speaking, struck or addressed): his face is a living one, near enough to be seen.
-    const candidates = mine.filter((d) => d.man !== 0 && d.crowd !== null && d.gone === 0).map((d) => ({
+    const candidates = mine.filter((d) => d.man !== 0 && d.crowd !== null && d.covered === 0).map((d) => ({
       man: d.man, distance: d.distance, seen: d.seen,
       matters: (this.matters.get(d.man) ?? 0) > fr.now || (at - d.hurtAt < HURT_MATTERS && d.distance <= HURT_REACH),
     }));
@@ -548,7 +562,9 @@ export class CrewView {
       // His face: from what he is doing and what has just happened to him (app/faces.ts).
       const task = taskOf(ship.crew, d.man), voice = [...this.voices].find(([, man]) => man === d.man)?.[0];
       const end = fr.state.to.fight.end, ended = !end ? null : end.lost[fr.mine] ? 'lost' : end.lost.some((l) => l !== null) ? 'won' : null;
+      const gun = gunWork(ship, d.man, d.m);
       const present = facesNow({
+        gun: gun ? { strains: gunStrains(gun), captain: gun.part === 'captain', sinceFired: gun.sinceFired } : undefined,
         job: task && task.began !== null ? task.job : null, aloft: !!d.at.way || routeNetwork().surfaces.has(d.at.space), sinceStruck: d.struck,
         fighting: ship.told.quarters, harm: d.harm, sinceHurt: fr.state.to.tick / STEPS_PER_SECOND - d.hurtAt, shouting: voice === 'boatswain' && (this.matters.get(d.man) ?? 0) > fr.now, ended,
       });

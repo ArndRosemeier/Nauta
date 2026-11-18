@@ -28,6 +28,7 @@
     "src/app/crewLevels.ts",
     "src/app/crewTrial.ts",
     "src/app/gunsSeen.ts",
+    "src/app/gunDrill.ts",
     "src/app/shotsSeen.ts",
     "src/offline/plan.ts",
     "src/probe/report.ts",

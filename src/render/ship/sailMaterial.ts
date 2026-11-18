@@ -15,9 +15,10 @@ import {
   round, select, sin, smoothstep, step, texture, textureLoad, transformNormalToView, uniform, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import {
-  BREATHE_HZ, BREATHE_U, BREATHE_V, BUNT, FLAG, NONE, REEF_ROLL, SAME_POINT, ROLL_ENDS, ROLL_IN, ROLL_TURNS, ROW_TEXELS, SCALLOP, SHIVER_FALL, SHIVER_HZ,
+  BREATHE_HZ, BREATHE_U, BREATHE_V, BUNT, FLAG, NONE, REEF_ROLL, ROW, SAME_POINT, ROLL_ENDS, ROLL_IN, ROLL_TURNS, ROW_TEXELS, SHAPE_TEXELS, TEXEL, SCALLOP, SHIVER_FALL, SHIVER_HZ,
   SHIVER_SLANT, SHIVER_WAVES,
 } from './sailForm';
+import { CLEAR_DRAPE, CLEAR_FADE, CLEAR_MARGIN, CLEAR_REACH, CLEAR_SOLIDS, CLEAR_STRIDE } from './sailClear';
 import { ENSIGN_PATTERN, FLAGS, PENNANT_PATTERN, SAIL_ATLAS_SIZE } from './sailGrid';
 import { SHIPS_DRAWN, SHIP_OBJECT, crossfadeMask, nearest } from './shipMaterials';
 import { filtered } from '../dataTexture';
@@ -66,7 +67,7 @@ const NO_NORMAL = 1e-14;
 
 // --- The shape (sailForm.ts clothAt, line for line).
 /** A row's texels by number. */
-const TEXELS = Array.from({ length: ROW_TEXELS }, (_, i) => i);
+const TEXELS = Array.from({ length: SHAPE_TEXELS }, (_, i) => i);
 const T = (row, k) => textureLoad(SAIL_TEXTURE, ivec2(int(k), int(row).add(int(SHIP_OBJECT.ship).mul(MOST_SAIL_ROWS))));
 const sinHalf = (x) => sin(x.mul(Math.PI));
 const bilerp = (p00, p10, p01, p11, u, v) => mix(mix(p00, p10, u), mix(p01, p11, u), v);
@@ -76,6 +77,24 @@ const scallop = (u) => sinHalf(select(u.lessThan(BUNT), u.div(BUNT), select(u.gr
 const rollNode = (at, up, toward, spar, radius, t) => {
   const a = t.mul(ROLL_TURNS * TURN), r = radius.mul(float(1).sub(t.mul(ROLL_IN)));
   return at.add(up.mul(spar.add(radius).sub(cos(a).mul(r)))).add(toward.mul(sin(a).mul(r)));
+};
+
+/** The first texel of a row's clearance table, and the texels a piece of timber takes (its extent and side, then its planes). */
+const CLEAR_TEXEL = ROW.clear / TEXEL, CLEAR_TEXELS = CLEAR_STRIDE / TEXEL;
+/** sailClear.ts `cleared`: the point's z pushed forward of, or abaft, the timber sail `row` keeps clear of. */
+const clearNode = (row, p) => {
+  let ahead = float(0), abaft = float(0);
+  for (let s = 0; s < CLEAR_SOLIDS; s++) {
+    const a = T(row, CLEAR_TEXEL + s * CLEAR_TEXELS), b = T(row, CLEAR_TEXEL + s * CLEAR_TEXELS + 1);
+    const side = a.w, across = max(abs(p.x).sub(a.x), 0), up = max(max(a.y.sub(p.y), p.y.sub(a.z)), 0);
+    const edge = vec2(across, up).length(), reach = float(1).sub(smoothstep(0, CLEAR_REACH, edge));
+    const front = b.x.add(b.y.mul(p.y)), back = b.z.add(b.w.mul(p.y));
+    const depth = select(side.greaterThan(0), p.z.sub(front), back.sub(p.z));
+    const push = max(depth.sub(edge.mul(CLEAR_DRAPE)), 0).mul(float(1).sub(smoothstep(0, CLEAR_FADE, depth.div(max(back.sub(front), CLEAR_MARGIN)).sub(1)))).mul(reach);
+    ahead = max(ahead, select(side.greaterThan(0), push, 0));
+    abaft = max(abaft, select(side.lessThan(0), push, 0));
+  }
+  return vec3(p.x, p.y, p.z.add(abaft).sub(ahead));
 };
 
 /** A sail's point (u, v) at time t: sailForm.ts `clothAt`. */
@@ -102,7 +121,7 @@ const sailCloth = Fn(([row, u, v, t]) => {
   const shaped = bilerp(p00, p10, p01, p11, ug, vg).add(belly.mul(off));
   const up = t7.xyz, head = mix(p00, p10, u), radius = t8.w.mul(float(ROLL_ENDS).add(sinHalf(u).mul(1 - ROLL_ENDS)));
   const furled = mix(shaped, rollNode(head, up, belly, t9.z, radius, vs), t7.w.mul(square));
-  return select(reefed.and(v.lessThan(taken)), rollNode(head, up, belly, t9.z, radius.mul(REEF_ROLL), v.div(max(taken, NONE))), furled);
+  return clearNode(row, select(reefed.and(v.lessThan(taken)), rollNode(head, up, belly, t9.z, radius.mul(REEF_ROLL), v.div(max(taken, NONE))), furled));
 }).setLayout({ name: 'sailCloth', type: 'vec3', inputs: [{ name: 'row', type: 'float' }, { name: 'u', type: 'float' }, { name: 'v', type: 'float' }, { name: 't', type: 'float' }] });
 
 /** A flag's point (u along the fly, v down the hoist) at time t: sailForm.ts `flagAt`. */

@@ -220,6 +220,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A point of the rig plan in ship space | `src/render/ship/swings.ts#shipPoint` |
 | Handing the moving frames to the rope shader | `src/render/ship/shipMaterials.ts#setShipFrame` |
 | A sail's shape from its numbers (belly, shiver, breathing, folds gathered, rolled on its yard, a reef rolled) and a flag's, on the CPU: the one the sail shader mirrors (N3.10) | `src/render/ship/sailForm.ts#clothAt` |
+| The timber of each mast a sail must hang clear of (shaft, masthead, cap, top, topmast, crosstrees, topgallant mast), as planes in ship space, from the same spar table and timber rules the drawing builds the masts from (N3.10) | `src/sim/ship/mastSolids.ts#mastSolids` |
+| Each sail's clearance table, and the cloth pushed out of the masts' timber on the CPU: the one the sail shader mirrors | `src/render/ship/sailClear.ts#cleared` |
 | How each sail is drawn, from the rig plan: corners, the spars that carry them, belly shape, folds | `src/render/ship/sailForm.ts#sailForms` |
 | The points of a sail lines are made fast to, each with its own moving frame | `src/render/ship/sailForm.ts#sailPoints` |
 | The sails' and flags' grids, with seams, reef bands, edges and the hole map's place per vertex | `src/render/ship/sailGrid.ts#buildSailGrids` |
@@ -303,8 +305,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What is heard of gunfire, from the fired events: reports arriving by the speed of sound, balls passing and falling near the ear, the ears' load, jolts | `src/audio/gunHearing.ts#GunWatch` |
 | Where a ball's path passes nearest a point | `src/audio/gunHearing.ts#nearestPass` |
 | A ball's place on its path a time after firing (damage traces it, the drawing flies it) | `src/sim/guns/shot.ts#pathAt` |
-| How a ship's guns stand for the drawing: run out or in, leaping back when fired, trained; her lids wanted up (N5.4a) | `src/app/gunsSeen.ts#gunsSeen` |
+| How a ship's guns stand for the drawing: run out or in, leaping back when fired, trained and elevated; her lids wanted up (N5.4a) | `src/app/gunsSeen.ts#gunsSeen` |
 | How far run out a gun stands through her recoil (the leap back on her breeching) | `src/app/gunsSeen.ts#recoilOut` |
+| What a man at a gun does and shows: his part in her crew, the motion of the drill's step, whether she is worked, strain, and the seconds since she fired (N5.4b) | `src/app/gunDrill.ts#gunWork` |
+| Which gun a man stands to and his place in her crew | `src/sim/guns/guns.ts#servedBy` |
 | What is seen of gunfire, from the events and the shots in flight: flashes, balls along their paths, splashes where they touch the sea, strikes; a ball stopped in a ship drawn no further | `src/app/shotsSeen.ts#ShotsSeen` |
 | Her guns and port lids drawn moving: slides trained, carriages run out and in, the long sixes on their trucks, lids swung, as instances in moving frames (N5.4a) | `src/render/ship/gunsView.ts#GunsView` |
 | A gun's moving frame: trained about her pivot and run in along her axis | `src/render/ship/gunPlaces.ts#gunMove` |
@@ -313,7 +317,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A carronade at her port as built (run out, square) | `src/render/ship/gunPlaces.ts#carronadeRest` |
 | The carronade cut into her slide and the gun on her carriage | `src/render/ship/gunPlaces.ts#splitCarronade` |
 | The ring on a carronade's cascabel her breeching is rove through | `src/render/ship/gunPlaces.ts#cascabelRing` |
-| Gunfire drawn: muzzle flashes and first puffs, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
+| Gunfire drawn: muzzle flashes, first puffs and burning wads, splinters where shot strikes, the balls as streaks (N5.4a) | `src/render/gunfire.ts#GunfireView` |
 | Powder smoke: poured from the ports as guns fire, drifting with the wind, swelling and thinning, lit by the day and the flashes (N5.5) | `src/render/smoke.ts#SmokeView` |
 | Fire drawn: each fire's flames on its floor and out of its vent, its black smoke, poured into the smoke's fire rings, seeded (N6.5) | `src/render/fireView.ts#FireView` |
 | Where a fire in a space of the plan is seen: its floor, its reach, the weather-deck opening it vents by | `src/render/fireView.ts#fireSeat` |
@@ -369,9 +373,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A man as a full character, looking as his crowd figure does | `src/app/crewLooks.ts#fullLook` |
 | What a man wears and his build as a key (alike men differ in colour only) | `src/app/crewLooks.ts#wearing` |
 | What a man's face shows: the causes from the simulation, the table, one frame of it | `src/app/faces.ts#FACES` |
-| What the violence setting shows at each level (blood, stains, the killed on deck or taken below, the trail) | `src/app/violence.ts#SHOWN` |
+| What the violence setting shows at each level (blood, stains, the killed bare or covered, the trail) | `src/app/violence.ts#SHOWN` |
 | The blood about a man struck down (pools, drops, spatter), seeded | `src/app/violence.ts#bloodOf` |
-| A shirt colour stained toward blood, how far a hurt stains it, how much of the killed is taken below at mild | `src/app/violence.ts#stained` |
+| A shirt colour stained toward blood, how far a hurt stains it, how far the canvas is laid over the killed at mild | `src/app/violence.ts#stained` |
 | Blood on a ship's decks: dishes of paint written on the page, falls kept so a level change shows them all | `src/render/crew/blood.ts#Blood` |
 | A man being carried below: held between his two bearers | `src/app/crewDrawn.ts#carryOf` |
 | A stand-in for a fight's casualties (`?sail&casualties=`), to look at the men under fire | `src/app/scars.ts#casualtiesOf` |
@@ -608,6 +612,9 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A fight at its start, its time as the match setting says | `src/sim/end.ts#startFight` |
 | How a fight ends: beaten, burnt out, the match's time and the master's warning, striking asked twice (first proposals) | `src/sim/rules/end.ts#BEATEN` |
 | The pair of guns a gun is of (one crew a pair) | `src/sim/crew/roster.ts#pairOf` |
+| Where the killed are carried: a place of each man's own in the hold | `src/sim/crew/dead.ts#deadSpot` |
+| The men killed, as a set (roster places) | `src/sim/damage.ts#killedOf` |
+| The canvas over a man killed at the mild level | `src/render/crew/shroud.ts#Shrouds` |
 | What the crew does for her life (N6.3): the repairs wanted now from her damage, her orders and where her men are, in the order they are manned | `src/sim/crew/repairs.ts#repairsDue` |
 | How many of a repair's men are at its spot (a fire party at its fire, the pump hands) | `src/sim/crew/crew.ts#atWork` |
 | The men the first lieutenant takes from the guns, in the quarter bill's order (waisters, then the last places of each gun) | `src/sim/crew/roster.ts#billOrder` |

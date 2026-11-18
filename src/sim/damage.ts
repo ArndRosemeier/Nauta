@@ -557,16 +557,23 @@ export function openHoles(d: Damage): readonly Leak[] {
 /** What of her rig stands now (damage/fall.ts `standingOf` of what she has had broken, cut and holed). */
 export const standingNow = (d: Damage): Standing => standingOf(d.fallen, d.cut, d.rent);
 
+/** The roster places hurt at least this badly (an index into HARMS), as a set kept while nothing changes (`cache` is that harm's). */
+function placesHurt(d: Damage, least: number, only: boolean, cache: WeakMap<readonly number[], ReadonlySet<number>>): ReadonlySet<number> {
+  let set = cache.get(d.hurt);
+  if (!set) {
+    set = new Set(d.hurt.flatMap((h) => ((only ? h % HARMS.length === least : h % HARMS.length >= least) ? [Math.floor(h / HARMS.length)] : [])));
+    cache.set(d.hurt, set);
+  }
+  return set;
+}
+
 /** The men out of the quarter bill: badly hurt or killed (roster places); the same set while nothing changes. */
 const outs = new WeakMap<readonly number[], ReadonlySet<number>>();
-export function outOf(d: Damage): ReadonlySet<number> {
-  let out = outs.get(d.hurt);
-  if (!out) {
-    out = new Set(d.hurt.flatMap((h) => (h % HARMS.length >= HARMS.indexOf('badly') ? [Math.floor(h / HARMS.length)] : [])));
-    outs.set(d.hurt, out);
-  }
-  return out;
-}
+export const outOf = (d: Damage): ReadonlySet<number> => placesHurt(d, HARMS.indexOf('badly'), false, outs);
+
+/** The men killed (roster places); the same set while nothing changes. */
+const killedSets = new WeakMap<readonly number[], ReadonlySet<number>>();
+export const killedOf = (d: Damage): ReadonlySet<number> => placesHurt(d, HARMS.indexOf('killed'), true, killedSets);
 
 /** Without one entry of `x` (a list kept ascending). */
 const lessOne = (list: readonly number[], x: number): readonly number[] => {

@@ -19,7 +19,7 @@
  */
 import { stepCrew } from './crew/crew';
 import { repairsDue } from './crew/repairs';
-import { launch, outOf, stepAftermath, stepHits, type Aftermath, type Hit } from './damage';
+import { killedOf, launch, outOf, stepAftermath, stepHits, type Aftermath, type Hit } from './damage';
 import { carryOut, giveOrder, heard, masterSteers, wordSpent, type AnswerCode, type Order, type OrderMoment, type RefusalCode, type SailingOrder } from './orders';
 import { stepFight, waterIn, type FightEvent } from './end';
 import { masterOrder } from './captain/helm';
@@ -152,7 +152,7 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     // At quarters, the side her guns bear on the enemy: her gun crews stand to it (gunnery.ts, crew.ts).
     const enemies = ships.flatMap((o, k) => (k === i ? [] : [o.motion.pose]));
     const quarters = s.told.quarters ? engagedSide(pose, enemies, s.told.aim) : undefined;
-    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, repairs, quarters });
+    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, killed: killedOf(s.damage), repairs, quarters });
     for (const e of crewed.events) {
       const given = s.told.given.find((g) => g.id === e.of);
       if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });

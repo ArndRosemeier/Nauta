@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mend, openHoles, outOf, startDamage, type Damage } from '../src/sim/damage.ts';
 import { sparParts } from '../src/sim/damage/meet.ts';
+import { deadSpot } from '../src/sim/crew/dead.ts';
 import { atWork, NO_ACT, sameSpot, type Crew } from '../src/sim/crew/crew.ts';
 import { billOrder, brigRoster, placeSpot } from '../src/sim/crew/roster.ts';
 import { handsAtGuns } from '../src/sim/guns/guns.ts';
@@ -83,7 +84,7 @@ test('unasked, the carpenter and his mate plug a hole under the water, the boats
   assert.deepEqual(s.ships[0]!.crew.tasks, [], 'nothing more to do: the men go back to their posts');
 });
 
-test('the killed and badly wounded leave the quarter bill: the killed lie where they fell, the badly wounded are carried below by two waisters, at most four at once', () => {
+test('the killed and badly wounded leave the quarter bill: the badly wounded are carried below to the surgeon by two waisters, then the killed to the hold, at most four parties at once', () => {
   // Six gun-crew men badly wounded and one killed, all at their guns.
   const atGuns = roster.flatMap((m, i) => (m.gun !== null && m.part !== 'waist' ? [i] : []));
   const badly = atGuns.slice(0, 6), killed = atGuns[6]!;
@@ -99,15 +100,27 @@ test('the killed and badly wounded leave the quarter bill: the killed lie where 
     const crew = st.ships[0]!.crew, parties = crew.tasks.filter((t) => t.job === 'fetch' || t.job === 'carry');
     most = Math.max(most, parties.length);
     for (const t of parties) for (const i of t.hands) assert.equal(roster[i]!.part, 'waist', 'the bearers are waisters');
-    assert.deepEqual(crew.men[killed], musterCrew().men[killed], 'the killed man lies where he fell');
     // While four parties are out, the others wait where they lie.
     if (parties.length === CARRY_PARTIES) for (const m of badly.filter((b) => !parties.some((t) => t.on === b))) assert.equal(crew.men[m]!.going, null);
+    // The wounded first: the killed man is taken up only when every wounded man has his party or is below already.
+    if (crew.tasks.some((t) => t.on === killed)) {
+      for (const m of badly) assert.ok(crew.tasks.some((t) => t.on === m) || sameSpot(crew.men[m]!.stands!, placeSpot(SURGEON)), 'the wounded come first');
+    }
     below = badly.filter((m) => { const h = st.ships[0]!.crew.men[m]!; return !h.going && h.stands !== null && sameSpot(h.stands, placeSpot(SURGEON)); }).length;
   });
   assert.equal(most, CARRY_PARTIES, 'four parties carry at most');
   assert.ok(below >= CARRY_PARTIES, `${below} carried below to the surgeon in 40 s`);
   const crew = s.ships[0]!.crew;
   assert.ok(crew.tasks.every((t) => t.hands.every((i) => !out.has(i))), 'no man out of the quarter bill has a task');
+});
+
+test('a man killed is carried to the hold by two waisters to a place of his own in the hold', () => {
+  const [a, b] = roster.flatMap((m, i) => (m.gun !== null && m.part !== 'waist' ? [i] : [])).slice(0, 2) as [number, number];
+  assert.ok(!sameSpot(deadSpot(a), deadSpot(b)), 'each his own place');
+  assert.ok(!sameSpot(deadSpot(a), placeSpot(SURGEON)), 'not the surgeon\'s');
+  const s = run(lying({ hurt: [hurtCode(a, KILLED), hurtCode(b, KILLED)].sort((p, q) => p - q) }), 40, []);
+  const men = s.ships[0]!.crew.men;
+  for (const m of [a, b]) assert.ok(!men[m]!.going && sameSpot(men[m]!.stands!, deadSpot(m)), 'lies in the hold');
 });
 
 test('the first lieutenant\'s parties take men from the guns by the quarter bill, and frees the carpenter\'s crew to plug', () => {

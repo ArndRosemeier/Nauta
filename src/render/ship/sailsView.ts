@@ -15,6 +15,7 @@ import type { SailStanding } from '../../sim/ship/sailing';
 import { sailShare, type SailSetting } from '../../sim/ship/sails';
 import { HANGING } from '../../sim/rules/rig';
 import { sparOf, type RigPlan } from '../../sim/ship/rig';
+import { clearTable, CLEAR_FLOATS } from './sailClear';
 import { FLAG, FORE_AFT, ROW, ROW_FLOATS, SQUARE, clothAt, sailForms, sailPoints, shiftFrame, type SailForm, type SailPoint } from './sailForm';
 import { FLAGS } from './sailGrid';
 import { shipPoint, swingsOf } from './swings';
@@ -121,6 +122,9 @@ export class SailsView {
     this.forms = sailForms(rig);
     this.points = sailPoints(rig, this.forms, swingsOf(rig).length + 1);
     this.rows = new Float32Array((this.forms.length + FLAGS.length) * ROW_FLOATS);
+    // What each sail keeps clear of (the masts' timber) lies at the end of its row, written once.
+    const clearance = clearTable(rig);
+    this.forms.forEach((f) => this.rows.set(clearance.subarray(f.index * CLEAR_FLOATS, (f.index + 1) * CLEAR_FLOATS), f.index * ROW_FLOATS + ROW.clear));
     this.drawn = this.forms.map(() => ({ drop: 0, roll: 1, taken: 0, depth: 0, shiver: 0 }));
     const rng = new Rng(PHASE_SEED);
     this.phases = [...this.forms, ...FLAGS].map(() => rng.float() * TURN);
