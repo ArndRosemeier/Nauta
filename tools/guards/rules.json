@@ -11,6 +11,7 @@
     "src/app/quality.ts",
     "src/app/orderReport.ts",
     "src/app/pageMatch.ts",
+    "src/app/glass.ts",
     "src/app/crew.ts",
     "src/app/crewLooks.ts",
     "src/app/crewLevels.ts",

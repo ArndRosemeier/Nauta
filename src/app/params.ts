@@ -1,6 +1,6 @@
 /**
  * What the page's address asks for (`?hud&hour=17`, `?eye=30&wind=6`, `?sea=gale`, `?yaw=70&pitch=-10`,
- * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`; two players:
+ * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`, `?motion=0.5`, `?brace=30`, `?sail`, `?glass=12`; two players:
  * `?room`, `?join=K7Q2ZP`, `?key=`, `?hub=`, `?seed=`, `?netcheck`). Pure: it takes the query string.
  */
 import { CREW_SIZE } from './crew';
@@ -8,6 +8,7 @@ import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
 import { CALM_LEAST } from '../sim/rules/body';
+import { GLASS_POWER } from './glass';
 
 /** The hour a game starts at when the address names none: a clear morning. */
 const START_HOUR = 10;
@@ -98,6 +99,8 @@ export interface Params {
   readonly men: number;
   /** Start the crew trial's measured run at once (`?trial`), instead of on its button. */
   readonly trial: boolean;
+  /** The spyglass raised from the start, drawn out to this magnification (`?glass=12`; `?glass` alone: as it starts); null: lowered. */
+  readonly glass: number | null;
 }
 
 export function readParams(query: string): Params {
@@ -122,6 +125,7 @@ export function readParams(query: string): Params {
     room: q.has('room'), join: q.get('join') || null, key: q.get('key') || null, hub: q.get('hub') || null,
     seed: q.has('seed') ? Math.round(num('seed', 0, 0, SEED_MOST)) : null, netcheck: q.has('netcheck'),
     crew: q.has('crew') ? (q.get('crew') === 'aboard' ? 'aboard' : 'twin') : null, trial: q.has('trial'), men: Math.round(num('men', CREW_SIZE, 1, CREW_SIZE)),
+    glass: q.has('glass') ? num('glass', GLASS_POWER.start, GLASS_POWER.least, GLASS_POWER.most) : null,
   };
 }
 

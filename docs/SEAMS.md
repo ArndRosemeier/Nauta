@@ -480,5 +480,11 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Opening a room, joining one from the lobby or by its code, on the page | `src/app/roomPanel.ts#RoomPanel` |
 | The link that brings another device into a room | `src/app/params.ts#joinLink` |
 | The network check's bare page (`?netcheck`) | `src/app/netCheck.ts#runNetCheck` |
-| The other captain's ship drawn (her coarse outside, until N3.8) | `src/render/ship/otherShip.ts#OtherShipView` |
-| A ship's group placed on the water by her pose | `src/render/ship/otherShip.ts#placeShip` |
+| The other captain's ship drawn (plan N3.8): a second ShipView of the same build, her outside only, posed from the match, sunk by the earth's curve, near or far by her distance through the glass | `src/render/ship/shipView.ts#ShipView` |
+| Whose ship a mesh is (0 hers, 1 the other's), read by every ship kind to find that ship's rows | `src/render/ship/shipMaterials.ts#SHIP_OBJECT` |
+| How many ships the ship kinds draw at once (the per-ship textures' blocks of rows) | `src/render/ship/shipMaterials.ts#SHIPS_DRAWN` |
+| A ship's sail rows into the sails' texture | `src/render/ship/sailMaterial.ts#setShipSails` |
+| The sun's shadow fitted round her, and round the other ship alongside | `src/render/ship/shipView.ts#ShipView` |
+| The spyglass: raised and lowered, drawn out, its tremble, how the hands hold it against her motion | `src/app/glass.ts#Spyglass` |
+| The spyglass's controls: its button, two fingers spread or pinched, the G key and the wheel | `src/app/glassInput.ts#watchGlass` |
+| The view magnified (the glass) | `src/render/view.ts#createView` |

@@ -25,6 +25,12 @@ export const MOST_LAMPS = 40;
 export const MOST_SKIES = 24;
 /** Rows of a moving frame (an affine 3 × 4). */
 const FRAME_ROWS = 3;
+/**
+ * Ships her kinds draw at once (plan N3.8): hers and the other captain's. Each mesh says whose it is
+ * (`SHIP_OBJECT.ship`), and the per-ship textures (her moving frames here, the sails' rows in sailMaterial.ts) hold a
+ * block of rows per ship, so the second ship draws with the same shaders.
+ */
+export const SHIPS_DRAWN = 2;
 
 /** What the ship's shaders read, written by the ship's view (shipView.ts). */
 export const SHIP_INPUTS = {
@@ -51,9 +57,9 @@ const TEXEL = 4;
  * affine matrix (ship space to ship space); frame 0, her hull, stays the identity. A texture, read texel by texel,
  * works alike on WebGPU and WebGL 2.
  */
-export const FRAMES_TEXTURE = new DataTexture(new Float32Array(MOST_FRAMES * FRAME_ROWS * TEXEL), FRAME_ROWS, MOST_FRAMES, RGBAFormat, FloatType);
+export const FRAMES_TEXTURE = new DataTexture(new Float32Array(SHIPS_DRAWN * MOST_FRAMES * FRAME_ROWS * TEXEL), FRAME_ROWS, SHIPS_DRAWN * MOST_FRAMES, RGBAFormat, FloatType);
 nearest(FRAMES_TEXTURE);
-for (let f = 0; f < MOST_FRAMES; f++) setShipFrame(f, new Matrix4());
+for (let ship = 0; ship < SHIPS_DRAWN; ship++) for (let f = 0; f < MOST_FRAMES; f++) setShipFrame(f, new Matrix4(), ship);
 
 /** A data texture read texel by texel: no filtering, and uploaded on first use. */
 export function nearest(t: DataTexture): DataTexture {
@@ -63,12 +69,12 @@ export function nearest(t: DataTexture): DataTexture {
   return t;
 }
 
-/** Moving frame `frame` of hers set to `m` (ship space to ship space), for her ropes' shaders. */
-export function setShipFrame(frame: number, m: Matrix4): void {
-  if (frame >= MOST_FRAMES) return;
-  const d = FRAMES_TEXTURE.image.data, e = m.elements;
+/** Moving frame `frame` of ship `ship` (0 hers, 1 the other's) set to `m` (ship space to ship space), for her ropes' shaders. */
+export function setShipFrame(frame: number, m: Matrix4, ship = 0): void {
+  if (frame >= MOST_FRAMES || ship >= SHIPS_DRAWN) return;
+  const d = FRAMES_TEXTURE.image.data, e = m.elements, row = (ship * MOST_FRAMES + frame) * FRAME_ROWS;
   // Three rows of the affine matrix (three.js keeps it column by column).
-  for (let r = 0; r < FRAME_ROWS; r++) for (let c = 0; c < TEXEL; c++) d[(frame * FRAME_ROWS + r) * TEXEL + c] = e[c * TEXEL + r];
+  for (let r = 0; r < FRAME_ROWS; r++) for (let c = 0; c < TEXEL; c++) d[(row + r) * TEXEL + c] = e[c * TEXEL + r];
   FRAMES_TEXTURE.needsUpdate = true;
 }
 
@@ -86,7 +92,12 @@ export const SHIP_OBJECT = {
   toShip: uniform(new Matrix4()).onObjectUpdate(({ object }) => object.userData.toShip ?? IDENTITY),
   /** Its share of a crossfade between levels of detail: drawn where the screen's dither lies in [x, y). */
   fade: uniform(new Vector2()).onObjectUpdate(({ object }) => object.userData.fade ?? WHOLE),
+  /** Whose it is: 0 her own, 1 the other captain's ship (its block of rows in the per-ship textures). */
+  ship: uniform(0).onObjectUpdate(({ object }) => object.userData.ship ?? 0),
 };
+
+/** 1 on her own meshes, 0 on the other ship's: her water (wakeMap.ts `wetHull`) is hers alone, the other ship is drawn dry. */
+const ownShip = () => float(1).sub(SHIP_OBJECT.ship.min(1));
 
 /** Bytes per texel of the damage map (before the map: the bundle reads it as undefined when it comes later, and the map is empty). */
 const RGBA = 4;
@@ -236,7 +247,7 @@ export function makeWoodMaterial(crossfade = false): MeshStandardNodeMaterial {
   const seam = max(seamA, seamB).mul(planked).mul(fade);
   const seamColour = mix(vec3(...PITCH), surface.mul(SEAM_UNDER_PAINT), cover);
   // Her outside wet where the sea has climbed it (wakeMap.ts `wetHull`); inside, dry.
-  const wet = wetHull(positionLocal, scorched(mix(surface, seamColour, seam), gr, sh.z), mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))));
+  const wet = wetHull(positionLocal, scorched(mix(surface, seamColour, seam), gr, sh.z), mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), ownShip());
   const outside = float(1).sub(step(0, SHIP_OBJECT.light.w));
   m.colorNode = mix(scorched(mix(surface, seamColour, seam), gr, sh.z), wet.colour, outside);
   m.roughnessNode = mix(mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), wet.rough, outside);
@@ -300,7 +311,7 @@ export function makeCopperMaterial(crossfade = false): MeshStandardNodeMaterial 
   const tarnish = clamp(g.w.mul(TARNISH).add(sheet.mul(1 - TARNISH)), 0, 1);
   const green = smoothstep(GREEN_FROM, GREEN_FROM + GREEN_SOFT, g.z);
   const metal = mix(fin.rgb, vec3(...COPPER_BROWN), tarnish);
-  const wet = wetHull(positionLocal, mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail)), mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2)));
+  const wet = wetHull(positionLocal, mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail)), mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2)), ownShip());
   m.colorNode = wet.colour;
   m.metalnessNode = float(1).sub(green);
   m.roughnessNode = wet.rough;
@@ -335,7 +346,8 @@ const ROUGH_HEMP = 0.88;
 const ROUGH_TAR = 0.86;
 /** A point (w 1) or a direction (w 0) carried by moving frame `i` (a float index). */
 function framed(i, p, w) {
-  const row = (r) => textureLoad(FRAMES_TEXTURE, ivec2(r, int(i))), q = vec4(p, w);
+  const f = int(i).add(int(SHIP_OBJECT.ship).mul(MOST_FRAMES));
+  const row = (r) => textureLoad(FRAMES_TEXTURE, ivec2(r, f)), q = vec4(p, w);
   return vec3(dot(row(0), q), dot(row(1), q), dot(row(2), q));
 }
 

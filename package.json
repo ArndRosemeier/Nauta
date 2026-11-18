@@ -27,6 +27,7 @@
     "check:shots": "node tools/shot/check.mjs",
     "check:ship": "node tools/shot/ship.mjs",
     "shot:sails": "node tools/shot/sails.mjs",
+    "shot:glass": "node tools/shot/glass.mjs",
     "walk:check": "tsx tools/walk/everywhere.ts",
     "check:room": "node tools/net/room.mjs",
     "packs": "node tools/crew/pack.mjs"

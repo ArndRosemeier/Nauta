@@ -24,7 +24,9 @@ import { Furnishings } from './render/ship/furnishings';
 import { loadFittings } from './render/ship/fittings';
 import { furnish } from './sim/ship/furnish';
 import { shipPlan } from './sim/ship/plan';
-import { OtherShipView } from './render/ship/otherShip';
+import { Spyglass } from './app/glass';
+import { watchGlass } from './app/glassInput';
+import { earthDrop } from './render/earth';
 import { VERSION } from 'virtual:nauta/version';
 import { SprayView } from './render/spray';
 import { SPRAY } from './render/materials';
@@ -73,6 +75,8 @@ const SHOT_SEA_TIME = 60;
 const CREW_LOOK: Look = { yaw: -0.25, pitch: -0.1 };
 /** The browser checks' jumps run the match on by this much at a time, s: within what one pump of the match catches up (net/duel.ts MOST_STEPS). */
 const JUMP_PIECE = 1;
+/** The checks aim the glass this high over the other ship's waterline, m: about her lower yards, so hull and sails are in the field. */
+const AIM_HEIGHT = 10;
 
 declare global {
   interface Window {
@@ -92,7 +96,18 @@ declare global {
      * (set, furled, aback, shivering); `aback`: how many of her sails the match has aback now; `windFrom`: the
      * bearing the mean wind blows from, degrees (tools/shot/sails.mjs).
      */
-    __nautaSail?: { say: (words: string) => string; onward: (seconds: number, draw?: boolean) => Promise<void>; sails: () => SailsSummary; aback: () => number; windFrom: () => number };
+    __nautaSail?: {
+      say: (words: string) => string; onward: (seconds: number, draw?: boolean) => Promise<void>; sails: () => SailsSummary; aback: () => number; windFrom: () => number;
+      /** Turns the look onto the other ship from where the last frame put the eye (the browser checks' glass shots) and says how far off she is, m; -1: no other ship. */
+      aimAtOther: () => number;
+      /** How far apart the two ships' middles are as the match stands, m; -1: no other ship. */
+      apart: () => number;
+      /** Stops the match's clock (true; only `onward` runs it on, so slow software frames do not) or lets it run again. */
+      stop: (on: boolean) => void;
+      /** The glass at the eye at once, drawn out to `power`, or lowered (null); and what the HUD says of the other ship. */
+      glass: (power: number | null) => void;
+      other: () => { drawn: number; near: boolean; apart: number; draws: number; mine: number } | null;
+    };
   }
 }
 
@@ -109,17 +124,26 @@ async function start(): Promise<void> {
   const sailing = params.sail || params.room || params.join !== null;
   const build = params.ship !== null || walking || sailing ? await loadShip(import.meta.env.BASE_URL) : null;
   const ship = build ? new ShipView(build) : null;
-  /** Seconds the browser checks have run the match on ahead of the page's clock (`__nautaSail.onward`). */
-  let ahead = 0;
-  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => pageSeconds() + ahead, params.windAsked ? params.wind : null) : null;
-  // The other captain's ship, where the match has her (until N3.8 draws her whole).
-  const other = build && match ? new OtherShipView(build) : null;
+  /** Seconds the browser checks have run the match on ahead of the page's clock (`__nautaSail.onward`), and the page's clock where they stopped it (`__nautaSail.stop`; null: running). */
+  let ahead = 0, stopped: number | null = null;
+  const match = ship && sailing ? new PageMatch(VERSION, params.seed, () => (stopped ?? pageSeconds()) + ahead, params.windAsked ? params.wind : null) : null;
+  // The other captain's ship, where the match has her (plan N3.8): the whole of her outside from the same build, her
+  // far level beyond, sunk by the earth's curve far off.
+  const other = build && match ? new ShipView(build, 1) : null;
   if (ship && match) ship.poseFrom = () => match.pose(match.ship)!;
+  if (other && match) other.poseFrom = () => match.pose(match.other) ?? match.pose(match.ship)!;
+  // The spyglass (plan N3.8), held steady against her motion as the hands can.
+  const glass = ship ? new Spyglass(MATCH_SEED, params.glass) : null;
+  if (ship) ship.steadying = glass;
   let where: Standpoint = standpoint(params.ship ?? '');
   const view = await createView(canvas, ship !== null);
   // Her fittings (plan N2.6): drawn as instances in her frame, each zone's into that zone of her.
-  const furnished = ship ? new Furnishings(view.renderer, await loadFittings(import.meta.env.BASE_URL), furnish(shipPlan())) : null;
+  const fittings = ship ? await loadFittings(import.meta.env.BASE_URL) : null;
+  const furnished = ship && fittings ? new Furnishings(view.renderer, fittings, furnish(shipPlan())) : null;
   if (ship && furnished) for (const [zone, draws] of furnished.zones) ship.addToZone(zone, draws.group);
+  // The other ship's fittings on her weather deck (plan N3.8): she is seen only from outside.
+  const herFittings = other && fittings ? new Furnishings(view.renderer, fittings, furnish(shipPlan()), true) : null;
+  if (other && herFittings) for (const [zone, draws] of herFittings.zones) other.addToZone(zone, draws.group);
   // `?crew`: the trial's 240 men (plan N4.0), mustered behind the loading screen; how long that takes is part of the trial.
   const mustered = performance.now();
   const men = ship && params.crew ? musterCrews(params.crew === 'aboard').filter((m, i, all) => i - all.findIndex((o) => o.crew === m.crew) < params.men) : [], note = loading.querySelector('p')!;
@@ -158,7 +182,9 @@ async function start(): Promise<void> {
   await seaView.wake.compile(view.renderer);
   const spray = ship ? new SprayView(SPRAY.make()) : null;
   await furnished?.ready();
-  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(furnished ? [...furnished.zones.values()].map((d) => d.group) : [])]);
+  await herFittings?.ready();
+  const fittingGroups = [furnished, herFittings].flatMap((f) => (f ? [...f.zones.values()].map((d) => d.group) : []));
+  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...fittingGroups]);
   // The crews' shaders, a few men at each level of detail wearing between them all the crew wears, at full speed
   // behind the loading screen (docs/SHADERS.md rule 5), as MasterWorld warms its townsfolk.
   // The cap stays open (share 1) until the crews are in: before the first frame no frame frees a slot.
@@ -197,7 +223,10 @@ async function start(): Promise<void> {
   const crewMemory = crew?.memory();
   // On WebGPU, building a shader that reads the sky's environment map can leave it blank until it is drawn again.
   sky.redrawEnvironment();
-  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, walking ? (e) => walking.input.owns(e) : undefined);
+  const leaveView = walking ? (e: PointerEvent) => walking.input.owns(e) : undefined;
+  const glassInput = glass ? watchGlass(canvas, el<HTMLButtonElement>('glass-button'), glass, leaveView) : null;
+  const input = watchLook(canvas, walking ? params.look ?? walking.startLook : crew ? CREW_LOOK : ship ? where.look : startLook, view.radPerPixel, leaveView, () => glassInput?.pinching ?? false);
+  const glassField = el('glass');
   /** The scene the address asks for: the hour and the day's pace, the wind and its sea, the eye, the look. */
   const setScene = (p: Params) => {
     sky.hour = p.hour; sky.dayMinutes = p.dayMinutes;
@@ -246,6 +275,30 @@ async function start(): Promise<void> {
     sails: () => ship!.sails.summary(),
     aback: () => sailsSeen(match.state, match.ship)?.standing.filter((st) => st.aback).length ?? 0,
     windFrom: () => blowing.from / DEGREE,
+    aimAtOther: () => {
+      const her = match.other >= 0 ? match.pose(match.other) : null;
+      if (!her || !ship) return -1;
+      // Her bearing and height from the eye, turned into her own ship's frame (the look is taken in it).
+      const eye = view.camera.position, dx = her.x - eye.x, dz = her.z - eye.z, h = ship.drawn.heading;
+      const x = dx * Math.cos(h) + dz * Math.sin(h), z = -dx * Math.sin(h) + dz * Math.cos(h), d = Math.hypot(dx, dz);
+      input.look = { yaw: Math.atan2(-x, -z), pitch: Math.atan2(AIM_HEIGHT - earthDrop(d) - eye.y, d) };
+      return d;
+    },
+    apart: () => {
+      const a = match.pose(match.ship), b = match.other >= 0 ? match.pose(match.other) : null;
+      return a && b ? Math.hypot(a.x - b.x, a.z - b.z) : -1;
+    },
+    stop: (on) => {
+      if (on && stopped === null) stopped = pageSeconds();
+      else if (!on && stopped !== null) { ahead -= pageSeconds() - stopped; stopped = null; }
+    },
+    glass: (power) => {
+      if (!glass) return;
+      glass.up = power !== null;
+      glass.raised = glass.up ? 1 : 0;
+      if (power !== null) glass.power = power;
+    },
+    other: () => (other?.group.visible ? { drawn: other.trianglesDrawn, near: other.nearDrawn, apart: Math.round(other.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null),
   };
   // Walking, the calm view's button has the top right corner: the panel stands below it.
   if (orders && walking) el('orders').classList.add('under-motion');
@@ -316,26 +369,47 @@ async function start(): Promise<void> {
     if (phase) input.look = { ...CREW_LOOK };
     // Her sails as the match says they stand (furled when no match sails her).
     const seen = ship && match ? sailsSeen(match.state, match.ship) : null;
+    // The glass raised or lowered, and the view magnified as far as it is (ship views pick their detail by it).
+    if (glass) {
+      glass.step(dt);
+      view.magnify(glass.magnification);
+      glassField.style.opacity = String(glass.raised);
+      if (ship) ship.zoom = glass.magnification;
+      if (other) other.zoom = glass.magnification;
+    }
     if (ship) {
       // The sails drawn as they stand, the flags in the true wind; after a jump of the browser checks, the sails as
       // drawn catch up with it at once.
       ship.sails.stand(seen?.standing ?? null, seen?.canvas ?? null);
       ship.sails.blow(windAt(wind, ship.drawn.x, ship.drawn.z, seaTime));
       if (jump > 0) ship.sails.follow(jump);
-      jump = 0;
       if (walking) {
         where = walking.walk(dt, ship.drawn, input);
         walking.swingDoors((id, angle) => ship.setDoor(id, angle));
       }
-      ship.update(sea, seaTime, dt, view.camera, where, input.look, view.sun, sky.lightDirection, sky.gain, view.radPerPixel(), seaView.origin);
+      ship.update(sea, seaTime, dt, view.camera, where, glass ? glass.aim(input.look) : input.look, sky.gain, view.radPerPixel(), seaView.origin);
       furnished?.update(ship.group, view.camera, sky.lightDirection);
-      other?.show(match && match.other >= 0 ? match.pose(match.other) : null);
+      if (other && match) {
+        // The other ship as her match says she sails: her sails and yards as her crew has them, her flags in the wind where she is.
+        other.group.visible = match.other >= 0;
+        if (other.group.visible) {
+          const hers = sailsSeen(match.state, match.other);
+          other.sails.stand(hers?.standing ?? null, hers?.canvas ?? null);
+          other.sails.blow(windAt(wind, other.drawn.x, other.drawn.z, seaTime));
+          for (const [id, angle] of sparAngles(match.state, match.other)) other.setBrace(id, angle);
+          if (jump > 0) other.sails.follow(jump);
+          other.follow(sea, seaTime, dt, view.camera);
+          herFittings?.update(other.group, view.camera, sky.lightDirection);
+        }
+      }
+      ship.shade(view.sun, sky.lightDirection, other);
       if (captain && walking?.drawnBody) captain.draw(dt, walking.drawnBody, walking.captain.walker, walking.captain.climber, view.camera);
       if (crew) {
         crew.crews = phase?.crews ?? 2;
         crew.override = phase?.override ?? {};
         crew.animate(dt, view.camera, quality.knobs.crew);
       }
+      jump = 0;
       sky.below = ship.below;
       seaView.sheltered = ship.below > 0;
     } else {
@@ -382,7 +456,7 @@ async function start(): Promise<void> {
     if (showHud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''}${furnished ? ` · ${furnished.count} fittings, ${Math.round(furnished.triangles / THOUSAND)}k tris whole` : ''}${other?.group.visible ? ` · other ship ${Math.round(other.trianglesDrawn / THOUSAND)}k drawn` : ''}${glass?.up ? ` · glass ×${glass.power.toFixed(0)}` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}${match ? `\n${match.line()}` : ''}${crew ? `\n${crewLine(crew, musterSeconds, crewMemory!, view.renderer.info.memory.total)}` : ''}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;

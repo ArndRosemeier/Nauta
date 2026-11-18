@@ -80,6 +80,10 @@
       .room-link { flex: 1; min-width: 0; overflow-wrap: anywhere; font: 12px/1.4 ui-monospace, monospace; -webkit-user-select: text; user-select: text; }
       .room-big { font: 300 40px/1.1 ui-monospace, monospace; letter-spacing: 0.25em; margin: 12px 0; color: #f2c14e; -webkit-user-select: text; user-select: text; }
       .room-say { font: 13px/1.4 ui-monospace, monospace; opacity: 0.85; white-space: pre-wrap; }
+      /* The spyglass (src/app/glass.ts): its round field, black outside with a soft dark rim, faded in as it is raised; its button above the version's. */
+      #glass { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(circle closest-side at 50% 50%, transparent 0%, #00000014 70%, #0000004d 86%, #000000e6 94%, #000 98%); }
+      #glass-button { position: fixed; right: max(10px, env(safe-area-inset-right)); bottom: calc(max(10px, env(safe-area-inset-bottom)) + 54px); display: none; min-height: 44px; min-width: 76px; padding: 0 16px; border-radius: 22px; border: 1px solid #ffffff33; background: #0b1a2a99; color: #e8eef4; font: 14px/1 system-ui, sans-serif; touch-action: manipulation; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+      #glass-button.on { border-color: #f2c14e; color: #f2c14e; }
       /* Walking (src/app/walkInput.ts): the left thumb's stick, a ring where it lands and a knob that follows it. */
       #stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid #ffffff40; background: #0b1a2a33; pointer-events: none; display: none; }
       #stick.on { display: block; }
@@ -88,8 +92,10 @@
   </head>
   <body>
     <canvas id="view"></canvas>
+    <div id="glass"></div>
     <pre id="hud"></pre>
     <pre id="bench"></pre>
+    <button id="glass-button" type="button"></button>
     <button id="version" type="button"></button>
     <button id="motion" type="button"></button>
     <div id="loading"><div><h1>NAUTA</h1><p></p></div></div>

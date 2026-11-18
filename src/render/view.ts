@@ -20,8 +20,10 @@ export interface View {
   /** The sun (or moon) and the hemisphere light (the ground's bounce): the sky's light rig sets both each frame. */
   readonly sun: DirectionalLight;
   readonly hemi: HemisphereLight;
-  /** The view's vertical angle over its height in pixels: what a drag of one pixel turns the look by. */
+  /** The view's vertical angle over its height in pixels: what a drag of one pixel turns the look by (magnified as the view is). */
   radPerPixel(): number;
+  /** Magnifies the view `power` times (the spyglass, app/glass.ts; 1 the naked eye). */
+  magnify(power: number): void;
   /** Draws `scale` of the device's pixels along each side (the quality level's `renderScale`, src/app/quality.ts). */
   setRenderScale(scale: number): void;
   /** The pixels drawn now, width × height. */
@@ -57,9 +59,17 @@ export async function createView(canvas: HTMLCanvasElement, shadows = false): Pr
   new ResizeObserver(fit).observe(canvas);
   // The device's pixels per CSS pixel as the Stage capped them: the render scale is a share of these.
   const devicePixels = renderer.getPixelRatio(), drawn = new Vector2();
+  let power = 1;
   return {
     renderer, backend, scene, camera, stage, sun, hemi,
-    radPerPixel: () => (FOV * DEGREE) / Math.max(1, canvas.clientHeight),
+    radPerPixel: () => (FOV * DEGREE) / power / Math.max(1, canvas.clientHeight),
+    magnify: (p) => {
+      if (p === power) return;
+      power = p;
+      // The view's half angle's tangent shrinks by the power: what was a degree off the middle fills `power` degrees.
+      camera.fov = (2 * Math.atan(Math.tan((FOV * DEGREE) / 2) / p)) / DEGREE;
+      camera.updateProjectionMatrix();
+    },
     setRenderScale: (scale) => renderer.setPixelRatio(devicePixels * scale),
     drawnSize: () => renderer.getDrawingBufferSize(drawn),
   };
