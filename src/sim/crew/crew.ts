@@ -95,6 +95,22 @@ const sameSpot = (a: Spot, b: Spot): boolean => a.space === b.space && a.along =
 /** Where a man stands (his post when `stands` is null), or set out from when on his way. */
 const standing = (h: Hand, m: Man): Spot => h.going?.path.from ?? h.stands ?? placeSpot(m.post);
 
+let posts: Map<string, number> | null = null;
+/** A crew place's spot by id and the height of its floor or surface, m above her base (kept: places do not move). */
+export function placeAt(id: string): { spot: Spot; height: number } {
+  posts ??= new Map();
+  const spot = placeSpot(id);
+  let h = posts.get(id);
+  if (h === undefined) { h = heightAt(routeNetwork(), spot); posts.set(id, h); }
+  return { spot, height: h };
+}
+
+/** Where a man is now (on his way, standing where he got to, or at his post `post`) and the height he stands at, m above her base. */
+export function manAt(hand: Hand, post: string): { spot: Spot; height: number } {
+  if (hand.going) { const w = goingAt(hand.going); return { spot: w, height: w.height }; }
+  return hand.stands ? { spot: hand.stands, height: heightAt(routeNetwork(), hand.stands) } : placeAt(post);
+}
+
 /** Where a man must be: the place of his task, or his post. */
 function target(i: number, roster: readonly Man[], byMan: ReadonlyMap<number, Task>): Spot {
   const t = byMan.get(i);

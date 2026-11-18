@@ -9,9 +9,12 @@
  * wind's mean at the step's start, and every ship has the acts of her orders falling due now carried out (orders.ts),
  * sails one step in the true wind at her place (sailing.ts), works and fires her guns at the other ship as she has
  * been told (guns/gunnery.ts) and floats one step on that sea as her sailing says (motion.ts).
- * Last, ships that have run into each other are pushed apart (ship/touch.ts: struck, fouled).
+ * Last, ships that have run into each other are pushed apart (ship/touch.ts: struck, fouled). Before the ships move,
+ * every shot in flight is traced through them for the part of its flight this step covers (damage.ts), and what each
+ * ball hits is done and reported (`hit`); after, the shots fired in the step are put in flight.
  */
 import { stepCrew } from './crew/crew';
+import { launch, stepHits, type Hit } from './damage';
 import { carryOut, giveOrder, heard, wordSpent, type AnswerCode, type Order, type RefusalCode, type SailingOrder } from './orders';
 import { stepGunnery } from './guns/gunnery';
 import type { GunFired } from './guns/shot';
@@ -23,7 +26,7 @@ import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
-export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent;
+export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit;
 
 /** An order the ship could not take: why, as a code (the phrase book, N4.5, words it) and in English for now. */
 export interface OrderRefused {
@@ -97,34 +100,33 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     else if (answer.code) events.push({ kind: 'answered', tick, ship: order.ship, order, code: answer.code, reason: answer.reason });
     if (answer.told !== ship.told) ships = ships.map((s, i) => (i === order.ship ? { ...s, told: answer.told } : s));
   }
+  // The shots in flight, each ball's piece of this step traced through the ships as they lie now (damage.ts).
+  const hits = stepHits({ seed: state.matchSeed, tick, flying: state.flying, ships: ships.map((s) => ({ pose: s.motion.pose, crew: s.crew, canvas: s.sailing.canvas, guns: s.guns, damage: s.damage })) });
+  events.push(...hits.events);
+  ships = ships.map((s, i) => (hits.damage[i] === s.damage && hits.guns[i] === s.guns ? s : { ...s, damage: hits.damage[i]!, guns: hits.guns[i]! }));
   const sea = followWind(state.sea, { speed: wind.speed, toward: wind.toward }, t);
-  const stepped = {
-    state: {
-      ...state,
-      tick: tick + 1,
-      sea,
-      ships: ships.map((s, i) => {
-        const pose = s.motion.pose;
-        const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas });
-        for (const e of crewed.events) {
-          const given = s.told.given.find((g) => g.id === e.of);
-          if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });
-        }
-        const carried = carryOut(s.told, setShares(s.sailing, crewed.sails), crewed.done, wind);
-        for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
-        const sailed = stepSailing(carried.sailing, pose, windAt(state.wind, pose.x, pose.z, t));
-        for (const kind of sailed.events) events.push({ kind, tick, ship: i });
-        // The duel's one enemy is the other ship (design decisions for N5: she is the target).
-        const enemy = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
-        const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, sailing: s.sailing, pose, enemy, sea });
-        events.push(...gunnery.fired);
-        const told = heard(carried.told, sailed.events, sailed.sailing);
-        return { ...s, motion: stepMotion(s.motion, sea, t, sailed.way), sailing: sailed.sailing, told: gunnery.spent ? wordSpent(told) : told, crew: crewed.crew, guns: gunnery.guns };
-      }),
-    },
-    events,
-  };
-  const touched = touch(state.ships, stepped.state.ships, tick);
+  const next = ships.map((s, i) => {
+    const pose = s.motion.pose;
+    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas });
+    for (const e of crewed.events) {
+      const given = s.told.given.find((g) => g.id === e.of);
+      if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });
+    }
+    const carried = carryOut(s.told, setShares(s.sailing, crewed.sails), crewed.done, wind);
+    for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
+    const sailed = stepSailing(carried.sailing, pose, windAt(state.wind, pose.x, pose.z, t));
+    for (const kind of sailed.events) events.push({ kind, tick, ship: i });
+    // The duel's one enemy is the other ship (design decisions for N5: she is the target).
+    const enemy = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
+    const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, sailing: s.sailing, pose, enemy, sea });
+    events.push(...gunnery.fired);
+    const told = heard(carried.told, sailed.events, sailed.sailing);
+    return { ...s, motion: stepMotion(s.motion, sea, t, sailed.way), sailing: sailed.sailing, told: gunnery.spent ? wordSpent(told) : told, crew: crewed.crew, guns: gunnery.guns };
+  });
+  // Every shot fired in this step is put in flight (damage.ts); it is first traced in the next step.
+  let flying = hits.flying;
+  for (const e of events) if (e.kind === 'fired') flying = launch(flying, e);
+  const touched = touch(state.ships, next, tick);
   events.push(...touched.events);
-  return { state: { ...stepped.state, ships: touched.ships }, events };
+  return { state: { ...state, tick: tick + 1, sea, flying, ships: touched.ships }, events };
 }

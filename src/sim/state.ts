@@ -13,13 +13,14 @@ import { startOrders, type ShipOrders } from './orders';
 import { openShip, type Closures } from './crew/closures';
 import { startCrew, type Crew } from './crew/crew';
 import { startGuns, type Battery } from './guns/guns';
+import { startDamage, type Damage, type Flying } from './damage';
 import { startMotion, type ShipMotion } from './ship/motion';
 import { startSailing, type Sailing } from './ship/sailing';
 import { START_CANVAS, type CanvasName } from './rules/sailing';
 import { STEPS_PER_SECOND } from './units';
 import { makeWind, meanWind, windAt, type WindState } from './wind';
 
-/** One ship of the match: how she lies on the water (motion.ts owns it), how she sails (sailing.ts), what she has been told (orders.ts), her crew at work (crew/crew.ts), what is shut aboard her (crew/closures.ts) and her guns (guns/guns.ts). */
+/** One ship of the match: how she lies on the water (motion.ts owns it), how she sails (sailing.ts), what she has been told (orders.ts), her crew at work (crew/crew.ts), what is shut aboard her (crew/closures.ts), her guns (guns/guns.ts) and what shot has done to her (damage.ts). */
 export interface SimShip {
   readonly motion: ShipMotion;
   /** Her heading, way, helm, canvas and yards: the sailing model's state. */
@@ -32,6 +33,8 @@ export interface SimShip {
   readonly closures: Closures;
   /** Her guns through their drill, packed in battery order (guns/guns.ts owns them; `gunAt` reads one). */
   readonly guns: Battery;
+  /** Her holes, lines cut, spars wounded, sails holed and men hurt (damage.ts owns it). */
+  readonly damage: Damage;
 }
 
 /** The whole match. Changed only by `step` (and made by `startMatch`); rules.json `owners` names each field's owner. */
@@ -46,6 +49,8 @@ export interface SimState {
   readonly sea: SeaState;
   /** The ships, each known by its place in this list (orders name a ship by it). */
   readonly ships: readonly SimShip[];
+  /** The shots on their way: which gun fired each and when, and what each ball has spent (damage.ts owns them). */
+  readonly flying: readonly Flying[];
 }
 
 /**
@@ -91,7 +96,9 @@ export function startMatch(setup: MatchSetup): SimState {
       crew: startCrew(),
       closures: openShip(),
       guns: startGuns(),
+      damage: startDamage(),
     })),
+    flying: [],
   };
 }
 

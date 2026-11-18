@@ -107,6 +107,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her body afloat: pressure points, mass, centre of gravity, inertia | `src/sim/ship/motion.ts#shipBody` |
 | Her rotation at a pose (ship space to the world) | `src/sim/ship/motion.ts#poseRotation` |
 | A point of ship space in the world at her pose | `src/sim/ship/motion.ts#toWorld` |
+| A world point in ship space at her pose | `src/sim/ship/motion.ts#toShip` |
 | Where ship space's origin stands at her pose (where a drawing of her is placed) | `src/sim/ship/motion.ts#shipOrigin` |
 | Her pose between two steps, for drawing | `src/sim/ship/motion.ts#poseBetween` |
 | A smooth curve through readings that never overshoots (monotone cubic) | `src/sim/curve.ts#monotoneCurve` |
@@ -442,6 +443,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A crew at the start, every man at his post | `src/sim/crew/crew.ts#startCrew` |
 | One step of the crew: acts become tasks, men told off by the quarter bill and sent, work done at the share of hands present, acts finished (the one owner of every man's task and place) | `src/sim/crew/crew.ts#stepCrew` |
 | The task a man has | `src/sim/crew/crew.ts#taskOf` |
+| Where a man is now and the height he stands at (on his way, where he got to, or at his post) | `src/sim/crew/crew.ts#manAt` |
+| A crew place's spot and the height of its floor or surface | `src/sim/crew/crew.ts#placeAt` |
 | What stands on her and the numbers that set it out (the fittings' models, guns' gear, helm, boats, anchors, nettings, casks) | `src/sim/rules/fittings.ts#MODEL` |
 | Every fitting on her, set out on her plan in ship space (plan N2.6) | `src/sim/ship/furnish.ts#furnish` |
 | What the fittings put in a man's way, by height: standing obstacles and overheads for the plan, the low ones stepped over | `src/sim/ship/furnish.ts#fittingSolids` |
@@ -483,6 +486,17 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The captain's word carried out: what she is told once her held side has fired | `src/sim/orders.ts#wordSpent` |
 | The shot's rules: muzzle speeds, each shot's balls, mass, size, speed, drag, spread and span; scatter; skipping; the range table (first proposals) | `src/sim/rules/guns.ts#SHOT` |
 | The highest the water can stand anywhere at a moment (above it nothing meets the sea) | `src/sim/sea/sea.ts#highestWater` |
+| Hits (N6.1): every shot in flight traced each step through the other ships as they lie, and what each ball meets done in order while its punch lasts: holes, lodged balls, splinters among the men, guns dismounted, men struck, spars wounded, lines cut, sails holed (the one routine that takes a hit) | `src/sim/damage.ts#stepHits` |
+| A gun's shot put in flight | `src/sim/damage.ts#launch` |
+| How much oak a ball goes through at a speed (its punch) | `src/sim/damage.ts#punchAt` |
+| How far a ball reaches to a line, sail or spar it passes (chain's whirl) | `src/sim/damage.ts#reachOf` |
+| A ship as nothing has struck her | `src/sim/damage.ts#startDamage` |
+| A hole read out of her damage (cell, place in it, the ball, lodged); the holes in a cell; how a cell stands (sound, holed, stove in) | `src/sim/damage.ts#holeAt` |
+| Whether a line is shot away; a spar part's wounds; how badly a man is hurt | `src/sim/damage.ts#harmOf` |
+| What a straight piece of a ball's path meets in a ship, in order: timber crossed (cell, thickness, how square), guns, men, spars, lines, sails as set | `src/sim/damage/meet.ts#meetings` |
+| The parts of her spars between the places each can break (what a wound is kept against) | `src/sim/damage/meet.ts#sparParts` |
+| The closest approach of two straight pieces | `src/sim/damage/meet.ts#closest` |
+| What a hit does: timber thickness, each shot's punch by speed, chain's bite, splinters, how men are hurt, stove in and smashed, the violence levels (first proposals) | `src/sim/rules/damage.ts#PIERCE` |
 | The match the page sails (`?sail`, `?room`, `?join=`): the session running now behind one face, its events to the order panel, the poses to draw | `src/app/pageMatch.ts#PageMatch` |
 | Where a duel starts: 1,500 m apart, the wind on the beam of the line between them, the seed turning the picture and picking the force | `src/sim/start.ts#duelStart` |
 | How a duel starts (distance apart, way on at the start) | `src/sim/rules/start.ts#START_APART` |

@@ -12,8 +12,8 @@ import { clamp, hash3i, hashToFloat, lerp } from '@futuremagic/core';
 import { goingAt } from '../sim/crew/going';
 import { heightAt, lineLength, routeNetwork } from '../sim/crew/network';
 import { jobWork } from '../sim/crew/drill';
-import type { Hand, Task } from '../sim/crew/crew';
-import { brigRoster, placeSpot } from '../sim/crew/roster';
+import { manAt, placeAt, type Task } from '../sim/crew/crew';
+import { brigRoster } from '../sim/crew/roster';
 import type { SailingOrder } from '../sim/orders';
 import { toWorld, type ShipPose } from '../sim/ship/motion';
 import { shipPlan, spacesById, type Spot } from '../sim/ship/plan';
@@ -74,22 +74,6 @@ const DRAW = { haul: 0 } as const;
 /** A spot's place in ship space at a height over its floor. */
 function shipSpace(spot: Spot, height: number, over: number): Vec3 {
   return [spot.across, shipY(height) + over, -spot.along];
-}
-
-let posts: Map<string, number> | null = null;
-/** A crew place's spot and floor height, kept (places do not move). */
-function placeAt(id: string): { spot: Spot; height: number } {
-  posts ??= new Map();
-  const spot = placeSpot(id);
-  let h = posts.get(id);
-  if (h === undefined) { h = heightAt(routeNetwork(), spot); posts.set(id, h); }
-  return { spot, height: h };
-}
-
-/** Where a man is: on his way, standing where he got to, or at his post; and his floor's height. */
-function manAt(hand: Hand, post: string): { spot: Spot; height: number } {
-  if (hand.going) { const w = goingAt(hand.going); return { spot: w, height: w.height }; }
-  return hand.stands ? { spot: hand.stands, height: heightAt(routeNetwork(), hand.stands) } : placeAt(post);
 }
 
 let decks: ReadonlyMap<string, boolean> | null = null;
