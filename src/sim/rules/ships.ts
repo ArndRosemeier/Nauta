@@ -144,13 +144,13 @@ export const STEM: readonly (readonly [height: number, along: number])[] = [
 /** Her after end: [height above the base, m forward of the mainmast], the sternpost's after face up to the wing transom, then the counter up to the taffrail. */
 export const STERN: readonly (readonly [height: number, along: number])[] = [
   [0.39, -9.15], [1.0, -9.39], [1.5, -9.58], [2.0, -9.76], [2.5, -9.94], [3.0, -10.12], [3.5, -10.3], [4.0, -10.48],
-  [4.5, -10.65], [5.0, -10.84], [5.5, -11.01], [5.76, -11.1], [6.0, -11.47], [6.25, -11.97], [6.5, -12.08], [6.75, -12.16],
+  [4.5, -10.65], [5.0, -10.84], [5.25, -10.93], [5.5, -11.35], [5.75, -11.65], [6.0, -11.85], [6.25, -11.97], [6.5, -12.08], [6.75, -12.16],
   [7.0, -12.25], [7.25, -12.34], [7.5, -12.45], [7.71, -12.54],
 ];
 /** The square stern: the wing transom's height (m above the base), and the stern's half-breadth [height, half-breadth] from it to the taffrail (the body plan's stern board), m. */
 export const TRANSOM = {
-  wing: 5.76,
-  outline: [[5.76, 2.85], [6.0, 2.85], [6.25, 2.83], [6.5, 2.77], [6.75, 2.71], [7.0, 2.67], [7.25, 2.63], [7.5, 2.6], [7.71, 2.53]],
+  wing: 5.25,
+  outline: [[5.25, 2.72], [5.5, 2.8], [5.76, 2.85], [6.0, 2.85], [6.25, 2.83], [6.5, 2.77], [6.75, 2.71], [7.0, 2.67], [7.25, 2.63], [7.5, 2.6], [7.71, 2.53]],
 } as const;
 /**
  * Her stern board as the body plan draws it, seen from aft: the moulding across it where the counter meets the
@@ -160,13 +160,13 @@ export const TRANSOM = {
 export const STERN_BOARD = { moulding: 6.25, ports: { across: 1.2, sill: 6.6, top: 7.28, width: 0.66 } } as const;
 /**
  * Her rudder (the draught's sheer plan): hung by its pintles on the sternpost's after face from the heel up, its
- * breadth fore and aft [height above the base, m] narrowing to the head, which runs up under her counter; the head's
- * fore and after edges end at these heights (m above the base), inside the counter. Its thickness at the fore edge
- * (the sternpost's siding) and the after edge, m, and the heights of its pintles' straps, m above the base.
+ * breadth fore and aft (m) at the heel [height above the base, breadth], where it begins to narrow and where it has
+ * narrowed to the head (m below the wing transom), the head running up into her counter this far (m). Its thickness
+ * at the fore edge (the sternpost's siding) and the after edge, m, and the heights of its pintles' straps, m above the base.
  */
 export const RUDDER_BLADE = {
-  breadth: [[0.05, 1.15], [4.9, 0.75], [5.3, 0.42]],
-  head: { fore: 5.85, aft: 6.1 },
+  breadth: { heel: [0.05, 1.15], hance: { below: 0.85, breadth: 0.75 }, neck: { below: 0.45, breadth: 0.42 } },
+  intoCounter: 0.1,
   thick: { fore: 2 * KEEL_HALF_SIDING, aft: 0.2 },
   pintles: [0.7, 1.7, 2.7, 3.7, 4.7],
 } as const;

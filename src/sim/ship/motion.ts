@@ -66,7 +66,7 @@ export interface Way {
 /** Lying still with her head on `heading` and no sail: the way of a ship at anchor (the slice). */
 export const lyingStill = (heading: number): Way => ({ heading, ahead: 0, leeway: 0, rollMoment: 0 });
 
-/** Her hull as pressure points: sections from end to end and rows up each side (about 1.6 m by 0.6 m panels). */
+/** Her hull as pressure points: sections from end to end (about 1.6 m apart, closer at her ends) and rows up each side (about 0.6 m). */
 const HULL_SECTIONS = 20;
 const HULL_ROWS = 10;
 /**

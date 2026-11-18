@@ -215,7 +215,17 @@ export interface HullMesh {
 }
 
 /**
- * Her moulded hull as one closed surface: `sections` sections from her after end to her fore end, each `rows` points
+ * How much closer together the hull mesh's sections crowd toward her ends than amidships (0: evenly; 1: none at the
+ * very ends). Her ends turn fast (the counter just above her waterline aft, the stem forward) and her middle hardly
+ * at all: even sections 1.6 m apart floated her stern 7 cm high once the counter came down to the wing transom.
+ */
+const END_CROWDING = 0.4;
+/** A whole turn, rad. */
+const TURN = 2 * Math.PI;
+
+/**
+ * Her moulded hull as one closed surface: `sections` sections from her after end to her fore end (closer toward her
+ * ends, END_CROWDING), each `rows` points
  * from the bottom of her hull to the top of her side on each side, joined across her bottom edge (keel, stem, the
  * counter and transom) and across the top (a lid), and closed at both ends. Faces turn outward.
  */
@@ -223,7 +233,7 @@ export function hullMesh(sections: number, rows: number): HullMesh {
   const pts: number[] = [], tris: number[] = [];
   const per = 2 * (rows + 1);
   for (let i = 0; i <= sections; i++) {
-    const a = HULL_AFT + ((HULL_FORE - HULL_AFT) * i) / sections, bottom = hullBottom(a), top = Math.max(bottom, sideTop(a));
+    const u = i / sections, a = HULL_AFT + (HULL_FORE - HULL_AFT) * (u - (END_CROWDING * Math.sin(TURN * u)) / TURN), bottom = hullBottom(a), top = Math.max(bottom, sideTop(a));
     for (const side of [1, -1]) {
       for (let j = 0; j <= rows; j++) {
         const h = bottom + ((top - bottom) * j) / rows;

@@ -9,7 +9,7 @@
 import { Matrix4, Vector3 } from 'three/webgpu';
 import { BULWARK, KEEL_HALF_SIDING, PLANKING, RUDDER_BLADE, STERN, STERN_BOARD, TRANSOM } from '../../sim/rules/ships';
 import { RUDDER } from '../../sim/rules/sailing';
-import { HULL_AFT, designWaterline, hullEnds, sideTop, weatherDeck } from '../../sim/ship/hull';
+import { HULL_AFT, designWaterline, hullBottom, hullEnds, sideTop, weatherDeck } from '../../sim/ship/hull';
 import { linearCurve, monotoneCurve } from '../../sim/curve';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { box, rod, roundedProfile, sheet, sweep, type SheetTarget } from './shapes';
@@ -59,7 +59,9 @@ const postAlong = linearCurve(POST.map((r) => r[0]), POST.map((r) => r[1]));
 /** Her rudder's hinge line: its foot (ship space) and its direction up the sternpost. */
 const HINGE_FOOT = new Vector3(0, shipY(POST[0]![0]), shipZ(POST[0]![1] - RUDDER_GAP));
 const HINGE_UP = new Vector3(0, shipY(POST[POST.length - 1]![0]), shipZ(POST[POST.length - 1]![1] - RUDDER_GAP)).sub(HINGE_FOOT).normalize();
-const BREADTH = linearCurve(RUDDER_BLADE.breadth.map((r) => r[0]), RUDDER_BLADE.breadth.map((r) => r[1]));
+/** Her rudder's breadth up from the heel: broad below, narrowing to the head under the wing transom. */
+const BLADE = RUDDER_BLADE.breadth, HANCE = TRANSOM.wing - BLADE.hance.below, NECK = TRANSOM.wing - BLADE.neck.below;
+const BREADTH = linearCurve([BLADE.heel[0], HANCE, NECK], [BLADE.heel[1], BLADE.hance.breadth, BLADE.neck.breadth]);
 
 /** A box's frame: its middle at a point, ship space, square to her axes. */
 const centredAt = (x: number, y: number, z: number): Matrix4 => new Matrix4().setPosition(x, y, z);
@@ -181,13 +183,15 @@ const bladeAt = (h: number) => {
  * pintles' straps across it; into `rudder` (turned by her helm). The gudgeons' straps on the sternpost go into `out`.
  */
 export function buildRudder(rudder: ZoneParts, out: ZoneParts): void {
-  const heel = RUDDER_BLADE.breadth[0]![0], neck = RUDDER_BLADE.breadth[RUDDER_BLADE.breadth.length - 1]![0];
+  const heel = BLADE.heel[0];
   const copperTop = designWaterline(postAlong(heel)) + COPPER_ABOVE_WATER;
-  const t = RUDDER_BLADE.thick, head = RUDDER_BLADE.head;
+  const t = RUDDER_BLADE.thick;
+  // The head runs up into her counter: its fore edge above the wing transom, its after edge above the counter there.
+  const fore = TRANSOM.wing + RUDDER_BLADE.intoCounter, head = { fore, aft: hullBottom(bladeAt(fore).aft) + RUDDER_BLADE.intoCounter };
   // Each row: its heights at the fore and after edges (the head's top follows her counter) and its edges along her.
   const row = (h: number) => ({ fore: h, aft: h, edge: bladeAt(h) });
   const top = { fore: head.fore, aft: head.aft, edge: { fore: bladeAt(head.fore).fore, aft: bladeAt(head.aft).aft } };
-  const rows = [...steps(heel, neck, RUDDER_STEP, [copperTop, ...RUDDER_BLADE.breadth.map((r) => r[0])]).map((h) => row(h)), top];
+  const rows = [...steps(heel, NECK, RUDDER_STEP, [copperTop, HANCE]).map((h) => row(h)), top];
   const point = (r: (typeof rows)[number], s: number, aft: boolean) =>
     new Vector3(s * (aft ? t.aft : t.fore) * HALF, shipY(aft ? r.aft : r.fore), shipZ(aft ? r.edge.aft : r.edge.fore));
   for (const [lo, hi, solid, f] of [[heel, copperTop, rudder.copper, COPPER], [copperTop, Infinity, rudder.wood, SIDE_PLANKS(BLACK)]] as const) {

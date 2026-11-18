@@ -11,10 +11,10 @@
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
 import {
-  BODY_STATIONS, BULWARK, CEILING, FRAME_DEPTH, KEEL_DEPTH, KEEL_HALF_SIDING, PLANKING, PORTS, WALE, WATERWAY,
+  BODY_STATIONS, BULWARK, CEILING, FRAME_DEPTH, KEEL_DEPTH, KEEL_HALF_SIDING, PLANKING, PORTS, TRANSOM, WALE, WATERWAY,
 } from '../../sim/rules/ships';
 import {
-  HULL_AFT, HULL_FORE, designWaterline, hullBottom, hullHalfBreadth, keelBottom, sheer, sideTop,
+  HULL_AFT, HULL_FORE, designWaterline, hullBottom, hullEnds, hullHalfBreadth, keelBottom, sheer, sideTop,
 } from '../../sim/ship/hull';
 import { linearCurve } from '../../sim/curve';
 import { shipY, shipZ } from '../../sim/ship/section';
@@ -163,7 +163,8 @@ const OCHRE_BANDS = [4, 5, 6];
  */
 export function buildOutside(out: ZoneParts, detail: Detail = FULL_DETAIL): void {
   // Rows from bow to stern (ship-space z rising), as all her sheets run.
-  const alongs = rowsAlong(HULL_AFT, HULL_FORE, detail.rowStep).reverse();
+  // A row at the wing transom, where her sternpost's face ends and her counter begins.
+  const alongs = rowsAlong(HULL_AFT, HULL_FORE, detail.rowStep, [hullEnds(TRANSOM.wing).aft]).reverse();
   const sections = alongs.map((a) => {
     const girth = girthOf(a);
     return { a, girth, edges: bandEdges(a, girth.bottom, girth.top) };
@@ -200,7 +201,8 @@ export function buildOutside(out: ZoneParts, detail: Detail = FULL_DETAIL): void
 
 /**
  * The keel, stem and sternpost: where her two sides' planking ends at her bottom, the keel's sides and underside
- * below the rabbet amidships, and at her ends the stem's and the sternpost's faces. Coppered as far as her copper.
+ * below the rabbet amidships, and at her ends the stem's and the sternpost's faces up to the wing transom (above it
+ * her counter is the stern board's: stern.ts). Coppered as far as her copper.
  */
 function buildBackbone(out: ZoneParts, alongs: readonly number[]): void {
   const rows = alongs.map((a) => {
@@ -209,7 +211,7 @@ function buildBackbone(out: ZoneParts, alongs: readonly number[]): void {
   });
   const copperTop = (a: number) => designWaterline(a) + COPPER_ABOVE_WATER;
   sheet((i) => (hullBottom(alongs[i]!) < copperTop(alongs[i]!) ? out.copper : out.wood), rows, { ...COPPER, plank: 0 },
-    (i, j) => [shipZ(alongs[i]!), j * KEEL_HALF_SIDING], () => true, true);
+    (i, j) => [shipZ(alongs[i]!), j * KEEL_HALF_SIDING], (i) => Math.max(hullBottom(alongs[i]!), hullBottom(alongs[i + 1]!)) <= TRANSOM.wing + EPSILON, true);
 }
 
 /**
