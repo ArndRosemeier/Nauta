@@ -17,8 +17,8 @@ import type { Slam } from './wake';
 import { WAKE } from './wake';
 import { daylight } from './seaMaterial';
 
-/** The drops in the ring: a slam throws a few dozen, and a drop lives under three seconds. */
-export const MOST_DROPS = 1024;
+/** The drops in the ring: a slam throws a few dozen, a broadside's splashes a few hundred, and a drop lives under three seconds. */
+export const MOST_DROPS = 2048;
 /** Numbers per drop in each of its two attributes. */
 export const DROP_STRIDE = 4;
 /** The names of a drop's attributes: where and when it starts (x, y, z from the spray's origin, s), how it is flung (velocity, m/s, and its size, m). */
@@ -56,10 +56,55 @@ const QUAD = [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0];
 const QUAD_INDEX = [0, 1, 2, 0, 2, 2 + 1];
 /** Numbers per corner. */
 const XYZ = 3;
+/**
+ * A ball's splash (N5.4a): a column of water thrown up where it plunges, lower where it skips on. Drops for a
+ * carronade's ball (`SPLASH_BALL`, m) coming in at `SPLASH_SPEED` m/s, more for a bigger or faster ball (by its
+ * cross-section and speed), at most `SPLASH_MOST`; flung up between these speeds, m/s (the column stands a few metres
+ * and falls as rain), spread sideways this much, from within this of where it struck, m; a skip throws this share.
+ */
+const SPLASH_DROPS = 36;
+const SPLASH_BALL = 0.155;
+const SPLASH_SPEED = 150;
+const SPLASH_MOST = 64;
+const SPLASH_UP = [12, 24] as const;
+const SPLASH_SPREAD = 1.4;
+const SPLASH_SCATTER = 0.3;
+const SKIP_SHARE = 0.45;
+/** A splash's drops are smaller than a slam's, m. */
+const SPLASH_SIZE = [0.2, 0.55] as const;
 /** Seed of the drops' scatter. */
 const SPRAY_SEED = 1798;
 /** Where each number of a drop sits. */
 const X = 0, Y = 1, Z = 2, W = 3;
+
+/**
+ * Where a thing flung from `start` at `v0` (m/s) is `t` s on, slowed by the air at `k` (1/s) toward the velocity it
+ * drifts to, `drift` (the wind, and gravity over the drag): x = x0 + u·t + (v0 − u)·(1 − e^(−k·t))/k (TSL nodes;
+ * spray here, gunfire's puffs and splinters, gunfire.ts).
+ */
+export function flown(start, v0, drift, k, t) {
+  return start.add(drift.mul(t)).add(v0.sub(drift).mul(float(1).sub(exp(t.mul(k).negate()))).div(k));
+}
+
+/** The quad's corner (its geometry's position, ±1) of a thing at `centre` (the mesh's space) `size` m across, facing the eye, in clip space (TSL). */
+export function facingEye(centre, size) {
+  return cameraProjectionMatrix.mul(modelViewMatrix.mul(vec4(centre, 1)).add(vec4(positionGeometry.xy.mul(size), 0, 0)));
+}
+
+/** A quad facing the eye, corners at ±1, as one geometry many instances draw (spray, gunfire). */
+export function eyeQuad(): BufferGeometry {
+  const g = new BufferGeometry();
+  g.setAttribute('position', new Float32BufferAttribute(QUAD, XYZ));
+  g.setIndex(QUAD_INDEX);
+  return g;
+}
+
+/** A ring of starts (x, y, z, time in `stride`s) moved by the floating origin's step along x and z. */
+export function shiftStarts(a: InstancedBufferAttribute, dx: number, dz: number): void {
+  const d = a.array as Float32Array;
+  for (let i = 0; i < d.length; i += a.itemSize) { d[i + X] -= dx; d[i + Z] -= dz; }
+  a.needsUpdate = true;
+}
 
 /** What the drops' shader reads each frame. */
 export const SPRAY_INPUTS = {
@@ -79,12 +124,11 @@ export function makeSprayMaterial(): MeshBasicNodeMaterial {
     const age = I.now.sub(drop.w), alive = smoothstep(0, float(LIFE * FADE_OUT), float(LIFE).sub(age)).mul(age.greaterThanEqual(0).select(float(1), float(0)));
     // dv/dt = DRAG·(wind − v) + g: v drifts to u = wind + g/DRAG; x = x0 + u·t + (v0 − u)·(1 − e^(−DRAG·t))/DRAG.
     const t = max(age, 0), u = vec3(I.wind.x, float(-GRAVITY / DRAG), I.wind.z);
-    const centre = drop.xyz.add(u.mul(t)).add(fling.xyz.sub(u).mul(float(1).sub(exp(t.mul(-DRAG)))).div(DRAG));
+    const centre = flown(drop.xyz, fling.xyz, u, float(DRAG), t);
     const size = fling.w.mul(t.mul(GROWTH - 1).add(1));
-    const view = modelViewMatrix.mul(vec4(centre, 1)).add(vec4(positionGeometry.xy.mul(size).mul(alive), 0, 0));
     vCorner.assign(positionGeometry.xy);
     vAlpha.assign(alive);
-    return cameraProjectionMatrix.mul(view);
+    return facingEye(centre, size.mul(alive));
   })();
   m.colorNode = Fn(() => {
     const r = length(vCorner), puff = saturate(float(1).sub(r)).pow(2).mul(DENSITY).mul(vAlpha);
@@ -122,9 +166,7 @@ export class SprayView {
   private readonly rng = new Rng(SPRAY_SEED);
 
   constructor(material: Material) {
-    const g = new BufferGeometry();
-    g.setAttribute('position', new Float32BufferAttribute(QUAD, XYZ));
-    g.setIndex(QUAD_INDEX);
+    const g = eyeQuad();
     // Every drop starts long dead.
     const dead = new Float32Array(MOST_DROPS * DROP_STRIDE);
     for (let i = 0; i < MOST_DROPS; i++) dead[i * DROP_STRIDE + W] = -LIFE * 2;
@@ -168,6 +210,29 @@ export class SprayView {
     if (written) { this.drops.needsUpdate = true; this.flings.needsUpdate = true; }
   }
 
+  /**
+   * A ball's splash at `at` (the world) at the clock's `t`: a column of drops by how fast it came in (`speed`, m/s) and
+   * its diameter (`size`, m), lower when it skips on; `share` of the drops thrown (the quality level).
+   */
+  splash(at: readonly [number, number, number], speed: number, size: number, skip: boolean, t: number, share: number): void {
+    const r = this.rng, d = this.drops.array as Float32Array, f = this.flings.array as Float32Array;
+    const weight = (size / SPLASH_BALL) ** 2 * (speed / SPLASH_SPEED) * (skip ? SKIP_SHARE : 1);
+    const n = Math.min(SPLASH_MOST, Math.round(SPLASH_DROPS * weight * share)), lift = skip ? SKIP_SHARE : 1;
+    for (let i = 0; i < n; i++) {
+      const k = this.next * DROP_STRIDE;
+      this.next = (this.next + 1) % MOST_DROPS;
+      d[k + X] = at[X] - this.origin.x + r.gaussian(0, SPLASH_SCATTER);
+      d[k + Y] = at[Y];
+      d[k + Z] = at[Z] - this.origin.z + r.gaussian(0, SPLASH_SCATTER);
+      d[k + W] = t;
+      f[k + X] = r.gaussian(0, SPLASH_SPREAD);
+      f[k + Y] = r.range(SPLASH_UP[0], SPLASH_UP[1]) * lift;
+      f[k + Z] = r.gaussian(0, SPLASH_SPREAD);
+      f[k + W] = r.range(SPLASH_SIZE[0], SPLASH_SIZE[1]);
+    }
+    if (n > 0) { this.drops.needsUpdate = true; this.flings.needsUpdate = true; }
+  }
+
   /** One drop from `at` (world), flung out to `side` by a climb of `rate` m/s, with her velocity. */
   private throw(at: readonly [number, number, number], side: number, rate: number, bow: SprayBow, t: number): void {
     const r = this.rng, i = this.next, d = this.drops.array as Float32Array, f = this.flings.array as Float32Array, k = i * DROP_STRIDE;
@@ -186,9 +251,7 @@ export class SprayView {
 
   /** The spray's frame follows the sea's origin: every drop moved by the step. */
   private move(origin: Vector3): void {
-    const d = this.drops.array as Float32Array, dx = origin.x - this.origin.x, dz = origin.z - this.origin.z;
-    for (let i = 0; i < MOST_DROPS; i++) { d[i * DROP_STRIDE + X] -= dx; d[i * DROP_STRIDE + Z] -= dz; }
-    this.drops.needsUpdate = true;
+    shiftStarts(this.drops, origin.x - this.origin.x, origin.z - this.origin.z);
     this.origin.copy(origin);
   }
 }

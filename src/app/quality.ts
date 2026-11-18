@@ -34,6 +34,8 @@ export interface QualityKnobs {
   readonly sailShadows: boolean;
   /** The crew's levels of detail and animation rates (plan N4.0, src/app/crewLevels.ts). */
   readonly crew: CrewKnobs;
+  /** The share of the puffs, splinters and splash drops gunfire throws that are drawn (N5.4a, render/gunfire.ts): fewer and bigger on the lower levels. */
+  readonly gunfireShare: number;
 }
 
 /** What a quality level sets for the crew (plan N4.0): how many men get detail, out to where, and how often each animates. */
@@ -64,10 +66,10 @@ export interface QualityLevel extends QualityKnobs {
  * rig's rope shadows, her sails' grids and shadows, and how near another ship turns to her far version.
  */
 export const QUALITY_LEVELS: readonly QualityLevel[] = [
-  { name: 'high', renderScale: 1, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, sailGrid: 'fine', sailShadows: true, crew: { detailed: 12, fullTo: 5, mediumTo: 16, stepsTo: [12, 40], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 25 } },
-  { name: 'medium', renderScale: 0.8, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, sailGrid: 'fine', sailShadows: true, crew: { detailed: 8, fullTo: 4, mediumTo: 12, stepsTo: [10, 35], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 20 } },
-  { name: 'low', renderScale: 0.65, seaCells: 8, fineSeaBands: 2, fineSeaSize: 256, ropeShadows: false, shipFarFrom: 100, wakeLevels: 2, sailGrid: 'coarse', sailShadows: true, crew: { detailed: 6, fullTo: 0, mediumTo: 10, stepsTo: [8, 30], steps: [1, 3, 6], hiddenStep: 12, shadowTo: 15 } },
-  { name: 'lowest', renderScale: 0.5, seaCells: 8, fineSeaBands: 2, fineSeaSize: 128, ropeShadows: false, shipFarFrom: 80, wakeLevels: 1, sailGrid: 'coarse', sailShadows: false, crew: { detailed: 4, fullTo: 0, mediumTo: 6, stepsTo: [6, 25], steps: [2, 4, 8], hiddenStep: 16, shadowTo: 10 } },
+  { name: 'high', renderScale: 1, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, sailGrid: 'fine', sailShadows: true, crew: { detailed: 12, fullTo: 5, mediumTo: 16, stepsTo: [12, 40], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 25 }, gunfireShare: 1 },
+  { name: 'medium', renderScale: 0.8, seaCells: 16, fineSeaBands: 3, fineSeaSize: 256, ropeShadows: true, shipFarFrom: 130, wakeLevels: 2, sailGrid: 'fine', sailShadows: true, crew: { detailed: 8, fullTo: 4, mediumTo: 12, stepsTo: [10, 35], steps: [1, 2, 4], hiddenStep: 8, shadowTo: 20 }, gunfireShare: 1 },
+  { name: 'low', renderScale: 0.65, seaCells: 8, fineSeaBands: 2, fineSeaSize: 256, ropeShadows: false, shipFarFrom: 100, wakeLevels: 2, sailGrid: 'coarse', sailShadows: true, crew: { detailed: 6, fullTo: 0, mediumTo: 10, stepsTo: [8, 30], steps: [1, 3, 6], hiddenStep: 12, shadowTo: 15 }, gunfireShare: 0.6 },
+  { name: 'lowest', renderScale: 0.5, seaCells: 8, fineSeaBands: 2, fineSeaSize: 128, ropeShadows: false, shipFarFrom: 80, wakeLevels: 1, sailGrid: 'coarse', sailShadows: false, crew: { detailed: 4, fullTo: 0, mediumTo: 6, stepsTo: [6, 25], steps: [2, 4, 8], hiddenStep: 16, shadowTo: 10 }, gunfireShare: 0.4 },
 ];
 
 /** The frame rate a level must hold. */

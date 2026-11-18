@@ -149,6 +149,8 @@ export class ShipView {
   private readonly zones = new Map<string, Group>();
   private readonly outside: Part[] = [];
   private readonly far = new Group();
+  /** What moves on her outside, drawn near and far (`addMoving`). */
+  private readonly moving: Object3D[] = [];
   private readonly farParts: Part[] = [];
   private readonly doors = new Map<string, { pivot: Group; shut: number; opens: number; zones: readonly [string, string]; angle: number }>();
   /** The spars that turn (swings.ts): each one's groups near and far, its brace or swing (rad) and hoist (1 hoisted). */
@@ -336,6 +338,16 @@ export class ShipView {
       o.castShadow &&= light === undefined || ((o as Mesh).material as Material).name === SHIP_WOOD.name;
     });
     zone.add(object);
+  }
+
+  /**
+   * Puts `object` (in her space: her guns and lids, gunsView.ts) on her outside, drawn whenever her outside or her far
+   * level is, near and far alike (it is not crossfaded: it has its own levels of detail).
+   */
+  addMoving(object: Object3D): void {
+    object.traverse((o) => { o.userData.ship = this.index; });
+    this.moving.push(object);
+    this.group.add(object);
   }
 
   /**
@@ -542,6 +554,7 @@ export class ShipView {
       p.mesh.userData.fade = t > 0 ? new Vector2(0, 1 - t) : undefined;
     }
     for (const p of this.farParts) p.mesh.userData.fade = new Vector2(1 - t, 1);
+    for (const o of this.moving) o.visible = near.visible || this.far.visible;
   }
 
   /** Whether her whole outside (not only her far level) is drawn this frame. */

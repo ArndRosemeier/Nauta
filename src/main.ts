@@ -29,7 +29,14 @@ import { watchGlass } from './app/glassInput';
 import { earthDrop } from './render/earth';
 import { VERSION } from 'virtual:nauta/version';
 import { SprayView } from './render/spray';
-import { SPRAY } from './render/materials';
+import { GUNFIRE, SHOT_IN_FLIGHT, SPRAY } from './render/materials';
+import { GunsView } from './render/ship/gunsView';
+import { GunfireView, fallInSea } from './render/gunfire';
+import { gunsSeen } from './app/gunsSeen';
+import { ShotsSeen, type Strike } from './app/shotsSeen';
+import { battery } from './sim/guns/guns';
+import { toWorld, type ShipPose } from './sim/ship/motion';
+import { shipY, shipZ } from './sim/ship/section';
 import { SeaSound } from './audio/seaSound';
 import { ShipSound } from './audio/shipSound';
 import { CrewSound } from './audio/crewSound';
@@ -111,6 +118,8 @@ declare global {
       /** The glass at the eye at once, drawn out to `power`, or lowered (null); and what the HUD says of the other ship. */
       glass: (power: number | null) => void;
       other: () => { drawn: number; near: boolean; apart: number; draws: number; mine: number } | null;
+      /** Seconds since a gun of ship `index` was last seen to fire (Infinity: none yet): checks catch a broadside as it comes. */
+      firedAgo: (index: number) => number;
     };
     /**
      * Walking (`?walk`), for shots: the captain pushed by the left thumb (`forward`, `strafe`: -1..1) for so many
@@ -158,6 +167,11 @@ async function start(): Promise<void> {
   // The other ship's fittings on her weather deck (plan N3.8): she is seen only from outside.
   const herFittings = other && fittings ? new Furnishings(view.renderer, fittings, furnish(shipPlan()), true) : null;
   if (other && herFittings) for (const [zone, draws] of herFittings.zones) other.addToZone(zone, draws.group);
+  // Her guns and port lids, moving as the match works them (plan N5.4a); the other ship's too.
+  const guns = ship && fittings ? new GunsView(view.renderer, fittings, furnish(shipPlan())) : null;
+  if (ship && guns) ship.addMoving(guns.draws.group);
+  const herGuns = other && fittings ? new GunsView(view.renderer, fittings, furnish(shipPlan()), 1) : null;
+  if (other && herGuns) other.addMoving(herGuns.draws.group);
   // `?crew`: the trial's 240 men (plan N4.0), mustered behind the loading screen; how long that takes is part of the trial.
   const mustered = performance.now();
   const men = ship && params.crew ? musterCrews(params.crew === 'aboard').filter((m, i, all) => i - all.findIndex((o) => o.crew === m.crew) < params.men) : [], note = loading.querySelector('p')!;
@@ -195,10 +209,17 @@ async function start(): Promise<void> {
   // So are her fittings' instanced draws, which three builds shaders of their own for, and the spray from her bow (N2.5).
   for (const w of seaView.wakes) await w.compile(view.renderer);
   const spray = ship ? new SprayView(SPRAY.make()) : null;
+  // Gunfire (plan N5.4a): flashes, puffs, splinters and the balls in flight, both ships' as the match fires them.
+  const fireDrawn = match ? new GunfireView(GUNFIRE.make(), SHOT_IN_FLIGHT.make()) : null;
+  const shots = match ? new ShotsSeen() : null;
+  if (match && shots) match.on('events', (events) => shots.take(events));
   await furnished?.ready();
   await herFittings?.ready();
+  await guns?.ready();
+  await herGuns?.ready();
   const fittingGroups = [furnished, herFittings].flatMap((f) => (f ? [...f.zones.values()].map((d) => d.group) : []));
-  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...fittingGroups]);
+  const gunGroups = [guns, herGuns].flatMap((g) => (g ? [g.draws.group] : []));
+  await view.stage.warmUp([seaView.mesh, ...(spray ? [spray.mesh] : []), ...(fireDrawn ? [fireDrawn.bits, fireDrawn.balls] : []), ...fittingGroups, ...gunGroups]);
   // The crews' shaders, a few men at each level of detail wearing between them all the crew wears, at full speed
   // behind the loading screen (docs/SHADERS.md rule 5), as MasterWorld warms its townsfolk.
   // The cap stays open (share 1) until the crews are in: before the first frame no frame frees a slot.
@@ -227,6 +248,7 @@ async function start(): Promise<void> {
   if (ship) for (const id of ship.swingIds) ship.setBrace(id, params.brace);
   if (other) await view.stage.add(other.group);
   if (spray) await view.stage.add(spray.mesh);
+  if (fireDrawn) { await view.stage.add(fireDrawn.bits); await view.stage.add(fireDrawn.balls); }
   if (crew) {
     note.textContent = 'bringing the crews aboard';
     await view.stage.add(crew.aboard);
@@ -318,6 +340,7 @@ async function start(): Promise<void> {
       if (power !== null) glass.power = power;
     },
     other: () => (other?.group.visible ? { drawn: other.trianglesDrawn, near: other.nearDrawn, apart: Math.round(other.group.position.distanceTo(view.camera.position)), draws: view.renderer.info.render.drawCalls, mine: ship?.trianglesDrawn ?? 0 } : null),
+    firedAgo: (index) => Math.min(Infinity, ...battery().map((_, g) => shots?.firedFor(index, g, seaTime) ?? Number.NaN).filter(Number.isFinite)),
   };
   // Walking, the calm view's button has the top right corner: the panel stands below it.
   if (orders && walking) el('orders').classList.add('under-motion');
@@ -328,6 +351,7 @@ async function start(): Promise<void> {
   const apply = (k: QualityKnobs) => {
     view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k);
     for (const w of seaView.wakes) w.levels = k.wakeLevels;
+    if (fireDrawn) fireDrawn.plenty = k.gunfireShare;
   };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());
@@ -414,6 +438,10 @@ async function start(): Promise<void> {
       }
       ship.update(sea, seaTime, dt, view.camera, where, glass ? glass.aim(input.look) : input.look, sky.gain, view.radPerPixel(), seaView.origin);
       furnished?.update(ship.group, view.camera, sky.lightDirection);
+      // Her guns as the match has them: run out and in, leaping back when fired, trained; her lids up and down.
+      shots?.watch(match!.state);
+      const mine = match?.state.ships[match.ship];
+      guns?.moveGuns(ship.group, view.camera, match && mine && shots ? gunsSeen(mine, (g) => shots.firedFor(match.ship, g, seaTime)) : null, seaTime, sky.lightDirection);
       if (other && match) {
         // The other ship as her match says she sails: her sails and yards as her crew has them, her flags in the wind where she is.
         other.group.visible = match.other >= 0;
@@ -425,6 +453,8 @@ async function start(): Promise<void> {
           if (jump > 0) other.sails.follow(jump);
           other.follow(sea, seaTime, dt, view.camera);
           herFittings?.update(other.group, view.camera, sky.lightDirection);
+          const her = match.state.ships[match.other];
+          herGuns?.moveGuns(other.group, view.camera, her && shots ? gunsSeen(her, (g) => shots.firedFor(match.other, g, seaTime)) : null, seaTime);
         }
       }
       ship.shade(view.sun, sky.lightDirection, other);
@@ -455,6 +485,14 @@ async function start(): Promise<void> {
       const from = [{ slams: ship.slams, bow }, ...(other && herWater ? [{ slams: other.slams, bow: other.bow(herWay) }] : [])];
       spray.show(from, windAt(wind, bow.stem[0], bow.stem[2], seaTime, gust), seaTime, dt, seaView.origin);
     }
+    // Gunfire (N5.4a): flashes and first puffs at the muzzles, the balls in flight, splashes where they fall (spray
+    // and white water on the sea), splinters where they strike.
+    if (match && shots && fireDrawn) {
+      const seen = shots.sightsAt(seaTime), struck = seen.strikes.map((s) => strikeInWorld(s, match.pose(s.ship)));
+      fireDrawn.showGunfire(seaTime, blowing, seaView.origin, seen.flashes, struck.filter((s) => s !== null), seen.balls, (f) => battery()[f.gun]?.gun === 'long6');
+      if (spray) fallInSea(seen.splashes, spray, seaView.wakes, [ship?.drawn ?? null, other?.group.visible ? other.drawn : null], fireDrawn.plenty);
+    }
+    for (const w of seaView.wakes) w.laySplashes(seaTime, seaView.origin.x, seaView.origin.z);
     seaView.fine.run(view.renderer);
     for (const w of seaView.wakes) w.fill(view.renderer);
     view.camera.getWorldPosition(ear);
@@ -503,6 +541,14 @@ async function start(): Promise<void> {
       setTimeout(() => loading.remove(), LOADING_FADE_MS);
     }
   });
+}
+
+/** Shot striking a ship (shotsSeen.ts `Strike`) in the world as she lies at `pose`, and which way out of her side; null: no such ship. */
+function strikeInWorld(s: Strike, pose: ShipPose | null): { s: Strike; at: Vector3; out: Vector3 } | null {
+  if (!pose) return null;
+  const [along, across, height] = s.at, at = new Vector3(...toWorld(pose, across, shipY(height), shipZ(along)));
+  const side = new Vector3(...toWorld(pose, across + Math.sign(across || 1), shipY(height), shipZ(along))).sub(at).normalize();
+  return { s, at, out: side };
 }
 
 /** The crew trial's HUD line (plan N4.0): the men by level, how many animate, the crew's page time, what was fetched and how long mustering took. */
