@@ -91,6 +91,11 @@ export class ShipView {
   readonly group = new Group();
   /** Her pose as drawn this frame: between her last two steps. */
   drawn: ShipPose;
+  /**
+   * Where her pose comes from when a match sails her (`?sail`, app/soloMatch.ts): her pose at the clock's time. Null:
+   * she floats on her own, lying still where she is.
+   */
+  poseFrom: ((t: number) => ShipPose) | null = null;
   private motion: ShipMotion = startMotion(AT.x, AT.z, AT.heading);
   private previous: ShipMotion = this.motion;
   /** The shared clock's time of her last step (NaN until the first frame). */
@@ -315,8 +320,10 @@ export class ShipView {
     // The eye: on board it rides with her, its tilt eased toward level; off her it stands still where she lies.
     this.eye.set(...where.eye);
     if (where.off) {
-      camera.position.copy(this.eye).applyAxisAngle(UP, -AT.heading).add(new Vector3(AT.x, 0, AT.z));
-      this.euler.set(0, -AT.heading, 0, 'YXZ');
+      // Sailed by a match, the eye off her keeps its place beside her as she goes.
+      const at = this.poseFrom ? this.drawn : AT;
+      camera.position.copy(this.eye).applyAxisAngle(UP, -at.heading).add(new Vector3(at.x, 0, at.z));
+      this.euler.set(0, -at.heading, 0, 'YXZ');
     } else {
       camera.position.copy(this.eye).applyMatrix4(g.matrixWorld);
       this.euler.set(this.drawn.pitch * RIDE, -this.drawn.heading, -this.drawn.roll * RIDE, 'YXZ');
@@ -358,6 +365,10 @@ export class ShipView {
 
   /** Her floating stepped up to the clock at the fixed rate, and her pose drawn one step behind it, between steps. */
   private float(sea: SeaState, t: number): void {
+    if (this.poseFrom) {
+      this.drawn = this.poseFrom(t);
+      return;
+    }
     if (!(t - this.stepped < MOST_STEPS * STEP_SECONDS)) this.stepped = t - STEP_SECONDS;
     while (this.stepped + STEP_SECONDS <= t) {
       this.previous = this.motion;

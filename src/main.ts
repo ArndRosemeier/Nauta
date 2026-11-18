@@ -9,6 +9,8 @@ import { showVersion } from './app/whatsNew';
 import { Walking } from './app/walking';
 import { QUALITY_LEVELS, QualityChooser, type QualityKnobs } from './app/quality';
 import { showMotionSetting } from './app/motionSetting';
+import { SoloMatch, sparAngles } from './app/soloMatch';
+import { OrderPanel } from './app/orderPanel';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
@@ -68,7 +70,10 @@ async function start(): Promise<void> {
   // `?ship`: the whole brig, built in a worker behind the loading screen (plan N2.4); the sun casts shadows then.
   // `?walk`: the captain walks her decks with two thumbs (plan N2.3), on the whole brig.
   const walking = params.walk !== null ? new Walking(canvas, params.walk || undefined) : null;
-  const ship = params.ship !== null || walking ? new ShipView(await loadShip(import.meta.env.BASE_URL)) : null;
+  const ship = params.ship !== null || walking || params.sail ? new ShipView(await loadShip(import.meta.env.BASE_URL)) : null;
+  // `?sail`: the brig under way in a match on this machine, where the ship view lays her, commanded from the order panel (plan N3.5).
+  const match = ship && params.sail ? new SoloMatch({ seed: MATCH_SEED, windForce: params.wind, windFrom: WIND_FROM, x: 0, z: 0, heading: 0 }) : null;
+  if (ship && match) ship.poseFrom = (t) => match.pose(t);
   let where: Standpoint = standpoint(params.ship ?? '');
   const view = await createView(canvas, ship !== null);
   view.camera.position.set(0, params.eye, 0);
@@ -79,8 +84,9 @@ async function start(): Promise<void> {
   sky.update(0, null);
   // The wind and the sea of the match, on the clock `seaTime` (s); one shared clock comes with the simulation (N3.1).
   // The sea keeps the wind it is given, so it gets a copy of the mean wind, never the one `meanWind` writes into.
-  let wind = makeWind(MATCH_SEED, params.wind, WIND_FROM), blowing = meanWind(wind, 0);
-  let seaTime = 0, sea = startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
+  // Sailing, the match's own wind and sea are the page's.
+  let wind = match ? match.state.wind : makeWind(MATCH_SEED, params.wind, WIND_FROM), blowing = meanWind(wind, 0);
+  let seaTime = 0, sea = match ? match.state.sea : startSea(MATCH_SEED, { speed: blowing.speed, toward: blowing.toward }, seaTime);
   /** The clocks stand still (a scene set for a shot); held: the scene is drawn and nothing is drawn until the next. */
   let still = false, held = false;
   /** Waiting for the scene set by `__nautaScene` to be drawn: frames still to draw, and what to call then. */
@@ -137,6 +143,9 @@ async function start(): Promise<void> {
   showVersion(el<HTMLButtonElement>('version'));
   // Walking: the calm view, how much of his body's motion the view takes (plan N2.7).
   if (walking) showMotionSetting(el<HTMLButtonElement>('motion'), params.motion, (s) => { walking.body.strength = s; });
+  const orders = match ? new OrderPanel(match) : null;
+  // Walking, the calm view's button has the top right corner: the panel stands below it.
+  if (orders && walking) el('orders').classList.add('under-motion');
   const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); ship?.setQuality(k.ropeShadows, k.shipFarFrom); };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());
@@ -165,7 +174,12 @@ async function start(): Promise<void> {
     const flight = bench?.fly(now);
     seaTime += dt;
     meanWind(wind, seaTime, blowing);
-    sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
+    if (match) {
+      match.advance(seaTime);
+      sea = match.state.sea;
+      // Her yards, boom and gaff as the crew trims them: the order seen carried out aloft.
+      for (const [id, angle] of sparAngles(match.state, match.ship)) ship?.setBrace(id, angle);
+    } else sea = followWind(sea, { speed: blowing.speed, toward: blowing.toward }, seaTime);
     if (ship) {
       if (walking) {
         where = walking.walk(dt, ship.drawn, input);
@@ -192,6 +206,7 @@ async function start(): Promise<void> {
     sound.hear(sea, wind, seaTime, [ear.x, ear.y, ear.z], [facing.x, facing.y, facing.z], [crown.x, crown.y, crown.z], room);
     view.stage.frame();
     view.renderer.render(view.scene, view.camera);
+    orders?.update(now);
     bench?.worked(performance.now() - now);
     frames++;
     if (sceneDrawn && --sceneFrames <= 0) { sceneDrawn(); sceneDrawn = null; held = true; }

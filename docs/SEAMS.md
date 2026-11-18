@@ -327,6 +327,17 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The walking thumb's stick as a push | `src/app/thumbs.ts#stickPush` |
 | Keys held as a push (WASD and arrows) | `src/app/thumbs.ts#keyPush` |
 | The walking thumb and keys on the page (the left half's floating stick) | `src/app/walkInput.ts#watchWalk` |
+| A running match as the order panel sees it (my ship, the state, give an order, each step's events): the seam with the two-player session | `src/app/orderReport.ts#OrderSession` |
+| The order panel's buttons: every order of the vocabulary but a course | `src/app/orderReport.ts#orderButtons` |
+| A ship's state in words for the panel: heading, way, wind, point of sail, canvas | `src/app/orderReport.ts#shipLines` |
+| Her point of sail and tack by name | `src/app/orderReport.ts#pointOfSail` |
+| What the crew is still doing for each order, in words | `src/app/orderReport.ts#crewLines` |
+| An event of a step in the panel's words (a refused order she kept is the master's answer) | `src/app/orderReport.ts#eventWords` |
+| Whether an order would be refused now (a dim button), and whether it stands (a ringed one) | `src/app/orderReport.ts#wouldRefuse` |
+| A match stepped on this machine alone (`?sail`), her pose between steps; a stand-in for the two-player session | `src/app/soloMatch.ts#SoloMatch` |
+| Her turning spars' angles in a state, for drawing the yards braced as the sailing model trims them | `src/app/soloMatch.ts#sparAngles` |
+| The order panel on the page (`?sail`): buttons, compass, typed orders, answers | `src/app/orderPanel.ts#OrderPanel` |
+| Making an element of the page's own panels in one line | `src/app/dom.ts#make` |
 | The ways across her weather deck's centreline: how wide, how often (the fife rails' places that make them: `MAIN_FIFE_AT`, `FORE_FIFE_FORE_AT`) | `src/sim/rules/ships.ts#DECK_CROSSING` |
 | How fast a man gets about the ship: his pace on each footing, smartly, stooping, the heel, a crowd, queuing on a way, standing aside (first proposals) | `src/sim/rules/routes.ts#PACE` |
 | The crew's way network on the one walk graph: the ends of every way and what each way takes to cross | `src/sim/crew/network.ts#routeNetwork` |

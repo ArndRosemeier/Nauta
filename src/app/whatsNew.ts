@@ -5,6 +5,7 @@
  */
 import { LABEL, VERSION } from 'virtual:nauta/version';
 import type { Release } from '../../tools/version/version';
+import { make } from './dom';
 
 /** Where the device remembers the last version it showed the history of. */
 const SEEN_KEY = 'nauta.seenVersion';
@@ -16,13 +17,6 @@ function seenVersion(): string | null {
 function rememberSeen(): void {
   try { localStorage.setItem(SEEN_KEY, VERSION); } catch { /* not remembered */ }
 }
-
-const make = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = '') => {
-  const e = document.createElement(tag);
-  e.className = className;
-  e.textContent = text;
-  return e;
-};
 
 /** The panel of every version, newest first, over the view until it is closed. */
 function openPanel(history: readonly Release[]): void {
