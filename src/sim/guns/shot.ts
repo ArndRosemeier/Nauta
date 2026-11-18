@@ -327,6 +327,15 @@ export interface Lay {
   readonly laid: number;
 }
 
+/** The training a gun at `place` needs to bear on `target` as she lies at `pose` (rad toward the bow from her side's square), the range to it, m, and her muzzle's world point. */
+export function trainTo(place: GunPlace, pose: ShipPose, target: Vec): { train: number; range: number; from: Vec } {
+  const at = muzzleAt(place), from = toWorld(pose, at[0], at[1], at[2]);
+  const dx = target[0] - from[0], dz = target[2] - from[2], range = Math.hypot(dx, dz);
+  // The bearing of the point against her side's square, toward the bow.
+  const [ax, az] = bearingDir(pose.heading), ahead = (dx * ax + dz * az) / range;
+  return { train: Math.asin(Math.max(-1, Math.min(1, ahead))), range, from };
+}
+
 /**
  * How a gun captain lays his gun on a world point from where she lies: the training that points her at it (as her
  * heading lies), and the elevation for its range as he judges it (seeded misjudgement of the range, `JUDGING`, judged
@@ -334,11 +343,7 @@ export interface Lay {
  * against her steady heel so the roll brings her bore through it. Not kept within her arcs: the gun (guns.ts) is.
  */
 export function layOn(f: Pick<Fire, 'seed' | 'ship' | 'gun' | 'tick' | 'place' | 'pose'> & { readonly shot: ShotKind; readonly heel: number }, target: Vec): Lay {
-  const at = muzzleAt(f.place), from = toWorld(f.pose, at[0], at[1], at[2]);
-  const dx = target[0] - from[0], dz = target[2] - from[2], range = Math.hypot(dx, dz);
-  // Training: the bearing of the point against her side's square, toward the bow.
-  const [ax, az] = bearingDir(f.pose.heading), ahead = (dx * ax + dz * az) / range;
-  const train = Math.asin(Math.max(-1, Math.min(1, ahead)));
+  const { train, range, from } = trainTo(f.place, f.pose, target);
   // He judges the range afresh every JUDGE_SECONDS, so his error holds while he lays and changes between rounds.
   const spell = Math.floor(f.tick / (JUDGE_SECONDS * STEPS_PER_SECOND));
   const judged = range * (1 + new Rng(deriveSeed(f.seed, 'judge', f.ship, f.gun, spell)).gaussian(0, JUDGING));

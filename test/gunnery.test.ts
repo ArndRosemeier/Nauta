@@ -102,7 +102,8 @@ test('at quarters the guns load the shot ordered and run out; stood down they ru
   assert.equal(beatingToQuarters(quarters.told, READY), false, 'every gun loaded: at quarters, the drum stops');
   const ready = run(LOADED, 1, [EACH.quarters]).state;
   const stood = run(ready, 1, [EACH.stand]).state.ships[0]!;
-  assert.ok(battery().every((_, i) => gunAt(stood.guns, i).drill === 'running-in'), 'stood down, every gun runs in with her load');
+  // At quarters her gun crews went to her starboard guns, which bear on her: those run in at once; the larboard guns wait for their men.
+  assert.ok(battery().every((g, i) => gunAt(stood.guns, i).drill === (g.side > 0 ? 'running-in' : 'ready')), 'stood down, the guns with their crews run in with their load');
 });
 
 test('a ship not at quarters never fires; at quarters the guns on her side are laid on the part of her aimed at', () => {
