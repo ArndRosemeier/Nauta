@@ -1,7 +1,6 @@
 /**
  * The captain's body on a moving deck (implementation plan N2.7): how he leans against her roll, how quickly he
- * catches himself, how his feet step to keep him up, how his walk bobs, how a steep deck slows him, when he takes
- * hold of a rail, and how far the calm view stills all of it. Pure data; his size is the plan's (ships.ts BODY).
+ * catches himself, how his feet step to keep him up, how his walk bobs, when he takes hold of a rail, and how far the calm view stills all of it. Pure data; his size is the plan's (ships.ts BODY).
  *
  * Tilts are small angles as tangents: a body axis (tx, 1, tz) normalised, in ship space (x across, z aft).
  */
@@ -62,15 +61,6 @@ export const CATCH_KEEP = 0.55;
 export const STOOP_FORWARD = 0.35;
 /** His body turns to where he looks at this rate, 1/s; past this much of a turn (rad) his feet step round with it. */
 export const TURN_RATE = 5;
-
-/**
- * A steep deck slows him (share of his pace lost per unit of slope, as a tangent): climbing her heeled deck most,
- * going down it a little (he holds back), across it least. Never slower than `SLOPE_LEAST` of his pace.
- */
-export const SLOPE_UPHILL = 1.5;
-export const SLOPE_DOWNHILL = 0.6;
-export const SLOPE_ACROSS = 0.4;
-export const SLOPE_LEAST = 0.35;
 
 /**
  * Taking hold: how hard the sea is (the felt tilt off her deck's square, its swing measured over `SWING_SECONDS`, rad)

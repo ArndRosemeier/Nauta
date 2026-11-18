@@ -114,7 +114,7 @@ export class CaptainBody {
   /** The felt tilt's mean square over the last few seconds (rad²). */
   private swing2 = 0;
   private holdW = 0;
-  private held: { side: FootSide; at: Handhold } | null = null;
+  private grip: { side: FootSide; at: Handhold } | null = null;
   private ladderW = 0;
   private eyeRoom = 1;
   private readonly lastV: [number, number] = [0, 0];
@@ -207,7 +207,7 @@ export class CaptainBody {
       eye, up: [hu[0] / hn, hu[1] / hn, hu[2] / hn],
       hips: [hx, w.floor + this.hipY, hz], yaw: this.yaw,
       feet: { L: this.sole('L', w.floor), R: this.sole('R', w.floor) },
-      hold: this.holdW > 0 && this.held ? this.held : null,
+      hold: this.holdW > 0 && this.grip ? this.grip : null,
       stoop,
     };
   }
@@ -223,15 +223,15 @@ export class CaptainBody {
   private holdOn(felt: [number, number], pace: number, dt: number, onLadder: boolean): void {
     this.swing2 += (felt[0] * felt[0] + felt[1] * felt[1] - this.swing2) * ease(1 / SWING_SECONDS, dt);
     const swing = Math.sqrt(this.swing2);
-    const wants = !onLadder && pace <= HOLD_PACE && swing >= (this.held ? HOLD_OFF : HOLD_ON);
+    const wants = !onLadder && pace <= HOLD_PACE && swing >= (this.grip ? HOLD_OFF : HOLD_ON);
     const at = wants ? this.world.handhold() : null;
     if (at) {
       // The hand on the side of him the hold is on.
       const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw), side: FootSide = (at.point[0] - this.feetMiddle(0)) * rx + (at.point[2] - this.feetMiddle(1)) * rz >= 0 ? 'R' : 'L';
-      this.held = { side: this.held && this.holdW > 0 ? this.held.side : side, at };
+      this.grip = { side: this.grip && this.holdW > 0 ? this.grip.side : side, at };
     }
     this.holdW += ((at ? 1 : 0) - this.holdW) * ease(HOLD_RATE, dt);
-    if (!at && this.holdW < LET_GO) this.held = null;
+    if (!at && this.holdW < LET_GO) this.grip = null;
   }
 
   private feetMiddle(i: 0 | 1): number {

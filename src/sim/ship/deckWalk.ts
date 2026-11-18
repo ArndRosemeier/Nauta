@@ -11,7 +11,7 @@
 import { standAt, stepDeckBody, type DeckBody, type DeckGait, type DeckGround, type DeckIntent, type Standing, type Vec3 } from '@futuremagic/deck';
 import { BODY, DOOR } from '../rules/ships';
 import { BACK_PACE, DUCK_AHEAD, EYE_BELOW_TOP, HEAD_CLEAR, LADDER_AIM, LADDER_PRESS, LADDER_REACH, LADDER_TOUCH, SIDE_PACE, STOOP_RATE, WALK_GRIP, WALK_PACE } from '../rules/walking';
-import { SLOPE_ACROSS, SLOPE_DOWNHILL, SLOPE_LEAST, SLOPE_UPHILL } from '../rules/body';
+import { heelEase } from '../crew/route';
 import { shipY, shipZ } from './section';
 import { floorAt, holds, overheadAt, spacesById, type ShipPlan, type Space, type Spot, type Way } from './plan';
 import { nodeAt, type WalkGraph } from './walk';
@@ -121,10 +121,11 @@ export function walkerAt(plan: ShipPlan, spot: Spot): DeckWalker {
 
 /**
  * One step of the captain walking as the thumbs say (`intent.heading`: his look's yaw on her), with her doors as they
- * are; `up`: gravity's up in her frame (none: a level deck), so her heeled deck slows him (`slopePace`).
+ * are; `up`: gravity's up in her frame (none: a level deck), so her heeled deck slows him as it slows every man
+ * aboard (crew/route.ts `heelEase`).
  */
 export function stepWalker(w: DeckWalker, intent: DeckIntent, plan: ShipPlan, graph: WalkGraph, doors: Doors, dt: number, up?: Vec3): DeckWalker {
-  const ground = deckGround(plan, graph, doors), pace = up ? slopePace(intent, up) : 1;
+  const ground = deckGround(plan, graph, doors), pace = up ? heelEase('walk', 0, Math.acos(Math.min(1, up.y))) : 1;
   const next = stepDeckBody(w, { ...intent, forward: intent.forward * pace, strafe: intent.strafe * pace }, CAPTAIN_GAIT, ground, dt);
   return guideIntoDoorway(next, plan, graph, ground, dt);
 }
@@ -154,18 +155,6 @@ export function pushOf(intent: DeckIntent): { along: number; across: number; pus
   // In ship space forward is (-sin, -cos) in (x, z) and right is (cos, -sin); along is -z.
   const x = -s * intent.forward + c * intent.strafe, z = -c * intent.forward - s * intent.strafe, n = Math.hypot(x, z) || 1;
   return { along: -z / n, across: x / n, push };
-}
-
-/**
- * How much of his pace he keeps walking the way the thumbs push on a deck tilted so that gravity's up in her frame is
- * `up` (rules/body.ts): up her heeled deck slowest, down it a little slow, across it least.
- */
-export function slopePace(intent: DeckIntent, up: Vec3): number {
-  const p = pushOf(intent), level = Math.max(Math.abs(up.y), Number.EPSILON);
-  // Gravity's up seen from her deck leans toward the high side: its share along his way is the climb's slope.
-  const climb = (p.along * -up.z + p.across * up.x) / level, aside = (p.along * up.x + p.across * up.z) / level;
-  const lost = SLOPE_UPHILL * Math.max(0, climb) + SLOPE_DOWNHILL * Math.max(0, -climb) + SLOPE_ACROSS * Math.abs(aside);
-  return Math.max(SLOPE_LEAST, 1 - lost);
 }
 
 /** A ladder he stands at and pushes into: which, and whether he goes up it (at its foot) or down (at its head). */

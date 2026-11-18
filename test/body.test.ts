@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { walkGraph, nodeAt } from '../src/sim/ship/walk.ts';
 import { shutDoors } from '../src/sim/ship/doors.ts';
-import { deckGround, eyeOf, slopePace, stepWalker, walkerAt, type DeckWalker } from '../src/sim/ship/deckWalk.ts';
+import { deckGround, eyeOf, stepWalker, walkerAt, type DeckWalker } from '../src/sim/ship/deckWalk.ts';
 import { handholdNear } from '../src/sim/ship/handholds.ts';
 import { pointVelocity, startMotion, toWorld, type ShipPose } from '../src/sim/ship/motion.ts';
 import { CaptainBody, type BodyPose, type BodyWorld } from '../src/app/body.ts';
-import { CALM_LEAST, SLOPE_LEAST } from '../src/sim/rules/body.ts';
+import { CALM_LEAST } from '../src/sim/rules/body.ts';
 import { WALK_PACE } from '../src/sim/rules/walking.ts';
 
 const plan = shipPlan(), graph = walkGraph(plan), doors = shutDoors(plan), DT = 1 / 60;
@@ -153,19 +153,18 @@ test('a blow staggers him: his lean is thrown and a foot steps to catch it, then
   assert.ok(Math.abs(b.up[0]) < 0.02, 'settled');
 });
 
-test('her heeled deck slows him: climbing it most, going down it less, never to a stop', () => {
-  const heel = 0.2, up = { x: Math.sin(heel), y: Math.cos(heel), z: 0 };
-  // Gravity's up leaning to starboard (+x): starboard is her high side. Facing forward (heading 0), right is starboard.
-  const toHigh = slopePace({ forward: 0, strafe: 1, heading: 0 }, up), toLow = slopePace({ forward: 0, strafe: -1, heading: 0 }, up);
-  const along = slopePace({ forward: 1, strafe: 0, heading: 0 }, up), level = slopePace({ forward: 1, strafe: 0, heading: 0 }, { x: 0, y: 1, z: 0 });
-  assert.equal(level, 1);
-  assert.ok(toHigh < toLow && toLow < 1 && along < 1 && along > toLow, `up ${toHigh.toFixed(2)}, down ${toLow.toFixed(2)}, along ${along.toFixed(2)}`);
-  assert.ok(slopePace({ forward: 0, strafe: 1, heading: 0 }, { x: Math.sin(1.2), y: Math.cos(1.2), z: 0 }) >= SLOPE_LEAST);
-});
-
 test('a point of her moves as her heave, pitch and roll rates say', () => {
   const p: ShipPose = { ...still, roll: 0.1, rollRate: 0.2, pitchRate: -0.05, heaveRate: 0.3 };
   const v = pointVelocity(p, 3, 2, -4), h = 1e-4;
   const a = toWorld(p, 3, 2, -4), b = toWorld({ ...p, roll: p.roll + p.rollRate * h, pitch: p.pitch + p.pitchRate * h, heave: p.heave + p.heaveRate * h }, 3, 2, -4);
   for (let i = 0; i < 3; i++) assert.ok(Math.abs(v[i]! - (b[i]! - a[i]!) / h) < 1e-3, `axis ${i}`);
+});
+
+test('her heeled deck slows him as it slows every man aboard', () => {
+  const pace = (heel: number) => {
+    let w = walkerAt(plan, { space: 'deck', along: -4, across: 1.5 });
+    for (let i = 0; i < 2 / DT; i++) w = stepWalker(w, { forward: 1, strafe: 0, heading: 0 }, plan, graph, doors, DT, { x: Math.sin(heel), y: Math.cos(heel), z: 0 });
+    return Math.hypot(w.vx, w.vz);
+  };
+  assert.ok(pace(0.35) < pace(0) * 0.8 && pace(0.35) > pace(0) * 0.4, `level ${pace(0).toFixed(2)} m/s, heeled 20° ${pace(0.35).toFixed(2)}`);
 });

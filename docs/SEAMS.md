@@ -297,6 +297,11 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The forces a duel is fought in | `src/sim/rules/wind.ts#DUEL_FORCES` |
 | The captain aboard: walking, climbing her ladders as a seen figure, her doors | `src/app/captain.ts#Captain` |
 | Walking her decks on the page (`?walk`): thumbs to captain to standpoint and doors | `src/app/walking.ts#Walking` |
+| The captain's body on a moving deck: his lean against her roll, his feet stepping, his walk's bob, holding on, a blow's stagger, the eye and the head's hold it gives, the calm view's share | `src/app/body.ts#CaptainBody` |
+| The body's tuning: lean and balance, legs and stance, cadence, holding on, the calm view's steps | `src/sim/rules/body.ts#LEAN_SHARE` |
+| What a hand can hold where he stands (her rail on deck, the beam overhead below) | `src/sim/ship/handholds.ts#handholdNear` |
+| How fast a point of her moves in the world from her heave, pitch and roll (what feet on her deck feel) | `src/sim/ship/motion.ts#pointVelocity` |
+| The calm view's button (how much of his body's motion the view takes; the device remembers it) | `src/app/motionSetting.ts#showMotionSetting` |
 | The walking thumb's stick as a push | `src/app/thumbs.ts#stickPush` |
 | Keys held as a push (WASD and arrows) | `src/app/thumbs.ts#keyPush` |
 | The walking thumb and keys on the page (the left half's floating stick) | `src/app/walkInput.ts#watchWalk` |
