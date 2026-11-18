@@ -169,3 +169,22 @@ export const RANGE_TABLE: Readonly<Record<GunKind, { readonly pointBlank: number
   long6: { pointBlank: 575, five: 1335 },
 };
 export const RANGE_TOLERANCE = 0.05;
+
+// ---- Gunnery orders (N5.3a) ----
+
+/** Where the gun captains lay their guns on her (orders.md: the gunner's "Aim: Hull, Rigging, Deck"). */
+export type AimName = 'hull' | 'rigging' | 'deck';
+/**
+ * The point each aim lays on, m above the calm water at her middle, on her side toward the guns: the hull half her
+ * freeboard up (where N5.2's check aims, so the range shares hold for it); the rigging about her lower yards (her lower
+ * masts' hounds); the deck a man's chest above her rail. First proposals, judged at G5 when damage (N6.1) can say what
+ * each strikes.
+ */
+export const AIM_HEIGHT: Readonly<Record<AimName, number>> = { hull: 1.25, rigging: 13, deck: 4 };
+/**
+ * The most guns of one ship that fire in a step: a broadside ripples down her side over a few steps, as a real one
+ * did, and so a whole side of grape (about 6.5 ms of flights, N5.2) is spread over steps of 2 ms.
+ */
+export const RIPPLE = 3;
+/** Fired as they bear, a gun captain fires only once his gun is laid within this of what he wants, rad. */
+export const LAID_WITHIN = 0.1 * DEGREE;

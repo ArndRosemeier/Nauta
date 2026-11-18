@@ -18,7 +18,12 @@ import { hullEnds, hullHalfBreadth, sideTop } from '../../src/sim/ship/hull.ts';
 import { lyingStill, poseRotation, shipBody, startMotion, stepMotion, type ShipMotion, type ShipPose } from '../../src/sim/ship/motion.ts';
 import { LOAD_WATERLINE } from '../../src/sim/rules/ships.ts';
 import { startMatch } from '../../src/sim/state.ts';
-import { DEGREE, STEPS_PER_SECOND } from '../../src/sim/units.ts';
+import { duelStart } from '../../src/sim/start.ts';
+import { step } from '../../src/sim/step.ts';
+import { parseOrder, type Order } from '../../src/sim/orders.ts';
+import { RIPPLE } from '../../src/sim/rules/guns.ts';
+import type { GunFired } from '../../src/sim/guns/shot.ts';
+import { DEGREE, STEPS_PER_SECOND, wrapBearing } from '../../src/sim/units.ts';
 
 const SEED = 1805;
 const FORCE = 4;
@@ -41,6 +46,44 @@ const FULL = 5;
 const SETTLE = 20;
 
 const problems: string[] = [];
+
+/** The ?sail match's broadside by the order panel's words (N5.3a): the most she sails before it, s. */
+const BROADSIDE_WITHIN = 150;
+
+/**
+ * The duel's start as `?sail` gives it, the first ship sailed by the panel's typed words: she bears away to bring the
+ * enemy onto her starboard beam, beats to quarters and holds for the word; once her starboard guns stand ready the
+ * word is given, and the broadside ripples down her side as events with their flights. Fails if it does not.
+ */
+function broadsideByOrders(): void {
+  let s = startMatch(duelStart(SEED));
+  const say = (words: string): Order => { const o = parseOrder(words, 0); if (typeof o === 'string') throw new Error(o); return o; };
+  const enemy = Math.atan2(s.ships[1]!.motion.pose.x - s.ships[0]!.motion.pose.x, -(s.ships[1]!.motion.pose.z - s.ships[0]!.motion.pose.z));
+  const course = Math.round(wrapBearing(enemy - Math.PI / 2) / DEGREE) % 360;
+  const starboard = battery().flatMap((p, i) => (p.side > 0 ? [i] : []));
+  let k = 0, wordAt = -1;
+  const fired: GunFired[] = [], refused: string[] = [];
+  for (; k < BROADSIDE_WITHIN * STEPS_PER_SECOND; k++) {
+    const orders = k === 0 ? [say(`steer ${String(course).padStart(3, '0')}`), say('beat to quarters'), say('hold for my word')] : [];
+    const ready = starboard.every((i) => gunAt(s.ships[0]!.guns, i).drill === 'ready');
+    if (wordAt < 0 && ready) { orders.push(say('fire')); wordAt = s.tick; }
+    const r = step(s, orders);
+    s = r.state;
+    for (const e of r.events) { if (e.kind === 'fired') fired.push(e); if (e.kind === 'refused') refused.push(e.reason); }
+    if (wordAt >= 0 && !s.ships[0]!.told.word) break;
+  }
+  const ticks = new Set(fired.map((e) => e.tick)), first = Math.min(...ticks);
+  console.log(`?sail by orders: bore away to ${course}, at quarters and held; the word at ${(wordAt / STEPS_PER_SECOND).toFixed(0)} s, ${fired.length} guns fired over ${ticks.size} steps`);
+  if (refused.length > 0) problems.push(`broadside: refused: ${refused.join('; ')}`);
+  if (wordAt < 0) problems.push(`broadside: her starboard guns were not ready within ${BROADSIDE_WITHIN} s`);
+  else if (fired.length === 0) problems.push('broadside: the word was given and no gun fired');
+  else {
+    if (first !== wordAt) problems.push(`broadside: the first gun fired at tick ${first}, the word was given at ${wordAt}`);
+    if (fired.some((e) => e.ship !== 0 || !starboard.includes(e.gun))) problems.push('broadside: a gun fired that is not of her starboard side');
+    if (fired.some((e) => e.fired.balls.some((b) => b.path.length < 2 || b.path.some((p) => !p.every(Number.isFinite))))) problems.push('broadside: a shot has no flight');
+    if (ticks.size < Math.ceil(fired.length / RIPPLE)) problems.push(`broadside: ${fired.length} guns in ${ticks.size} steps, more than ${RIPPLE} a step`);
+  }
+}
 
 /** A world point in a ship's own space at her pose. */
 function toShip(pose: ShipPose, p: Vec): Vec {
@@ -125,6 +168,7 @@ for (const shot of ['chain', 'grape'] as const) {
   const out = run(100, SEED, shot);
   console.log(`${shot} at 100 m: ${out.struck} of ${out.fired} balls through her side; the farthest went ${out.farthest.toFixed(0)} m`);
 }
+broadsideByOrders();
 console.log(`gunnery: ${((performance.now() - began) / 1000).toFixed(1)} s`);
 if (problems.length > 0) {
   for (const p of problems) console.error(`FAIL ${p}`);

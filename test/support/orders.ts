@@ -47,4 +47,7 @@ export const EACH: Readonly<Record<OrderKind, Order>> = {
   tack: { kind: 'tack', ship: 0 }, wear: { kind: 'wear', ship: 0 }, heave: { kind: 'heave', ship: 0 },
   sail: { kind: 'sail', ship: 0, canvas: 'plain' }, shorten: { kind: 'shorten', ship: 0 },
   back: { kind: 'back', ship: 0, mast: 'main' }, fill: { kind: 'fill', ship: 0 },
+  quarters: { kind: 'quarters', ship: 0 }, stand: { kind: 'stand', ship: 0 },
+  shot: { kind: 'shot', ship: 0, shot: 'chain' }, aim: { kind: 'aim', ship: 0, at: 'rigging' },
+  bear: { kind: 'bear', ship: 0 }, hold: { kind: 'hold', ship: 0 }, fire: { kind: 'fire', ship: 0 }, cease: { kind: 'cease', ship: 0 },
 };

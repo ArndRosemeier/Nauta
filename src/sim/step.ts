@@ -7,11 +7,13 @@
  * Within a step, in this order: the orders are given in the order listed (the host's list is the truth, so two
  * orders in one step never race; orders.ts answers each: taken, taken with words (`answered`) or refused with its reason), the sea follows the
  * wind's mean at the step's start, and every ship has the acts of her orders falling due now carried out (orders.ts),
- * sails one step in the true wind at her place (sailing.ts) and floats one step on that sea as her sailing says
- * (motion.ts).
+ * sails one step in the true wind at her place (sailing.ts), works and fires her guns at the other ship as she has
+ * been told (guns/gunnery.ts) and floats one step on that sea as her sailing says (motion.ts).
  */
 import { stepCrew } from './crew/crew';
-import { carryOut, giveOrder, heard, type AnswerCode, type Order } from './orders';
+import { carryOut, giveOrder, heard, wordSpent, type AnswerCode, type Order, type RefusalCode, type SailingOrder } from './orders';
+import { stepGunnery } from './guns/gunnery';
+import type { GunFired } from './guns/shot';
 import { followWind } from './sea/sea';
 import { stepMotion } from './ship/motion';
 import { setShares, stepSailing, type SailingEvent } from './ship/sailing';
@@ -19,14 +21,15 @@ import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
-export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded;
+export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired;
 
-/** An order the ship could not take, with the reason in words. */
+/** An order the ship could not take: why, as a code (the phrase book, N4.5, words it) and in English for now. */
 export interface OrderRefused {
   readonly kind: 'refused';
   /** The tick of the step it was given in. */
   readonly tick: number;
   readonly order: Order;
+  readonly code: RefusalCode;
   readonly reason: string;
 }
 
@@ -49,7 +52,7 @@ export interface OrderDone {
   readonly kind: 'done';
   readonly tick: number;
   readonly ship: number;
-  readonly order: Order;
+  readonly order: SailingOrder;
 }
 
 /** A ship came through the wind (tacked), round before it (wore), or missed stays and fell back (sailing.ts). */
@@ -64,7 +67,7 @@ export interface ShortHanded {
   readonly kind: 'short-handed';
   readonly tick: number;
   readonly ship: number;
-  readonly order: Order;
+  readonly order: SailingOrder;
   /** The job (rules/crew.ts `JOBS`). */
   readonly job: string;
 }
@@ -84,12 +87,12 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
   for (const order of orders) {
     const ship: SimShip | undefined = Number.isInteger(order.ship) ? ships[order.ship] : undefined;
     if (!ship) {
-      events.push({ kind: 'refused', tick, order, reason: `there is no ship ${order.ship}` });
+      events.push({ kind: 'refused', tick, order, code: 'no ship', reason: `there is no ship ${order.ship}` });
       continue;
     }
     const answer = giveOrder(ship.told, ship.sailing, order, { tick, wind, force: state.wind.windForce });
-    if (answer.code) events.push({ kind: 'answered', tick, ship: order.ship, order, code: answer.code, reason: answer.reason });
-    else if (answer.reason) events.push({ kind: 'refused', tick, order, reason: answer.reason });
+    if (answer.refused) events.push({ kind: 'refused', tick, order, code: answer.code, reason: answer.reason });
+    else if (answer.code) events.push({ kind: 'answered', tick, ship: order.ship, order, code: answer.code, reason: answer.reason });
     if (answer.told !== ship.told) ships = ships.map((s, i) => (i === order.ship ? { ...s, told: answer.told } : s));
   }
   const sea = followWind(state.sea, { speed: wind.speed, toward: wind.toward }, t);
@@ -109,7 +112,12 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
         for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
         const sailed = stepSailing(carried.sailing, pose, windAt(state.wind, pose.x, pose.z, t));
         for (const kind of sailed.events) events.push({ kind, tick, ship: i });
-        return { ...s, motion: stepMotion(s.motion, sea, t, sailed.way), sailing: sailed.sailing, told: heard(carried.told, sailed.events, sailed.sailing), crew: crewed.crew };
+        // The duel's one enemy is the other ship (design decisions for N5: she is the target).
+        const enemy = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
+        const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, sailing: s.sailing, pose, enemy, sea });
+        events.push(...gunnery.fired);
+        const told = heard(carried.told, sailed.events, sailed.sailing);
+        return { ...s, motion: stepMotion(s.motion, sea, t, sailed.way), sailing: sailed.sailing, told: gunnery.spent ? wordSpent(told) : told, crew: crewed.crew, guns: gunnery.guns };
       }),
     },
     events,

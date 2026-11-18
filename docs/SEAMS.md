@@ -475,6 +475,12 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A direction of ship space in the world at her pose | `src/sim/guns/shot.ts#worldDir` |
 | Her pose a moment on along her rates | `src/sim/guns/shot.ts#poseAfter` |
 | The seeded randomness of a gun's shot | `src/sim/guns/shot.ts#shotRng` |
+| The gunnery orders carried out: what each gun crew wants (at quarters, the shot, laid on the enemy) and which guns fire, as they bear or on the word, rippled (the one place that decides when a gun fires) | `src/sim/guns/gunnery.ts#stepGunnery` |
+| The point on the enemy the gun captains lay on for the aim ordered (hull, rigging, deck) | `src/sim/guns/gunnery.ts#aimPoint` |
+| Whether the drum beats: she goes to quarters and a gun is not yet loaded | `src/sim/guns/gunnery.ts#beatingToQuarters` |
+| Building the guns' laying tables while the page loads | `src/sim/guns/gunnery.ts#warmGunnery` |
+| Where each aim lays on her, how many guns fire in a step, how near laid a gun fires as they bear (first proposals) | `src/sim/rules/guns.ts#AIM_HEIGHT` |
+| The captain's word carried out: what she is told once her held side has fired | `src/sim/orders.ts#wordSpent` |
 | The shot's rules: muzzle speeds, each shot's balls, mass, size, speed, drag, spread and span; scatter; skipping; the range table (first proposals) | `src/sim/rules/guns.ts#SHOT` |
 | The highest the water can stand anywhere at a moment (above it nothing meets the sea) | `src/sim/sea/sea.ts#highestWater` |
 | The match the page sails (`?sail`, `?room`, `?join=`): the session running now behind one face, its events to the order panel, the poses to draw | `src/app/pageMatch.ts#PageMatch` |

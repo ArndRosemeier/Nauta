@@ -77,9 +77,11 @@ const calls = (shots: readonly Heard[]) => shots.filter((s) => s.id.startsWith('
 const index = JSON.parse(readFileSync(new URL('../public/sound/index.json', import.meta.url), 'utf8')) as { sounds: Record<string, { files: string[]; seconds: number[] }> };
 
 test('every order has its call, the hands\' orders each their own, and every call is a take of the game as long as the tuning says', () => {
-  for (const w of VOCABULARY) assert.ok(ORDER_CALLS[w.kind], `${w.kind} has a call`);
-  const hands = VOCABULARY.filter((w) => w.to === 'first lieutenant' || ['tack', 'wear', 'heave'].includes(w.kind));
-  assert.equal(new Set(hands.map((w) => ORDER_CALLS[w.kind].id)).size, hands.length, 'no two orders of the hands share a call');
+  // The gunnery orders take no sailing hands and are not piped (the drum beats to quarters).
+  const sailing = VOCABULARY.flatMap((w) => (Object.hasOwn(ORDER_CALLS, w.kind) ? [w.kind as keyof typeof ORDER_CALLS] : []));
+  assert.deepEqual(VOCABULARY.filter((w) => !sailing.includes(w.kind as keyof typeof ORDER_CALLS)).map((w) => w.kind), ['quarters', 'stand', 'shot', 'aim', 'bear', 'hold', 'fire', 'cease'], 'every sailing order has a call');
+  const hands = sailing.filter((k) => VOCABULARY.find((w) => w.kind === k)!.to === 'first lieutenant' || ['tack', 'wear', 'heave'].includes(k));
+  assert.equal(new Set(hands.map((k) => ORDER_CALLS[k].id)).size, hands.length, 'no two orders of the hands share a call');
   for (const c of [...Object.values(ORDER_CALLS), HAUL_CALL, STILL_CALL, CARRY_ON]) {
     const entry = index.sounds[c.id];
     assert.ok(entry, `${c.id} is made`);

@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Order } from '../src/sim/orders.ts';
+import { isGunnery, type Order } from '../src/sim/orders.ts';
 import type { SimState } from '../src/sim/state.ts';
 import { step } from '../src/sim/step.ts';
 import { DEGREE, wrapBearing } from '../src/sim/units.ts';
@@ -30,7 +30,8 @@ let built: SimState | null = null;
 const start = (): SimState => (built ??= Object.freeze(underWay(MODERATE, 100, SETTLE)));
 
 test('every order is applied and shows in the state at once: taken, being carried out, its work still to do', () => {
-  for (const order of Object.values(EACH)) {
+  // The gunnery orders take none of the sailing drill's hands (test/gunnery.test.ts).
+  for (const order of Object.values(EACH).filter((o) => !isGunnery(o))) {
     const s = step(start(), ordersFor(order)), told = s.state.ships[0]!.told;
     assert.deepEqual(s.events.filter((e) => e.kind === 'refused'), [], `${order.kind} is taken`);
     assert.deepEqual(told.given.map((g) => g.order), [order], `${order.kind} is being carried out`);
