@@ -15,6 +15,7 @@
  */
 import { DEGREE } from '../units';
 import type { ShotKind } from './guns';
+import type { SparKind } from '../ship/spars';
 import { BERTH_BEAM, BULWARK, CEILING, DEAL, DECK_BEAM, FRAME_DEPTH, FRAME_FILL, OAK, PLANKING, type GunKind } from './ships';
 
 // ---- Her timber ----
@@ -113,14 +114,106 @@ export const LODGED_SPLINTERS = 0.5;
 export type Harm = 'wounded' | 'badly' | 'killed';
 export const HARMS: readonly Harm[] = ['wounded', 'badly', 'killed'];
 /** What strikes a man: a ball itself (by its kind), or splinters. */
-export type HurtBy = ShotKind | 'splinter';
-/** How a man struck is hurt, by what struck him: the shares wounded, badly wounded and killed (they add up to one, tested). */
+export type HurtBy = ShotKind | 'splinter' | 'fall';
+/** How a man struck is hurt, by what struck him (a man aloft on a spar that falls is thrown down: `fall`): the shares wounded, badly wounded and killed (they add up to one, tested). */
 export const HURT: Readonly<Record<HurtBy, readonly [wounded: number, badly: number, killed: number]>> = {
   round: [0, 0.3, 0.7],
   chain: [0, 0.4, 0.6],
   grape: [0.3, 0.4, 0.3],
   splinter: [0.6, 0.3, 0.1],
+  fall: [0.2, 0.4, 0.4],
 };
+
+// ---- Water (N6.2) ----
+
+/**
+ * A shot hole lets the sea in as a round opening RAGGED times the ball's diameter across (the timber splintered round
+ * it), passing DISCHARGE of the ideal flow (a sharp-edged opening): flow = DISCHARGE × area × √(2 g × depth), the depth
+ * from the sea outside down to the hole, less the water inside standing over it. A lodged ball plugs its own hole. Held
+ * to the design's statement (tested): five holes at her waterline, unplugged, with the pumps manned, sink her in about
+ * eight minutes (`FOUNDER_MINUTES`); plugged and pumped she holds.
+ */
+export const RAGGED = 1.7;
+export const DISCHARGE = 0.6;
+export const FOUNDER_MINUTES = 8;
+/**
+ * Her chain pumps (ship.md; rules/fittings.ts `PUMPS`): `count` side by side by the mainmast, each fully manned by
+ * `hands` men clearing `rate` t of water a second (a ton and a half a minute), fewer men in proportion. They draw from
+ * the well and leave `least` t in the bilge. The men posted at the pumps by the quarter bill (crew.ts) work them.
+ */
+export const PUMPING = { count: 2, hands: 4, rate: 1.5 / 60, least: 1 } as const;
+/** The post of the men who work the pumps (rules/crew.ts quarter bill). */
+export const PUMP_POST = 'station-pumps';
+/**
+ * Water in her runs across her hold toward the level as she heels, taking about CROSS_SECONDS through her stowage and ballast: the sea
+ * coming in at a hole on one side lists her that way until it has run across, and water left in her runs to the low
+ * side as she rolls (her free surface).
+ */
+export const CROSS_SECONDS = 12;
+
+// ---- Spars falling (N6.2) ----
+
+/**
+ * A spar breaks at a part with STRUCK_DOWN wounds (design decisions for N6), and goes over its lee side with all it
+ * carries. A spar goes too when more than SUPPORT_LOST of the standing lines holding it on its weather side are gone
+ * (its shrouds and backstays: cut, or made fast to a spar that is down) and the wind is on that side at FALL_WIND or
+ * more (m/s, across her); or when that share of its stays is gone and its mast's square sails are aback (the wind on
+ * their fore side presses it aft). Pulled over, a mast breaks at the part above where it is held (`FALLS_AT_PART` of its
+ * parts, damage/meet.ts `sparParts`): a lower mast at her partners (the deck), a topmast at the cap, the bowsprit at
+ * the stem.
+ */
+export const STRUCK_DOWN = 3;
+export const SUPPORT_LOST = 0.5;
+export const FALL_WIND = 3;
+export const FALLS_AT_PART = 1;
+/**
+ * What falls drags alongside, held by its rigging until it is cut away (N6.3): a drag on her where it lies, at her side
+ * by its mast, kN for each (m/s)² of the water past it, by the kind of each spar that fell (with its sails and rigging
+ * in the water). A lower mast over the side all but stops her and swings her toward it.
+ */
+export const WRECK_DRAG: Readonly<Record<SparKind, number>> = {
+  mast: 6, topmast: 2, 'topgallant mast': 0.6, yard: 0.8, bowsprit: 2, 'jib-boom': 0.6, striker: 0.1, boom: 0.6, gaff: 0.4,
+};
+/**
+ * A sail's holes: each takes RENT_AREA m² of its drive (the cloth round it flogs), and a sail that has lost more than
+ * SPLIT of its area so splits from head to foot and draws no more. A sail draws nothing either once its sheet or
+ * halliard is cut, or the spar or stay it is set on is down.
+ */
+export const RENT_AREA = 0.5;
+export const SPLIT = 0.6;
+
+// ---- Fire (N6.2) ----
+
+/**
+ * Fire (design decisions for N6: it reaches the magazine only if left unfought for three minutes or more). A fire burns
+ * in one of the plan's spaces (the weather deck is one); its size is the share of the space alight, `start` where a
+ * ball starts it. Unfought it doubles every `doubling` s up to the whole space; at `spread` it catches the spaces the
+ * plan's ways join it to (doors, ladders, openings) at `start`; each man fighting it puts out `put` of the space a
+ * second. Powder catches when the magazine's own fire reaches `catch`: from `start` that takes log₂(catch / start)
+ * doublings, about 3 min (tested). Out below `out`.
+ */
+export const FIRE = { start: 0.05, doubling: 78, spread: 0.5, catch: 0.25, put: 0.0012, out: 0.005 } as const;
+/** The space the powder is kept in (the plan's). */
+export const MAGAZINE = 'magazine';
+/** Until fire parties are sent (N6.3), the men in a burning space and the spaces joined to it fight it, at most this many. */
+export const FIGHT_AT_HAND = 8;
+/**
+ * The chance a ball that holes her timber, lodges in it or dismounts a gun sets her afire: `wad` when it was fired from
+ * within WAD_RANGE (m, the burning wads and the flash reach her), else `ball` (a lantern, the galley fire, powder
+ * by the guns).
+ */
+export const FIRE_CHANCE = { wad: 0.05, ball: 0.003 } as const;
+export const WAD_RANGE = 40;
+
+// ---- Steering (N6.2) ----
+
+/**
+ * Her steering gear: the wheel on the weather deck and the tiller ropes from its drum down and aft to the rudder head.
+ * A ball passing within STEERING_REACH (m) of that line shoots her steering away: her rudder trails amidships and she
+ * answers no helm until it is mended (N6.3). WHEEL_HIGH: the wheel's middle over her deck, m.
+ */
+export const STEERING_REACH = 0.4;
+export const WHEEL_HIGH = 1.1;
 
 // ---- What she looks like after ----
 

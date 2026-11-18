@@ -168,8 +168,10 @@ export function eventWords(e: SimEvent, ship: number): string | null {
     case 'fouled':
       if (e.ship === ship) return `${at} her ${sparOf(rigPlan(), e.spar).name} is foul of the other ship's rigging`;
       return e.other === ship ? `${at} the other ship's ${sparOf(rigPlan(), e.spar).name} is foul of our rigging` : null;
-    // What shot does is shown and heard where it happens (N6.5, N6.8), never written.
-    case 'hit': return null;
+    // What shot does and what follows (a spar falling, fire, water) is shown and heard where it happens (N6.5, N6.8),
+    // never written; the men's cries for it ("the wheel's shot away", "fire!") come with the phrase book (N4.5).
+    case 'hit':
+    case 'aftermath': return null;
   }
 }
 

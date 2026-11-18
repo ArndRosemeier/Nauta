@@ -13,10 +13,11 @@
  * gives where it crossed her side, a bulwark or a deck; a gun port or an open hatch is no timber.
  */
 import { clamp, v3cross, v3dot, v3sub } from '@futuremagic/core';
-import { GUN_HIGH, MAN_REACH, TIMBER } from '../rules/damage';
+import { GUN_HIGH, MAN_REACH, STEERING_REACH, TIMBER, WHEEL_HIGH } from '../rules/damage';
+import { ON_CENTRELINE } from '../rules/fittings';
 import { BODY, BULWARK, CELL, WALE, type Level } from '../rules/ships';
 import { battery } from '../guns/guns';
-import { HULL_AFT, HULL_FORE, HULL_LOW, hullBottom, hullHalfBreadth, sheer, sideTop, weatherDeck } from '../ship/hull';
+import { HULL_AFT, HULL_FORE, HULL_LOW, hullBottom, hullEnds, hullHalfBreadth, sheer, sideTop, weatherDeck } from '../ship/hull';
 import { berthDeck, holds, shipPlan, type Cell } from '../ship/plan';
 import { rigPlan } from '../ship/rig';
 import { onSpar, type RigPoint } from '../ship/spars';
@@ -48,7 +49,9 @@ export interface ManMet extends Met { readonly kind: 'man'; readonly man: number
 export interface SparMet extends Met { readonly kind: 'spar'; readonly part: number; readonly chord: number }
 export interface LineMet extends Met { readonly kind: 'line'; readonly line: number }
 export interface SailMet extends Met { readonly kind: 'sail'; readonly sail: number }
-export type Meeting = TimberMet | GunMet | ManMet | SparMet | LineMet | SailMet;
+/** Her steering gear: the wheel and its tiller ropes (rules/damage.ts `STEERING_REACH`). */
+export interface SteeringMet extends Met { readonly kind: 'steering' }
+export type Meeting = TimberMet | GunMet | ManMet | SparMet | LineMet | SailMet | SteeringMet;
 
 /** Where a man stands (his feet, m) and so his body up to BODY.height over them; null for a man not met (killed). */
 export type ManPlace = Place | null;
@@ -58,6 +61,11 @@ export interface Aboard {
   readonly men: readonly ManPlace[];
   readonly mounted: readonly boolean[];
   readonly sails: readonly number[];
+  /** Her spars down and lines gone (rig plan places; damage/fall.ts): what is down is no longer where the plan lays it. Left out: all stands. */
+  readonly down?: readonly boolean[];
+  readonly gone?: readonly boolean[];
+  /** Whether her steering gear is still there to be shot away. */
+  readonly steering?: boolean;
 }
 
 /** One part of a spar between two places it can break (the rig plan's marks), and its spar. */
@@ -182,6 +190,21 @@ function girthTo(along: number, h: number): number {
     lastX = x; lastH = y;
   }
   return girth;
+}
+
+/** Where in her a spot of a planking cell is (`u` m along it from its after edge, `v` m up its girth): the place on her side, `girthTo` walked back. */
+export function plankingPlace(cell: Cell, u: number, v: number): Place {
+  const along = cell.aft + u, bottom = hullBottom(along), girth = cell.from + v;
+  let walked = 0, lastX = hullHalfBreadth(along, bottom), lastH = bottom;
+  for (let y = bottom + GIRTH_STEP; y <= sideTop(along); y += GIRTH_STEP) {
+    const x = hullHalfBreadth(along, y), piece = Math.hypot(x - lastX, y - lastH);
+    if (walked + piece >= girth) {
+      const f = (girth - walked) / piece;
+      return [along, cell.side * (lastX + (x - lastX) * f), lastH + (y - lastH) * f];
+    }
+    walked += piece; lastX = x; lastH = y;
+  }
+  return [along, cell.side * lastX, lastH];
 }
 
 let cellIndex: Map<string, Cell[]> | null = null;
@@ -328,9 +351,11 @@ function boxesMeet(a: Place, b: Place, c: Place, e: Place, room: number): boolea
   return true;
 }
 
-/** The spars met: each part within its radius and the ball's reach. */
-function sparMeetings(a: Place, b: Place, reach: number, out: Meeting[]): void {
+/** The spars met: each part within its radius and the ball's reach (none of a spar that is down). */
+function sparMeetings(a: Place, b: Place, reach: number, down: readonly boolean[] | undefined, out: Meeting[]): void {
+  const spars = down && sparIndex();
   sparParts().forEach((p, i) => {
+    if (spars && down[spars.get(p.spar)!]) return;
     const within = p.radius + reach;
     if (!boxesMeet(a, b, p.from, p.to, within)) return;
     const c = closest(a, b, p.from, p.to);
@@ -349,10 +374,11 @@ function piecesOfLines(): NonNullable<typeof linePieces> {
   return linePieces;
 }
 
-/** The lines met: each piece of each line, within its thickness and the ball's reach (a line met twice counts once, where nearest). */
-function lineMeetings(a: Place, b: Place, reach: number, out: Meeting[]): void {
+/** The lines met: each piece of each line, within its thickness and the ball's reach (a line met twice counts once, where nearest; none that is gone). */
+function lineMeetings(a: Place, b: Place, reach: number, gone: readonly boolean[] | undefined, out: Meeting[]): void {
   const best = new Map<number, { d: number; s: number }>();
   for (const p of piecesOfLines()) {
+    if (gone?.[p.line]) continue;
     const within = p.radius + reach;
     if (!boxesMeet(a, b, p.from, p.to, within)) continue;
     const c = closest(a, b, p.from, p.to), was = best.get(p.line);
@@ -402,6 +428,27 @@ function throughTriangle(a: Place, b: Place, p: Place, q: Place, r: Place): numb
   return s >= 0 && s <= 1 ? s : null;
 }
 
+let sparsById: ReadonlyMap<string, number> | null = null;
+/** Each spar's rig plan place by its id. */
+const sparIndex = (): ReadonlyMap<string, number> => (sparsById ??= new Map(rigPlan().spars.map((s, i) => [s.id, i])));
+
+let gear: readonly [Place, Place] | null = null;
+/** Her steering gear as one line: from the wheel's middle down and aft to her rudder head under her deck at her stern. */
+function steeringGear(): readonly [Place, Place] {
+  if (gear) return gear;
+  const wheel = ON_CENTRELINE.wheel, stern = hullEnds(berthDeck(HULL_AFT)).aft;
+  gear = [[wheel, 0, weatherDeck(wheel, 0) + WHEEL_HIGH], [stern, 0, berthDeck(stern)]];
+  return gear;
+}
+
+/** Her steering gear met: the piece passing within STEERING_REACH (and the ball's reach) of it. */
+function steeringMeeting(a: Place, b: Place, reach: number, out: Meeting[]): void {
+  const [w, r] = steeringGear(), within = STEERING_REACH + reach;
+  if (!boxesMeet(a, b, w, r, within)) return;
+  const c = closest(a, b, w, r);
+  if (c.d <= within) out.push({ kind: 'steering', s: c.s, at: lerp3(a, b, c.s) });
+}
+
 /** Whether a piece a→b comes near her at all (within her hull's and her rig's box). */
 export const nearHer = (a: Place, b: Place): boolean => clip(a, b, herBoxes().all) !== null;
 
@@ -420,8 +467,9 @@ export function meetings(a: Place, b: Place, reach: number, aboard: Aboard): Mee
     gunMeetings(a, b, aboard.mounted, out);
   }
   manMeetings(a, b, aboard.men, out);
-  sparMeetings(a, b, reach, out);
-  lineMeetings(a, b, reach, out);
+  sparMeetings(a, b, reach, aboard.down, out);
+  lineMeetings(a, b, reach, aboard.gone, out);
   sailMeetings(a, b, aboard.sails, out);
+  if (aboard.steering !== false) steeringMeeting(a, b, reach, out);
   return out.sort((p, q) => p.s - q.s);
 }

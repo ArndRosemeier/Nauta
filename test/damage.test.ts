@@ -2,7 +2,8 @@
  * Hits (implementation plan N6.1): the same shot and seed give the same damage; a ball spends its punch in order along
  * its path; the design's ranges for piercing hold; every effect is reachable (a hole, a lodged ball, splinters, a gun
  * dismounted, a man struck, a spar wounded, a line cut, a sail holed); splinters strike only men ahead of the hole;
- * chain cuts more than round shot; the step puts fired shots in flight and traces them. That no state under `owners`
+ * chain cuts more than round shot; a ball through her wheel shoots her steering away and one fired close may set her
+ * afire (N6.2); the step puts fired shots in flight and traces them. That no state under `owners`
  * is written elsewhere is the guards' test (test/guards.test.ts).
  *
  * Shots here fly straight at a set speed through a ship lying still (built for the purpose, as CHECKS.md asks): what a
@@ -18,7 +19,9 @@ import { sparParts, type Place } from '../src/sim/damage/meet.ts';
 import { battery, gunAt } from '../src/sim/guns/guns.ts';
 import { fly, type Shot, type Vec } from '../src/sim/guns/shot.ts';
 import { MUZZLE_SPEED, PATH_STEP, SHOT, type ShotKind } from '../src/sim/rules/guns.ts';
-import { HURT, PIERCE, SPLINTER_REACH, TIMBER } from '../src/sim/rules/damage.ts';
+import { HURT, PIERCE, SPLINTER_REACH, TIMBER, WHEEL_HIGH } from '../src/sim/rules/damage.ts';
+import { ON_CENTRELINE } from '../src/sim/rules/fittings.ts';
+import { weatherDeck } from '../src/sim/ship/hull.ts';
 import { LOAD_WATERLINE, type GunKind } from '../src/sim/rules/ships.ts';
 import { toWorld } from '../src/sim/ship/motion.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
@@ -143,7 +146,7 @@ test('every effect is reachable: holes, lodged balls, splinters, a gun dismounte
   const seen = new Set<string>();
   const runs = [fire(across(BETWEEN_DECKS, AT_100)), fire(across(BETWEEN_DECKS, SPENT)), fire(grapeOverDeck()), fire(across(OVER_DECK, AT_100)), fire(throughRig('chain')), fire(throughRig('round'))];
   const gunShot = intoGun(), intoIt = fire(gunShot.shot);
-  for (const r of [...runs, intoIt]) for (const e of r.events) seen.add(e.what);
+  for (const r of [...runs, intoIt]) for (const e of r.events) if (e.what !== 'fire') seen.add(e.what);
   assert.deepEqual([...seen].sort(), ['gun', 'hole', 'line', 'lodged', 'man', 'sail', 'spar', 'splinters']);
   // What the events say is what the state keeps.
   assert.ok(gunAt(intoIt.guns, gunShot.gun).dismounted, 'the gun the ball met is dismounted');
@@ -189,6 +192,19 @@ test('splinters strike only men ahead of where the ball came through, within the
     }
   }
   assert.ok(splintered > 0, 'splinters struck someone');
+});
+
+test('a ball through her wheel shoots her steering away; a ball fired close may set her afire where it struck', () => {
+  const wheel = ON_CENTRELINE.wheel, h = weatherDeck(wheel, 0) + WHEEL_HIGH;
+  const r = fire(straight('round', [wheel, -OFF, h], [wheel, OFF, h], AT_100));
+  assert.ok(r.events.some((e) => e.what === 'steering') && !r.damage.steering, 'her steering is shot away');
+  // Fired from within WAD_RANGE (the shots here start 14 m off her middle), one ball in about twenty through her side sets her afire.
+  let afire: Run | null = null;
+  for (let seed = 1; seed < 200 && !afire; seed++) { const run = fire(across(BETWEEN_DECKS, AT_100), CARRONADE, seed); if (run.damage.fires.length > 0) afire = run; }
+  assert.ok(afire, 'some ball set her afire');
+  const started = afire.events.find((e) => e.what === 'fire')!;
+  assert.deepEqual(afire.damage.fires.map((f) => f.space), [started.id]);
+  assert.equal(shipPlan().spaces[started.id]!.level, 'berth', 'between her decks, where it came through');
 });
 
 test('chain cuts more of her rigging than round shot on the same path', () => {
