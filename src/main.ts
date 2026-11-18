@@ -165,7 +165,7 @@ declare global {
     };
     /** The crews drawn (N4.3), for the browser checks: what they hold and where. */
     __nautaCrew?: CrewView;
-    __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string };
+    __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string; press: (forward?: number, strafe?: number) => void };
   }
 }
 
@@ -369,7 +369,7 @@ async function start(): Promise<void> {
     sceneFrames = SCENE_FRAMES; sceneDrawn = done;
   });
   if (ship && !walking) showStandpoints(where, (s) => { where = s; input.look = s.look; });
-  if (walking && ship) window.__nautaWalk = { drive: (forward, strafe, seconds, pitch, yaw) => walking.drive({ forward, strafe }, seconds, ship.drawn, input, pitch, yaw) };
+  if (walking && ship) window.__nautaWalk = { drive: (forward, strafe, seconds, pitch, yaw) => walking.drive({ forward, strafe }, seconds, ship.drawn, input, pitch, yaw), press: (forward, strafe) => { walking.pressed = forward === undefined ? null : { forward, strafe: strafe ?? 0 }; } };
   let showHud = false;
   // The settings that need no more than the page above: the HUD, the calm view (plan N2.7), the walking thumb and
   // keys, the glass button's word.

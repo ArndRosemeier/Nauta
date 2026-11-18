@@ -61,6 +61,14 @@ export const CATCH_KEEP = 0.55;
 
 /** Stooping under beams bends him forward: his eye comes this far forward per metre he stoops, m/m. */
 export const STOOP_FORWARD = 0.35;
+/**
+ * Leaning out over her rail (plan N2.11; ship.md, "The view from the deck"): standing within `within` m of the rail's
+ * inside on her weather deck, a push toward it of at least `push` (a share of a full push) leans him out over it, his
+ * hands on the rail; leaning out to the full his eye is `reach` m outboard of the rail's inside and `overRail` m over
+ * its top, so he looks down her side to the water. He leans out and comes back at `rate` (1/s). He cannot fall.
+ */
+export const LEAN_OUT = { within: 0.6, push: 0.4, reach: 0.5, overRail: 0.3, rate: 3 } as const;
+
 /** His body turns to where he looks at this rate, 1/s; past this much of a turn (rad) his feet step round with it. */
 export const TURN_RATE = 5;
 

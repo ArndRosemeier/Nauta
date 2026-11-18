@@ -117,7 +117,7 @@ export class Captain {
       this.aloft.stepAloft(intent, up, dt);
       const landed = this.aloft.landed;
       if (!this.aloft.active && landed) this.walker = this.standing(landed);
-    } else if (!this.climbing) this.walk(intent, up, dt, pitch);
+    } else if (!this.climbing) this.walkOnDeck(intent, up, dt, pitch);
     if (this.climbing) {
       this.climb.up.copy(up);
       this.climb.advance(dt);
@@ -132,7 +132,7 @@ export class Captain {
   }
 
   /** Walking her decks or a surface aloft, or onto a ladder or a way aloft he pushes into. */
-  private walk(intent: DeckIntent, up: Vec3, dt: number, pitch: number): void {
+  private walkOnDeck(intent: DeckIntent, up: Vec3, dt: number, pitch: number): void {
     const w = this.walker, surface = surfaceOf(this.rig, w.place);
     const ladder = surface ? null : ladderOffered(w, intent, this.plan);
     if (ladder) return this.startClimb(ladder);

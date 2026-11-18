@@ -4,10 +4,10 @@ import { shipPlan } from '../src/sim/ship/plan.ts';
 import { walkGraph, nodeAt } from '../src/sim/ship/walk.ts';
 import { shutDoors } from '../src/sim/ship/doors.ts';
 import { deckGround, eyeOf, stepWalker, walkerAt, type DeckWalker } from '../src/sim/ship/deckWalk.ts';
-import { handholdNear } from '../src/sim/ship/handholds.ts';
+import { handholdNear, railToLean } from '../src/sim/ship/handholds.ts';
 import { pointVelocity, startMotion, toWorld, type ShipPose } from '../src/sim/ship/motion.ts';
 import { CaptainBody, type BodyPose, type BodyWorld } from '../src/app/body.ts';
-import { CALM_LEAST } from '../src/sim/rules/body.ts';
+import { CALM_LEAST, LEAN_OUT } from '../src/sim/rules/body.ts';
 import { OUTFITS } from '@actors/generator';
 import { BODY } from '../src/sim/rules/ships.ts';
 import { EYE_BELOW_TOP } from '../src/sim/rules/walking.ts';
@@ -202,4 +202,25 @@ test('the captain wears Actors\' post captain\'s uniform of his navy from the cr
   }
   assert.notDeepEqual(captainLook(catalog, 'french').garmentColors, captainLook(catalog).garmentColors);
   assert.deepEqual([navyOf(0), navyOf(1), navyOf(0, 'french'), navyOf(1, 'french')], ['british', 'french', 'french', 'british']);
+});
+
+test('pushing toward the rail beside it he leans out over it, hands on the rail, his eye over the water; let go, he comes back', () => {
+  // As close to her starboard rail in the waist as he may stand, and a step in from it.
+  let across = 0;
+  for (let x = 0; x < 5; x += 0.02) if (nodeAt(graph, { space: 'deck', along: 5, across: x }) >= 0) across = x;
+  assert.equal(railToLean(plan, 'deck', 5, across - LEAN_OUT.within - 0.1), null, 'too far from the rail');
+  assert.equal(railToLean(plan, 'berth', 5, across), null, 'no rail below deck');
+  const rail = railToLean(plan, 'deck', 5, across)!, w = walkerAt(plan, { space: 'deck', along: 5, across }), body = new CaptainBody(worldOf(() => w));
+  const lean = (over: typeof rail | null, seconds: number) => {
+    let b: BodyPose | null = null;
+    for (let i = 0; i < seconds / DT; i++) b = body.follow({ pose: still, walker: w, eye: eyeOf(w), onLadder: false, yaw: 0, leanOver: over }, DT);
+    return b!;
+  };
+  const out = lean(rail, 2);
+  assert.ok(out.eye[0] > rail.hold.point[0] + LEAN_OUT.reach * 0.9, `eye ${out.eye[0].toFixed(2)} m out, the rail at ${rail.hold.point[0].toFixed(2)}`);
+  assert.ok(Math.abs(out.eye[1] - rail.eye[1]) < 0.05 && out.eye[1] > rail.hold.point[1], 'his eye a little over the rail');
+  assert.ok(out.hold?.at.kind === 'rail' && out.hold.w > 0.9, 'his hands on the rail');
+  assert.ok(out.bend > 0, 'his back bent over it');
+  const back = lean(null, 3);
+  assert.ok(Math.abs(back.eye[0] - eyeOf(w)[0]) < 0.02, 'back where he stands');
 });

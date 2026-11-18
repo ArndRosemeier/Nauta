@@ -10,7 +10,8 @@ import { rigPlan, rigWalk } from '../sim/ship/rig';
 import { shipFrame, type ShipPose } from '../sim/ship/motion';
 import { doorAngle, doorLeaves } from '../sim/ship/doors';
 import { spotOf } from '../sim/ship/deckWalk';
-import { handholdAloft, handholdNear } from '../sim/ship/handholds';
+import { handholdAloft, handholdNear, railToLean, type RailToLean } from '../sim/ship/handholds';
+import { LEAN_OUT } from '../sim/rules/body';
 import { Captain } from './captain';
 import { CaptainBody, type BodyPose } from './body';
 import { watchWalk, type WalkInput } from './walkInput';
@@ -55,18 +56,31 @@ export class Walking {
     this.input = watchWalk(view);
   }
 
+  /** For shots: a push held frame after frame in place of the thumbs (null: the thumbs again). */
+  pressed: { forward: number; strafe: number } | null = null;
+
   /** One frame: the thumbs move him on her as she lies at `pose` and his body keeps its feet; returns where the eye stands and how the head is held. */
   walk(dt: number, pose: ShipPose, look: LookInput): Standpoint {
-    const push = this.input.push(), c = this.captain;
+    const push = this.pressed ?? this.input.push(), c = this.captain;
     c.update({ forward: push.forward, strafe: push.strafe, heading: look.look.yaw }, upInFrame(shipFrame(pose)), dt, look.look.pitch);
     const face = c.facing;
     if (face !== null) {
       const turn = Math.atan2(Math.sin(face - look.look.yaw), Math.cos(face - look.look.yaw));
       look.look = { yaw: look.look.yaw + turn * (1 - Math.exp(-FACE_RATE * dt)), pitch: look.look.pitch };
     }
-    const body = this.body.follow({ pose, walker: c.walker, eye: c.eye, onLadder: c.onLadder, yaw: look.look.yaw }, dt);
+    const leanOver = c.onLadder ? null : this.leanOver(push, look.look.yaw);
+    const body = this.body.follow({ pose, walker: c.walker, eye: c.eye, onLadder: c.onLadder, yaw: look.look.yaw, leanOver }, dt);
     this.drawnBody = body;
     return { name: 'walk', eye: body.eye, look: look.look, up: body.up };
+  }
+
+  /** The rail he leans out over (plan N2.11): standing by it and pushing toward it, the push turned by his look's yaw. */
+  private leanOver(push: { forward: number; strafe: number }, yaw: number): RailToLean | null {
+    const s = spotOf(this.captain.walker), rail = railToLean(this.plan, s.space, s.along, s.across);
+    if (!rail) return null;
+    // The push across her (ship space x): forward along the look (-sin yaw), strafe to its right (cos yaw).
+    const across = -Math.sin(yaw) * push.forward + Math.cos(yaw) * push.strafe;
+    return across * rail.side >= LEAN_OUT.push ? rail : null;
   }
 
   /**
