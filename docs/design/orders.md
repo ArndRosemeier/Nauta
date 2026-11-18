@@ -54,6 +54,16 @@ Stations and people are those of [ship.md](ship.md) ("Where orders are given"). 
 
 Which side fires is never ordered: the side she bears on fires. Orders left out on purpose for the first game: single sails and single yards, single guns, the anchors, the boats, boarding.
 
+## The fans as built (confirmed 2026-11-18)
+
+- **The master:** Steer there; Come up; Bear away; About (a ring: Tack, Wear); Keep her (a ring of standing orders: Full and by, Steer for her, Her on the beam); Heave to.
+- **The first lieutenant:** Make sail (a ring: battle, plain, all); Shorten; Back or Fill (one place, whichever applies); Quarters or Stand down (one place); Her life (a ring: Hands to the pumps, Fire party, Clear the wreckage); Strike (asked twice).
+- **The midshipman** asks whom the order is for, then shows that man's fan. He follows the captain on every deck and below, never aloft; from aloft the captain hails, and a hail reaches the weather deck.
+- **The carpenter:** Sound the well (he reports the water in her, an event), Plug the shot holes, Man the pumps.
+- Standing at a fixed standpoint without walking, the captain counts as on the quarterdeck.
+
+**One crew serves a pair of guns.** At quarters each gun's crew stands to the gun of its pair on the side that is engaged, and crosses the deck when the other side comes to bear, which is seen and takes its seconds. Fought on both sides at once, the crews are split between the pair and each gun is served at a little over half pace. So which side a captain shows the enemy, and being caught between two fires, matter.
+
 ## How an order travels
 
 1. **The captain's part is seen.** His arm points for a course, he lifts the speaking trumpet for a hail, he turns to his midshipman.
