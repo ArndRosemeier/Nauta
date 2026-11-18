@@ -1,9 +1,9 @@
 /**
  * Her outside, the whole length of her (plan N2.4): the hull's planking from the keel to the top of her side, laid on
  * the fair surface of her lines (sim/ship/hull.ts), copper below the waterline, black paint above, the ochre band
- * along her ports, the wales standing proud, the gun ports cut through, the keel, stem and sternpost, the square
- * stern; and above the deck the bulwarks' inside, the rail, the ports' linings, and the channels (the lids swing with
- * the guns: gunsView.ts).
+ * along her ports, the wales standing proud, the gun ports cut through, the keel, stem and sternpost (her square
+ * stern is stern.ts's); and above the deck the bulwarks' inside, the rail, the ports' linings, and the channels (the
+ * lids swing with the guns: gunsView.ts).
  *
  * Her side's grain runs along her (u: ship-space z) and up her girth (v: m from the bottom of her hull at that
  * place), which is also how the damage map lays out her planking (damageMap.ts) and how the plan's planking cells
@@ -11,12 +11,12 @@
  */
 import { Matrix4, Vector3 } from 'three/webgpu';
 import {
-  BODY_STATIONS, BULWARK, CEILING, FRAME_DEPTH, KEEL_DEPTH, KEEL_HALF_SIDING, PLANKING, PORTS, STERN, TRANSOM, WALE, WATERWAY,
+  BODY_STATIONS, BULWARK, CEILING, FRAME_DEPTH, KEEL_DEPTH, KEEL_HALF_SIDING, PLANKING, PORTS, WALE, WATERWAY,
 } from '../../sim/rules/ships';
 import {
-  HULL_AFT, HULL_FORE, designWaterline, hullBottom, hullEnds, hullHalfBreadth, keelBottom, sheer, sideTop,
+  HULL_AFT, HULL_FORE, designWaterline, hullBottom, hullHalfBreadth, keelBottom, sheer, sideTop,
 } from '../../sim/ship/hull';
-import { linearCurve, monotoneCurve } from '../../sim/curve';
+import { linearCurve } from '../../sim/curve';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { box, roundedProfile, sheet, sweep } from './shapes';
 import type { ZoneParts } from './parts';
@@ -36,7 +36,7 @@ const GIRTH_SAMPLES = 96;
 /** Two heights or places this close are one, m. */
 export const EPSILON = 1e-6;
 /** How far above the load waterline her copper reaches, m (a hand's breadth, so she shows copper when she rolls). */
-const COPPER_ABOVE_WATER = 0.28;
+export const COPPER_ABOVE_WATER = 0.28;
 /** The ochre band: how far below the port sills and above the port tops it reaches, m. */
 const BAND_BELOW_SILL = 0.09;
 const BAND_ABOVE_TOP = 0.05;
@@ -52,10 +52,6 @@ const LEAST_INSIDE = 0.05;
 /** Ambient occlusion baked into corners, and how far its shade reaches, m. */
 export const CORNER_AO = 0.55;
 export const CORNER_REACH = 0.35;
-/** Columns across the stern's transom. */
-const TRANSOM_COLUMNS = 16;
-/** The taffrail across the top of her stern: its width and depth, m (the rail's). */
-const TAFFRAIL = { width: BULWARK.railWidth, deep: BULWARK.railThick } as const;
 
 /** The dead flat, where the draught's midship section was read: the wales' and the band's heights are given there. */
 const DEAD_FLAT = BODY_STATIONS.find((s) => s.name === '⊗')!.along;
@@ -68,8 +64,6 @@ const SILL_OVER_SHEER = linearCurve(PORT_EDGES, PORTS.flatMap(([, along, sill, ,
 const TOP_OVER_SHEER = linearCurve(PORT_EDGES, PORTS.flatMap(([, along, , top, w]) => [top - sheer(along - w / 2), top - sheer(along + w / 2)]));
 export const sillAt = (along: number): number => sheer(along) + SILL_OVER_SHEER(along);
 export const portTopAt = (along: number): number => sheer(along) + TOP_OVER_SHEER(along);
-/** The transom's half-breadth at a height above the wing transom. */
-const TRANSOM_HALF = monotoneCurve(TRANSOM.outline.map((r) => r[0]), TRANSOM.outline.map((r) => r[1]));
 
 /** Her outside's half-breadth at a place and height: the moulded line and her planking, the wales standing proud. */
 export function outsideX(along: number, h: number, wale = false): number {
@@ -202,7 +196,6 @@ export function buildOutside(out: ZoneParts, detail: Detail = FULL_DETAIL): void
     }
   }
   buildBackbone(out, alongs);
-  buildTransom(out);
 }
 
 /**
@@ -217,20 +210,6 @@ function buildBackbone(out: ZoneParts, alongs: readonly number[]): void {
   const copperTop = (a: number) => designWaterline(a) + COPPER_ABOVE_WATER;
   sheet((i) => (hullBottom(alongs[i]!) < copperTop(alongs[i]!) ? out.copper : out.wood), rows, { ...COPPER, plank: 0 },
     (i, j) => [shipZ(alongs[i]!), j * KEEL_HALF_SIDING], () => true, true);
-}
-
-/** Her square stern above the wing transom: planked across, black, and the taffrail on top. */
-function buildTransom(out: ZoneParts): void {
-  const top = STERN[STERN.length - 1]![0];
-  const hs = steps(TRANSOM.wing, top, GIRTH_STEP * 2);
-  const grid = hs.map((h) => {
-    const half = TRANSOM_HALF(h) + PLANKING.side, z = shipZ(hullEnds(h).aft) + PLANKING.side;
-    return Array.from({ length: TRANSOM_COLUMNS + 1 }, (_, j) => new Vector3(-half + (2 * half * j) / TRANSOM_COLUMNS, shipY(h), z));
-  });
-  sheet(out.wood, grid, SIDE_PLANKS(BLACK), (i, j) => [grid[i]![j]!.x, hs[i]!], () => true, true);
-  // The taffrail across the top.
-  const half = TRANSOM_HALF(top) + PLANKING.side, z = shipZ(hullEnds(top).aft) - BULWARK_THICK / 2 + PLANKING.side;
-  box(out.wood, new Matrix4().makeTranslation(0, shipY(top) + TAFFRAIL.deep / 2, z), [2 * half, TAFFRAIL.deep, TAFFRAIL.width], BLACK, BEVEL, 0);
 }
 
 /**

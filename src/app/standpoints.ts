@@ -53,6 +53,8 @@ const AT = {
   cabin: { along: -6.1, x: -0.85, look: { yaw: HALF + 0.35, pitch: -0.08 } },
   hold: { along: 10.2, x: 0.3, look: { yaw: HALF - 0.1, pitch: 0.05 } },
   alongside: { along: 1.5, x: 15, up: 1.3, look: { yaw: QUARTER, pitch: 0.16 } },
+  /** Off her larboard quarter, low on the water and riding with her (as alongside): her stern board, quarter pieces, counter and rudder. */
+  stern: { along: -22, x: -5, up: 1.4, look: { yaw: -0.5, pitch: 0.08 } },
   near: { along: 9, x: 50, up: 3.5, look: { yaw: QUARTER + 0.12, pitch: 0.02 } },
   far: { along: 120, x: 480, up: 4.5, look: { yaw: QUARTER + 0.25, pitch: 0 } },
   farthest: { along: 500, x: 1940, up: 4.5, look: { yaw: QUARTER + 0.25, pitch: 0.004 } },
@@ -82,6 +84,7 @@ export const STANDPOINTS: readonly Standpoint[] = [
   { name: 'Cabin', eye: [AT.cabin.x, shipY(berthDeck(AT.cabin.along)) + EYE_BELOW, shipZ(AT.cabin.along)], look: AT.cabin.look },
   { name: 'Hold', eye: [AT.hold.x, shipY(HOLD_FLOOR) + EYE_HOLD, shipZ(AT.hold.along)], look: AT.hold.look },
   { name: 'Alongside', eye: [AT.alongside.x, AT.alongside.up, shipZ(AT.alongside.along)], look: AT.alongside.look },
+  { name: 'Stern', eye: [AT.stern.x, AT.stern.up, shipZ(AT.stern.along)], look: AT.stern.look },
   { name: '50 m off', eye: [AT.near.x, AT.near.up, shipZ(AT.near.along)], look: AT.near.look, off: true },
   { name: 'Above', eye: [AT.above.x, AT.above.up, shipZ(AT.above.along)], look: AT.above.look, off: true },
   { name: '500 m off', eye: [AT.far.x, AT.far.up, shipZ(AT.far.along)], look: AT.far.look, off: true },

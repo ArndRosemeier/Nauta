@@ -172,7 +172,10 @@ Before writing code that does something, look here. If a row covers it, call tha
 | The middle of an oblong of the plan | `src/sim/ship/plan.ts#rectCentre` |
 | Which zones can be seen from the eye (portals on screen) | `src/render/ship/visibility.ts#Visibility` |
 | Each zone's solids and ropes, and her doors | `src/render/ship/parts.ts#ShipParts` |
-| Her outside: bands of planking, wales, copper, keel, stem, transom | `src/render/ship/hullSide.ts#buildOutside` |
+| Her outside: bands of planking, wales, copper, keel, stem, sternpost | `src/render/ship/hullSide.ts#buildOutside` |
+| Her stern: the stern board outside (ports, moulding, quarter pieces), its inside up from the deck's end, her bulwarks carried aft to it, the taffrail | `src/render/ship/stern.ts#buildStern` |
+| Her rudder on the sternpost, its pintles and gudgeons | `src/render/ship/stern.ts#buildRudder` |
+| Her rudder's frame put over by her helm | `src/render/ship/stern.ts#rudderMatrix` |
 | Her bulwarks: the inside face, ports, lids, rail, waterway | `src/render/ship/hullSide.ts#buildBulwarks` |
 | Where the deck meets her side at her ends | `src/render/ship/hullSide.ts#deckEnds` |
 | Her side's outside and inside lines (planking, bulwark, ceiling) | `src/render/ship/hullSide.ts#outsideX` |
@@ -209,7 +212,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What her shaders read each frame (lanterns, sky openings, glow, time) | `src/render/ship/shipMaterials.ts#SHIP_INPUTS` |
 | Her half-breadth and deck height in a shader (none beyond her ends) | `src/render/ship/hullNode.ts#hullAt` |
 | No water drawn inside her hull | `src/render/seaCut.ts#seaCut` |
-| The ship drawn and riding the sea, the eye carried with her, the zones seen, the far ship crossfaded, her doors swung, her yards braced and hoisted and her boom and gaff swung (`setBrace`, `setHoist`; N3.3 drives them) | `src/render/ship/shipView.ts#ShipView` |
+| The ship drawn and riding the sea, the eye carried with her, the zones seen, the far ship crossfaded, her doors swung, her yards braced and hoisted and her boom and gaff swung (`setBrace`, `setHoist`; N3.3 drives them), her rudder put over (`setRudder`) | `src/render/ship/shipView.ts#ShipView` |
 | A ship's water kept for her wake and spray, however she is laid: her track, her way, the churn at her side (`water`, `bow`) | `src/render/ship/shipView.ts#ShipView` |
 | Kelvin's pattern of a moving source on deep water (stationary phase, held at the cusp; the GPU's sums mirror it) | `src/render/wake.ts#kelvinAt` |
 | A speed's g/U² (the wake's wavenumber) and U²/2g (the height her waves scale with) | `src/render/wake.ts#kelvinWavenumber` |
@@ -449,6 +452,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | An event of a step in the panel's words (a refused order she kept is the master's answer) | `src/app/orderReport.ts#eventWords` |
 | Whether an order would be refused now (a dim button), and whether it stands (a ringed one) | `src/app/orderReport.ts#wouldRefuse` |
 | Her turning spars' angles in a state, for drawing the yards braced as the sailing model trims them | `src/app/pageMatch.ts#sparAngles` |
+| Where her rudder lies in a state, for drawing it put over | `src/app/pageMatch.ts#rudderAngle` |
 | The order panel on the page (`?sail`): buttons, compass, typed orders, answers | `src/app/orderPanel.ts#OrderPanel` |
 | Making an element of the page's own panels in one line | `src/app/dom.ts#make` |
 | The ways across her weather deck's centreline: how wide, how often (the fife rails' places that make them: `MAIN_FIFE_AT`, `FORE_FIFE_FORE_AT`) | `src/sim/rules/ships.ts#DECK_CROSSING` |

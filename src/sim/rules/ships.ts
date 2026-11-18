@@ -153,6 +153,24 @@ export const TRANSOM = {
   outline: [[5.76, 2.85], [6.0, 2.85], [6.25, 2.83], [6.5, 2.77], [6.75, 2.71], [7.0, 2.67], [7.25, 2.63], [7.5, 2.6], [7.71, 2.53]],
 } as const;
 /**
+ * Her stern board as the body plan draws it, seen from aft: the moulding across it where the counter meets the
+ * upright stern (m above the base), and the two square stern ports above the deck: their middles either side of the
+ * middle line, sill and top (m above the base) and width, m.
+ */
+export const STERN_BOARD = { moulding: 6.25, ports: { across: 1.2, sill: 6.6, top: 7.28, width: 0.66 } } as const;
+/**
+ * Her rudder (the draught's sheer plan): hung by its pintles on the sternpost's after face from the heel up, its
+ * breadth fore and aft [height above the base, m] narrowing to the head, which runs up under her counter; the head's
+ * fore and after edges end at these heights (m above the base), inside the counter. Its thickness at the fore edge
+ * (the sternpost's siding) and the after edge, m, and the heights of its pintles' straps, m above the base.
+ */
+export const RUDDER_BLADE = {
+  breadth: [[0.05, 1.15], [4.9, 0.75], [5.3, 0.42]],
+  head: { fore: 5.85, aft: 6.1 },
+  thick: { fore: 2 * KEEL_HALF_SIDING, aft: 0.2 },
+  pintles: [0.7, 1.7, 2.7, 3.7, 4.7],
+} as const;
+/**
  * The body plan's stations, aft to fore, about 1.45 m apart (the marks are illegible at this size; aft numbered,
  * forward lettered, as English draughts are). Each station's half-breadths come from the four waterlines of the
  * half-breadth plan at their heights, the station's top, and the dead flat's shape between them (it matches the
