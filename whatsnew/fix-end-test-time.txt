@@ -1,0 +1,1 @@
+Behind the scenes: one of the slower automatic tests (a ship going down after the fight is over) now runs three times faster, so it no longer fails now and then on a busy build machine.

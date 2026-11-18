@@ -25,10 +25,14 @@ import { SECONDS_PER_MINUTE, STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { holesUnder } from './support/damage.ts';
 import { musterCrew } from './support/muster.ts';
 
-/** Two ships lying still in a calm 300 m apart, the first with the damage `damage`. */
-function pair(damage: Partial<Damage> = {}, minutes?: number): SimState {
+/**
+ * Two ships lying still in a calm 300 m apart, the first with the damage `damage`, the crews at quarters (`mustered`;
+ * false leaves them standing by at their home places: a step is then a third of the cost, which a minute of steps wants).
+ */
+function pair(damage: Partial<Damage> = {}, minutes?: number, mustered = true): SimState {
   const s = startMatch({ seed: 9, windForce: 0, windFrom: 0, minutes, ships: [{ x: 0, z: 0, heading: Math.PI / 2, canvas: 'bare' }, { x: 0, z: 300, heading: Math.PI / 2, canvas: 'bare' }] });
-  return { ...s, ships: s.ships.map((sh, i) => (i === 0 ? { ...sh, crew: musterCrew(), damage: { ...startDamage(), ...damage } } : { ...sh, crew: musterCrew() })) };
+  const crew = (sh: SimState['ships'][number]) => (mustered ? musterCrew() : sh.crew);
+  return { ...s, ships: s.ships.map((sh, i) => (i === 0 ? { ...sh, crew: crew(sh), damage: { ...startDamage(), ...damage } } : { ...sh, crew: crew(sh) })) };
 }
 
 /** One step with `orders`: the state after and its events. */
@@ -62,7 +66,8 @@ test('each way of being lost ends the fight as one record: sunk, burnt out, blow
 });
 
 test('after the end every order is refused, and a foundered ship goes on going down', () => {
-  let s = once(pair({ flooded: [founderTonnes() / 2, founderTonnes() / 2] })).state;
+  // Her men stand by at their places: what is asked here is the sea, not the crew, and a minute of mustered crews costs three times as much.
+  let s = once(pair({ flooded: [founderTonnes() / 2, founderTonnes() / 2] }, undefined, false)).state;
   const ended: Fight = s.fight;
   const r = once(s, [say('hands to the pumps'), say('beat to quarters', 1)]);
   assert.deepEqual(ofKind(r.events, 'refused').map((e) => (e.kind === 'refused' ? e.code : '')), ['fight over', 'fight over']);
