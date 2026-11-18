@@ -110,6 +110,18 @@ export const CATTED = { along: 18.2, out: 1.18, below: 0.28, lean: 1.2, height: 
 
 /** Hammock nettings along her rails, both sides: from and to (m forward of the mainmast), and the length of one netting tile. */
 export const NETTINGS = { aft: -11.2, fore: 16.6, tile: 2 } as const;
+/**
+ * The hammocks in the nettings (Arnd, 2026-11-18: the view from her deck comes first): the nettings stand empty, the
+ * cranes and their ropes only, and the men's hammocks are stowed in them when she beats to quarters, a breastwork
+ * against small shot. The netting model's material slot that is the stowed hammocks under their cloth.
+ */
+export const HAMMOCK_SLOT = 'cloth';
+/**
+ * The waist's nettings, where the hammocks are stowed at quarters to shelter the gun crews, m forward of the mainmast:
+ * between the quarterdeck's break and the forecastle's (ship.md, "The view from the deck"). The rails of the raised
+ * decks stay open at all times, so the captain's view from where he commands is never walled in.
+ */
+export const HAMMOCK_WAIST = { aft: -1.3, fore: 13.9 } as const;
 
 /** Fire buckets either side of the companion (FITTINGS: the companion, -6.65..-5.62), m across. */
 export const BUCKETS = { along: -6.45, across: [0.72, 1.02] } as const;
