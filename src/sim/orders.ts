@@ -25,6 +25,7 @@ import { angleDiff } from '@futuremagic/core';
 import { BY_FOLLOW, HOVE_TO_CHECK, HOVE_TO_IN, HOVE_TO_MAST, NO_WAY, POINT } from './rules/orders';
 import { AIM_HEIGHT, SHOT, type AimName, type ShotKind } from './rules/guns';
 import type { MastName } from './rules/rig';
+import type { OrderTaker } from './rules/crew';
 import { CLOSE_HAULED, type CanvasName } from './rules/sailing';
 import { rigPlan } from './ship/rig';
 import { canvasFor, layAback, MASTS, setSail, steerTo, type Sailing, type SailingEvent } from './ship/sailing';
@@ -83,19 +84,35 @@ export interface AimOrder {
 export type GunneryOrder = GunsOrder | ShotOrder | AimOrder;
 export type GunneryKind = GunneryOrder['kind'];
 
+/**
+ * The orders for her life (N6.3, design decisions for N6): the first lieutenant's hands to the pumps, fire party and
+ * clear the wreckage (men taken from the guns while there is water in her, a fire, wreckage alongside), and the
+ * carpenter's plug the shot holes and man the pumps (what his crew does first). They stand once given; crew/repairs.ts
+ * has the men do them when there is something to do.
+ */
+export interface LifeOrder {
+  readonly kind: 'pumps' | 'fires' | 'wreckage' | 'plug' | 'pumping';
+  readonly ship: number;
+}
+export type LifeKind = LifeOrder['kind'];
+
 /** An order to one ship, named by her place in `SimState.ships`. Plain data, sent between machines as it is. */
-export type Order = SailingOrder | GunneryOrder;
+export type Order = SailingOrder | GunneryOrder | LifeOrder;
 export type OrderKind = Order['kind'];
 
 /** The kinds of the gunnery orders. */
 const GUNNERY_KINDS: readonly OrderKind[] = ['quarters', 'stand', 'shot', 'aim', 'bear', 'hold', 'fire', 'cease'];
 /** Whether an order is one of the gunnery orders. */
 export const isGunnery = (order: Order): order is GunneryOrder => GUNNERY_KINDS.includes(order.kind);
+/** The kinds of the orders for her life. */
+const LIFE_KINDS: readonly OrderKind[] = ['pumps', 'fires', 'wreckage', 'plug', 'pumping'];
+/** Whether an order is one of the orders for her life. */
+export const isLife = (order: Order): order is LifeOrder => LIFE_KINDS.includes(order.kind);
 
 /** One word of the vocabulary: who takes it (docs/design/orders.md), what it does, and what more it names. */
 export interface OrderWord {
   readonly kind: OrderKind;
-  readonly to: 'master' | 'first lieutenant' | 'gunner';
+  readonly to: OrderTaker;
   readonly what: string;
   readonly takes: 'heading' | 'canvas' | 'mast' | 'shot' | 'aim' | null;
 }
@@ -121,6 +138,11 @@ export const VOCABULARY: readonly OrderWord[] = [
   { kind: 'hold', to: 'gunner', what: "hold for my word: the loaded side waits for the captain's word", takes: null },
   { kind: 'fire', to: 'gunner', what: "the captain's word: the held side fires now, rippling down her side", takes: null },
   { kind: 'cease', to: 'gunner', what: 'cease firing: the guns finish loading and stand ready', takes: null },
+  { kind: 'pumps', to: 'first lieutenant', what: 'hands to the pumps: eight men from the guns pump while there is water in her, and the carpenter\'s crew plugs', takes: null },
+  { kind: 'fires', to: 'first lieutenant', what: 'fire party: eight men from the guns fight each fire, the one nearest the magazine first', takes: null },
+  { kind: 'wreckage', to: 'first lieutenant', what: 'clear the wreckage: six forecastle men cut away what lies alongside', takes: null },
+  { kind: 'plug', to: 'carpenter', what: 'plug the shot holes: all his crew plugs first, then pumps', takes: null },
+  { kind: 'pumping', to: 'carpenter', what: 'man the pumps: all his crew pumps first, and plugs when the pumps are manned by others', takes: null },
 ];
 
 /** The words each order is given by, the first for each its own (`orderWords`); fixed parts of the order beside them. */
@@ -160,6 +182,12 @@ const PHRASES: readonly { readonly words: string; readonly order: Partial<Order>
   { words: 'fire', order: { kind: 'fire' } },
   { words: 'cease firing', order: { kind: 'cease' } },
   { words: 'cease fire', order: { kind: 'cease' } },
+  { words: 'hands to the pumps', order: { kind: 'pumps' } },
+  { words: 'fire party', order: { kind: 'fires' } },
+  { words: 'clear the wreckage', order: { kind: 'wreckage' } },
+  { words: 'cut away the wreckage', order: { kind: 'wreckage' } },
+  { words: 'plug the shot holes', order: { kind: 'plug' } },
+  { words: 'man the pumps', order: { kind: 'pumping' } },
 ];
 
 /** Words left out when an order is read ("come up a point, sir" is "come up"; "back the main" is "back main"). */
@@ -284,7 +312,16 @@ export interface ShipOrders {
   readonly firing: FireMode;
   /** The captain's word given, her held side firing down its length until every gun that could has fired (guns/gunnery.ts says when, `wordSpent`). */
   readonly word: boolean;
+  /** The first lieutenant's parties for her life: the tick each was ordered, or null (not ordered). */
+  readonly pumps: number | null;
+  readonly fires: number | null;
+  readonly wreckage: number | null;
+  /** What the carpenter's crew does first: plug, pump, or as it sees fit (null: the carpenter and his mate plug, the rest pump). */
+  readonly carpenter: CarpenterFirst | null;
 }
+
+/** What the carpenter's crew is told to do first. */
+export type CarpenterFirst = 'plug' | 'pump';
 
 /** What her guns load and lay on until told otherwise: round shot at her hull. */
 const START_SHOT: ShotKind = 'round';
@@ -294,7 +331,7 @@ const START_AIM: AimName = 'hull';
 export function startOrders(heading: number, canvas: CanvasName): ShipOrders {
   return {
     helm: { heading: wrapBearing(heading), by: 0 }, canvas, hove: false, backed: MASTS.map(() => false), acts: [], given: [], serial: 0,
-    quarters: false, shot: START_SHOT, aim: START_AIM, firing: 'cease', word: false,
+    quarters: false, shot: START_SHOT, aim: START_AIM, firing: 'cease', word: false, pumps: null, fires: null, wreckage: null, carpenter: null,
   };
 }
 
@@ -309,7 +346,8 @@ export type AnswerCode = 'will not lie' | 'wearing round';
 export type RefusalCode =
   | 'no such order' | 'no ship' | 'full and by already' | 'no way' | 'in stays' | 'hove to already' | 'canvas already'
   | 'carries it already' | 'bare poles' | 'aback already' | 'drawing' | 'not at quarters' | 'at quarters already'
-  | 'loading it already' | 'laid there already' | 'firing so already' | 'not held' | 'word given' | 'not firing';
+  | 'loading it already' | 'laid there already' | 'firing so already' | 'not held' | 'word given' | 'not firing'
+  | 'sent already' | 'first already';
 
 /**
  * What giving an order comes to: what she has now been told, the answer in words ('' when simply taken) and its code:
@@ -443,6 +481,7 @@ export function malformed(order: Order): string {
     case 'aim': return Object.hasOwn(AIM_HEIGHT, order.at) ? '' : `there is no aiming at her "${order.at}" (hull, rigging, deck)`;
     case 'up': case 'away': case 'by': case 'tack': case 'wear': case 'heave': case 'shorten': case 'fill': return '';
     case 'quarters': case 'stand': case 'bear': case 'hold': case 'fire': case 'cease': return '';
+    case 'pumps': case 'fires': case 'wreckage': case 'plug': case 'pumping': return '';
     default: return `there is no order "${(order as { kind: string }).kind}"`;
   }
 }
@@ -456,6 +495,7 @@ export function giveOrder(told: ShipOrders, s: Sailing, order: Order, now: Order
   const bad = malformed(order);
   if (bad) return refuse(told, 'no such order', bad);
   if (isGunnery(order)) return gunnery(told, order);
+  if (isLife(order)) return life(told, order, now.tick);
   const from = now.wind.from, tack = tackOf(s.heading, from, s.sides[0]!), base = toldHeading(told.helm, from);
   const baseTack = tackOf(base, from, tack);
   switch (order.kind) {
@@ -540,6 +580,22 @@ function gunnery(told: ShipOrders, order: GunneryOrder): OrderAnswer {
       return take({ firing: mode, word: false });
     }
   }
+}
+
+/** The parties each order for her life sends, and how each is said when it is out already. */
+const PARTY: Readonly<Record<'pumps' | 'fires' | 'wreckage', string>> = { pumps: 'the hands are at the pumps already', fires: 'the fire party is out already', wreckage: 'the hands are clearing the wreckage already' };
+/** What the carpenter's crew does first by his orders. */
+const FIRST: Readonly<Record<'plug' | 'pumping', CarpenterFirst>> = { plug: 'plug', pumping: 'pump' };
+
+/** An order for her life (N6.3): it stands from now (crew/repairs.ts has the men do it when there is work), or is refused as given already. */
+function life(told: ShipOrders, order: LifeOrder, tick: number): OrderAnswer {
+  if (order.kind === 'plug' || order.kind === 'pumping') {
+    const first = FIRST[order.kind];
+    if (told.carpenter === first) return refuse(told, 'first already', `the carpenter's crew ${first === 'plug' ? 'plugs' : 'pumps'} first already`);
+    return { refused: false, told: { ...told, carpenter: first }, ...NOTHING_SAID };
+  }
+  if (told[order.kind] !== null) return refuse(told, 'sent already', PARTY[order.kind]);
+  return { refused: false, told: { ...told, [order.kind]: tick }, ...NOTHING_SAID };
 }
 
 /** What she is told once the captain's word has been carried out: every gun that could fire on it has fired (guns/gunnery.ts). */

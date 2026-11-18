@@ -82,3 +82,20 @@ export function brigRoster(): readonly Man[] {
   built = deepFreeze(men);
   return built;
 }
+
+/** A man's place in his gun's crew (1 the gun captain), from his post `gun-<gun>-<k>`; 0 for a man not at a gun. */
+const gunPlace = (m: Man): number => (m.gun === null ? 0 : Number(m.post.slice(m.post.lastIndexOf('-') + 1)));
+
+const bills = new WeakMap<readonly Man[], readonly number[]>();
+/**
+ * The men the first lieutenant takes from the guns for her life (N6.3, design decisions for N6), in the order he takes
+ * them: the waisters first, then the last places of each gun's crew, the gun captains last (roster places).
+ */
+export function billOrder(roster: readonly Man[] = brigRoster()): readonly number[] {
+  let out = bills.get(roster);
+  if (out) return out;
+  out = roster.flatMap((m, i) => (m.gun === null ? [] : [i]))
+    .sort((a, b) => Number(roster[b]!.part === 'waist') - Number(roster[a]!.part === 'waist') || gunPlace(roster[b]!) - gunPlace(roster[a]!) || a - b);
+  bills.set(roster, out);
+  return out;
+}

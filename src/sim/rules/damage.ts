@@ -195,8 +195,8 @@ export const SPLIT = 0.6;
 export const FIRE = { start: 0.05, doubling: 78, spread: 0.5, catch: 0.25, put: 0.0012, out: 0.005 } as const;
 /** The space the powder is kept in (the plan's). */
 export const MAGAZINE = 'magazine';
-/** Until fire parties are sent (N6.3), the men in a burning space and the spaces joined to it fight it, at most this many. */
-export const FIGHT_AT_HAND = 8;
+/** Until a fire party comes (N6.3), the men in a burning space and the spaces joined to it beat at it, at most this many. */
+export const FIGHT_AT_HAND = 4;
 /**
  * The chance a ball that holes her timber, lodges in it or dismounts a gun sets her afire: `wad` when it was fired from
  * within WAD_RANGE (m, the burning wads and the flash reach her), else `ball` (a lantern, the galley fire, powder

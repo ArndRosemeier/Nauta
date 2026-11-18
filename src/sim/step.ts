@@ -16,7 +16,8 @@
  * ball hits is done and reported (`hit`); after, the shots fired in the step are put in flight.
  */
 import { stepCrew } from './crew/crew';
-import { launch, stepAftermath, stepHits, type Aftermath, type Hit } from './damage';
+import { repairsDue } from './crew/repairs';
+import { launch, outOf, stepAftermath, stepHits, type Aftermath, type Hit } from './damage';
 import { carryOut, giveOrder, heard, wordSpent, type AnswerCode, type Order, type RefusalCode, type SailingOrder } from './orders';
 import { stepGunnery } from './guns/gunnery';
 import type { GunFired } from './guns/shot';
@@ -109,7 +110,9 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
   const sea = followWind(state.sea, { speed: wind.speed, toward: wind.toward }, t);
   const next = ships.map((s, i) => {
     const pose = s.motion.pose;
-    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas });
+    // The men out of the quarter bill (badly hurt, killed), and what the crew does for her life now (crew/repairs.ts).
+    const out = outOf(s.damage), repairs = repairsDue(s.damage, s.told, s.crew, tick);
+    const crewed = stepCrew(s.crew, s.told, { tick, heel: pose.roll, closures: s.closures, captain: null, canvas: s.sailing.canvas, out, repairs });
     for (const e of crewed.events) {
       const given = s.told.given.find((g) => g.id === e.of);
       if (given) events.push({ kind: 'short-handed', tick, ship: i, order: given.order, job: e.job });
@@ -118,13 +121,13 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
     for (const order of carried.done) events.push({ kind: 'done', tick, ship: i, order });
     const here = windAt(state.wind, pose.x, pose.z, t);
     // What her damage leads to this step: the sea in at her holes, spars falling, fire (damage.ts).
-    const after = stepAftermath(s.damage, { seed: state.matchSeed, tick, t, ship: i, pose, sea, crew: crewed.crew, sailing: carried.sailing, wind: here });
+    const after = stepAftermath(s.damage, { seed: state.matchSeed, tick, t, ship: i, pose, sea, crew: crewed.crew, sailing: carried.sailing, wind: here, mended: crewed.mended });
     events.push(...after.events);
     const sailed = stepSailing(carried.sailing, pose, here, after.sailing);
     for (const kind of sailed.events) events.push({ kind, tick, ship: i });
     // The duel's one enemy is the other ship (design decisions for N5: she is the target).
     const enemy = ships.length === 2 ? ships[1 - i]!.motion.pose : null;
-    const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, sailing: s.sailing, pose, enemy, sea });
+    const gunnery = stepGunnery({ seed: state.matchSeed, ship: i, tick, t, guns: s.guns, told: s.told, crew: crewed.crew, out, sailing: s.sailing, pose, enemy, sea });
     events.push(...gunnery.fired);
     const told = heard(carried.told, sailed.events, sailed.sailing);
     return {

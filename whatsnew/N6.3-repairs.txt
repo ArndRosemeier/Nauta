@@ -1,0 +1,3 @@
+The crew now looks after a damaged ship: the carpenter plugs shot holes, the boatswain splices cut rigging, the quartermasters rig tackles when the steering is shot away, and the badly wounded are carried below to the surgeon.
+New orders in the panel: Hands to the pumps, Fire party, Clear the wreckage (men leave the guns for them), and the carpenter's Plug the shot holes or Man the pumps.
+Try the new buttons in ?sail&hud; the men at work are drawn later.

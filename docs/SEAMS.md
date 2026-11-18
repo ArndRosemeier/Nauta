@@ -450,7 +450,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Who works a sail (its gang) | `src/sim/crew/drill.ts#gangOf` |
 | What a job takes (hands, work, places, parts) from its name and what it is done on | `src/sim/crew/drill.ts#jobWork` |
 | A crew at the start, every man at his post | `src/sim/crew/crew.ts#startCrew` |
-| One step of the crew: acts become tasks, men told off by the quarter bill and sent, work done at the share of hands present, acts finished (the one owner of every man's task and place) | `src/sim/crew/crew.ts#stepCrew` |
+| One step of the crew: acts and repairs become tasks, men told off by the quarter bill and sent, work done at the share of hands present, acts and repairs finished; the hurt taken out of the quarter bill, the killed left where they fell, the wounded carried below (the one owner of every man's task and place) | `src/sim/crew/crew.ts#stepCrew` |
 | The task a man has | `src/sim/crew/crew.ts#taskOf` |
 | Where a man is now and the height he stands at (on his way, where he got to, or at his post) | `src/sim/crew/crew.ts#manAt` |
 | A crew place's spot and the height of its floor or surface | `src/sim/crew/crew.ts#placeAt` |
@@ -508,6 +508,15 @@ Before writing code that does something, look here. If a row covers it, call tha
 | What a hit does and what follows: timber thickness, each shot's punch by speed, chain's bite, splinters, how men are hurt, stove in and smashed, the violence levels; water, pumps, falling spars, the wreck's drag, holed sails, fire, steering (first proposals) | `src/sim/rules/damage.ts#PIERCE` |
 | What damage leads to (N6.2), each step for each ship: the sea in at her holes against the pumps, spars falling with the men on them, fire growing, spreading, fought and reaching her powder; what is left of her sails, her steering, the wreck's drag and the water's weight for her sailing and floating (the one routine that takes what follows a hit) | `src/sim/damage.ts#stepAftermath` |
 | A hole as her damage keeps it | `src/sim/damage.ts#holeCode` |
+| The repairs her crew finished, done to her: holes plugged, spars fished, lines spliced, steering mended, wreckage cut away (the one routine that mends) | `src/sim/damage.ts#mend` |
+| The holes in her planking the sea can come in at (not lodged, not plugged) | `src/sim/damage.ts#openHoles` |
+| The men out of the quarter bill (badly hurt or killed) | `src/sim/damage.ts#outOf` |
+| What the crew does for her life (N6.3): the repairs wanted now from her damage, her orders and where her men are, in the order they are manned | `src/sim/crew/repairs.ts#repairsDue` |
+| How many of a repair's men are at its spot (a fire party at its fire, the pump hands) | `src/sim/crew/crew.ts#atWork` |
+| The men the first lieutenant takes from the guns, in the quarter bill's order (waisters, then the last places of each gun) | `src/sim/crew/roster.ts#billOrder` |
+| Whether a job is a repair, not one of the sailing drill's | `src/sim/crew/drill.ts#isRepair` |
+| Whether a line is fast to, or holds, a spar that is down | `src/sim/damage/fall.ts#lostWith` |
+| The repairs' men, work and who does them; plugging parties, carrying parties, the surgeon's place (first proposals) | `src/sim/rules/crew.ts#REPAIRS` |
 | The sea's flow in at a shot hole by its depth | `src/sim/damage/flood.ts#inflow` |
 | What the pumps clear, by the men at them | `src/sim/damage/flood.ts#pumped` |
 | The water in her running across her as she heels, with what comes in and what is pumped | `src/sim/damage/flood.ts#flowed` |

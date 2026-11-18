@@ -113,7 +113,9 @@ export const COMPLEMENT = 121;
  * A sail's jobs move how far it is set (rules/rig.ts `HANGING`): loose from furled to hanging, sheet on to sheeted home,
  * clew back to hanging, furl on to furled, hoist and douse the whole way; reef leaves it hanging.
  */
-export type JobName = 'helm' | 'stations' | 'brace' | 'loose' | 'sheet' | 'clew' | 'furl' | 'reef' | 'hoist' | 'douse';
+export type DrillJob = 'helm' | 'stations' | 'brace' | 'loose' | 'sheet' | 'clew' | 'furl' | 'reef' | 'hoist' | 'douse';
+/** Every job a man can be given: the sailing drill's (`JOBS`) and the repairs (`REPAIRS`). */
+export type JobName = DrillJob | RepairName;
 
 /** A job's hands and seconds: one number, or one per yard (a square sail's jobs). */
 export type BySail = number | Readonly<Record<YardLevel, number>>;
@@ -128,7 +130,7 @@ export interface JobRow {
   readonly lines: readonly LineKind[] | null;
 }
 
-export const JOBS: Readonly<Record<JobName, JobRow>> = {
+export const JOBS: Readonly<Record<DrillJob, JobRow>> = {
   helm: { what: 'the helm put over', hands: 1, work: 1.5, lines: null },
   stations: { what: 'the hands at the braces and headsail sheets', hands: 12, work: 2, lines: ['brace', 'sheet'] },
   brace: { what: "a mast's yards swung round", hands: 8, work: 8, lines: ['brace'] },
@@ -171,7 +173,9 @@ export const FEWEST = 0.25;
  * the men being told off, by who takes it (orders.ts VOCABULARY's `to`). The gunner's orders take none of the
  * sailing drill's hands (guns/gunnery.ts has the gun crews carry them out); his time is the first lieutenant's.
  */
-export const PASSED: Readonly<Record<'master' | 'first lieutenant' | 'gunner', number>> = { master: 1, 'first lieutenant': 2, gunner: 2 };
+export const PASSED: Readonly<Record<OrderTaker, number>> = { master: 1, 'first lieutenant': 2, gunner: 2, carpenter: 2 };
+/** Who takes the captain's orders (orders.ts VOCABULARY's `to`). */
+export type OrderTaker = 'master' | 'first lieutenant' | 'gunner' | 'carpenter';
 
 /**
  * Choosing the men: the nearest free man of the parts a job is for goes first. Nearness is the distance in plan plus
@@ -187,3 +191,60 @@ export const CLIMB_METRES = 3;
  * men a second.
  */
 export const SENT_PER_STEP = 2;
+
+/**
+ * The repairs and the hurt (implementation plan N6.3, design decisions for N6; first proposals, balanced in N7.5): the
+ * jobs her damage gives the crew (crew/repairs.ts says when), each manned by a count of men, not by skill, and done
+ * at a spot of its own (the hole, the fire, where the wounded man lies), not at a crew place.
+ * - plug: a shot hole near or under the water plugged, by two of the carpenter's crew, about 45 s.
+ * - fish: a wounded spar fished (one wound less), by the carpenter and his mate, when nothing leaks.
+ * - splice: a cut line knotted and spliced, by the boatswain and his two mates, about 60 s.
+ * - tackle: the relieving tackles rigged on the tiller when her steering is shot away, four quartermasters, about 90 s.
+ * - cut: a fallen spar cut away from alongside, six forecastle men with axes, about 60 s (the first lieutenant's order).
+ * - pump, fight: eight men at the pumps, eight at a fire, for as long as there is water in her or the fire burns (his
+ *   orders), taken from the guns by the quarter bill (`bill`: the waisters first, then the last places of each gun).
+ * - fetch, carry: a badly wounded man lifted by the two nearest waisters where he lies, then carried below to the surgeon.
+ */
+export type RepairName = 'plug' | 'fish' | 'splice' | 'tackle' | 'cut' | 'pump' | 'fight' | 'fetch' | 'carry';
+
+/** Who does a repair: men of these ranks or these parts (the nearest first), or men taken from the guns by the quarter bill. */
+export type RepairHands = { readonly ranks: readonly string[] } | { readonly parts: readonly Part[] } | 'bill';
+
+export interface RepairRow {
+  readonly what: string;
+  /** Men it takes (counted, not by skill), and seconds of work with them all there. */
+  readonly men: number;
+  readonly work: number;
+  readonly who: RepairHands;
+}
+
+/** The six the quarter bill posts at the pumps: the carpenter's crew (rules above). */
+export const CARPENTERS: readonly string[] = ['carpenter', "carpenter's mate", 'sailmaker', 'armourer', "carpenter's crew"];
+/** The work of a job that lasts while it is needed (the pumps, a fire): it is dropped when no longer wanted, not finished. */
+export const STANDING_WORK = 3600;
+
+export const REPAIRS: Readonly<Record<RepairName, RepairRow>> = {
+  plug: { what: 'a shot hole plugged', men: 2, work: 45, who: { ranks: CARPENTERS } },
+  fish: { what: 'a wounded spar fished', men: 2, work: 90, who: { ranks: ['carpenter', "carpenter's mate"] } },
+  splice: { what: 'a cut line knotted and spliced', men: 3, work: 60, who: { ranks: ['boatswain', "boatswain's mate"] } },
+  tackle: { what: 'the relieving tackles rigged', men: 4, work: 90, who: { ranks: ['quartermaster'] } },
+  cut: { what: 'the wreckage cut away', men: 6, work: 60, who: { parts: ['forecastle'] } },
+  pump: { what: 'hands at the pumps', men: 8, work: STANDING_WORK, who: 'bill' },
+  fight: { what: 'a fire fought', men: 8, work: STANDING_WORK, who: 'bill' },
+  fetch: { what: 'a wounded man lifted', men: 2, work: 3, who: { parts: ['waist'] } },
+  carry: { what: 'a wounded man carried below', men: 2, work: 2, who: { parts: ['waist'] } },
+};
+
+/**
+ * How many plugging parties of two the carpenter's crew makes: one (the carpenter and his mate) unasked, every pair when
+ * the carpenter is told to plug first or the first lieutenant's pump hands free them, none when told to pump first.
+ */
+export const PLUG_PARTIES = { unasked: 1, all: 3 } as const;
+/** At most this many parties carry the wounded below at once; the others wait where they lie until one is free. */
+export const CARRY_PARTIES = 4;
+/** Holes plugged: those in her planking up to this far above her waterline (m), which her roll and the sea bring under. */
+export const PLUG_ABOVE = 0.6;
+/** Where the badly wounded are carried (the surgeon's station in the cockpit). */
+export const SURGEON = 'station-surgeon';
+/** Where the relieving tackles are rigged: the tiller, in the space over the rudder head (the plan's space). */
+export const TILLER_SPACE = 'breadroom';

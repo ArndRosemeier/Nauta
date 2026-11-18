@@ -35,7 +35,7 @@ import { fallsDue, sparUnder, standingOf, wreckOf, type Standing, type Wreck } f
 import { atHand, burnt, kindled, spaceAt, type Fire } from './damage/fire';
 import { flowed, inflow, loadOf, lyingOf, pumped } from './damage/flood';
 import { meetings, nearHer, plankingPlace, type Aboard, type Meeting, type Place, type TimberPart } from './damage/meet';
-import { manAt, type Crew } from './crew/crew';
+import { atWork, manAt, type Crew, type Mended } from './crew/crew';
 import { brigRoster, type Man } from './crew/roster';
 import { battery, dismountGun, gunAt, gunCount, type Battery } from './guns/guns';
 import type { GunFired, Shot, Vec } from './guns/shot';
@@ -78,6 +78,8 @@ export interface Damage {
   readonly steering: boolean;
   /** Her magazine has gone up. */
   readonly blownUp: boolean;
+  /** The holes the carpenter's crew has plugged (their `holes` numbers), ascending: the sea comes in at them no more. */
+  readonly plugged: readonly number[];
 }
 
 /** A shot on its way: the ship and gun (battery place) that fired it and the tick, and how much of its punch each ball has spent (mm of oak; `GONE` once it is stopped or in the sea). */
@@ -129,7 +131,7 @@ export interface Aftermath {
 export function startDamage(): Damage {
   return {
     holes: [], cut: [], wounds: [], rent: rigPlan().sails.map(() => 0), hurt: [],
-    flooded: [0, 0], fallen: [], alongside: [], fires: [], steering: true, blownUp: false,
+    flooded: [0, 0], fallen: [], alongside: [], fires: [], steering: true, blownUp: false, plugged: [],
   };
 }
 
@@ -495,6 +497,8 @@ export interface AftermathIn {
   readonly crew: Crew;
   readonly sailing: Sailing;
   readonly wind: Wind;
+  /** The repairs her crew finished this step (crew.ts), mended first. */
+  readonly mended?: readonly Mended[];
 }
 /** Her damage one step on, what followed, and what it does to her sailing (sailing.ts) and her floating (motion.ts: the water's weight). */
 export interface AftermathOut {
@@ -504,8 +508,9 @@ export interface AftermathOut {
   readonly load: Burden;
 }
 
-/** A hole the sea can come in at: where (the plan's place), and the ball whose opening it is (a lodged ball plugs its hole; holes above her deck let in no sea). */
-interface Leak {
+/** A hole the sea can come in at: its `holes` number, where (the plan's place), and the ball whose opening it is (a lodged ball plugs its hole; holes above her deck let in no sea). */
+export interface Leak {
+  readonly code: number;
   readonly at: Place;
   readonly shot: ShotKind;
   readonly gun: GunKind;
@@ -516,9 +521,61 @@ function leaks(holes: readonly number[]): readonly Leak[] {
   let out = leaksOf.get(holes);
   if (out) return out;
   const cells = shipPlan().cells;
-  out = holes.map(holeAt).filter((h) => !h.lodged && cells[h.cell]!.kind === 'planking').map((h) => ({ at: plankingPlace(cells[h.cell]!, h.u, h.v), shot: h.shot, gun: h.gun }));
+  out = holes.flatMap((code) => {
+    const h = holeAt(code);
+    return !h.lodged && cells[h.cell]!.kind === 'planking' ? [{ code, at: plankingPlace(cells[h.cell]!, h.u, h.v), shot: h.shot, gun: h.gun }] : [];
+  });
   leaksOf.set(holes, out);
   return out;
+}
+
+/** The holes in her planking the sea can come in at (not lodged, not plugged), wherever they lie; the same list while nothing changes. */
+const openOf = new WeakMap<readonly number[], { readonly plugged: readonly number[]; readonly open: readonly Leak[] }>();
+export function openHoles(d: Damage): readonly Leak[] {
+  const was = openOf.get(d.holes);
+  if (was && was.plugged === d.plugged) return was.open;
+  const plugged = new Set(d.plugged), open = d.plugged.length === 0 ? leaks(d.holes) : leaks(d.holes).filter((h) => !plugged.has(h.code));
+  openOf.set(d.holes, { plugged: d.plugged, open });
+  return open;
+}
+
+/** The men out of the quarter bill: badly hurt or killed (roster places); the same set while nothing changes. */
+const outs = new WeakMap<readonly number[], ReadonlySet<number>>();
+export function outOf(d: Damage): ReadonlySet<number> {
+  let out = outs.get(d.hurt);
+  if (!out) {
+    out = new Set(d.hurt.flatMap((h) => (h % HARMS.length >= HARMS.indexOf('badly') ? [Math.floor(h / HARMS.length)] : [])));
+    outs.set(d.hurt, out);
+  }
+  return out;
+}
+
+/** Without one entry of `x` (a list kept ascending). */
+const lessOne = (list: readonly number[], x: number): readonly number[] => {
+  const k = list.indexOf(x);
+  return k < 0 ? list : [...list.slice(0, k), ...list.slice(k + 1)];
+};
+
+/**
+ * The repairs her crew finished, done to her (N6.3, design decisions for N6): a hole plugged lets in no more sea, a
+ * spar fished has one wound less, a line spliced is whole again, the relieving tackles give her her steering back, the
+ * wreckage cut away drags her no more. The pumps, the fire parties and the wounded carried below change nothing here.
+ */
+export function mend(d: Damage, mended: readonly Mended[]): Damage {
+  let next = d;
+  for (const m of mended) {
+    switch (m.job) {
+      case 'plug':
+        if (next.holes.includes(m.on) && !next.plugged.includes(m.on)) next = { ...next, plugged: [...next.plugged, m.on].sort((p, q) => p - q) };
+        break;
+      case 'fish': next = { ...next, wounds: lessOne(next.wounds, m.on) }; break;
+      case 'splice': next = { ...next, cut: lessOne(next.cut, m.on) }; break;
+      case 'tackle': next = next.steering ? next : { ...next, steering: true }; break;
+      case 'cut': next = { ...next, alongside: lessOne(next.alongside, m.on) }; break;
+      default: break;
+    }
+  }
+  return next;
 }
 
 /** Each ship's drag alongside, by her `alongside` (worked out again only when something more falls or is cut away). */
@@ -539,12 +596,13 @@ const holeWorld: [number, number, number] = [0, 0, 0];
  * across her as she heels; spars falling that are due (damage/fall.ts) with the men on them; fires growing, spreading,
  * fought by the men at hand and reaching her powder. Her damage is the same value where nothing changed.
  */
-export function stepAftermath(d: Damage, input: AftermathIn, roster: readonly Man[] = brigRoster()): AftermathOut {
+export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly Man[] = brigRoster()): AftermathOut {
   const events: Aftermath[] = [], { tick, ship } = input;
+  const d = input.mended && input.mended.length > 0 ? mend(was, input.mended) : was;
   let next = d;
 
   // The sea coming in, and the pumps.
-  const holes = leaks(d.holes), [larboard, starboard] = d.flooded;
+  const holes = openHoles(d), [larboard, starboard] = d.flooded;
   if (holes.length > 0 || larboard + starboard > 0) {
     const roll = input.pose.roll, level = lyingOf(larboard + starboard).level;
     let inL = 0, inS = 0;
@@ -584,7 +642,8 @@ export function stepAftermath(d: Damage, input: AftermathIn, roster: readonly Ma
   // Fire.
   if (d.fires.length > 0 && !d.blownUp) {
     const fighting = menBySpace(input.crew, d, roster);
-    const b = burnt(d.fires, (space) => Math.min(FIGHT_AT_HAND, atHand(space).reduce((n, s) => n + (fighting.get(s) ?? 0), 0)));
+    // A fire party at the fire fights it; until one comes, the men at hand beat at it.
+    const b = burnt(d.fires, (space) => atWork(input.crew, 'fight', space) || Math.min(FIGHT_AT_HAND, atHand(space).reduce((n, s) => n + (fighting.get(s) ?? 0), 0)));
     for (const space of b.spread) events.push({ kind: 'aftermath', tick, ship, what: 'fire', id: space });
     for (const space of b.out) events.push({ kind: 'aftermath', tick, ship, what: 'out', id: space });
     if (b.magazine) events.push({ kind: 'aftermath', tick, ship, what: 'blew up', id: GONE });
@@ -620,10 +679,11 @@ const fit = (d: Damage, man: number): boolean => {
   return h === null || h === 'wounded';
 };
 
-/** The men of the quarter bill at the pumps who are there and fit to work them. */
+/** The men at the pumps and fit to work them: the quarter bill's men there with nothing else to do, and the hands sent to them (N6.3). */
 function pumpHands(crew: Crew, d: Damage, roster: readonly Man[]): number {
   pumpMen ??= roster.flatMap((m, i) => (m.post === PUMP_POST ? [i] : []));
-  return pumpMen.filter((i) => { const h = crew.men[i]; return h && !h.going && !h.stands && fit(d, i); }).length;
+  const atPost = pumpMen.filter((i) => { const h = crew.men[i]; return h && !h.going && !h.stands && fit(d, i); }).length;
+  return atPost + atWork(crew, 'pump', 0);
 }
 
 /** The fit men in each space (the plan's places) where they are now. */

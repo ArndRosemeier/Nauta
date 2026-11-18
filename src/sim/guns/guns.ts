@@ -152,11 +152,11 @@ function gunsByPlace(): ReadonlyMap<string, number> {
   return gunAtPlace;
 }
 
-/** How many men stand at each gun's crew places now, by battery place (men on their way are at none). */
-export function handsAtGuns(crew: Crew, roster: readonly Man[] = brigRoster()): number[] {
+/** How many men stand at each gun's crew places now, by battery place (men on their way are at none, nor the men `struck` out of the quarter bill). */
+export function handsAtGuns(crew: Crew, roster: readonly Man[] = brigRoster(), struck: ReadonlySet<number> | null = null): number[] {
   const at = gunsByPlace(), out = battery().map(() => 0);
   crew.men.forEach((h, i) => {
-    if (h.going) return;
+    if (h.going || struck?.has(i)) return;
     const g = at.get(h.stands ? spotKey(h.stands) : roster[i]!.post);
     if (g !== undefined) out[g]!++;
   });
