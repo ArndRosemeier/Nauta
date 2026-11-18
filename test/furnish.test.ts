@@ -101,8 +101,6 @@ test('the fittings pack holds every model she is furnished with', () => {
   for (const model of new Set(all.map((f) => f.model))) assert.ok(pack.has(model), model);
 });
 
-/** Models whose room in the plan leads the drawing (ship.md, "The forecastle is reached past the fore fife rail"): the fittings thread narrows the model to it. */
-const DRAWING_FOLLOWS = new Set<string>([MODEL.fifeRail]);
 /** A model's room in rules/fittings.ts SOLID matches its built bounds this closely, m. */
 const BOUNDS = 0.01;
 
@@ -110,7 +108,7 @@ test('each fitting\'s room in the plan is its built model\'s: every part inside 
   const pack = decodePack(new Uint8Array(readFileSync(new URL('../public/ship/fittings.fmpk', import.meta.url))));
   for (const model of Object.values(MODEL)) {
     const parts = SOLID[model], built = pack.get(model)!;
-    if (parts.length === 0 || DRAWING_FOLLOWS.has(model)) continue;
+    if (parts.length === 0) continue;
     const axes = ['x', 'y', 'z'] as const;
     axes.forEach((a, k) => {
       for (const p of parts) assert.ok(p[a][0] >= built.min[k]! - BOUNDS && p[a][1] <= built.max[k]! + BOUNDS, `${model} ${a}: a part outside the model`);
