@@ -9,6 +9,7 @@
 import { angleDiff } from '@futuremagic/core';
 import { sparParts } from '../../sim/damage/meet';
 import type { LostHow } from '../../sim/end';
+import { foeOf } from '../../sim/foes';
 import { founderTonnes } from '../../sim/damage/flood';
 import { WATER_MARKS, type Notice } from '../../sim/notices';
 import type { Order } from '../../sim/orders';
@@ -177,7 +178,7 @@ export function saysOf(e: SimEvent | Notice | Sent, ship: number): Say[] {
     case 'losing': return [report('master', ship, 'losing')];
     case 'end': {
       if (e.lost.every((l) => l === null)) return [report('master', ship, e.apart ? 'apart' : 'nightfall')];
-      const her = e.lost[1 - ship];
+      const her = e.lost.find((l, i) => i !== ship && l !== null);
       return her ? [cry('lookout', ship, HER_END[her])] : [];
     }
     // ---- What her officers notice ----
@@ -203,8 +204,8 @@ const TOWARD_WITHIN = 4 * POINT;
  * and her ports if they are open. Nothing when there is no other ship.
  */
 export function lookoutSays(state: SimState, ship: number): Say[] {
-  const mine = state.ships[ship], her = state.ships[1 - ship];
-  if (!mine || !her || state.ships.length < 2) return [];
+  const foe = foeOf(state.ships, ship), mine = state.ships[ship], her = foe === null ? undefined : state.ships[foe];
+  if (!mine || !her) return [];
   const me = mine.motion.pose, she = her.motion.pose;
   const off = angleDiff(mine.sailing.heading, bearingTo(me, she));
   const towardUs = Math.abs(angleDiff(her.sailing.heading, bearingTo(she, me)));

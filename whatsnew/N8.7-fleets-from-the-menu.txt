@@ -1,0 +1,2 @@
+The setup now starts any fleet action of two to eight ships: pick "Fleet action", tap Start, and the other ships sail and fight around you.
+If your ship is lost while others still fight, the view goes free and you watch the rest. The watch buttons keep company with your side, the others, or everyone.

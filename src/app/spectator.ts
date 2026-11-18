@@ -12,7 +12,7 @@ import { make } from './dom';
 import { makeButton } from './button';
 import type { Look } from './look';
 import type { Standpoint } from './standpoints';
-import { FreeCam, vantageOf, vantageOfBoth, vantageOver, type Hull, type Vec3 } from './freeCam';
+import { FreeCam, camps, foeHull, vantageOf, vantageOfAll, vantageOver, type Hull, type Vec3 } from './freeCam';
 import type { Push } from './thumbs';
 import type { WordKey } from './words';
 import type { Offered } from '../sim/rules/captain';
@@ -114,7 +114,7 @@ export class Spectator {
     this.opening = true;
     this.held.clear();
     this.cam.parted();
-    const v = ships.length > 1 ? vantageOver(ships[0]!, ships[1]!) : vantageOf(ships[0]!);
+    const v = ships.length > 1 ? vantageOver(ships[0]!, foeHull(ships)!) : vantageOf(ships[0]!);
     this.cam.x = v.at[0]; this.cam.y = v.at[1]; this.cam.z = v.at[2];
     this.caption.textContent = caption;
     for (const el of [this.bar, this.arrows, this.caption]) el.hidden = false;
@@ -169,9 +169,16 @@ export class Spectator {
     for (const [name, b] of this.buttons) b.classList.toggle('on', name === to);
     if (to === 'stay') return;
     this.hulls = this.page.hulls();
-    const [a, b] = this.hulls;
-    if (!a) return;
-    this.cam.glideTo(to === 'both' && b ? vantageOfBoth(a!, b) : vantageOf(to === 'french' && b ? b : a!));
+    const group = this.group(to);
+    if (group.length === 0) return;
+    this.cam.glideTo(to === 'both' ? vantageOfAll(group) : vantageOf(group[0]!));
+  }
+
+  /** The ships a company keeps: 'british' the first one's side, 'french' the other sides, 'both' every ship. */
+  private group(to: Company): readonly Hull[] {
+    if (this.hulls.length === 0) return [];
+    const { first, others } = camps(this.hulls);
+    return to === 'british' ? first : to === 'french' ? others : this.hulls;
   }
 
   private onKey(e: KeyboardEvent, down: boolean): void {
@@ -184,13 +191,11 @@ export class Spectator {
     if (down) { if (!sheet) { this.held.add(e.code); e.preventDefault(); } } else this.held.delete(e.code);
   }
 
-  /** The place the eye keeps company with now: the ship, the middle of both, or none. */
+  /** The place the eye keeps company with now: the middle of the ships it keeps, or none. */
   private companyNow(): { x: number; z: number } | null {
-    const [a, b] = this.hulls;
-    if (!a || this.company === 'stay') return null;
-    if (this.company === 'british') return a;
-    if (this.company === 'french') return b ?? a;
-    return b ? { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 } : a;
+    if (this.hulls.length === 0 || this.company === 'stay') return null;
+    const group = this.group(this.company);
+    return { x: group.reduce((s, h) => s + h.x, 0) / group.length, z: group.reduce((s, h) => s + h.z, 0) / group.length };
   }
 
   /**
@@ -203,7 +208,7 @@ export class Spectator {
     let opened: Look | null = null;
     if (this.opening && ships.length > 1) {
       this.opening = false;
-      const v = vantageOver(ships[0]!, ships[1]!);
+      const v = vantageOver(ships[0]!, foeHull(ships)!);
       [c.x, c.y, c.z] = v.at;
       c.parted();
       opened = v.look;

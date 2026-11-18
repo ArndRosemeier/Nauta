@@ -21,7 +21,7 @@ const PRESET_WORDS: Readonly<Record<PresetName, WordKey>> = { alone: 'presetAlon
 const SKILL_WORDS: Readonly<Record<Offered, WordKey>> = { green: 'skillGreen', seasoned: 'skillSeasoned', master: 'skillMaster' };
 const NAVY_WORDS: Readonly<Record<(typeof NAVIES)[number], WordKey>> = { british: 'british', french: 'french' };
 /** What each limit says (scenario.ts `limitOf`). */
-export const LIMIT_WORDS: Readonly<Record<Limit, WordKey>> = { 'one side': 'limitOneSide', 'too close': 'limitTooClose', 'more ships': 'limitMoreShips', 'same navy': 'limitSameNavy', 'host ship': 'limitHostShip' };
+export const LIMIT_WORDS: Readonly<Record<Limit, WordKey>> = { 'one side': 'limitOneSide', 'too close': 'limitTooClose', 'host ship': 'limitHostShip' };
 
 /** The letters the sides go by. */
 const SIDE_LETTERS = ['A', 'B', 'C', 'D'];
