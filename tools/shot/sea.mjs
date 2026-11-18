@@ -5,12 +5,12 @@
  * one page (`window.__nautaScene`), so the shaders are built once and the set runs within its 3 minutes. Writes
  * `<out dir>/<time>-<sea>-eye<m>.png` (default `shots/sea`) and `sheet.png`, all of them on one page. Words narrow
  * the set to the shots whose name holds every one (`npm run shot:sea -- shots/sea noon gale`). The browser's
- * switches are browser.mjs's (CHROMIUM_PATH, SHOT_GPU, SHOT_SIZE); without SHOT_GPU it draws with WebGL 2 (`?gl`). The
+ * switches are browser.mjs's (CHROMIUM_PATH, SHOT_GPU, SHOT_SIZE). The
  * quality is fixed at its best (`?quality=high`): the software GPU's slow frames would step it down to the lowest.
  */
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { TIMEOUT, openBrowser, openGame, shotSize } from './browser.mjs';
+import { TIMEOUT, openBrowser, openGame, shotSize, snap } from './browser.mjs';
 
 /** The times of day, hours: just after sunrise, noon, just before sunset, and a moonlit night (the moon is high then). */
 export const TIMES = { dawn: 6.3, noon: 12, dusk: 17.7, night: 22 };
@@ -22,9 +22,10 @@ export const EYES = [4.5, 30];
 const LOOK_DOWN = -6;
 /**
  * The shots' size unless SHOT_SIZE names one: the software GPU of the cloud and CI draws a frame of the sea in about
- * 3 s at 1280 × 800 (2.5 s at 960 × 600), and the set's 24 frames and its page load must fit in 3 minutes.
+ * 3 s at 1280 × 800 (2.5 s at 960 × 600 with WebGL 2; WebGPU there since N1.2 took the set to 162 s at 960 × 600), and
+ * the set's 24 frames and its page load must fit in 3 minutes.
  */
-const SEA_SHOT_SIZE = '960x600';
+const SEA_SHOT_SIZE = '800x500';
 /** How wide each shot is drawn on the sheet, px. */
 const SHEET_THUMB = 480;
 
@@ -43,7 +44,7 @@ async function main() {
   if (!shots.length) { console.error(`no shot's name holds ${words.join(' and ')}`); process.exit(2); }
   mkdirSync(outDir, { recursive: true });
   const t0 = performance.now(), served = await openBrowser(), viewport = shotSize(SEA_SHOT_SIZE);
-  const game = await openGame(served, `?${process.env.SHOT_GPU ? '' : 'gl&'}day=0&quality=high`, viewport);
+  const game = await openGame(served, '?day=0&quality=high', viewport);
   const { page } = game;
   // Only the sea and the sky: the version button stays out of the shots.
   await page.addStyleTag({ content: '#version{display:none!important}' });
@@ -51,7 +52,7 @@ async function main() {
   for (const shot of shots) {
     await page.evaluate((q) => window.__nautaScene(q), shot.query);
     const file = join(outDir, `${shot.name}.png`);
-    await page.screenshot({ path: file, timeout: TIMEOUT });
+    await snap(page, file);
     files.push({ ...shot, file });
     console.log(`${file}  (?${shot.query})`);
   }

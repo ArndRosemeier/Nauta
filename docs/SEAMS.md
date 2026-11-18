@@ -59,24 +59,35 @@ Before writing code that does something, look here. If a row covers it, call tha
 | How far a sea vertex has slid onto the next coarser grid (the vertex stage does the same) | `src/render/seaGrid.ts#seaMorph` |
 | How far out the sea is drawn for an eye height | `src/render/seaGrid.ts#seaReach` |
 | The sea's waves at a moment as the vertex stage reads them (weighted, phases near the eye) | `src/render/seaWaves.ts#fillSeaWaves` |
-| The sea's shader: the grid displaced by the simulated waves, foam's bunching now and a few seconds ago, and the water's look per pixel (sky reflection, sun and moon glitter, deep colour, light through crests, gusts, foam, haze, the view from below) | `src/render/seaMaterial.ts#makeSeaMaterial` |
+| The sea's shader: the grid displaced by the simulated waves and the fine bands, foam's bunching now and a few seconds ago, and the water's look per pixel (sky reflection, sun and moon glitter, deep colour, light through crests, gusts, foam, haze, the view from below) | `src/render/seaMaterial.ts#makeSeaMaterial` |
 | Handing the sea the light rig's environment map (its reflections and the sky's light on the water) | `src/render/seaMaterial.ts#useSeaSky` |
+| Handing the sea its fine bands (the textures its shader reads) | `src/render/seaMaterial.ts#useFineSea` |
 | The deep around an eye under water | `src/render/seaMaterial.ts#makeDeepMaterial` |
 | How rough the sea is in a wind (Cox and Munk's mean square slope, glassy in a calm) | `src/render/seaFine.ts#seaRoughness` |
 | The slope a wave set carries | `src/render/seaFine.ts#slopeVariance` |
 | What the fine waves carry of the roughness | `src/render/seaFine.ts#fineSlope` |
-| A wind layer's fine waves (seeded, metres down to half a metre; what they cannot carry is roughness, the rest the ripples') | `src/render/seaFine.ts#makeFineWaves` |
-| The fine waves of a moment as the material reads them (long to short, each with the slope of all shorter) | `src/render/seaFine.ts#fillFineWaves` |
+| A short wave's frequency (deep water and surface tension) | `src/render/seaFine.ts#fineOmega` |
+| The fine sea's bands: how many, their tiles and the wavelengths each holds | `src/render/seaFine.ts#bandLayout` |
+| The bands' fixed tables for the GPU (wavenumbers, frequencies, the spectrum's fixed part, seeded noise) | `src/render/seaFine.ts#bandTables` |
+| The cos-2s spread's normalisation | `src/render/seaFine.ts#spreadNorm` |
+| A wind layer's fine waves (their spectrum's level, where they begin, the slope each band and the ripples carry) | `src/render/seaFine.ts#fineLayer` |
+| The fine sea of a moment (its two strongest layers, weighted in energy) | `src/render/seaFine.ts#fineFrame` |
+| The fine sea on the GPU: the spectrum turned into waves each frame (FFT in workgroup memory), shape and slope textures per band, the foam a fold leaves | `src/render/seaBands.ts#BandSet` |
+| Every band set the quality levels need, the one drawn, and the texture nodes the sea's shader reads | `src/render/seaBands.ts#FineSea` |
+| The moment's fine sea written into the GPU passes' inputs | `src/render/seaBands.ts#setBandInputs` |
 | How much a gust roughens the fine waves | `src/render/seaFine.ts#gustRoughening` |
 | The gust patches laid into a map around the eye for the sea to draw | `src/render/seaGusts.ts#drawGusts` |
 | The share of the sea a wind whitens (Monahan) | `src/render/seaFoam.ts#whitecapShare` |
 | Where foam forms in the waves drawn (the bunching that whitens that share) | `src/render/seaFoam.ts#foamLevels` |
+| The variance of the simulated waves' bunching | `src/render/seaFoam.ts#bunchVariance` |
+| How many deviations deep the bunching must go to turn white (per pixel, with the bands') | `src/render/seaFoam.ts#foamDepth` |
 | A standard normal quantile | `src/render/seaFoam.ts#normalAbove` |
 | The foam's seeded, tiling pattern (lace, breakup, bubbles) | `src/render/seaFoam.ts#foamPattern` |
 | The ripples' share of the short waves' slope | `src/render/seaRipples.ts#rippleShare` |
 | The ripples' seeded, tiling slope texture (half a metre down to 3.5 cm) | `src/render/seaRipples.ts#ripplePattern` |
 | The strength lit materials take the sky's environment map at | `src/render/skyView.ts#SkyView` |
 | The sea drawn: tiles chosen for the camera each frame, waves and light handed to the shader | `src/render/seaView.ts#SeaView` |
+| A texture that tiles (repeat, mipmaps, anisotropic filtering) | `src/render/tiling.ts#tiling` |
 | A game kind's own attribute on the Stage's stand-in mesh | `src/render/materials.ts#standInAttribute` |
 | The brig's measures (Cruizer class, from the Admiralty draught): her midship section, decks, ports, rig sizes | `src/sim/rules/ships.ts#MIDSHIP_SECTION` |
 | Her table of offsets: profile, stem, stern, transom, body plan stations | `src/sim/rules/ships.ts#BODY_STATIONS` |
@@ -212,6 +223,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Frame times summed up as the budget reads them (percentiles, worst, on time, hitches) | `src/app/bench.ts#frameStats` |
 | The bench on the page: flying, measuring, the result on screen | `src/app/benchRun.ts#BenchRun` |
 | The built game in a headless browser (for screenshots) | `tools/shot/browser.mjs#openGame` |
+| A screenshot of the game, its last WebGPU frame painted first where the software GPU cannot present (`tools/shot/swapchain.js`) | `tools/shot/browser.mjs#snap` |
 | The standard sea shots (times of day × seas × eye heights), each scene set on one page by main.ts's `window.__nautaScene` | `tools/shot/sea.mjs#seaShots` |
 | The rig's measures: masts, yards, booms, the heights yards hang at, how far they brace (Steel's brig, estimated) | `src/sim/rules/rig.ts#MAST_SPARS` |
 | Her sails' cuts and reefs | `src/sim/rules/rig.ts#SAILS` |

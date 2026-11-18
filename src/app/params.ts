@@ -1,5 +1,5 @@
 /**
- * What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?sea=gale`, `?yaw=70&pitch=-10`,
+ * What the page's address asks for (`?hud&hour=17`, `?eye=30&wind=6`, `?sea=gale`, `?yaw=70&pitch=-10`,
  * `?look=90,-5`, `?bench`, `?probe`, `?rig`, `?ship=hold`, `?quality=low`, `?walk`). Pure: it takes the query string.
  */
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
@@ -38,8 +38,6 @@ export interface LookAtLight {
 }
 
 export interface Params {
-  /** Draw with WebGL 2 even where WebGPU exists (headless checks in the cloud). */
-  readonly forceWebGL: boolean;
   /** Show the line of numbers in the corner. */
   readonly hud: boolean;
   /** The hour the day starts at, 0..24. */
@@ -76,7 +74,7 @@ export function readParams(query: string): Params {
   };
   const named = NAMED_SEAS[q.get('sea') ?? ''], force = q.has('wind') || named === undefined ? num('wind', WIND_FORCE, 0, WIND_PRESETS.length - 1) : named;
   return {
-    forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
+    hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
     dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
     ship: q.get('ship') ?? q.get('slice'), quality: q.get('quality'), walk: q.get('walk'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(force),
     look: q.has('yaw') || q.has('pitch')

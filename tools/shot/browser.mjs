@@ -1,9 +1,11 @@
 /**
  * The built game in headless Chromium, for the screenshot scripts (shot.mjs, sea.mjs): serves the production build
- * and renders with SwiftShader (no GPU needed), so it works in a cloud container; there use `?gl` and set
- * CHROMIUM_PATH. SHOT_GPU=1 renders on the machine's own GPU. SHOT_TIMEOUT=<ms> bounds every wait. SHOT_LOG=1 prints
+ * and renders WebGPU with SwiftShader (no GPU needed), so it works in a cloud container; there set CHROMIUM_PATH.
+ * The software GPU cannot present WebGPU to a canvas, so a stand-in swap chain (swapchain.js) is injected and `snap`
+ * paints the last frame for the picture. SHOT_GPU=1 renders on the machine's own GPU and presents normally. SHOT_TIMEOUT=<ms> bounds every wait. SHOT_LOG=1 prints
  * every message of the page.
  */
+import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { preview } from 'vite';
 
@@ -37,10 +39,19 @@ export async function openGame({ base, browser }, query, viewport, hasTouch = fa
   const context = await browser.newContext({ viewport, hasTouch });
   const page = await context.newPage();
   let failed = false;
-  page.on('console', (m) => { if (m.type() === 'error' || process.env.SHOT_LOG) console.error(`[page] ${m.text()}`); });
+  // The software GPU cannot present WebGPU to a canvas: a stand-in swap chain does (swapchain.js).
+  if (!process.env.SHOT_GPU) await page.addInitScript({ path: fileURLToPath(new URL('./swapchain.js', import.meta.url)) });
+  // Errors, and three's warnings (a shader node that failed to build is only warned about, and the mesh is not drawn).
+  page.on('console', (m) => { if (m.type() === 'error' || (m.type() === 'warning' && m.text().startsWith('THREE.')) || process.env.SHOT_LOG) console.error(`[page] ${m.text()}`); });
   page.on('pageerror', (e) => { failed = true; console.error(`[page error] ${e.message}`); });
-  await page.goto(base + (query.startsWith('?') ? query : '?' + query));
+  await page.goto(base + (query.startsWith('?') ? query : '?' + query), { timeout: TIMEOUT });
   await page.waitForFunction(() => window.__nautaReady === true, null, { timeout: TIMEOUT }).catch(() => { failed = true; console.error('page did not report ready'); });
   await page.addStyleTag({ content: '#loading{display:none!important}' });
   return { page, context, failed: () => failed };
+}
+
+/** The page's picture in `path`: the last frame painted first where the stand-in swap chain draws (swapchain.js). */
+export async function snap(page, path) {
+  if (!process.env.SHOT_GPU) await page.evaluate(() => window.__presentWebGPU?.());
+  await page.screenshot({ path, timeout: TIMEOUT });
 }

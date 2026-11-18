@@ -21,7 +21,9 @@ const FOAM_SHOW = 2.5;
 /** The most of the sea that is ever white (a storm's streaks). */
 const FOAM_MOST = 0.35;
 /** How far below the level the foam turns fully white, in deviations of the bunching. */
-const FOAM_RAMP = 1.2;
+export const FOAM_RAMP = 1.2;
+/** Deviations below the mean that no bunching reaches: no foam at all. */
+export const FOAM_DEPTH_NONE = 1000;
 /** Below this share there is no foam at all (the level is put out of reach). */
 const FOAM_NONE = 1e-5;
 /** Abramowitz and Stegun 7.1.26: erfc(x) ≈ t·e^(−x²)·Σ aₙtⁿ with t = 1 / (1 + p·x); accurate to 1.5e-7. */
@@ -66,15 +68,30 @@ export interface FoamLevels {
  * where the share of the sea below it is the whitecap share.
  */
 export function foamLevels(table: SeaWaveTable, speed: number, out: FoamLevels = { level: 0, ramp: 0 }): FoamLevels {
+  const deviation = Math.sqrt(bunchVariance(table)), share = whitecapShare(speed);
+  out.ramp = Math.max(deviation * FOAM_RAMP, Number.EPSILON);
+  out.level = share < FOAM_NONE ? -1 : 1 - deviation * normalAbove(share);
+  return out;
+}
+
+/** The variance of the bunching (the stretch's departure from 1) the simulated waves in `table` make. */
+export function bunchVariance(table: SeaWaveTable): number {
   let variance = 0;
   for (let i = 0; i < table.count; i++) {
     const at = i * SEA_WAVE_STRIDE, k = table.more[at + MORE_AT.k]!;
     variance += (table.more[at + MORE_AT.reach]! * k * k) ** 2 / 2;
   }
-  const deviation = Math.sqrt(variance), share = whitecapShare(speed);
-  out.ramp = Math.max(deviation * FOAM_RAMP, Number.EPSILON);
-  out.level = share < FOAM_NONE ? -1 : 1 - deviation * normalAbove(share);
-  return out;
+  return variance;
+}
+
+/**
+ * How many deviations below its mean the bunching must lie to turn white in a wind of `speed` m/s: the whitecap share
+ * of a normal variable (FOAM_DEPTH_NONE when the wind raises none). The sea's material applies it per pixel to the
+ * whole bunching, the simulated waves' and the fine bands' (whose variance is FINE_CHOP² times their slope).
+ */
+export function foamDepth(speed: number): number {
+  const share = whitecapShare(speed);
+  return share < FOAM_NONE ? FOAM_DEPTH_NONE : normalAbove(share);
 }
 
 /** The foam's (and the ripples') patterns drift with the wind, wrapped every FOAM_WRAP m: a whole number of each of their tiles. */

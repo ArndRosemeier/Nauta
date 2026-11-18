@@ -7,7 +7,7 @@ import { standpoint, type Standpoint } from './app/standpoints';
 import { showStandpoints } from './app/standpointBar';
 import { showVersion } from './app/whatsNew';
 import { Walking } from './app/walking';
-import { QualityChooser, type QualityKnobs } from './app/quality';
+import { QUALITY_LEVELS, QualityChooser, type QualityKnobs } from './app/quality';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
@@ -67,7 +67,7 @@ async function start(): Promise<void> {
   const walking = params.walk !== null ? new Walking(canvas, params.walk || undefined) : null;
   const ship = params.ship !== null || walking ? new ShipView(await loadShip(import.meta.env.BASE_URL)) : null;
   let where: Standpoint = standpoint(params.ship ?? '');
-  const view = await createView(canvas, params.forceWebGL, ship !== null);
+  const view = await createView(canvas, ship !== null);
   view.camera.position.set(0, params.eye, 0);
   const startLook = params.look ?? START_LOOK;
   view.camera.rotation.set(startLook.pitch, startLook.yaw, 0);
@@ -82,8 +82,15 @@ async function start(): Promise<void> {
   let still = false, held = false;
   /** Waiting for the scene set by `__nautaScene` to be drawn: frames still to draw, and what to call then. */
   let sceneFrames = 0, sceneDrawn: (() => void) | null = null;
-  const seaView = new SeaView(sky);
+  // The quality level: from the top, stepping down in the first seconds while frames are late (plan N1.8).
+  const quality = new QualityChooser(params.quality);
+  // The fine sea gets every level's bands at once, the level now first, so a change of level compiles nothing.
+  const fineOf = (k: QualityKnobs) => ({ bands: k.fineSeaBands, texels: k.fineSeaSize });
+  const seaView = new SeaView(sky, [fineOf(quality.knobs), ...QUALITY_LEVELS.map(fineOf)], sea.seaSeed);
   seaView.show(sea, wind, blowing.speed, seaTime, 0, view.camera, sky);
+  // The fine sea's compute passes are built in the warm-up too, and run once before the first frame.
+  await seaView.fine.warmUp(view.renderer);
+  seaView.fine.run(view.renderer);
   // The sea's mesh is drawn as many tiles at once, a shader of its own: the warm-up builds it with the kinds.
   await view.stage.warmUp([seaView.mesh]);
   await view.stage.add(sky.dome);
@@ -123,9 +130,7 @@ async function start(): Promise<void> {
   if (ship && !walking) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
-  // The quality level: from the top, stepping down in the first seconds while frames are late (plan N1.8).
-  const quality = new QualityChooser(params.quality);
-  const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); };
+  const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); seaView.fine.select(fineOf(k)); };
   apply(quality.knobs);
   document.addEventListener('visibilitychange', () => quality.interrupt());
   // The sea and the wind heard (N1.7): silent until the first tap or click, as browsers want.
@@ -168,6 +173,7 @@ async function start(): Promise<void> {
     }
     sky.update(dt, view.camera);
     seaView.show(sea, wind, blowing.speed, seaTime, dt, view.camera, sky);
+    seaView.fine.run(view.renderer);
     view.camera.getWorldPosition(ear);
     view.camera.getWorldDirection(facing);
     crown.copy(view.camera.up).applyQuaternion(view.camera.quaternion);
@@ -196,7 +202,7 @@ const run = readParams(location.search).probe ? () => import('./probe/page').the
 run().catch((err: unknown) => {
   const failed = el('failed');
   failed.textContent = err instanceof GraphicsUnavailable
-    ? `Nauta needs 3D graphics this browser does not offer (${err.why}). Try a current Chrome, Edge or Safari.`
+    ? `Nauta needs WebGPU, which this browser does not offer (${err.why}). It runs in Safari on an iPad or Mac (iPadOS and macOS 26 or later) and in a current Chrome or Edge.`
     : `Nauta could not start: ${err instanceof Error ? err.message : String(err)}`;
   failed.style.display = 'grid';
   el('loading').remove();

@@ -9,11 +9,12 @@ import { surfaceAt, seaSample, seaWind, type SeaState } from '../sim/sea/sea';
 import type { WaveSet } from '../sim/sea/waves';
 import type { WindState } from '../sim/wind';
 import { DEEP, SEA } from './materials';
-import { SEA_INPUTS, SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, TILE_AT, useSeaSky } from './seaMaterial';
+import { SEA_INPUTS, SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, TILE_AT, useFineSea, useSeaSky } from './seaMaterial';
 import { SEA_MAX_TILES, SEA_TILE_CELLS, seaCellChoices, seaDropAtReach, seaReach, seaTiles, seaTileTriangles } from './seaGrid';
 import { SEA_WAVE_STRIDE, WAVE_AT, fillSeaWaves, seaWaveTable } from './seaWaves';
-import { SEA_FINE_STRIDE, fillFineWaves, fineTable, slopeVariance } from './seaFine';
-import { FOAM_WRAP, foamLevels } from './seaFoam';
+import { fineFrame, slopeVariance } from './seaFine';
+import { FineSea, setBandInputs, type FineChoice } from './seaBands';
+import { FOAM_WRAP, bunchVariance, foamDepth, foamLevels } from './seaFoam';
 import { RIPPLE_REPEATS_SECOND, RIPPLE_TILE } from './seaRipples';
 import { drawGusts, type GustMap } from './seaGusts';
 import type { SkyView } from './skyView';
@@ -83,7 +84,8 @@ export class SeaView {
   private readonly viewProj = new Matrix4();
   /** Where the sea's own frame stands (it follows the eye in steps); the ship's sea cut reads it. */
   readonly origin = new Vector3();
-  private readonly fine = fineTable();
+  /** The fine sea's bands on the GPU (plan N1.2): main.ts runs their passes each frame before drawing. */
+  readonly fine: FineSea;
   private readonly gusts: GustMap;
   private readonly sample = seaSample();
   private readonly coarse = new WeakMap<WaveSet, number>();
@@ -94,9 +96,14 @@ export class SeaView {
   /** Where each grid's triangles stand in the index, by cells along a tile's side. */
   private readonly runs: Map<number, { start: number; count: number }>;
 
-  /** The sky's light rig must exist: the sea reflects its environment map. */
-  constructor(sky: SkyView) {
+  /**
+   * The sky's light rig must exist: the sea reflects its environment map. `fine`: what every quality level asks of
+   * the fine sea, the first drawn at the start; `seed`: the sea's, for the fine waves' noise.
+   */
+  constructor(sky: SkyView, fine: readonly FineChoice[], seed: number) {
     useSeaSky(sky.envTexture);
+    this.fine = new FineSea(fine, seed);
+    useFineSea(this.fine);
     const { geometry: grid, runs } = tileGrid();
     this.runs = runs;
     grid.setAttribute(SEA_TILE_ATTRIBUTE, SEA_INPUTS.tiles);
@@ -145,19 +152,13 @@ export class SeaView {
     for (let i = 0; i < table.count; i++) variance += table.wave[i * SEA_WAVE_STRIDE + WAVE_AT.height]! ** 2 / 2;
     I.crest.value = Math.max(CREST_DEVIATIONS * Math.sqrt(variance), Number.EPSILON);
 
-    // The fine waves, the foam's levels and its drift, the gusts.
-    const fine = fillFineWaves(sea, t, ox, oz, this.fine);
-    const fw = I.fine.array as Vector4[], fm = I.fineMore.array as Vector4[];
-    for (let i = 0; i < fine.count; i++) {
-      fw[i]!.fromArray(fine.wave, i * SEA_FINE_STRIDE);
-      fm[i]!.fromArray(fine.more, i * SEA_FINE_STRIDE);
-    }
-    I.fineCount.value = fine.count;
-    I.fineExcess.value = fine.excess;
-    I.ripples.value = fine.ripples;
+    // The fine sea's bands, the foam's levels and its drift, the gusts.
+    I.foamDepth.value = foamDepth(speed);
+    this.showFine(sea, t, dt, ox, oz);
     const levels = foamLevels(table, speed);
     I.foamLevel.value = levels.level;
     I.foamRamp.value = levels.ramp;
+    I.coarseBunch.value = bunchVariance(table);
     const blowing = seaWind(sea, t);
     this.foamDrift = (this.foamDrift + speed * FOAM_DRIFT * dt) % FOAM_WRAP;
     I.foamDrift.value.set(
@@ -214,6 +215,21 @@ export class SeaView {
     I.sun.value.set(sky.sunColor.r, sky.sunColor.g, sky.sunColor.b);
     I.skyLight.value = sky.skyStrength;
     I.haze.value = sky.light.fogDensity;
+  }
+
+  /** The fine sea of this moment: the passes' inputs, and per band where its tile lies and what it carries. */
+  private showFine(sea: SeaState, t: number, dt: number, ox: number, oz: number): void {
+    const I = SEA_INPUTS, fine = this.fine, frame = fineFrame(sea, t, fine.layout, fine.frame);
+    setBandInputs(frame, t, dt, I.foamDepth.value);
+    const at = I.band.array as Vector4[], more = I.bandMore.array as Vector4[];
+    fine.layout.bands.forEach((b, i) => {
+      // The tile's corner as the sea's origin sees it (worked out in double precision), and half a texel.
+      const texel = b.tile / fine.layout.texels, half = texel / 2;
+      at[i]!.set((ox % b.tile) + half, (oz % b.tile) + half, b.tile, texel);
+      more[i]!.set(frame.slope[i]!, Math.log(b.longest), Math.log(b.shortest), b.gust);
+    });
+    I.bandCount.value = fine.layout.bands.length;
+    I.ripples.value = frame.ripples;
   }
 
   /** The slope the simulated waves of the sea's newest wind carry, with the swell's (for how a gust roughens the rest). */

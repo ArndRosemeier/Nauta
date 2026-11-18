@@ -1,0 +1,3 @@
+The short waves are now real waves computed on the graphics chip every frame: thousands of them from tens of metres down to half a metre, so the water near the ship moves and glitters without any repeating pattern.
+Whitecaps now break where the short waves crowd together on a crest, in ragged patches instead of smooth blobs, and leave streaks of foam behind them.
+The game now needs WebGPU (Safari on the iPad has it); a browser without it shows a short note instead.
