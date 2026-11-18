@@ -2,25 +2,32 @@
  * Slow check (docs/CHECKS.md, implementation plan N7.4): a novice plays the first match, doing only what the first
  * lieutenant asks, when he asks it, a few seconds late as a new player would be. A pure simulation: the session the
  * menu starts (`FIRST_MATCH`), its clock driven here, the lessons (app/lessons.ts) heard step by step as the page
- * hears them. The novice is played at three speeds of reaction, each in a process of its own, side by side.
+ * hears them. The first lieutenant's own orders (the pumps, the fire party) are given as the page gives them.
+ *
+ * Played, each in a process of its own (as many at once as the machine has cores): the slow novice (`SLOW`, 15 s) on
+ * `SEEDS` seeds (the first match's own and the next ones: other winds, other places), the quick and the usual novice
+ * on the first match's own seed, and a captain who gives no orders at all on `IDLE_SEEDS` seeds.
  *
  * In the fight he does as the lieutenant taught: the word ("Fire!") once the whole side bears, as her deck comes up
  * level (within a new captain's eye, `LEVEL_BY_EYE`).
  *
  * Fails on what the lessons own (design thread, 2026-11-18): a lesson of the course that never came, one passed on
  * undone (its time ran out), an order a lesson asked for refused, the course not reaching the fight within
- * `FIGHT_WITHIN` minutes, the green captain never woken, the ships never within `FIGHTING_RANGE` or a ship that never
- * fired. The fight's result is printed and not judged; "the novice wins" becomes a failure (`MUST_WIN`) once the first
- * balance pass (N7.5a) is merged (until then nearly every duel is drawn, N7.1).
+ * `FIGHT_WITHIN` minutes, the other captain never woken, the ships never within `FIGHTING_RANGE` or a ship that never
+ * fired, all on the first match's own seed; an order a lesson asked for refused on any. And on the fight (design thread,
+ * 2026-11-18, after N7.5a): the captain who gives no orders winning at all, and (once `JUDGE_WINS`) the slow novice
+ * winning fewer than `MUST_WIN` of the `SEEDS`.
  *
  *   npm run check:first
- *   FIRST_TRACE=1 tsx tools/sim/first.ts --run 8     one novice (8 s), the ships every 30 s and his orders
+ *   FIRST_TRACE=1 tsx tools/sim/first.ts --run 8 1797     one novice (8 s, seed 1797), the ships every 30 s and his orders
+ *   tsx tools/sim/first.ts --run idle 1798                 the captain who gives no orders
  */
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { angleDiff } from '@futuremagic/core';
 import { waitingForWord } from '../../src/app/fanOrders.ts';
-import { FIRST_MATCH, Lessons, type Guide, type Want } from '../../src/app/lessons.ts';
+import { FIRST_MATCH, FIRST_SEED, Lessons, type Guide, type Want } from '../../src/app/lessons.ts';
+import { availableParallelism } from 'node:os';
 import { postOf, quarterdeck } from '../../src/app/officers.ts';
 import { DuelSession } from '../../src/net/duel.ts';
 import { sideReports } from '../../src/sim/captain/sight.ts';
@@ -32,16 +39,27 @@ import type { SimState } from '../../src/sim/state.ts';
 import type { SimEvent } from '../../src/sim/step.ts';
 import { apartOnWater, bearingTo, DEGREE, SECONDS_PER_MINUTE, STEPS_PER_SECOND } from '../../src/sim/units.ts';
 
-/** The novice's reaction, s: how long after the lieutenant asks he does it (a quick one, a usual one, a slow one). */
-const REACTIONS = [3, 8, 15];
+/** The novice's reaction, s: how long after the lieutenant asks he does it. The slow one is judged on every seed; the quick and the usual one play the first match's own. */
+const SLOW = 15;
+const QUICK = [3, 8];
+/** The seeds the slow novice plays (the first match's own and the next), and how many he must win (design thread, 2026-11-18). */
+const SEEDS = 10;
+const MUST_WIN = 9;
+/**
+ * Whether winning is judged yet: not until the first match's captain and help reach `MUST_WIN` (design thread,
+ * 2026-11-18); until then the wins are printed. The lessons and the captain who gives no orders are judged always.
+ */
+const JUDGE_WINS = false;
+/** The seeds the captain who gives no orders plays; he must win none. */
+const IDLE_SEEDS = 3;
+/** The captain who gives no orders, in place of a reaction. */
+const IDLE = 'idle';
 /** The match is played this long at most, minutes: the balance sheet's longest duel and the lessons before it. */
 const MOST_MINUTES = 30;
 /** The course must reach the fight (his first word given) within this many minutes, even for the slow novice. */
 const FIGHT_WITHIN = 12;
 /** The ships must come within this of each other, m, to have fought (check:captains' measure). */
 const FIGHTING_RANGE = 600;
-/** Whether the novice must win: false until N7.5a is merged (design thread, 2026-11-18). */
-const MUST_WIN = false;
 /** The lessons the novice does himself, all of which must come. */
 const DONE_BY_HIM = ['look', 'walk', 'glass', 'sail', 'by', 'tack', 'follow', 'quarters', 'hold', 'abeam', 'fire'];
 /** Her deck level by a new captain's eye, rad: he gives the word within this of level. */
@@ -53,7 +71,9 @@ const TRACE_EVERY = 30;
 
 /** What one novice's match came to. */
 interface Run {
-  readonly reaction: number;
+  /** The novice's reaction, s, or the captain who gives no orders. */
+  readonly reaction: number | typeof IDLE;
+  readonly seed: number;
   /** Each lesson or tip that held the marker, at its minute; those passed on undone; orders a lesson asked for that were refused. */
   readonly lessons: { id: string; minute: number }[];
   passed: readonly string[];
@@ -88,11 +108,11 @@ function wordNow(state: SimState, ship: number): boolean {
 }
 
 /** One novice plays the first match. */
-function play(reaction: number): Run {
+function play(reaction: number | typeof IDLE, seed: number): Run {
   let now = 0;
-  const session = new DuelSession({ ...FIRST_MATCH, build: 'check', now: () => now });
+  const session = new DuelSession({ ...FIRST_MATCH, seed, build: 'check', now: () => now });
   const lessons = new Lessons(), me = { looked: 0, glass: false, at: quarterdeck() };
-  const run: Run = { reaction, lessons: [], passed: [], refused: [], woke: -1, fight: -1, closest: Infinity, minutes: 0, lost: [], won: false, fired: [0, 0], hits: [0, 0] };
+  const run: Run = { reaction, seed, lessons: [], passed: [], refused: [], woke: -1, fight: -1, closest: Infinity, minutes: 0, lost: [], won: false, fired: [0, 0], hits: [0, 0] };
   let last: SimState = session.state, guide: Guide | null = null, askedAt = -Infinity, first = true, wordAt = -Infinity;
   /** The order a lesson asked for that he gave last, until it is answered. */
   let asked: string | null = null;
@@ -113,6 +133,8 @@ function play(reaction: number): Run {
     }
     const g = lessons.guideFor({ state, ship, heard: [...events, ...notices], looked: me.looked, glass: me.glass, at: me.at });
     if (g.wake) { session.wakeFoe(); if (run.woke < 0) run.woke = minute; }
+    for (const order of g.gives) session.give(order);
+    if (reaction === IDLE) return;
     if (g.now !== (guide?.now ?? '')) { askedAt = t; if (g.now) run.lessons.push({ id: g.now, minute }); }
     guide = g;
     if (TRACE && state.tick % (TRACE_EVERY * STEPS_PER_SECOND) === 0) {
@@ -137,52 +159,77 @@ function play(reaction: number): Run {
 
 /** What went wrong in a run, in words (none: it holds). */
 function problemsOf(r: Run): string[] {
-  const out: string[] = [], who = `reaction ${r.reaction} s`;
+  const out: string[] = [], who = whoOf(r);
+  if (r.reaction === IDLE) return r.won ? [`${who}: the captain who gives no orders won`] : [];
+  for (const what of r.refused) out.push(`${who}: an order a lesson asked for was refused: ${what}`);
+  // The lessons are judged on the first match's own seed (the one the menu plays); the others are other seas to win in.
+  if (r.seed !== FIRST_SEED) return out;
   for (const id of DONE_BY_HIM) if (!r.lessons.some((l) => l.id === id)) out.push(`${who}: the lesson "${id}" never came`);
   for (const id of r.passed) out.push(`${who}: "${id}" was passed on undone`);
-  for (const what of r.refused) out.push(`${who}: an order a lesson asked for was refused: ${what}`);
-  if (r.woke < 0) out.push(`${who}: the green captain never woke`);
+  if (r.woke < 0) out.push(`${who}: the other captain never woke`);
   if (r.fight < 0 || r.fight > FIGHT_WITHIN) out.push(`${who}: the course reached the fight at ${r.fight.toFixed(1)} min, not within ${FIGHT_WITHIN}`);
   if (r.closest > FIGHTING_RANGE) out.push(`${who}: the ships came no closer than ${r.closest.toFixed(0)} m`);
   if (r.fired.some((n) => n === 0)) out.push(`${who}: a ship never fired (${r.fired.join(' / ')})`);
-  if (MUST_WIN && !r.won) out.push(`${who}: the novice did not win within ${MOST_MINUTES} minutes`);
   return out;
 }
+
+const whoOf = (r: Run): string => `${r.reaction === IDLE ? 'no orders' : `reaction ${r.reaction} s`}, seed ${r.seed}`;
 
 function report(runs: readonly Run[]): void {
   const problems: string[] = [];
   for (const r of runs) {
-    console.log(`reaction ${r.reaction} s: ${r.won ? 'WON' : 'not won'} after ${r.minutes.toFixed(1)} min, lost ${JSON.stringify(r.lost)}; she woke at ${r.woke.toFixed(1)} min, the fight from ${r.fight.toFixed(1)} min, closest ${r.closest.toFixed(0)} m; guns fired ${r.fired.join(' / ')}, hits taken ${r.hits.join(' / ')}`);
-    console.log(`  lessons: ${r.lessons.map((l) => `${l.id} ${l.minute.toFixed(1)}`).join(', ')}`);
+    console.log(`${whoOf(r)}: ${r.won ? 'WON' : 'not won'} after ${r.minutes.toFixed(1)} min, lost ${JSON.stringify(r.lost)}; she woke at ${r.woke.toFixed(1)} min, the fight from ${r.fight.toFixed(1)} min, closest ${r.closest.toFixed(0)} m; guns fired ${r.fired.join(' / ')}, hits taken ${r.hits.join(' / ')}`);
+    if (r.reaction !== IDLE) console.log(`  lessons: ${r.lessons.map((l) => `${l.id} ${l.minute.toFixed(1)}`).join(', ')}`);
     problems.push(...problemsOf(r));
   }
-  console.log(`the novice won ${runs.filter((r) => r.won).length} of ${runs.length}${MUST_WIN ? '' : ' (printed, not judged until N7.5a)'}`);
+  const slow = runs.filter((r) => r.reaction === SLOW), won = slow.filter((r) => r.won).length;
+  console.log(`the slow novice (${SLOW} s) won ${won} of ${slow.length} seeds (${MUST_WIN} wanted${JUDGE_WINS ? '' : ', printed and not judged yet'})`);
+  if (JUDGE_WINS && won < MUST_WIN) problems.push(`the slow novice won ${won} of ${slow.length} seeds, not ${MUST_WIN}`);
   if (problems.length) {
     console.error(`check:first failed:\n  ${problems.join('\n  ')}`);
     process.exit(1);
   }
-  console.log('check:first: every lesson came and was done, nothing it asked for was refused, and the fight was fought');
+  console.log(`check:first: every lesson came and was done, nothing it asked for was refused, the slow novice won ${won} of ${slow.length} and the captain who gives no orders none`);
 }
 
 /** Each novice in a process of its own; its run comes back as JSON on its last line. */
-function inChild(reaction: number): Promise<Run> {
+function inChild([reaction, seed]: Game): Promise<Run> {
   return new Promise((done, failed) => {
-    const child = spawn(process.execPath, [...process.execArgv, fileURLToPath(import.meta.url), '--run', String(reaction), '--json'], { stdio: ['ignore', 'pipe', 'inherit'] });
+    const child = spawn(process.execPath, [...process.execArgv, fileURLToPath(import.meta.url), '--run', String(reaction), String(seed), '--json'], { stdio: ['ignore', 'pipe', 'inherit'] });
     let out = '';
     child.stdout.on('data', (d: Buffer) => { out += d.toString(); });
     child.on('exit', (code) => {
       const line = out.trim().split('\n').pop() ?? '';
       if (code === 0 && line.startsWith('{')) done(JSON.parse(line) as Run);
-      else failed(new Error(`the novice of ${reaction} s stopped (${code}): ${out.slice(-500)}`));
+      else failed(new Error(`the game of ${reaction} on seed ${seed} stopped (${code}): ${out.slice(-500)}`));
     });
   });
 }
 
+/** One game to play: the novice's reaction (or the idle captain) and the seed. */
+type Game = readonly [number | typeof IDLE, number];
+
+/** The games, `cores` at a time; their runs in the games' order. */
+async function playAll(games: readonly Game[], cores: number): Promise<Run[]> {
+  const runs: Run[] = [];
+  let next = 0;
+  const worker = async () => { while (next < games.length) { const i = next++; runs[i] = await inChild(games[i]!); } };
+  await Promise.all(Array.from({ length: Math.min(cores, games.length) }, worker));
+  return runs;
+}
+
 const at = process.argv.indexOf('--run');
 if (at >= 0) {
-  const run = play(Number(process.argv[at + 1]));
+  const who = process.argv[at + 1], seed = Number(process.argv[at + 2] ?? FIRST_SEED);
+  const run = play(who === IDLE ? IDLE : Number(who), Number.isFinite(seed) ? seed : FIRST_SEED);
   if (process.argv.includes('--json')) console.log(JSON.stringify(run));
   else report([run]);
 } else {
-  report(await Promise.all(REACTIONS.map(inChild)));
+  const seeds = (n: number) => Array.from({ length: n }, (_, i) => FIRST_SEED + i);
+  const games: Game[] = [
+    ...seeds(SEEDS).map((seed): Game => [SLOW, seed]),
+    ...QUICK.map((r): Game => [r, FIRST_SEED]),
+    ...seeds(IDLE_SEEDS).map((seed): Game => [IDLE, seed]),
+  ];
+  report(await playAll(games, availableParallelism()));
 }

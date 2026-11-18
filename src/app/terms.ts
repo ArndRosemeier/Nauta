@@ -5,7 +5,7 @@
  * shows and changes them, `TermsStore` keeps the last ones chosen on the device.
  */
 import { deriveSeed, hash32, Rng } from '@futuremagic/core';
-import { SKILLS, type Skill } from '../sim/rules/captain';
+import { SKILLS, type Offered } from '../sim/rules/captain';
 import { MATCH_MINUTES } from '../sim/rules/end';
 import { MEETINGS, WIND_CHOICE_NAMES, type Meeting, type StartTerms, type WindChoice } from '../sim/start';
 import { HOURS_PER_DAY, MINUTES_PER_HOUR } from '../sim/units';
@@ -39,7 +39,7 @@ const SEED_MOST = 2 ** 32 - 1;
 export interface MatchTerms {
   readonly navy: Navy;
   /** The other captain's skill, a match played alone. */
-  readonly foe: Skill;
+  readonly foe: Offered;
   readonly wind: WindChoice;
   readonly hour: HourChoice;
   readonly meet: Meeting;

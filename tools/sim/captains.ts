@@ -264,7 +264,7 @@ function sheet(records: readonly Record[]): string[] {
   console.log(`  a ship that could not sail beaten within ${SHEET.helpless} min: ${share(stopped - late.length, stopped)}`);
   for (const l of late) p.push(`${l} could not sail and was not beaten within ${SHEET.helpless} min`);
 
-  const rank = (k: Skill) => SKILLS.indexOf(k);
+  const rank = (k: Skill) => (SKILLS as readonly Skill[]).indexOf(k);
   const upOne = decided.filter((r) => Math.abs(rank(r.skills[0]) - rank(r.skills[1])) === 1);
   const betterWon = upOne.filter((r) => rank(r.skills[r.winner!]) > rank(r.skills[1 - r.winner!])).length;
   // Printed, not failed on, until it is met (design thread, 2026-11-18: skill pays through decisions, N7.5).
