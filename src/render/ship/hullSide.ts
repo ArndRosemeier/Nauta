@@ -264,6 +264,12 @@ export function buildBulwarks(out: ZoneParts, deckAft: number, deckFore: number,
     sweep(out.wood, way, roundedProfile(WATERWAY.width, WATERWAY.rise + PLANKING.deck, BEVEL * 2), side, OAK, CORNER_AO);
     for (const port of PORTS) buildPort(out, port, side);
   }
+  // At her bow the two bulwarks close: the knightheads' face between them, and the rail across their tops.
+  const bow = alongs[0]!, base = sheer(bow), foot = railFoot(bow), z = shipZ(bow);
+  const at = (side: number, h: number) => new Vector3(side * bulwarkInside(bow, h), shipY(h), z);
+  sheet(out.wood, [[at(-1, base), at(-1, foot)], [at(1, base), at(1, foot)]], RED, (i, j) => [i, j * (foot - base)]);
+  const across = 2 * (outsideX(bow, foot) - BULWARK_THICK / 2);
+  box(out.wood, new Matrix4().makeTranslation(0, shipY(foot) + BULWARK.railThick / 2, z - BULWARK.railWidth / 2), [across, BULWARK.railThick, BULWARK.railWidth], BLACK, BEVEL, 0);
 }
 
 /** Rows of the bulwark's face across a port's height. */

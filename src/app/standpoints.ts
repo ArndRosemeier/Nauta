@@ -40,7 +40,7 @@ const AT = {
   bow: { along: 17.6, x: 0.5, look: { yaw: HALF - 0.12, pitch: -0.08 } },
   top: { along: -0.95, x: 1.15, look: { yaw: 0.6, pitch: -0.95 } },
   berth: { along: 9.6, x: 0.6, look: { yaw: HALF - 0.2, pitch: 0.02 } },
-  cabin: { along: -7.6, x: -0.9, look: { yaw: -0.25, pitch: -0.02 } },
+  cabin: { along: -6.1, x: -0.85, look: { yaw: HALF + 0.35, pitch: -0.08 } },
   hold: { along: 10.2, x: 0.3, look: { yaw: HALF - 0.1, pitch: 0.05 } },
   alongside: { along: 1.5, x: 15, up: 1.3, look: { yaw: QUARTER, pitch: 0.16 } },
   near: { along: 9, x: 50, up: 3.5, look: { yaw: QUARTER + 0.12, pitch: 0.02 } },

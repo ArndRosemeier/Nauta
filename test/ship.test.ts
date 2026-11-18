@@ -14,7 +14,9 @@ import { OUTSIDE, portals, zoneAt, zoneNames, zoneOfSpaces } from '../src/render
 import { Visibility } from '../src/render/ship/visibility.ts';
 import { DAMAGE_MAP_SIZE, DAMAGE_REGIONS, damageTexel } from '../src/render/ship/damageMap.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
-import { hullHalfBreadth } from '../src/sim/ship/hull.ts';
+import { hullHalfBreadth, sideTop } from '../src/sim/ship/hull.ts';
+import { outsideX } from '../src/render/ship/hullSide.ts';
+import { Vector3 } from 'three/webgpu';
 
 /** How close a curve through the readings must come to them, m. */
 const ON_READING = 1e-9;
@@ -147,6 +149,14 @@ test('from the deck a room below is drawn only through an opening; from below, r
   const ahead = toClip(cabin, 0, 0);
   const closed = vis.seen(cz, ahead, shut)!, opened = vis.seen(cz, ahead, open)!;
   assert.ok(!closed.has("passage") && opened.has("passage"), `shut ${[...closed]}, open ${[...opened]}`);
+  // Off her side, low on the water, her rail hides every opening in her deck: nothing below is drawn.
+  const railed = new Visibility(portals(PLAN), (along) => ({ half: outsideX(along, sideTop(along)), top: shipY(sideTop(along)) }));
+  const off = standpoint('50 m off');
+  const offSeen = railed.seen(OUTSIDE, toClip(off.eye, off.look.yaw, off.look.pitch), open, new Vector3(...off.eye))!;
+  assert.deepEqual([...offSeen], [OUTSIDE]);
+  // From the main top she is seen from above: her hatches show what is under them.
+  const top = standpoint('top');
+  assert.ok(railed.seen(OUTSIDE, toClip(top.eye, 0, -1.4), open, new Vector3(...top.eye))!.size > 1);
   // An eye in none of her zones sees everything.
   assert.equal(vis.seen(null, ahead, shut), null);
 });

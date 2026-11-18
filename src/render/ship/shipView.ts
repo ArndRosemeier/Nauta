@@ -25,6 +25,9 @@ import { geometryOf, packedTriangles, type Packed } from './gathered';
 import type { ShipBuild, ZoneBuild } from './ship';
 import { OUTSIDE, zoneAt, zoneOfSpaces } from './zones';
 import { Visibility } from './visibility';
+import { outsideX } from './hullSide';
+import { sideTop } from '../../sim/ship/hull';
+import { shipY } from '../../sim/ship/section';
 
 /** Where she lies: her middle on the sea and her heading (bow north), lying still (no sailing yet). */
 const AT = { x: 0, z: 0, heading: 0 } as const;
@@ -147,7 +150,7 @@ export class ShipView {
     this.far.visible = false;
     this.group.add(this.far);
     this.triangles = tris;
-    this.visibility = new Visibility(build.portals);
+    this.visibility = new Visibility(build.portals, (along) => ({ half: outsideX(along, sideTop(along)), top: shipY(sideTop(along)) }));
     // Her bounds for the shadow map, from her outside.
     const b = this.zones.get(OUTSIDE)!;
     b.updateMatrixWorld(true);
@@ -261,7 +264,7 @@ export class ShipView {
     this.below = zone !== null && zone !== OUTSIDE ? 1 : 0;
     const distance = camera.position.distanceTo(g.position);
     this.toClip.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).multiply(g.matrixWorld);
-    const seen = distance > INSIDE_REACH ? new Set([OUTSIDE]) : this.visibility.seen(zone, this.toClip, (id) => (this.doors.get(id)?.angle ?? 0) > DOOR_OPEN);
+    const seen = distance > INSIDE_REACH ? new Set([OUTSIDE]) : this.visibility.seen(zone, this.toClip, (id) => (this.doors.get(id)?.angle ?? 0) > DOOR_OPEN, eyeShip);
     for (const [name, group] of this.zones) group.visible = !seen || seen.has(name);
     for (const d of this.doors.values()) d.pivot.visible = !seen || seen.has(d.zones[0]) || seen.has(d.zones[1]);
     this.crossfade(distance);
