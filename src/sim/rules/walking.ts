@@ -43,3 +43,25 @@ export const LADDER_REACH = 0.35;
 export const LADDER_AIM = 0.7;
 /** He climbs only while he goes no faster than this (m/s) the way he pushes: standing, or stopped at it. */
 export const LADDER_PRESS = 0.2;
+
+/**
+ * Aloft (N3.11). On a top or the crosstrees his middle keeps this far in from the rim and the mast's hole, m (a top
+ * has no rail on its sides). Pushed outboard within `RIM_REACH` (m) of where he may stand by the rim, and within
+ * `RIM_ALONG` (m) fore or aft of the shrouds there, he gets onto them: up the shrouds over him if he looks up past
+ * `LOOK_UP` (rad), down over the rim if not.
+ */
+export const RIM_KEEP = 0.3;
+export const RIM_REACH = 0.15;
+export const RIM_ALONG = 0.9;
+export const LOOK_UP = 0.35;
+/** Onto a mast's shrouds from her deck: his middle within this of the place at their foot by the rail, m. */
+export const SHROUD_REACH = 0.6;
+/** On a ladder aloft he steps across onto a yard's footrope with his feet within this of its height, m, pushing toward it. */
+export const FOOTROPE_REACH = 0.45;
+/** On the bowsprit his middle keeps this near the middle of its top, m; he gets off it at either end within this, m. */
+export const SPAR_FOOTING = 0.08;
+export const SPAR_END_REACH = 0.4;
+/** Onto the bowsprit from her deck: his middle within this of the spot beside its heel, m. */
+export const BOWSPRIT_REACH = 0.5;
+/** On a footrope his body is bent forward over the yard this far, rad (@futuremagic/figure's lean over a yard). */
+export const YARD_BEND = 0.75;

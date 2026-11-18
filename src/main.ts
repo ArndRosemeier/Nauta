@@ -107,6 +107,12 @@ declare global {
       glass: (power: number | null) => void;
       other: () => { drawn: number; near: boolean; apart: number; draws: number; mine: number } | null;
     };
+    /**
+     * Walking (`?walk`), for shots: the captain pushed by the left thumb (`forward`, `strafe`: -1..1) for so many
+     * seconds at once, looking `pitch` (rad, + up) and `yaw` (rad on her, 0 forward), without drawing in between (app/walking.ts `drive`); answers where
+     * he is then (on deck, on the shrouds, out on a yard).
+     */
+    __nautaWalk?: { drive: (forward: number, strafe: number, seconds: number, pitch?: number, yaw?: number) => string };
   }
 }
 
@@ -259,6 +265,7 @@ async function start(): Promise<void> {
     sceneFrames = SCENE_FRAMES; sceneDrawn = done;
   });
   if (ship && !walking) showStandpoints(where, (s) => { where = s; input.look = s.look; });
+  if (walking && ship) window.__nautaWalk = { drive: (forward, strafe, seconds, pitch, yaw) => walking.drive({ forward, strafe }, seconds, ship.drawn, input, pitch, yaw) };
   const showHud = params.hud || crew !== null;
   if (showHud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));

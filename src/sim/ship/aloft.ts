@@ -61,6 +61,11 @@ export const crosstreeEnd = (g: MastGeometry, side: number): RigPoint => point(g
 /** Where a man gets onto a mast's shrouds on a side: the plan's crew place at their foot (N2.1). */
 const shroudPlace = (plan: ShipPlan, mast: MastName, side: number): CrewPlace => plan.places.find((p) => p.id === `shroud-${mast}-${sideLetter(side)}`)!;
 
+/** A mast's climbs on a side. */
+export function climbOn(climbs: readonly MastClimb[], mast: MastName, side: number): MastClimb {
+  return climbs.find((k) => k.mast === mast && k.side === side)!;
+}
+
 /** The ladders of every mast's shrouds, both sides. */
 export function buildClimbs(plan: ShipPlan, geometry: Readonly<Record<MastName, MastGeometry>>, deadeyes: readonly Deadeye[]): MastClimb[] {
   const out: MastClimb[] = [];
@@ -151,7 +156,7 @@ export function buildAloft(plan: ShipPlan, geometry: Readonly<Record<MastName, M
     const span = 2 * row.crosstrees;
     const cross = add({ id: `${mast}-crosstrees`, name: `${mast} topmast crosstrees`, kind: 'crosstrees', spar: `${mast}-topmast`, points: rect(g.topmastAt(g.crosstrees), 0, g.crosstrees, CROSSTREES_TIMBERS.apart / 2, row.crosstrees), area: 2 * span * CROSSTREES_TIMBERS.sided, yard: null });
     for (const side of SIDES) {
-      const s = sideLetter(side), c = climbs.find((k) => k.mast === mast && k.side === side)!;
+      const s = sideLetter(side), c = climbOn(climbs, mast, side);
       // On the top beside its rim on this side, and on the crosstrees by the mast.
       const onTop = spotOn(top, point(g.lowerAt(g.topFloor), side * (row.top.breadth / 2 + hole / 2) / 2, g.topFloor));
       const onCross = spotOn(cross, point(g.topmastAt(g.crosstrees), side * row.crosstrees / 2, g.crosstrees));
@@ -183,7 +188,7 @@ export function buildAloft(plan: ShipPlan, geometry: Readonly<Record<MastName, M
   for (const side of SIDES) {
     const s = sideLetter(side), from = atMark(jib, 'cap'), to = onSpar(jib, jib.length - CLIMB.footropeShort);
     const hang = (p: RigPoint) => point(p.along, side * jib.diameter, p.height - JIB_FOOTROPE_DROP);
-    const rope = add({ id: `jib-boom-footrope-${s}`, name: `jib-boom's footrope, ${side > 0 ? 'starboard' : 'larboard'}`, kind: 'footrope', spar: jib.id, points: [hang(from), hang(to)], area: distance(from, to) * FOOTING, yard: null });
+    const rope = add({ id: `jib-boom-footrope-${s}`, name: `jib-boom's footrope, ${side > 0 ? 'starboard' : 'larboard'}`, kind: 'footrope', spar: jib.id, points: [hang(from), hang(to)], area: distance(from, to) * FOOTING, yard: horseOf(jib, side, from, to) });
     ways.push({ id: `jib-boom-${s}`, kind: 'footrope', from: spotOn(walk, walk.points[1]!), to: spotOn(rope, rope.points[0]!), ladders: [], at: null, rung: null, slope: jibSlope });
   }
   const stations: Station[] = ALOFT_STATIONS.map((st) => {
@@ -192,6 +197,17 @@ export function buildAloft(plan: ShipPlan, geometry: Readonly<Record<MastName, M
   });
   for (const st of stations) places.push(stationPlace(st));
   return { climbs, surfaces, ways, stations, places };
+}
+/**
+ * A jib-boom's footrope (its horse) on a side as the figure's `Yard`, from where it starts by the bowsprit's cap to
+ * near the boom's end: the boom's top its jackstay, rising along it; men stand on the horse beside it, facing it.
+ */
+function horseOf(jib: Spar, side: number, from: RigPoint, to: RigPoint): Yard {
+  const run = to.along - from.along, rise = (to.height - from.height) / run;
+  // Its middle (s = 0) as far in from the horse's start as a yard's footrope starts out from the slings.
+  const middle = point(from.along - FOOTROPE_INNER, 0, from.height - FOOTROPE_INNER * rise + jib.diameter / 2);
+  const [x, y, z] = toShip(middle);
+  return { x, y, z, ax: 0, az: -1, reach: FOOTROPE_INNER + run, nx: -side, nz: 0, drop: JIB_FOOTROPE_DROP + jib.diameter / 2, rise };
 }
 /** The figure's footrope starts this far out from a yard's middle, m (its default: the slings and the mast are inside it). */
 const FOOTROPE_INNER = 0.5;

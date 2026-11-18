@@ -1,24 +1,24 @@
 /**
- * The captain on his ship (implementation plan N2.3): his walking body on her decks (sim/ship/deckWalk.ts), her doors
- * swinging open before him and shut behind him (sim/ship/doors.ts), and her ladders climbed hand over hand, played out
- * by @futuremagic/figure's `LadderClimb` in her own frame, so the climb rises, pitches and rolls with her and slows or
- * holds on in a hard roll (show, don't tell: no cut from the foot of a ladder to its head). Gives the eye in ship space
- * and, on a ladder, the way he faces.
+ * The captain on his ship (implementation plan N2.3, N3.11): his walking body on her decks (sim/ship/deckWalk.ts), her
+ * doors swinging open before him and shut behind him (sim/ship/doors.ts), and her ladders climbed hand over hand,
+ * played out by @futuremagic/figure's `LadderClimb` in her own frame, so the climb rises, pitches and rolls with her and
+ * slows or holds on in a hard roll (show, don't tell: no cut from the foot of a ladder to its head). Aloft the same
+ * walking on the tops, the crosstrees and the bowsprit (sim/ship/aloftWalk.ts), and the rig climbed by the same figure
+ * (aloftClimb.ts). Gives the eye in ship space and, climbing, the way he faces.
  */
-import { LadderClimb, faceYaw, type ClimbStep, type Climber, type Ladder } from '@futuremagic/figure';
-import type { DeckIntent, Vec3 } from '@futuremagic/deck';
+import { LadderClimb, faceYaw, type ClimbStep, type Ladder } from '@futuremagic/figure';
+import type { DeckGround, DeckIntent, Vec3 } from '@futuremagic/deck';
 import { BODY, LADDER } from '../sim/rules/ships';
 import { EYE_BELOW_TOP, HEAD_CLEAR } from '../sim/rules/walking';
-import { floorsUnder, headroomAt, type ShipPlan, type Spot, type Way } from '../sim/ship/plan';
+import { floorAt, floorsUnder, headroomAt, spacesById, type ShipPlan, type Spot, type Way } from '../sim/ship/plan';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { WalkGraph } from '../sim/ship/walk';
-import { eyeOf, ladderOffered, paceOf, spotOf, stepWalker, walkerAt, type DeckWalker, type LadderOffer } from '../sim/ship/deckWalk';
+import { deckGround, eyeOf, ladderOffered, paceOf, spotOf, stepWalker, walkerAt, type DeckWalker, type LadderOffer } from '../sim/ship/deckWalk';
 import { shutDoors, stepDoors, type Doors } from '../sim/ship/doors';
+import { rigPlan, type RigPlan } from '../sim/ship/rig';
+import { aloftGround, aloftOffered, stepAloftWalker, surfaceOf, walkerAloft } from '../sim/ship/aloftWalk';
+import { AloftClimb, CLIMBER, walkTo as walkOnto } from './aloftClimb';
 
-/** The climber's body for the figure: his height (the hips at the figure's usual share of it). */
-const CLIMBER: Climber = { height: BODY.height, hipHeight: 0 };
-/** The walks onto and off a ladder end where the figure's walk to a rim ends: this far past its ladder's line, m (figure's ladder.ts). */
-const RIM_WALK = 0.62;
 /** A floor this near under the feet is the one they stand on, m (a climber's feet are a little over a rung). */
 const FEET_SLACK = 0.3;
 /** His head comes out from under the deck's edge into the opening over this much of his way, m either side of the edge: no jump. */
@@ -38,10 +38,10 @@ function ladderOf(way: Way): { foot: Ladder; head: Ladder } {
 }
 
 /** A walk (the figure's walk to a rim) that ends at a spot of the floor at height y, facing (dx, dz). */
-function walkTo(x: number, z: number, y: number, dx: number, dz: number): ClimbStep {
-  const n = Math.hypot(dx, dz) || 1, nx = dx / n, nz = dz / n;
-  return { kind: 'walk', ladder: { x: x - nx * RIM_WALK, z: z - nz * RIM_WALK, nx, nz, lo: y, hi: y, floor: y, halfWidth: LADDER.width / 2, rim: true } };
-}
+const walkTo = (x: number, z: number, y: number, dx: number, dz: number): ClimbStep => walkOnto(x, z, y, dx, dz, LADDER.width / 2);
+
+/** The space he is in while he climbs the rig: none of her plan's, so no door opens for him. */
+const IN_THE_RIG = 'rig';
 
 export class Captain {
   walker: DeckWalker;
@@ -50,25 +50,46 @@ export class Captain {
   /** The ladder he is on, and where he steps off it. */
   private climbing: { offer: LadderOffer; end: Spot } | null = null;
   private readonly eyeAt: [number, number, number] = [0, 0, 0];
+  private readonly rig: RigPlan;
+  /** Climbing the rig: the shrouds, a footrope, onto or off a top, the bowsprit (aloftClimb.ts). */
+  readonly aloft: AloftClimb;
 
+  /** Walking from a spot of her plan, or of a surface aloft (a top, the crosstrees, the bowsprit: its id for the space). */
   constructor(private readonly plan: ShipPlan, private readonly graph: WalkGraph, start: Spot) {
-    this.walker = walkerAt(plan, start);
+    this.rig = rigPlan(plan);
+    this.aloft = new AloftClimb(this.rig, this.climb);
+    this.aloft.deckAt = (s) => shipY(floorAt(spacesById(plan).get(s.space)!, s.along, s.across));
+    this.walker = this.standing(start);
     this.doors = shutDoors(plan);
   }
 
-  /** On a ladder now. */
+  /** Standing still at a spot of her plan or of a surface aloft. */
+  private standing(s: Spot): DeckWalker {
+    const surface = surfaceOf(this.rig, s.space);
+    return surface ? walkerAloft(this.rig, surface, s.along, s.across) : walkerAt(this.plan, s);
+  }
+
+  /** Where he may stand now: her decks round her doors as they are, or the surface aloft he is on. */
+  ground(): DeckGround<string> {
+    const surface = surfaceOf(this.rig, this.walker.place);
+    return surface ? aloftGround(this.rig, surface) : deckGround(this.plan, this.graph, this.doors);
+  }
+
+  /** Climbing now: a ladder, or the rig (not walking a deck or a surface aloft). */
   get onLadder(): boolean {
-    return this.climbing !== null;
+    return this.climbing !== null || this.aloft.active;
   }
 
-  /** On a ladder, the way he faces (a yaw on her: the look turns to it); null while he walks. */
+  /** Climbing, the way he faces (a yaw on her: the look turns to it); null while he walks. */
   get facing(): number | null {
-    return this.climbing ? this.climb.yaw : null;
+    return this.onLadder ? this.climb.yaw : null;
   }
 
-  /** Where he stands on her plan (on a ladder: the spot he steps off at). */
+  /** Where he stands on her plan or aloft (on a ladder: the spot he steps off at; in the rig: where he is, in no space of hers). */
   get spot(): Spot {
-    return this.climbing ? this.climbing.end : spotOf(this.walker);
+    if (this.climbing) return this.climbing.end;
+    if (this.aloft.active) return { space: IN_THE_RIG, along: -this.climb.pos.z, across: this.climb.pos.x };
+    return spotOf(this.walker);
   }
 
   /** The ladder he is on, or null. */
@@ -76,23 +97,27 @@ export class Captain {
     return this.climbing?.offer.way ?? null;
   }
 
-  /** The climb's body this frame (feet, hands and feet goals, for drawing his own body later), or null. */
+  /** The climb's body this frame (feet, hands and feet goals, for drawing his own body), or null. */
   get climber(): LadderClimb | null {
-    return this.climbing ? this.climb : null;
+    return this.onLadder ? this.climb : null;
   }
 
   /** His eye in ship space now. */
   get eye(): readonly [number, number, number] {
-    return this.climbing ? this.climbEye() : eyeOf(this.walker, this.eyeAt);
+    if (this.climbing) return this.climbEye();
+    return this.aloft.active ? this.aloft.eyeInto(this.eyeAt) : eyeOf(this.walker, this.eyeAt);
   }
 
-  /** One frame: walking as the thumbs say, or onto and up (or down) a ladder; `up`: gravity's up in her frame. */
-  update(intent: DeckIntent, up: Vec3, dt: number): void {
-    if (!this.climbing) {
-      const offer = ladderOffered(this.walker, intent, this.plan);
-      if (offer) this.startClimb(offer);
-      else this.walker = stepWalker(this.walker, intent, this.plan, this.graph, this.doors, dt, up);
-    }
+  /**
+   * One frame: walking as the thumbs say, or onto and up (or down) a ladder or the rig; `up`: gravity's up in her
+   * frame; `pitch`: how far he looks up (rad: on a top, looking up he climbs the shrouds over him, else he goes down).
+   */
+  update(intent: DeckIntent, up: Vec3, dt: number, pitch = 0): void {
+    if (this.aloft.active) {
+      this.aloft.stepAloft(intent, up, dt);
+      const landed = this.aloft.landed;
+      if (!this.aloft.active && landed) this.walker = this.standing(landed);
+    } else if (!this.climbing) this.walk(intent, up, dt, pitch);
     if (this.climbing) {
       this.climb.up.copy(up);
       this.climb.advance(dt);
@@ -104,6 +129,16 @@ export class Captain {
       }
     }
     this.doors = stepDoors(this.doors, this.plan, this.spot, dt);
+  }
+
+  /** Walking her decks or a surface aloft, or onto a ladder or a way aloft he pushes into. */
+  private walk(intent: DeckIntent, up: Vec3, dt: number, pitch: number): void {
+    const w = this.walker, surface = surfaceOf(this.rig, w.place);
+    const ladder = surface ? null : ladderOffered(w, intent, this.plan);
+    if (ladder) return this.startClimb(ladder);
+    const aloft = aloftOffered(this.rig, w, intent, pitch);
+    if (aloft) return this.aloft.start(aloft, w.x, w.floor, w.z, paceOf(w) > 0 ? Math.atan2(-w.vx, -w.vz) : intent.heading);
+    this.walker = surface ? stepAloftWalker(this.rig, surface, w, intent, dt, up) : stepWalker(w, intent, this.plan, this.graph, this.doors, dt, up);
   }
 
   private startClimb(offer: LadderOffer): void {

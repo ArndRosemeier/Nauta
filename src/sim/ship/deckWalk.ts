@@ -41,7 +41,7 @@ const LEAST_PUSH = 0.2;
 
 /** Ship space for a plan place, and back. */
 const toX = (across: number) => across;
-const toAlong = (z: number) => -z;
+export const toAlong = (z: number) => -z;
 
 /** The walker's spot on her plan. */
 export const spotOf = (w: Standing<string> & { x: number; z: number }): Spot => ({ space: w.place, along: toAlong(w.z), across: w.x });

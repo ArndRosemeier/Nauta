@@ -14,7 +14,7 @@ import {
   TRESTLE_DEPTH, type LineAct, type LineKind, type MastName,
 } from '../rules/rig';
 import { BULWARK, PLANKING } from '../rules/ships';
-import { crosstreeEnd, lowerMasthead, topgallantHounds, topmastHounds, type MastClimb } from './aloft';
+import { climbOn, crosstreeEnd, lowerMasthead, topgallantHounds, topmastHounds, type MastClimb } from './aloft';
 import { hullEnds, hullHalfBreadth, sideTop } from './hull';
 import type { Belay } from './plan';
 import { corner, edgePoint, type Sail } from './sails';
@@ -100,7 +100,7 @@ export function buildStanding(spars: ReadonlyMap<string, Spar>, geometry: Readon
   for (const mast of ['fore', 'main'] as const) {
     const g = geometry[mast], lower = mastSpar(spars, mast, 'mast'), topmast = mastSpar(spars, mast, 'topmast'), topgallant = mastSpar(spars, mast, 'topgallant-mast');
     for (const side of SIDES) {
-      const s = sideLetter(side), climb = climbs.find((c) => c.mast === mast && c.side === side)!;
+      const s = sideLetter(side), climb = climbOn(climbs, mast, side);
       deadeyes.filter((d) => d.id.startsWith(`${mast}-shroud-${s}`)).forEach((d, k) => {
         out.push(line(`${mast}-shroud-${s}${k + 1}`, 'shroud', lower.id, side, [spar(lower, lowerMasthead(g, side)), eye(d.id)]));
       });
