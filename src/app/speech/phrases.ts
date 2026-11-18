@@ -155,7 +155,7 @@ export const PHRASES = {
   'look out ports': p(['Her ports are open, sir.', 'Her guns are run out, sir.'], ['Ihre Stückpforten sind offen, Herr Kapitän.', 'Ihre Kanonen sind ausgerannt, Herr Kapitän.']),
   // ---- The first match (plan N7.4, app/lessons.ts): the first lieutenant teaching a new captain ----
   'lesson.welcome': p(["Welcome aboard, sir. She's yours, and so are we."], ['Willkommen an Bord, Herr Kapitän. Sie gehört Ihnen, und wir mit ihr.']),
-  'lesson.orders': p(['You never haul a rope yourself, sir. {Tap} one of us and give your order.'], ['Sie selbst fassen kein Tau an, Herr Kapitän. {Tap} Sie einen von uns an und geben Sie Ihren Befehl.']),
+  'lesson.orders': p(['You never haul a rope yourself, sir. {Tap} one of us, on deck or by the icons along the foot of the view, and give your order.'], ['Sie selbst fassen kein Tau an, Herr Kapitän. {Tap} Sie einen von uns an, an Deck oder an den Zeichen am unteren Bildrand, und geben Sie Ihren Befehl.']),
   'lesson.look': p(['Drag a finger across the view to look about you, sir.'], ['Ziehen Sie den Finger über das Bild, um sich umzusehen, Herr Kapitän.']),
   'lesson.look.again': p(['Look about you, sir: drag across the view.'], ['Sehen Sie sich um, Herr Kapitän: ziehen Sie über das Bild.']),
   'lesson.walk': p(['Now walk aft to the wheel, sir, to the master. Your left thumb walks you.'], ['Gehen Sie nun nach achtern zum Ruder, Herr Kapitän, zum Steuermann. Der linke Daumen lässt Sie gehen.']),

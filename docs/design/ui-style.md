@@ -77,6 +77,12 @@ The fight is watched, not read (design thread, 2026-11-18): **nothing stays on t
 - One or two words; a second line in small italic for a detail ("about").
 - The ring itself is a faint hairline, so the fan reads as one thing.
 
+## The officer row (N4.4, Arnd 2026-11-18)
+
+- Along the foot of the view, centred, always on screen: one **lacquer card** (112 px wide at most) per man he commands, in a brass rule, with a round lacquer disc 52 px across holding the man's icon in brass (a wheel, a sail, a gun, a hammer, a spyglass, a sealed letter), his rank in small brass capitals (13 px) and his role in small italic ivory (13 px).
+- The card of the fan that is open, or pressed, is polished brass with dark words. A man out of the captain's voice has a dashed disc and "by midshipman" in small capitals. A lesson's card carries the brass ring of the lesson marks.
+- No images; the icons are inline strokes in the card's own colour. Under 640 px wide the roles go and the cards sit above the foot's tags.
+
 ## Speech bubbles (for N4.5)
 
 - A lacquer note in a brass rule, rounded, with a tail to the man. The man's rank above the words in small brass capitals (13 px); the words in ivory Caslon, 18 px.

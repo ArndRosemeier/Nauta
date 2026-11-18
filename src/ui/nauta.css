@@ -294,6 +294,37 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .nt-lesson-skip { position: fixed; z-index: 10; margin: 0; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); background: var(--lacquer-over); color: var(--ivory); }
 body.in-menu .nt-lesson-ring, body.in-menu .nt-lesson-edge, body.in-menu .nt-lesson-skip { display: none; }
 
+/* The officer row (src/app/officerRow.ts): everyone the captain commands along the foot of the view, an icon with his rank and what he is for under it */
+.nt-officers {
+  position: fixed; z-index: 12; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  display: flex; gap: 8px; width: max-content; max-width: calc(100% - 2 * (max(14px, env(safe-area-inset-right)) + 114px));
+}
+.nt-officer {
+  flex: 1 1 0; min-width: 0; width: 112px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 7px;
+  border: 1px solid var(--brass-dim); border-radius: var(--corner); background: var(--lacquer-over); color: var(--ivory); font: 16px/1.15 var(--word-font); text-align: center;
+  box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-faint), 0 4px 12px #0008; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.nt-officer-disc { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border: 1px solid var(--brass-line); border-radius: 50%; background: var(--lacquer-bg); color: var(--brass); }
+.nt-officer-icon { width: 36px; height: 36px; }
+.nt-officer-rank { font: 400 13px/1.15 var(--title-font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--brass); }
+.nt-officer-role { font-size: 13px; font-style: italic; color: var(--ivory-soft); }
+.nt-officer-runs { visibility: hidden; font: 400 11px/1 var(--title-font); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ivory-soft); }
+.nt-officer.far .nt-officer-runs { visibility: visible; }
+.nt-officer.far .nt-officer-disc { border-style: dashed; }
+.nt-officer:active, .nt-officer.on { background: var(--brass-fill); color: var(--on-brass); }
+.nt-officer:active .nt-officer-rank, .nt-officer.on .nt-officer-rank, .nt-officer:active .nt-officer-role, .nt-officer.on .nt-officer-role, .nt-officer:active .nt-officer-runs, .nt-officer.on .nt-officer-runs { color: var(--on-brass); }
+.nt-officer.lesson:not(.on) { box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-faint), 0 0 0 3px var(--lacquer), 0 0 0 6px var(--brass), 0 4px 12px #0008; border-color: var(--brass-line); }
+/* While "Fire!" or "Steer there" stand by the right thumb, a narrow screen's row moves to the left, clear of them. */
+@media (max-width: 1100px) { body.thumb-up .nt-officers { left: max(14px, env(safe-area-inset-left)); transform: none; max-width: calc(100% - 28px - 250px); } }
+/* A phone: icons and ranks only, a row above the foot's tags */
+@media (max-width: 640px) {
+  .nt-officers, body.thumb-up .nt-officers { left: 8px; right: 8px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + var(--target) + 10px); transform: none; max-width: none; width: auto; gap: 4px; }
+  .nt-officer-role, .nt-officer-runs { display: none; }
+  .nt-officer-disc { width: 44px; height: 44px; }
+  .nt-officer-icon { width: 30px; height: 30px; }
+  .nt-officer-rank { font-size: 10px; letter-spacing: 0.04em; }
+}
+
 /* ---------- The menu (src/app/menu.ts, plan N7.2, docs/design/menu.md) ---------- */
 /* The main screen sits over the live view (her quarterdeck at sea): the name on its plate, four choices largest first,
    the version and the language in the foot's corners. It holds the finger, so no tap behind it walks or opens a fan. */
@@ -319,7 +350,7 @@ body.in-menu .nt-lesson-ring, body.in-menu .nt-lesson-edge, body.in-menu .nt-les
 .menu-foot .nt-link { margin: 0; background: var(--lacquer-over); color: var(--ivory); }
 .menu-language { background: var(--lacquer-over); }
 /* Over the menu nothing of the match's working tools shows. */
-body.in-menu #orders, body.in-menu #glass-button, body.in-menu #stick, body.in-menu .nt-bubbles, body.in-menu .nt-fan, body.in-menu .nt-thumb, body.in-menu .nt-steer-mark { display: none !important; }
+body.in-menu #orders, body.in-menu #glass-button, body.in-menu #stick, body.in-menu .nt-bubbles, body.in-menu .nt-fan, body.in-menu .nt-officers, body.in-menu .nt-thumb, body.in-menu .nt-steer-mark { display: none !important; }
 
 /* The menu's sheets: the match setup, joining, the waiting room, the captain's pause, the end card */
 .menu-sheet .nt-body { gap: 6px; }
