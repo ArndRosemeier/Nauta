@@ -2,21 +2,23 @@
  * Men going along their routes (pure, N4.2): each step every man on his way moves on at his speed under the heel,
  * eased by a low deckhead, slowed by the men round him, queuing on a ladder or the shrouds, standing aside for the
  * captain, and looking for another way when one ahead is shut or blocked (closures.ts). A man's going is plain data
- * (the codec carries it); this file owns it. The crew (N4.1) holds one per man on his way and steps them all at once:
+ * (the codec carries it), small enough for the network: it holds his route's `Path`, and the route itself is built
+ * from it where needed (route.ts `routeOf`, the same on every machine); this file owns it. The crew (N4.1) holds one per man on his way and steps them all at once:
  * every man decides from where all were before the step, so the order of the list changes nothing.
  */
 import {
   ASIDE_RADIUS, ASIDE_STEP, CROWD_FREE, CROWD_JAM, CROWD_RADIUS, CROWD_SLOWEST, WAY_ABREAST, WAY_GAP, type Haste,
 } from '../rules/routes';
-import type { Spot } from '../ship/plan';
+import { bareSpot, type Spot } from '../ship/plan';
 import { STEP_SECONDS } from '../units';
 import type { Closures } from './closures';
 import { heightAt, lineBlocked, routeNetwork, standable, type Network } from './network';
-import { findRoute, legTime, type Leg, type Route } from './route';
+import { findPath, legTime, linkOf, routeOf, WALK_STEP, type Leg, type Path, type Route } from './route';
 
 /** A man on his way. */
 export interface Going {
-  readonly route: Route;
+  /** What his route is built from (`goingRoute` gives the route). */
+  readonly path: Path;
   /** The leg he is on, and how much of it is behind him (0 to 1). */
   readonly leg: number;
   readonly share: number;
@@ -47,9 +49,12 @@ export interface Whereabouts extends Spot {
 
 /** A man sent from one spot to another, or null where no way is open between them. */
 export function startGoing(from: Spot, to: Spot, haste: Haste, heel: number, closures: Closures, net: Network = routeNetwork()): Going | null {
-  const route = findRoute(from, to, { heel, haste, closures }, net);
-  return route ? { route, leg: 0, share: 0, haste, aside: 0, held: 0, stuck: false } : null;
+  const path = findPath(from, to, { heel, haste, closures }, net);
+  return path ? { path, leg: 0, share: 0, haste, aside: 0, held: 0, stuck: false } : null;
 }
+
+/** The route a man on his way follows (built from his path). */
+export const goingRoute = (g: Going, net: Network = routeNetwork()): Route => routeOf(g.path, net);
 
 /** The point a share of the way along a line of along, across pairs, and the direction of its piece there. */
 function alongLine(line: readonly number[], length: number, share: number): { along: number; across: number; facing: [number, number] } {
@@ -69,9 +74,9 @@ function alongLine(line: readonly number[], length: number, share: number): { al
 
 /** Where a man on his way is now. */
 export function goingAt(g: Going, net: Network = routeNetwork()): Whereabouts {
-  const leg = g.route.legs[g.leg];
+  const leg = goingRoute(g, net).legs[g.leg];
   if (!leg) {
-    const to = g.route.to;
+    const to = g.path.to;
     return { ...to, height: heightAt(net, to), way: null, share: 1, facing: [1, 0] };
   }
   const p = alongLine(leg.line, leg.length, g.share);
@@ -85,10 +90,10 @@ export function goingAt(g: Going, net: Network = routeNetwork()): Whereabouts {
 }
 
 /** Whether the rest of a route still holds under the closures: no way ahead shut, no walk ahead blocked. */
-function stillOpen(g: Going, closures: Closures): boolean {
-  const closed = new Set(closures.waysClosed);
-  for (let i = g.leg; i < g.route.legs.length; i++) {
-    const leg = g.route.legs[i]!;
+function stillOpen(g: Going, closures: Closures, net: Network): boolean {
+  const closed = new Set(closures.waysClosed), legs = goingRoute(g, net).legs;
+  for (let i = g.leg; i < legs.length; i++) {
+    const leg = legs[i]!;
     // The way he is on he finishes.
     if (leg.way !== null) { if (i > g.leg && closed.has(leg.way)) return false; }
     else if (lineBlocked(leg.space, leg.line, closures.waysBlocked)) return false;
@@ -99,17 +104,20 @@ function stillOpen(g: Going, closures: Closures): boolean {
 /** A going brought up to the closures: as it was if its way still holds, else on another way (stuck if there is none). */
 function revise(g: Going, s: Surroundings, net: Network): Going {
   const serial = s.closures.waysSerial;
-  if (!g.stuck && stillOpen(g, s.closures)) return { ...g, route: { ...g.route, serial } };
-  const leg = g.route.legs[g.leg];
+  if (!g.stuck && stillOpen(g, s.closures, net)) return { ...g, path: { ...g.path, serial } };
+  const leg = goingRoute(g, net).legs[g.leg];
   const onWay = leg !== undefined && leg.way !== null;
   // On a way he goes on to its end and looks from there; on a floor, from where he stands.
   const from: Spot = onWay
     ? { space: leg.ends, along: leg.line[leg.line.length - 2]!, across: leg.line[leg.line.length - 1]! }
-    : goingAt({ ...g, aside: 0 }, net);
-  const found = findRoute(from, g.route.to, { heel: s.heel, haste: g.haste, closures: s.closures }, net);
-  if (!found) return { ...g, stuck: true, route: { ...g.route, serial } };
-  if (onWay) return { ...g, stuck: false, aside: 0, route: { ...found, from: g.route.from, legs: [leg, ...found.legs] }, leg: 0 };
-  return { ...g, stuck: false, aside: 0, route: found, leg: 0, share: 0 };
+    : bareSpot(goingAt({ ...g, aside: 0 }, net));
+  const found = findPath(from, g.path.to, { heel: s.heel, haste: g.haste, closures: s.closures }, net);
+  if (!found) return { ...g, stuck: true, path: { ...g.path, serial } };
+  if (!onWay) return { ...g, stuck: false, aside: 0, path: found, leg: 0, share: 0 };
+  // The way he is on, then the new path from its end: a path from the way's start that takes it first.
+  const link = linkOf(leg, net), start = net.links[link]!.from;
+  const path: Path = { ...found, from: net.portals[start]!.spot, steps: [start, WALK_STEP, net.links[link]!.to, link, ...found.steps] };
+  return { ...g, stuck: false, aside: 0, path, leg: 0 };
 }
 
 /** Whether j is ahead of i on the same way, going the same way (ties go to the earlier in the list). */
@@ -120,7 +128,7 @@ function queued(goings: readonly (Going | null)[], i: number, leg: Leg, share: n
   const me = goings[i]!, abreast = WAY_ABREAST[leg.kind] ?? 1;
   let close = 0;
   goings.forEach((o, j) => {
-    const l = o && j !== i ? o.route.legs[o.leg] : undefined;
+    const l = o && j !== i ? goingRoute(o).legs[o.leg] : undefined;
     if (!o || !l || l.way !== leg.way || l.up !== leg.up) return;
     if (ahead({ ...me, share }, i, o, j) && (o.share - share) * leg.length < WAY_GAP) close++;
   });
@@ -131,7 +139,7 @@ function queued(goings: readonly (Going | null)[], i: number, leg: Leg, share: n
 function mayEnter(goings: readonly (Going | null)[], i: number, leg: Leg): boolean {
   const single = (WAY_ABREAST[leg.kind] ?? 1) === 1;
   const against = goings.some((o, j) => {
-    const l = o && j !== i ? o.route.legs[o.leg] : undefined;
+    const l = o && j !== i ? goingRoute(o).legs[o.leg] : undefined;
     return l !== undefined && l.way === leg.way && l.up !== leg.up;
   });
   return !(single && against) && !queued(goings, i, leg, 0);
@@ -173,9 +181,9 @@ export function stepGoings(goings: readonly (Going | null)[], s: Surroundings, d
   const out: (Going | null)[] = [], entries: Entry[] = [];
   goings.forEach((g0, i) => {
     if (!g0) { out.push(null); return; }
-    let g = g0.route.serial === s.closures.waysSerial ? g0 : revise(g0, s, net);
+    let g = g0.path.serial === s.closures.waysSerial ? g0 : revise(g0, s, net);
     if (g.stuck) { out.push({ ...g, held: g.held + dt }); return; }
-    let leg = g.route.legs[g.leg];
+    let leg = goingRoute(g, net).legs[g.leg];
     const me = where[i]!;
     if (leg && leg.way === null && leg.kind === 'walk') {
       const side = giveWay(goingAt({ ...g, aside: 0 }, net), s.captain, s, net);
@@ -190,7 +198,7 @@ export function stepGoings(goings: readonly (Going | null)[], s: Surroundings, d
       const need = (1 - share) * time;
       if (left < need) { share += left / time; left = 0; break; }
       left -= need;
-      const next = g.route.legs[index + 1];
+      const next = goingRoute(g, net).legs[index + 1];
       if (next && next.way !== null && !mayEnter(goings, i, next)) { share = 1; held += left; break; }
       index++;
       share = 0;
@@ -225,7 +233,7 @@ function refused(goings: readonly (Going | null)[], entries: readonly Entry[]): 
   for (const list of ways.values()) {
     const first = list[0]!.leg, abreast = WAY_ABREAST[first.kind] ?? 1;
     let room = abreast - goings.filter((o) => {
-      const l = o?.route.legs[o.leg];
+      const l = (o ? goingRoute(o).legs[o.leg] : undefined);
       return l !== undefined && l.way === first.way && l.up === first.up && o!.share * l.length < WAY_GAP;
     }).length;
     for (const e of list) {

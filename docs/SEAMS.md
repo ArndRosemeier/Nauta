@@ -338,6 +338,8 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Whether a body may stand at a spot under the blocks | `src/sim/crew/network.ts#standable` |
 | Whether a line on a floor passes through a block | `src/sim/crew/network.ts#lineBlocked` |
 | A man's quickest route from one spot to another (the heel, his haste, what is shut) | `src/sim/crew/route.ts#findRoute` |
+| What a man's quickest route is built from, small enough for the state (its ends, links, what was shut) | `src/sim/crew/route.ts#findPath` |
+| A route found again from what it is built from (kept warm, not state) | `src/sim/crew/route.ts#routeOf` |
 | What the heel does to a man's pace on each footing, weather and lee shrouds | `src/sim/crew/route.ts#heelEase` |
 | A man's speed over a stretch, and its time | `src/sim/crew/route.ts#partSpeed` |
 | A route's time for a man alone on it | `src/sim/crew/route.ts#routeTime` |
@@ -345,6 +347,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Sending a man on his way | `src/sim/crew/going.ts#startGoing` |
 | One step of every man on his way (speeds, crowds, queues, the captain, rerouting) | `src/sim/crew/going.ts#stepGoings` |
 | Where a man on his way is now (spot, height, way, facing) | `src/sim/crew/going.ts#goingAt` |
+| The route a man on his way follows (found again from his path) | `src/sim/crew/going.ts#goingRoute` |
 | A spot alone, from anything that stands on one (a crew place, a man on his way) | `src/sim/ship/plan.ts#bareSpot` |
 | The crew's rules: the roster by rank, part, skill and post; the jobs (hands, work, lines); the gangs; the short-handed rule; how an order travels; choosing and sending the men (first proposals) | `src/sim/rules/crew.ts#ROSTER` |
 | The brig's people and the quarter bill: every man's rank, part, skill, post and gun | `src/sim/crew/roster.ts#brigRoster` |
@@ -352,6 +355,7 @@ Before writing code that does something, look here. If a row covers it, call tha
 | A crew place's spot | `src/sim/crew/roster.ts#placeSpot` |
 | What the crew does for an act of an order: its jobs, their places, hands, work and which waits for which (the drill) | `src/sim/crew/drill.ts#drill` |
 | Who works a sail (its gang) | `src/sim/crew/drill.ts#gangOf` |
+| What a job takes (hands, work, places, parts) from its name and what it is done on | `src/sim/crew/drill.ts#jobWork` |
 | A crew at the start, every man at his post | `src/sim/crew/crew.ts#startCrew` |
 | One step of the crew: acts become tasks, men told off by the quarter bill and sent, work done at the share of hands present, acts finished (the one owner of every man's task and place) | `src/sim/crew/crew.ts#stepCrew` |
 | The task a man has | `src/sim/crew/crew.ts#taskOf` |

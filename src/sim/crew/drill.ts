@@ -5,6 +5,10 @@
  * another of the same act (a sail is sheeted home only once it is loosed, the helm put down for a tack only when the
  * hands are at their stations). The places come from the rig's own lines: a man hauls at the pin his line is made
  * fast to, and lays out on the footrope of the yard he loosens.
+ *
+ * A job is kept small, as it lives in the state that travels to the other player (crew.ts `Task`): its name, what it
+ * is done on (a sail, a mast) and which job it waits for. Its places, parts, hands and work follow from the first two
+ * alone (`jobWork`), found again where they are needed.
  */
 import {
   GANGS, HELM_PARTS, JOBS, STATIONS_PARTS, WHEEL, type BySail, type Gang, type JobName, type Part,
@@ -17,9 +21,17 @@ import type { RigLine } from '../ship/lines';
 import { MASTS } from '../ship/sailing';
 import type { OrderKind } from '../orders';
 
-/** One job of an act, ready to be manned. */
+/** One job of an act. */
 export interface Job {
   readonly job: JobName;
+  /** What it is done on: the sail (its place in the rig's sails) for a sail's jobs, the mast (its place in `MASTS`) for the braces, 0 for the helm and the stations. */
+  readonly on: number;
+  /** The job of the same act that must be done before this one's work starts (its place in the list), or null. */
+  readonly after: number | null;
+}
+
+/** What a job takes, from its name and what it is done on. */
+export interface JobWork {
   /** Hands it needs (skill) and seconds of work with them all there. */
   readonly need: number;
   readonly work: number;
@@ -27,8 +39,6 @@ export interface Job {
   readonly places: readonly string[];
   /** The parts of the ship that man it, in the order they are sent. */
   readonly parts: readonly Part[];
-  /** The job of the same act that must be done before this one's work starts (its place in the list), or null. */
-  readonly after: number | null;
 }
 
 /** A job's number for a sail's yard (or the number itself). */
@@ -61,14 +71,44 @@ function yardPlaces(yard: string): string[] {
   return Array.from({ length: Math.max(sides[0]!.length, sides[1]!.length) }, (_, k) => sides.flatMap((side) => (side[k] ? [side[k].id] : []))).flat();
 }
 
-/** A job of a sail: its hands and work for the sail's yard, at the pins of its lines of the job's kinds. */
-function sailJob(job: JobName, sail: Sail, parts: readonly Part[], after: number | null): Job {
-  const row = JOBS[job], level = yardOf(sail)?.level ?? null;
+/** A job of a sail: its hands and work for the sail's yard, at the pins of its lines of the job's kinds (the loosers on its yard), by its gang aloft (loosing) or on deck. */
+function sailWork(job: JobName, sail: Sail): JobWork {
+  const row = JOBS[job], level = yardOf(sail)?.level ?? null, gang = GANGS[gangOf(sail)];
   let places = pins(ofKinds(sailLines(sail), row.lines));
   if (job === 'loose') places = yardPlaces(yardOf(sail)!.id);
   // A sail with none of the job's lines (a headsail run down by its own weight) is worked at its halliard.
   if (places.length === 0) places = pins(ofKinds(sailLines(sail), ['halliard']));
-  return { job, need: bySail(row.hands, level), work: bySail(row.work, level), places, parts, after };
+  return { need: bySail(row.hands, level), work: bySail(row.work, level), places, parts: job === 'loose' ? [gang.aloft!] : gang.deck };
+}
+
+/** A job's work found from scratch (`jobWork` keeps it). */
+function findWork(job: JobName, on: number): JobWork {
+  const rig = rigPlan();
+  switch (job) {
+    case 'helm': return { need: bySail(JOBS.helm.hands, null), work: bySail(JOBS.helm.work, null), places: [WHEEL], parts: HELM_PARTS };
+    case 'stations': {
+      // Ready about (or ready to wear): every brace and the headsail sheets manned.
+      const heads = new Set(rig.sails.filter((s) => s.kind === 'head').map((s) => s.id));
+      const lines = rig.lines.filter((l) => !l.standing && (l.kind === 'brace' || (l.kind === 'sheet' && heads.has(l.serves))));
+      return { need: bySail(JOBS.stations.hands, null), work: bySail(JOBS.stations.work, null), places: pins(lines), parts: STATIONS_PARTS };
+    }
+    case 'brace': {
+      const mast = MASTS[on]!;
+      const lines = rig.lines.filter((l) => l.kind === 'brace' && sparOf(rig, l.serves).mast === mast);
+      return { need: bySail(JOBS.brace.hands, null), work: bySail(JOBS.brace.work, null), places: pins(lines), parts: GANGS[mast].deck };
+    }
+    default: return sailWork(job, rig.sails[on]!);
+  }
+}
+
+const works = new Map<string, JobWork>();
+
+/** What a job takes (its hands, work, places and parts), from its name and what it is done on; kept once found (a cache, not state). */
+export function jobWork(job: JobName, on: number): JobWork {
+  const key = `${job}:${on}`;
+  let w = works.get(key);
+  if (!w) { w = findWork(job, on); works.set(key, w); }
+  return w;
 }
 
 /**
@@ -76,41 +116,25 @@ function sailJob(job: JobName, sail: Sail, parts: readonly Part[], after: number
  * reef taken in or shaken out is clewed up, the men lay out, and it is sheeted home again; taken in, it is clewed up.
  * A fore-and-aft sail is hoisted, or doused, or doused and hoisted again for a reef.
  */
-function sailDrill(sail: Sail, now: SailSetting, set: boolean, reefs: number): Job[] {
-  const gang = GANGS[gangOf(sail)];
+function sailDrill(sail: Sail, on: number, now: SailSetting, set: boolean, reefs: number): Job[] {
   const reef = set && now.set && now.reefs !== reefs;
+  const jobs = (...names: JobName[]): Job[] => names.map((job, k) => ({ job, on, after: k === 0 ? null : k - 1 }));
   if (sail.kind === 'square') {
-    const aloft = [gang.aloft!];
-    if (!set) return [sailJob('clew', sail, gang.deck, null)];
-    if (reef) return [sailJob('clew', sail, gang.deck, null), sailJob('loose', sail, aloft, 0), sailJob('sheet', sail, gang.deck, 1)];
-    return [sailJob('loose', sail, aloft, null), sailJob('sheet', sail, gang.deck, 0)];
+    if (!set) return jobs('clew');
+    return reef ? jobs('clew', 'loose', 'sheet') : jobs('loose', 'sheet');
   }
-  if (!set) return [sailJob('douse', sail, gang.deck, null)];
-  if (reef) return [sailJob('douse', sail, gang.deck, null), sailJob('hoist', sail, gang.deck, 0)];
-  return [sailJob('hoist', sail, gang.deck, null)];
+  if (!set) return jobs('douse');
+  return reef ? jobs('douse', 'hoist') : jobs('hoist');
 }
 
 /** The jobs of one act, given the kind of order it is for and how her sails stand now. */
 export function drill(act: Act, order: OrderKind, canvas: readonly SailSetting[]): Job[] {
-  const rig = rigPlan();
   switch (act.kind) {
-    case 'helm': {
-      const helm: Job = { job: 'helm', need: bySail(JOBS.helm.hands, null), work: bySail(JOBS.helm.work, null), places: [WHEEL], parts: HELM_PARTS, after: null };
-      if (order !== 'tack' && order !== 'wear') return [helm];
-      // Ready about (or ready to wear): every brace and the headsail sheets manned, then the helm over.
-      const heads = new Set(rig.sails.filter((s) => s.kind === 'head').map((s) => s.id));
-      const lines = rig.lines.filter((l) => !l.standing && (l.kind === 'brace' || (l.kind === 'sheet' && heads.has(l.serves))));
-      const row = JOBS.stations;
-      return [{ job: 'stations', need: bySail(row.hands, null), work: bySail(row.work, null), places: pins(lines), parts: STATIONS_PARTS, after: null }, { ...helm, after: 0 }];
-    }
-    case 'sail': {
-      const sail = rig.sails[act.sail]!;
-      return sailDrill(sail, canvas[act.sail]!, act.set, act.reefs);
-    }
-    case 'yards': {
-      const mast = MASTS[act.mast]!, row = JOBS.brace;
-      const lines = rig.lines.filter((l) => l.kind === 'brace' && sparOf(rig, l.serves).mast === mast);
-      return [{ job: 'brace', need: bySail(row.hands, null), work: bySail(row.work, null), places: pins(lines), parts: GANGS[mast].deck, after: null }];
-    }
+    case 'helm':
+      // Ready about (or ready to wear): the hands at their stations, then the helm over.
+      if (order !== 'tack' && order !== 'wear') return [{ job: 'helm', on: 0, after: null }];
+      return [{ job: 'stations', on: 0, after: null }, { job: 'helm', on: 0, after: 0 }];
+    case 'sail': return sailDrill(rigPlan().sails[act.sail]!, act.sail, canvas[act.sail]!, act.set, act.reefs);
+    case 'yards': return [{ job: 'brace', on: act.mast, after: null }];
   }
 }
