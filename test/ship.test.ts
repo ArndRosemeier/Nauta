@@ -9,6 +9,7 @@ import { deckY, halfBreadth, sectionOutline, shipY, shipZ } from '../src/sim/shi
 import { STANDPOINTS, standpoint } from '../src/app/standpoints.ts';
 import { Euler, Matrix4, PerspectiveCamera, Quaternion } from 'three/webgpu';
 import { buildShip, type ZoneBuild } from '../src/render/ship/ship.ts';
+import { channelBoards } from '../src/render/ship/rig.ts';
 import { packedTriangles, type Packed } from '../src/render/ship/gathered.ts';
 import { OUTSIDE, portals, zoneAt, zoneNames, zoneOfSpaces } from '../src/render/ship/zones.ts';
 import { Visibility } from '../src/render/ship/visibility.ts';
@@ -189,6 +190,16 @@ test('her whole rig is drawn: every line of the rig plan to its pin, the ratline
 });
 /** A line reaches its pin within this, m. */
 const PIN_REACH = 0.02;
+
+/** A channel reaches out from her planking by about its own breadth: more than this, m, is a timber laid across her deck. */
+const MOST_CHANNEL = 1;
+
+test('her channels lie along her sides: none reaches in across her deck, as one under the break of a raised deck once did', () => {
+  for (const c of channelBoards(RIG.deadeyes.filter((d) => d.on === 'channel'))) {
+    assert.ok(c.outer - c.inner < MOST_CHANNEL, `the channel at ${c.aft.toFixed(1)} to ${c.fore.toFixed(1)} m reaches ${(c.outer - c.inner).toFixed(2)} m`);
+    assert.ok(c.inner > 3, `its inner edge lies against her side (${c.inner.toFixed(2)} m)`);
+  }
+});
 
 test('her yards brace round and her boom and gaff swing: each in its own frame, near and far, and the ropes made fast to them follow it', () => {
   assert.deepEqual(SWINGS.map((w) => w.id).sort(), RIG.spars.filter((s) => s.yard || s.swing !== null).map((s) => s.id).sort());
