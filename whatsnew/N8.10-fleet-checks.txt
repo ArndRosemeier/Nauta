@@ -1,0 +1,1 @@
+Nothing new to see: the game now checks itself with fleets of four and eight computer ships on every build, so a fleet action keeps working.
