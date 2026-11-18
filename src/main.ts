@@ -53,6 +53,8 @@ import { VERSION } from 'virtual:nauta/version';
 import { SprayView } from './render/spray';
 import { GUNFIRE, SHOT_IN_FLIGHT, SMOKE, SPRAY } from './render/materials';
 import { GunsView } from './render/ship/gunsView';
+import { setFrenchFlags } from './render/ship/sailMaterial';
+import type { Navy } from './app/crewLooks';
 import { GunfireView, fallInSea } from './render/gunfire';
 import { SmokeView, useSmokeDepth } from './render/smoke';
 import { HalfSmoke } from './render/halfSmoke';
@@ -291,6 +293,21 @@ async function start(): Promise<void> {
     for (const o of officers.warmObjects()) await view.stage.prepare(o, { everyCaster: true });
     officers.afterWarm();
   }
+  // The other navy's coats too, when the menu may choose it (menu.md, "Your navy"): dressed in them, built, and back,
+  // so a match of either navy builds nothing while it is drawn.
+  if (params.menu && (captain || officers)) {
+    capTo(1);
+    note.textContent = 'building the other navy\'s coats';
+    await captain?.changeCoat('french');
+    await officers?.changeCoats('french');
+    if (captain) await view.stage.prepare(captain.group);
+    if (officers) {
+      for (const o of officers.warmObjects()) await view.stage.prepare(o, { everyCaster: true });
+      officers.afterWarm();
+    }
+    await captain?.changeCoat('british');
+    await officers?.changeCoats('british');
+  }
   await view.stage.add(sky.dome);
   await view.stage.add(seaView.mesh);
   await view.stage.add(seaView.deep);
@@ -476,6 +493,19 @@ async function start(): Promise<void> {
     },
     firstCommand: (session) => { if (session) first?.start(session); else first?.stop(); },
   }) : null;
+  // Her navy's coats and colours (menu.md, "Your navy"): the flags of both ships, and his own coat and the officers'
+  // changed when a match of the other navy begins (the warm-up built the British ones; the French use the same kinds).
+  if (match) {
+    let dressed: Navy = 'british';
+    match.onChange(() => {
+      const navy = match.navy;
+      setFrenchFlags(navy === 'french', match.herNavy === 'french');
+      if (navy === dressed) return;
+      dressed = navy;
+      void captain?.changeCoat(navy);
+      void officers?.changeCoats(navy);
+    });
+  }
   // The brig herself heard (N2.8): her timber, the water along her, the counter, the captain's feet, the room he is in.
   // Each part of the sound at the player's level (plan N7.3): the whole is the engine's master volume.
   const shipPart = new Channel(sound.engine), crewPart = new Channel(sound.engine), battlePart = new Channel(sound.engine);

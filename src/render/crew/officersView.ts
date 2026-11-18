@@ -13,7 +13,7 @@ import { Character, type CharacterPatch } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import HumanWorker from '@actors/human/worker?worker';
 import type { ShipView } from '../ship/shipView';
-import { PACK, navyLook, packCatalog, type Rank } from '../../app/crewLooks';
+import { DRESS, PACK, navyLook, packCatalog, type Dress, type Navy, type Rank } from '../../app/crewLooks';
 import { FULL } from '../../app/crewLevels';
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
@@ -22,14 +22,14 @@ import { heightAt, routeNetwork } from '../../sim/crew/network';
 import type { Spot } from '../../sim/ship/plan';
 import { shipY, shipZ } from '../../sim/ship/section';
 
-/** Each man's seed, his dress (an outfit preset of Actors' navy wardrobe: the master and first lieutenant in a lieutenant's coat, the gunner and carpenter as warrant officers in the boatswain's, the lookout a seaman's slops) and clip standing (crewLooks.ts PACK_CLIPS). */
-const MEN: Readonly<Record<Officer, { readonly seed: number; readonly rank: Rank; readonly dress: string; readonly clip: string }>> = {
-  master: { seed: 1801, rank: 'officer', dress: 'navy-rn-lieutenant', clip: 'idle' },
-  'first lieutenant': { seed: 1802, rank: 'officer', dress: 'navy-rn-lieutenant', clip: 'arms folded' },
-  gunner: { seed: 1803, rank: 'officer', dress: 'navy-rn-boatswain', clip: 'idle' },
-  carpenter: { seed: 1804, rank: 'seaman', dress: 'navy-rn-boatswain', clip: 'idle' },
-  lookout: { seed: 1806, rank: 'seaman', dress: 'navy-rn-seaman', clip: 'idle' },
-  midshipman: { seed: 1807, rank: 'officer', dress: 'navy-rn-midshipman', clip: 'idle' },
+/** Each man's seed, his dress (her navy's outfit preset of it, crewLooks.ts `DRESS`: the master and first lieutenant in a lieutenant's coat, the gunner and carpenter as warrant officers in the boatswain's, the lookout a seaman's slops) and clip standing (crewLooks.ts PACK_CLIPS). */
+const MEN: Readonly<Record<Officer, { readonly seed: number; readonly rank: Rank; readonly dress: Dress; readonly clip: string }>> = {
+  master: { seed: 1801, rank: 'officer', dress: 'lieutenant', clip: 'idle' },
+  'first lieutenant': { seed: 1802, rank: 'officer', dress: 'lieutenant', clip: 'arms folded' },
+  gunner: { seed: 1803, rank: 'officer', dress: 'boatswain', clip: 'idle' },
+  carpenter: { seed: 1804, rank: 'seaman', dress: 'boatswain', clip: 'idle' },
+  lookout: { seed: 1806, rank: 'seaman', dress: 'seaman', clip: 'idle' },
+  midshipman: { seed: 1807, rank: 'officer', dress: 'midshipman', clip: 'idle' },
 };
 /** The midshipman is the youngest grown man Actors makes (adults only), years. */
 const MIDSHIPMAN_AGE = 18;
@@ -82,12 +82,20 @@ export class OfficersView {
     const chars = [first];
     for (let i = 1; i < OFFICERS.length; i++) chars.push(await Character.load({ pack, renderer, materials: nodeMaterials, shareWith: first, catalog: packCatalog }));
     await Promise.all(OFFICERS.map(async (who, i) => {
-      const m = MEN[who], ch = chars[i]!, look = navyLook(ch.catalog, m.dress, m.seed, m.rank);
+      const m = MEN[who], ch = chars[i]!, look = navyLook(ch.catalog, DRESS.british[m.dress], m.seed, m.rank);
       const young: CharacterPatch = who === 'midshipman' ? { body: { ...look.body, ageYears: MIDSHIPMAN_AGE }, beard: 'none' } : {};
       await ch.set({ ...look, ...young, faceRig: true, faceAnimation: true, gaze: 'ahead', animation: m.clip });
       ch.actor.setLod(FULL);
     }));
     return new OfficersView(ship, chars);
+  }
+
+  /** The six in `navy`'s dress (the match setup's choice, menu.md): their coats changed, nothing else. */
+  async changeCoats(navy: Navy): Promise<void> {
+    await Promise.all(this.drawn.map(({ who, ch }) => {
+      const m = MEN[who], look = navyLook(ch.catalog, DRESS[navy][m.dress], m.seed, m.rank, [], navy);
+      return ch.set({ outfit: look.outfit, garmentColors: look.garmentColors });
+    }));
   }
 
   /** Each voice's character (for the speech bubbles' registry, N4.5). */

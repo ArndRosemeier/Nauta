@@ -1,0 +1,2 @@
+Your navy now shows: a French ship flies the tricolour and her officers wear French coats, a British one the red ensign and Royal Navy blue.
+Choose it under "Your navy" in the match setup; the other ship is always the other navy.

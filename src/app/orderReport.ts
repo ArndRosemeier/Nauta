@@ -20,10 +20,13 @@ import type { LostHow } from '../sim/end';
 import { orderMoment, type SimEvent } from '../sim/step';
 import { DEGREE, KNOT, SECONDS_PER_MINUTE, STEPS_PER_SECOND, wrapBearing } from '../sim/units';
 import { meanWind } from '../sim/wind';
+import type { Navy } from './terms';
 
 /** A running match as the panel sees it: my ship, the latest state, giving an order, and each step's events (after `state` has moved on to that step). */
 export interface OrderSession {
   readonly ship: number;
+  /** My ship's navy, when the session knows it (crewLooks.ts `navyOf` otherwise). */
+  readonly navy?: Navy;
   readonly state: SimState;
   give(order: Order): void;
   on(kind: 'events', fn: (events: readonly SimEvent[]) => void): void;

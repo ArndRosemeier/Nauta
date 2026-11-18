@@ -35,7 +35,7 @@ export class Speech {
   /** `clock`: the match's clock, s (the page's, or a browser check's: bubbles then wait on its jumps, not on slow frames). */
   constructor(parent: HTMLElement, private readonly match: OrderSession, language: Language, private readonly clock: () => number) {
     this.last = match.state;
-    this.queue = new BubbleQueue(match.state.matchSeed, language, navyOf(match.ship));
+    this.queue = new BubbleQueue(match.state.matchSeed, language, match.navy ?? navyOf(match.ship));
     this.layer = new BubbleLayer(parent, this.queue, this.speakers);
     match.on('events', (events) => {
       const now = match.state, ship = match.ship, t = this.clock();
@@ -44,7 +44,7 @@ export class Speech {
       const next = now.tick === this.last.tick + 1, notices = next ? noticed(this.last, now, ship, !this.looked) : [];
       if (next) this.looked = true;
       this.last = now;
-      this.queue.navy = navyOf(ship);
+      this.queue.navy = match.navy ?? navyOf(ship);
       const heard = [...events, ...notices];
       for (const e of heard) this.log.record(this.queue.add(saysOf(e, ship), t), now.tick);
       for (const fn of this.hearers) fn(heard, now);
