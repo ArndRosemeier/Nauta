@@ -4,7 +4,7 @@
  * through the same engine as the sea, the ship and the crew (`SeaSound.engine`). Call `aloft` each frame before
  * `SeaSound.hear`, whose `settle` keeps only the beds set since the last frame.
  */
-import type { AudioEngine } from '@futuremagic/audio/web';
+import type { Speaker } from './channel';
 import type { Room } from './acoustics';
 import { playHeard, type Heard } from './heard';
 import { SailWatch, sailSoundIds, type SailScene } from './sailHearing';
@@ -16,7 +16,7 @@ export class SailSound {
   private readonly watch: SailWatch;
   private readonly out: Heard = { shots: [], beds: [] };
 
-  constructor(private readonly sound: AudioEngine, seed: number) {
+  constructor(private readonly sound: Speaker, seed: number) {
     this.watch = new SailWatch(seed);
     // The short sounds are fetched as soon as sound opens: a sail heard filling late is heard filling wrongly. The beds
     // are fetched when first heard.

@@ -1,1 +1,6 @@
-[]
+[
+  {
+    "key": "same name: audio/channel.ts#play + render/captain/captainView.ts#play",
+    "reason": "False alarm: the channel plays a sound at its part's level (the engine's play, so Speaker matches it); the captain's view plays an animation clip on his figure."
+  }
+]

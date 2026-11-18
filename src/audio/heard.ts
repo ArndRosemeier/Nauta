@@ -3,7 +3,7 @@
  * the shots to start this frame and the beds to hold, each with its place in the world (or none: all round the ear)
  * and its bus. One shape, played in one place (`playHeard`).
  */
-import type { AudioEngine } from '@futuremagic/audio/web';
+import type { Speaker } from './channel';
 
 type Vec3 = readonly [number, number, number];
 
@@ -43,7 +43,7 @@ export function clearHeard(out: Heard): void {
 }
 
 /** Plays a frame's sounds (nothing until sound has opened). */
-export function playHeard(e: AudioEngine, heard: Heard): void {
+export function playHeard(e: Speaker, heard: Heard): void {
   if (!e.open) return;
   for (const s of heard.shots) e.play(s.id, { at: s.at, ref: s.ref, gain: s.gain, bus: s.bus, delay: s.delay, pitch: s.pitch ?? 1 });
   for (const b of heard.beds) e.bed(b.id, b.level, { glide: b.glide, bus: b.bus, ...(b.at ? { at: b.at, ref: b.ref } : {}) }, b.key);

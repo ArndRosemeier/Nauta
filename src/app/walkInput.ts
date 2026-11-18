@@ -1,15 +1,17 @@
 /**
  * Two thumbs on a tablet (implementation plan N2.3; touch first, keys and mouse on top): a finger landing on the left
- * of the view is the walking stick, drawn as a ring under it with a knob that follows; the walking keys do the same on
+ * of the view (the right, if the player says so) is the walking stick, drawn as a ring under it with a knob that follows; the walking keys do the same on
  * a desk. Looking stays with lookInput.ts, which leaves the stick's finger alone.
  */
-import { NO_PUSH, STICK_REACH, keyPush, stickPush, strongerPush, walksBy, type Push } from './thumbs';
+import { DEFAULT_WALK_KEYS, NO_PUSH, STICK_REACH, keyPush, stickPush, strongerPush, walksBy, type Push, type WalkKeys } from './thumbs';
 
 export interface WalkInput {
   /** What the thumb and the keys ask now. */
   push(): Push;
   /** Whether a pointer event belongs to the stick (looking leaves it alone). */
   owns(e: PointerEvent): boolean;
+  /** The player's layout (plan N7.3): the walking keys, and which half of the view the walking thumb lands on. */
+  layout(keys: WalkKeys, side: 'left' | 'right'): void;
 }
 
 /** The left share of the view a walking thumb lands on. */
@@ -23,12 +25,13 @@ export function watchWalk(el: HTMLElement): WalkInput {
   document.body.append(ring);
   let id: number | null = null, x0 = 0, y0 = 0, thumb: Push = NO_PUSH;
   const held = new Set<string>();
+  let keys = DEFAULT_WALK_KEYS, side: 'left' | 'right' = 'left';
   const show = (dx: number, dy: number) => {
     const len = Math.hypot(dx, dy), k = len > STICK_REACH ? STICK_REACH / len : 1;
     knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
   };
-  // A finger (or pen) on the left of the view; the mouse always looks, the keys walk on a desk.
-  const isStick = (e: PointerEvent) => e.pointerType !== 'mouse' && e.clientX < el.clientWidth * STICK_SHARE;
+  // A finger (or pen) on the walking thumb's half of the view; the mouse always looks, the keys walk on a desk.
+  const isStick = (e: PointerEvent) => e.pointerType !== 'mouse' && (side === 'left' ? e.clientX < el.clientWidth * STICK_SHARE : e.clientX >= el.clientWidth * STICK_SHARE);
   el.addEventListener('pointerdown', (e) => {
     if (id !== null || !isStick(e)) return;
     id = e.pointerId; x0 = e.clientX; y0 = e.clientY; thumb = NO_PUSH;
@@ -49,12 +52,13 @@ export function watchWalk(el: HTMLElement): WalkInput {
   };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
-  window.addEventListener('keydown', (e: KeyboardEvent) => { if (walksBy(e.code)) { held.add(e.code); e.preventDefault(); } });
+  window.addEventListener('keydown', (e: KeyboardEvent) => { if (walksBy(e.code, keys) && !(e.target instanceof HTMLInputElement)) { held.add(e.code); e.preventDefault(); } });
   window.addEventListener('keyup', (e: KeyboardEvent) => held.delete(e.code));
   // A key held while the page loses the keyboard would walk on forever.
   window.addEventListener('blur', () => held.clear());
   return {
-    push: () => strongerPush(thumb, keyPush(held)),
+    push: () => strongerPush(thumb, keyPush(held, keys)),
     owns: (e) => e.pointerId === id || (id === null && isStick(e)),
+    layout: (k, s) => { keys = k; side = s; held.clear(); },
   };
 }

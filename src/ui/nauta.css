@@ -1,0 +1,186 @@
+/*
+ * The interface's look (docs/design/ui-style.md): brass and lacquer, as on the binnacle and the captain's instruments.
+ * Black-blue lacquer, engraved brass rules and corners, ivory words; Caslon (the English book face of 1800) for the
+ * words, its display cut in spaced capitals for titles; polished brass for what is chosen (Arnd, 2026-11-18).
+ * Every colour is a token below; nothing else names one.
+ *
+ * Its cost (the 2 ms the interface shares with sky and light): solid panels, no backdrop blur, no animation that runs
+ * while the view does, no images. Every target a finger can hit: at least 44 px, mostly 52.
+ */
+
+@font-face { font-family: 'Caslon'; src: url('/fonts/caslon-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Caslon'; src: url('/fonts/caslon-400-italic.woff2') format('woff2'); font-weight: 400; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Caslon'; src: url('/fonts/caslon-700.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Caslon Display'; src: url('/fonts/caslon-display.woff2') format('woff2'); font-display: swap; }
+
+:root {
+  /* Lacquer */
+  --lacquer: #121c26;
+  --lacquer-top: #172430;
+  --lacquer-deep: #0a1118;
+  --lacquer-over: #121c26ee;
+  --lacquer-bg: linear-gradient(180deg, var(--lacquer-top) 0%, #0c141c 100%);
+  /* Ivory words */
+  --ivory: #eadfc6;
+  --ivory-soft: #eadfc6a6;
+  /* Brass */
+  --brass: #d4ad62;
+  --brass-line: #c9a45c;
+  --brass-dim: #c9a45c99;
+  --brass-faint: #c9a45c40;
+  --brass-soft: #d4ad6226;
+  --brass-fill: linear-gradient(#e3c27c, #b88d45);
+  --brass-ball: radial-gradient(circle at 35% 30%, #f6dfa5, #b88d45 55%, #6e5124);
+  --on-brass: #16120a;
+  /* A signal: a version not yet seen, a cry in danger */
+  --signal: #d0533c;
+  /* Type */
+  --title-font: 'Caslon Display', 'Caslon', Georgia, serif;
+  --word-font: 'Caslon', Georgia, 'Times New Roman', serif;
+  /* Sizes */
+  --target: 52px;
+  --target-small: 44px;
+  --corner: 6px;
+}
+
+button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; touch-action: manipulation; cursor: pointer; }
+
+/* ---------- The compass rose ---------- */
+.nt-rose { width: 44px; height: 44px; flex: none; color: var(--brass); }
+
+/* ---------- The sheet (src/app/sheet.ts): every panel that is not the world ---------- */
+.nt-backdrop {
+  position: fixed; inset: 0; z-index: 20; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); place-items: center;
+  background: #02050866; touch-action: pan-y;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.nt-sheet {
+  position: relative; box-sizing: border-box; display: flex; flex-direction: column; max-width: 100%; max-height: 100%;
+  width: min(620px, 100%); background: var(--lacquer-bg); color: var(--ivory); border: 1px solid var(--brass-line); border-radius: var(--corner);
+  box-shadow: 0 18px 50px #000c, inset 0 0 0 4px var(--lacquer-deep), inset 0 0 0 5px var(--brass-dim);
+  font: 17px/1.35 var(--word-font); -webkit-font-smoothing: antialiased;
+}
+/* Brass corners, as on a sea chest */
+.nt-sheet::before, .nt-sheet::after { content: ''; position: absolute; width: 22px; height: 22px; border: 2px solid var(--brass); pointer-events: none; }
+.nt-sheet::before { left: 8px; top: 8px; border-right: 0; border-bottom: 0; }
+.nt-sheet::after { right: 8px; bottom: 8px; border-left: 0; border-top: 0; }
+.nt-head { position: relative; display: flex; align-items: center; gap: 14px; padding: 22px 22px 8px 30px; flex: none; }
+.nt-head h2 { margin: 0; flex: 1; font: 400 26px/1 var(--title-font); letter-spacing: 0.18em; text-transform: uppercase; color: var(--brass); }
+.nt-close { width: var(--target); height: var(--target); flex: none; border: 1px solid var(--brass-faint); border-radius: 50%; background: transparent; font-size: 22px; line-height: 1; }
+.nt-close:active { background: var(--brass-soft); }
+.nt-body { position: relative; display: flex; flex-direction: column; min-height: 0; flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 30px 24px; }
+
+/* Headings inside a sheet: spaced capitals between two brass hairlines */
+.nt-section { display: flex; align-items: center; gap: 12px; margin: 18px 0 6px; font: 400 14px/1 var(--title-font); letter-spacing: 0.22em; text-transform: uppercase; color: var(--ivory-soft); }
+.nt-section::before, .nt-section::after { content: ''; height: 1px; background: var(--brass-faint); flex: 1; }
+.nt-section::before { flex: 0 0 18px; }
+.nt-note { margin: 6px 0; font-style: italic; font-size: 15px; color: var(--ivory-soft); }
+
+/* A setting's row: its name and help, its control */
+.nt-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 18px; min-height: 64px; padding: 6px 0; border-bottom: 1px solid var(--brass-faint); }
+.nt-label { display: flex; flex-direction: column; gap: 3px; flex: 1 1 140px; min-width: 0; }
+.nt-label small { font-size: 14px; font-style: italic; color: var(--ivory-soft); }
+
+/* A choice of a few: one line of words in a brass rule, the chosen one polished brass */
+.nt-choice { display: flex; flex-wrap: wrap; border: 1px solid var(--brass-dim); border-radius: 24px; overflow: hidden; }
+.nt-choice button { min-height: 48px; min-width: 72px; padding: 0 16px; border: 0; border-left: 1px solid var(--brass-faint); background: transparent; font-size: 17px; }
+.nt-choice button:first-child { border-left: 0; }
+.nt-choice button.on { background: var(--brass-fill); color: var(--on-brass); }
+
+/* A slider: a brass rule, polished where slid, a brass ball to hold */
+.nt-slide { display: flex; align-items: center; gap: 14px; }
+.nt-range { -webkit-appearance: none; appearance: none; width: min(280px, 46vw); height: 48px; margin: 0; background: transparent; touch-action: pan-y; --fill: 50%; }
+.nt-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--brass) var(--fill), var(--brass-faint) var(--fill)); }
+.nt-range::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; margin-top: -12px; border: 0; border-radius: 50%; background: var(--brass-ball); box-shadow: 0 2px 5px #000a; }
+.nt-range::-moz-range-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--brass) var(--fill), var(--brass-faint) var(--fill)); }
+.nt-range::-moz-range-thumb { width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--brass-ball); box-shadow: 0 2px 5px #000a; }
+.nt-value { min-width: 64px; text-align: right; font-variant-numeric: oldstyle-nums tabular-nums; color: var(--ivory-soft); }
+
+/* A key cap, a button in words, a link-like button */
+.nt-key { min-width: 96px; min-height: 48px; padding: 0 14px; border: 1px solid var(--brass-dim); border-bottom-width: 3px; border-radius: 8px; background: var(--lacquer-deep); color: var(--ivory); font-size: 17px; }
+.nt-key.on { color: var(--brass); border-color: var(--brass); font-style: italic; }
+.nt-button { min-height: var(--target-small); padding: 0 18px; border: 1px solid var(--brass-dim); border-radius: 22px; background: transparent; font-size: 17px; }
+.nt-button:active, .nt-key:active, .nt-choice button:active { background: var(--brass-soft); }
+.nt-link { align-self: flex-start; min-height: var(--target-small); margin-top: 10px; padding: 0 16px; border: 1px solid var(--brass-faint); border-radius: 22px; background: none; font-style: italic; font-size: 16px; }
+.fresh::after { content: ''; display: inline-block; width: 9px; height: 9px; margin-left: 8px; border-radius: 50%; background: var(--signal); vertical-align: 1px; }
+
+/* ---------- The settings (src/app/settingsPanel.ts): an index of pages, the page ---------- */
+.nt-sheet.settings { width: min(880px, 100%); height: min(660px, 100%); }
+.settings .nt-body { padding: 0; overflow: hidden; }
+.settings-body { flex: 1; display: flex; min-height: 0; gap: 22px; padding: 4px 30px 0 26px; }
+.settings-tabs { width: 190px; flex: none; display: flex; flex-direction: column; gap: 4px; padding-top: 6px; overflow: auto; }
+.nt-tab { min-height: var(--target); text-align: left; padding: 0 16px; border: 0; border-radius: var(--corner); background: none; font-size: 19px; display: flex; align-items: center; }
+.nt-tab.on { background: var(--brass-soft); color: var(--brass); box-shadow: inset 3px 0 0 var(--brass); }
+.settings-page { flex: 1; min-width: 0; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 6px 4px 20px; display: flex; flex-direction: column; }
+.settings-foot { position: relative; display: flex; align-items: center; justify-content: space-between; flex: none; margin: 0 18px; padding: 8px 12px 20px; border-top: 1px solid var(--brass-faint); font-size: 15px; color: var(--ivory-soft); }
+.settings-foot .nt-link { margin: 0; align-self: center; color: var(--ivory); }
+/* A narrow screen (a tablet upright, a phone): the index runs across the top */
+@media (max-width: 760px) {
+  .settings-body { flex-direction: column; gap: 6px; padding: 0 22px; }
+  .settings-tabs { width: auto; flex-direction: row; overflow-x: auto; padding: 0; gap: 2px; flex: none; }
+  .nt-tab { flex: none; font-size: 17px; padding: 0 12px; }
+  .nt-tab.on { box-shadow: inset 0 -3px 0 var(--brass); }
+}
+
+/* ---------- What's new and the rooms, on the sheet ---------- */
+.whatsnew .nt-body { -webkit-user-select: text; user-select: text; }
+.whatsnew-release h3 { font: 700 16px/1.2 var(--word-font); margin: 16px 0 6px; }
+.whatsnew-release.current h3 { color: var(--brass); }
+.whatsnew-date { font-weight: 400; font-style: italic; color: var(--ivory-soft); margin-left: 10px; }
+.whatsnew-release ul { margin: 0; padding-left: 20px; }
+.whatsnew-release li { margin: 3px 0; }
+.rooms .room-wide { display: block; width: 100%; margin: 8px 0; text-align: left; }
+.room-row { display: flex; gap: 8px; align-items: center; }
+.room-code { flex: 1; min-width: 0; min-height: var(--target-small); padding: 0 16px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-deep); color: var(--ivory); font: 20px/1 var(--word-font); letter-spacing: 0.2em; text-transform: uppercase; -webkit-user-select: text; user-select: text; }
+.room-link { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 13px; -webkit-user-select: text; user-select: text; }
+.room-big { font: 400 44px/1.1 var(--title-font); letter-spacing: 0.25em; margin: 12px 0; color: var(--brass); -webkit-user-select: text; user-select: text; }
+.room-say { font-style: italic; font-size: 15px; color: var(--ivory-soft); white-space: pre-wrap; }
+
+/* ---------- On the view: the few things that stay ---------- */
+/* A tag on the view: lacquer in a brass rule, nearly opaque, no blur behind it */
+.nt-pill {
+  min-height: var(--target); min-width: var(--target); padding: 0 20px; display: flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box;
+  border: 1px solid var(--brass-dim); border-radius: 26px; background: var(--lacquer-over); color: var(--ivory); font: 17px/1 var(--word-font);
+  box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-faint), 0 4px 12px #0007;
+}
+.nt-pill:active { background: var(--lacquer-top); }
+.nt-pill.on { background: var(--brass-fill); color: var(--on-brass); }
+.nt-pill.round { padding: 0; width: var(--target); border-radius: 50%; }
+.nt-pill .nt-rose { width: 34px; height: 34px; }
+#settings { position: fixed; z-index: 10; left: max(14px, env(safe-area-inset-left)); top: max(14px, env(safe-area-inset-top)); }
+#settings.fresh::after { position: absolute; right: -2px; top: -2px; margin: 0; width: 12px; height: 12px; box-shadow: 0 0 0 2px var(--lacquer); }
+#room { position: fixed; left: calc(max(14px, env(safe-area-inset-left)) + var(--target) + 12px); top: max(14px, env(safe-area-inset-top)); }
+#glass-button { position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: none; min-width: 84px; }
+
+/* ?ship: where to stand on her (src/app/standpointBar.ts), tags along the foot, clear of the glass */
+#standpoints { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); right: 120px; display: flex; flex-wrap: wrap; gap: 8px; }
+#standpoints button { min-height: var(--target-small); padding: 0 16px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-over); color: var(--ivory); font: 16px/1 var(--word-font); box-shadow: 0 3px 8px #0006; }
+#standpoints button.on { background: var(--brass-fill); color: var(--on-brass); }
+
+/* ?sail: the order panel (src/app/orderPanel.ts), a working panel until the order fan (N4.4) */
+#orders {
+  position: fixed; right: max(14px, env(safe-area-inset-right)); top: max(14px, env(safe-area-inset-top)); width: min(420px, calc(100% - 28px)); max-height: calc(100% - 100px);
+  display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden; background: var(--lacquer-bg); color: var(--ivory); font: 16px/1.3 var(--word-font);
+  border: 1px solid var(--brass-line); border-radius: var(--corner); box-shadow: inset 0 0 0 3px var(--lacquer-deep), inset 0 0 0 4px var(--brass-faint), 0 8px 24px #0008;
+}
+#orders:not(.open) { width: auto; }
+#orders:not(.open) .orders-body { display: none; }
+.orders-head { min-height: var(--target-small); padding: 0 18px; border: 0; background: none; color: var(--brass); font: 400 17px/1 var(--title-font); letter-spacing: 0.18em; text-transform: uppercase; text-align: left; }
+.orders-body { overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 12px 12px; }
+.orders-status, .orders-heard { margin: 0 0 8px; white-space: pre-wrap; font: 15px/1.35 var(--word-font); font-variant-numeric: lining-nums tabular-nums; }
+.orders-heard { color: var(--brass); font-style: italic; min-height: 1.35em; }
+.orders-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.orders-to { width: 100%; font: 400 12px/1.2 var(--title-font); letter-spacing: 0.2em; text-transform: uppercase; color: var(--ivory-soft); }
+.orders-button { min-height: var(--target-small); min-width: var(--target-small); padding: 0 14px; border: 1px solid var(--brass-dim); border-radius: 22px; background: transparent; color: var(--ivory); font: 16px/1 var(--word-font); }
+.orders-button:active { background: var(--brass-soft); }
+.orders-compass .orders-button { padding: 0; }
+.orders-button.on { background: var(--brass-fill); color: var(--on-brass); }
+.orders-button.dim { opacity: 0.4; }
+.orders-typed { display: flex; gap: 6px; margin-top: 8px; }
+.orders-input { flex: 1; min-width: 0; min-height: var(--target-small); padding: 0 14px; border: 1px solid var(--brass-dim); border-radius: 22px; background: var(--lacquer-deep); color: var(--ivory); font: 16px/1 var(--word-font); -webkit-user-select: text; user-select: text; }
+.orders-input::placeholder { color: var(--ivory-soft); font-style: italic; }
+
+/* Walking (src/app/walkInput.ts): the thumb's stick, a brass ring where it lands and a knob that follows it */
+#stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid var(--brass-dim); background: #0a111833; pointer-events: none; display: none; }
+#stick.on { display: block; }
+#stick .knob { position: absolute; left: 34px; top: 34px; width: 44px; height: 44px; border-radius: 50%; background: var(--brass-ball); opacity: 0.85; }

@@ -119,6 +119,26 @@ export class QualityChooser {
     }
   }
 
+  /**
+   * The player's choice in the settings (plan N7.3), mid-match: a level by name fixes it, `auto` (or a name not known)
+   * measures again from the top. Returns true when the level changed, so its knobs must be applied.
+   */
+  choose(name: string): boolean {
+    const was = this.level, i = levelNamed(name);
+    this.measured = 0; this.frames = 0; this.late = 0; this.steps.length = 0;
+    if (i >= 0) {
+      this.level = i;
+      this.chosen = true;
+      this.reason = `chosen in the settings`;
+    } else {
+      this.level = 0;
+      this.chosen = false;
+      this.settle = SETTLE_MS;
+      this.reason = 'measuring';
+    }
+    return this.level !== was;
+  }
+
   /** The knobs of the level now. */
   get knobs(): QualityLevel {
     return QUALITY_LEVELS[this.level]!;

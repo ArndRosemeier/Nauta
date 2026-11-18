@@ -1,32 +1,38 @@
 /**
- * The version in a corner of the screen, and on a tap every version with what it brought (Arnd 2026-11-17). The
- * numbers and notes come from the build (tools/version/version.ts); the history loads only when it is opened.
- * A version the device has not shown yet marks the button, so a new deploy is seen at a glance on the tablet.
+ * The version and every version with what it brought (Arnd 2026-11-17). The numbers and notes come from the build
+ * (tools/version/version.ts); the history loads only when it is opened. The version stands at the foot of the
+ * settings (design thread, 2026-11-18: out of the view's corner), and a version the device has not shown yet marks
+ * the settings button, so a new deploy is still seen at a glance on the tablet.
  */
 import { LABEL, VERSION } from 'virtual:nauta/version';
 import type { Release } from '../../tools/version/version';
 import { make } from './dom';
+import { openSheet } from './sheet';
+import type { WordKey } from './words';
 
 /** Where the device remembers the last version it showed the history of. */
 const SEEN_KEY = 'nauta.seenVersion';
 
-/** Storage can be refused (a private window, a blocked site): then nothing is remembered and the game goes on. */
-function seenVersion(): string | null {
-  try { return localStorage.getItem(SEEN_KEY); } catch { return null; }
+/** The version as the screen shows it (`0.071`, `0.024 dev`). */
+export const versionLabel = LABEL;
+
+/** Whether this version's history has not been shown on this device yet. Storage refused: never marked. */
+export function unseenVersion(): boolean {
+  try { return localStorage.getItem(SEEN_KEY) !== VERSION; } catch { return false; }
 }
 function rememberSeen(): void {
   try { localStorage.setItem(SEEN_KEY, VERSION); } catch { /* not remembered */ }
 }
 
-/** The panel of every version, newest first, over the view until it is closed. */
-function openPanel(history: readonly Release[]): void {
-  const backdrop = make('div', 'whatsnew-backdrop'), panel = make('section', 'whatsnew-panel');
-  panel.setAttribute('role', 'dialog');
-  panel.setAttribute('aria-label', "What's new");
-  const head = make('header', 'whatsnew-head'), close = make('button', 'whatsnew-close', '✕');
-  close.setAttribute('aria-label', 'Close');
-  head.append(make('h2', '', "What's new"), close);
-  const list = make('div', 'whatsnew-list');
+/** The history of every version, newest first, on a sheet over the view; `seen` is called once it is marked seen. */
+export function openWhatsNew(say: Readonly<Record<WordKey, string>>, seen: () => void = () => {}): void {
+  rememberSeen();
+  seen();
+  import('virtual:nauta/history').then((m) => showHistory(m.default, say), (err: unknown) => console.error(err));
+}
+
+function showHistory(history: readonly Release[], say: Readonly<Record<WordKey, string>>): void {
+  const sheet = openSheet('whatsnew', say.whatsNew, say.close);
   for (const r of history) {
     const item = make('article', r.version === VERSION ? 'whatsnew-release current' : 'whatsnew-release');
     const title = make('h3', '', r.version);
@@ -34,27 +40,7 @@ function openPanel(history: readonly Release[]): void {
     const notes = make('ul', '');
     for (const n of r.notes) notes.append(make('li', '', n));
     item.append(title, notes);
-    list.append(item);
+    sheet.body.append(item);
   }
-  if (!history.length) list.append(make('p', '', 'This build does not know its history.'));
-  panel.append(head, list);
-  backdrop.append(panel);
-  const shut = () => { backdrop.remove(); removeEventListener('keydown', onKey); };
-  const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') shut(); };
-  close.addEventListener('click', shut);
-  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) shut(); });
-  addEventListener('keydown', onKey);
-  document.body.append(backdrop);
-}
-
-/** Shows the version on `button`; a tap opens the history. */
-export function showVersion(button: HTMLButtonElement): void {
-  button.textContent = `${LABEL} · What's new`;
-  button.classList.toggle('fresh', seenVersion() !== VERSION);
-  button.style.display = 'block';
-  button.addEventListener('click', () => {
-    rememberSeen();
-    button.classList.remove('fresh');
-    import('virtual:nauta/history').then((m) => openPanel(m.default), (err: unknown) => console.error(err));
-  });
+  if (!history.length) sheet.body.append(make('p', '', say.noHistory));
 }

@@ -20,6 +20,8 @@ interface AudioSessionNavigator { audioSession?: { type: string } }
 
 export class SeaSound {
   readonly engine: AudioEngine;
+  /** The sea and the wind's own level, 0..1 (the player's setting, plan N7.3; channel.ts for the other parts). */
+  level = 1;
   private readonly watch: SlapWatch;
   private readonly beds: BedLevel[] = [];
   private readonly slaps: SlapEvent[] = [];
@@ -50,9 +52,9 @@ export class SeaSound {
     this.blow = windAt(wind, eye[0], eye[2], t, this.blow ?? undefined);
     seaAt(sea, eye[0], eye[2], t, this.water);
     bedLevels({ seaForce: force, windSpeed: way ? apparentSpeed(way, this.blow) : this.blow.speed, rise: this.water.velocity[1], t }, this.seed, this.beds);
-    for (const b of this.beds) e.bed(b.id, b.level * room.through, { glide: b.glide });
+    for (const b of this.beds) e.bed(b.id, b.level * room.through * this.level, { glide: b.glide });
     e.settle();
-    for (const s of this.watch.listen(sea, t, eye[0], eye[2], force, this.slaps)) e.play(s.kind.id, { at: s.at, gain: s.kind.gain * s.gain * room.through, ref: s.kind.ref });
+    for (const s of this.watch.listen(sea, t, eye[0], eye[2], force, this.slaps)) e.play(s.kind.id, { at: s.at, gain: s.kind.gain * s.gain * room.through * this.level, ref: s.kind.ref });
     this.muffle(eye[1] < this.water.height ? UNDER_WATER_HZ : room.muffle);
     e.update();
   }

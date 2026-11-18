@@ -26,21 +26,29 @@ export function stickPush(dx: number, dy: number): Push {
   return { forward: -dy * k, strafe: dx * k };
 }
 
-/** The keys that walk: forward, back, left, right (letters by place on the keyboard, and the arrows). */
-const KEYS = {
-  forward: ['KeyW', 'ArrowUp'],
-  back: ['KeyS', 'ArrowDown'],
-  left: ['KeyA', 'ArrowLeft'],
-  right: ['KeyD', 'ArrowRight'],
-} as const;
+/** The keys that walk, each direction's keys (their `code`s). */
+export interface WalkKeys {
+  readonly forward: readonly string[];
+  readonly back: readonly string[];
+  readonly left: readonly string[];
+  readonly right: readonly string[];
+}
+
+/** The walking keys from one key a direction (the player's, plan N7.3); the arrows always walk as well. */
+export const walkKeys = (k: { readonly forward: string; readonly back: string; readonly left: string; readonly right: string }): WalkKeys => ({
+  forward: [k.forward, 'ArrowUp'], back: [k.back, 'ArrowDown'], left: [k.left, 'ArrowLeft'], right: [k.right, 'ArrowRight'],
+});
+
+/** The keys that walk unless the player changes them: letters by place on the keyboard, and the arrows. */
+export const DEFAULT_WALK_KEYS = walkKeys({ forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD' });
 
 /** Whether a key (its `code`) is one that walks. */
-export const walksBy = (code: string): boolean => Object.values(KEYS).some((k) => (k as readonly string[]).includes(code));
+export const walksBy = (code: string, keys: WalkKeys = DEFAULT_WALK_KEYS): boolean => Object.values(keys).some((k: readonly string[]) => k.includes(code));
 
 /** The push of the walking keys held down (their `code`s); two at once walk at the same pace as one. */
-export function keyPush(held: ReadonlySet<string>): Push {
-  const on = (keys: readonly string[]) => (keys.some((k) => held.has(k)) ? 1 : 0);
-  const forward = on(KEYS.forward) - on(KEYS.back), strafe = on(KEYS.right) - on(KEYS.left), len = Math.hypot(forward, strafe);
+export function keyPush(held: ReadonlySet<string>, keys: WalkKeys = DEFAULT_WALK_KEYS): Push {
+  const on = (list: readonly string[]) => (list.some((k) => held.has(k)) ? 1 : 0);
+  const forward = on(keys.forward) - on(keys.back), strafe = on(keys.right) - on(keys.left), len = Math.hypot(forward, strafe);
   return len > 1 ? { forward: forward / len, strafe: strafe / len } : { forward, strafe };
 }
 
