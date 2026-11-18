@@ -111,6 +111,8 @@ interface Drawn {
   /** His looks: changed only when the match setup gives the ships the other navies (`changeNavy`). */
   figure: Figure;
   readonly at: ManDrawn;
+  /** Where he stands in his ship's space (his crowd figure's matrix is this carried by her pose every frame: the figures are drawn in world space, shared by the ships of a navy). */
+  readonly local: Matrix4;
   /** His crowd figure, or null while he is not drawn (hidden below, or his ship too far). */
   crowd: CrowdMan | null;
   /** The clip his figure plays. */
@@ -186,8 +188,10 @@ const UP = new Vector3(0, 1, 0);
 const HARM_ORDER: readonly Harm[] = ['wounded', 'badly', 'killed'];
 
 export class CrewView {
-  /** Each ship's men ride in her group, which follows her pose; each goes in through `stage.add`. */
+  /** Each ship's pool characters, blood, shrouds and hammocks ride in her group, which follows her pose; each goes in through `stage.add`. */
   readonly groups: Group[];
+  /** The crowd figures' meshes, one for each kind of man, drawn in world space (the origin's): every ship's men of that kind are instances of it. */
+  readonly crowd: Group;
   readonly stats: CrewStats = { total: 0, drawn: 0, pool: 0, placed: 0, ms: 0 };
   /** How many crews are drawn (the trial's phases: 0, 1 or 2). */
   crews = 2;
@@ -225,7 +229,8 @@ export class CrewView {
   private readonly frustum = new Frustum();
   private readonly projection = new Matrix4();
   private readonly sphere = new Sphere();
-  private readonly eyes: Vector3[] = [new Vector3(), new Vector3()];
+  /** The camera's eye in each ship's space. */
+  private readonly eyes: Vector3[];
 
   private constructor(
     private readonly figures: CrowdFigures,
@@ -237,13 +242,13 @@ export class CrewView {
     rosters: readonly (readonly Man[])[],
   ) {
     this.groups = rosters.map((_, s) => { const g = new Group(); g.name = `crew of ship ${s + 1}`; g.matrixAutoUpdate = false; return g; });
-    for (const k of figures.kinds.values()) {
-      const ship = rosters.findIndex((_, s) => k.name.startsWith(`${navyOf(s)}-`));
-      this.groups[Math.max(0, ship)]!.add(k.mesh);
-    }
+    this.crowd = new Group();
+    this.crowd.name = 'the crowd';
+    for (const k of figures.kinds.values()) this.crowd.add(k.mesh);
+    this.eyes = rosters.map(() => new Vector3());
     this.all = rosters.flatMap((roster, ship) => roster.map((m, man) => {
       const seed = manSeed(ship, man);
-      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false, on: null, up: true, rope: null, posed: false };
+      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), local: new Matrix4(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false, on: null, up: true, rope: null, posed: false };
     }));
     this.byShip = rosters.map((_, s) => this.all.filter((d) => d.ship === s));
     this.shrouds = rosters.map((_, s) => new Shrouds(this.groups[s]!));
@@ -287,8 +292,7 @@ export class CrewView {
     this.figures.update(0);
     await prepare(kindsGroup);
     for (const k of this.figures.kinds.values()) {
-      const ship = this.groups.findIndex((_, s) => k.name.startsWith(`${navyOf(s)}-`));
-      this.groups[Math.max(0, ship)]!.add(k.mesh);
+      this.crowd.add(k.mesh);
       k.mesh.visible = k.men.length > 0;
     }
     // Every dress of both navies with its first hairstyle, and the seamen's every hairstyle.
@@ -309,17 +313,13 @@ export class CrewView {
   }
 
   /**
-   * The first ship's navy, as the match setup chose (menu.md, "Your navy"; the other ship's the other): every man's
-   * dress follows his ship's navy, the kinds' meshes go to the ship whose navy they dress, and the near pool is given
-   * back to be dressed again. Both navies' kinds and dresses were built at load, so nothing is compiled.
+   * The navy of each ship, as the match setup chose (menu.md, "Your navy"): every man's dress follows his ship's navy,
+   * and the near pool is given back to be dressed again. Both navies' kinds and dresses were built at load, so nothing
+   * is compiled.
    */
-  changeNavy(first: Navy): void {
-    for (const k of this.figures.kinds.values()) {
-      const ship = this.groups.findIndex((_, s) => k.name.startsWith(`${navyOf(s, first)}-`));
-      if (ship >= 0 && k.mesh.parent !== this.groups[ship]) this.groups[ship]!.add(k.mesh);
-    }
+  changeNavy(navyAt: (ship: number) => Navy): void {
     for (const d of this.all) {
-      const f = figureOf(d.ship, d.man, d.m, navyOf(d.ship, first));
+      const f = figureOf(d.ship, d.man, d.m, navyAt(d.ship));
       if (f.kind === d.figure.kind && f.tints.join() === d.figure.tints.join()) continue;
       const p = this.pool.of(this.key(d));
       if (p) { this.pool.giveBack(p, this.figures, null); p.as = null; }
@@ -354,10 +354,11 @@ export class CrewView {
     fr.camera.getWorldPosition(this.eye);
     this.projection.multiplyMatrices(fr.camera.projectionMatrix, fr.camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projection);
+    let nearestMan = Infinity;
     this.byShip.forEach((men, ship) => {
       const g = this.groups[ship]!, near = this.placeGroup(ship, fr);
       g.visible = near !== null && this.crews > ship;
-      if (!near) return;
+      if (!near) { for (const d of men) this.hideMan(d); return; }
       this.inverse.copy(g.matrixWorld).invert();
       this.eyes[ship]!.copy(this.eye).applyMatrix4(this.inverse);
       const from = fr.state.from.ships[ship], to = fr.state.to.ships[ship];
@@ -374,14 +375,16 @@ export class CrewView {
           this.placeMan(d, from, to, fr);
           s.placed++;
         }
+        if (d.crowd) d.crowd.matrix.multiplyMatrices(g.matrixWorld, d.local);
         nearest = Math.min(nearest, d.distance);
         if (d.shown) s.drawn++;
       }
+      nearestMan = Math.min(nearestMan, nearest);
       this.blood[ship]!.growPools(at);
       this.trails(ship, to, at, fr.violence);
-      const castsShadow = !this.noShadows && nearest <= k.shadowTo;
-      for (const kind of this.figures.kinds.values()) if (kind.mesh.parent === g) kind.mesh.castShadow = castsShadow;
     });
+    const castsShadow = !this.noShadows && nearestMan <= k.shadowTo;
+    for (const kind of this.figures.kinds.values()) kind.mesh.castShadow = castsShadow;
     this.handOut(fr);
     this.figures.update(dt);
     this.animatePool(dt, fr);
@@ -494,7 +497,7 @@ export class CrewView {
     const c = d.crowd!;
     this.turn.setFromAxisAngle(UP, at.yaw);
     this.scale.setScalar(d.figure.scale);
-    c.matrix.compose(this.local.set(at.x, at.y, at.z), this.turn, this.scale);
+    d.local.compose(this.local.set(at.x, at.y, at.z), this.turn, this.scale);
     if (d.on || d.rope) {
       // On the rungs or the footrope: the donor, posed for him by `climbs` just now (hands and feet on the holds), faded in from the clip he walked up to them in.
       this.figures.pose(c, this.climber.actor, d.posed ? undefined : { fade: CLIP_FADE });
