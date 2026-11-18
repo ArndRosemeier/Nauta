@@ -44,10 +44,13 @@ test('the end card: guns fired and balls that struck counted once each, how it e
   assert.deepEqual(tally.of(1), { fired: 1, struck: 0 });
   const state = startMatch(duelStart(5));
   assert.equal(endCard(state, 0, tally), null, 'no card while the fight goes on');
-  const ended = (lost: readonly (string | null)[]): SimState => ({ ...state, fight: { ...state.fight, end: { tick: 1800, lost } } } as SimState);
+  const ended = (lost: readonly (string | null)[], apart = false): SimState => ({ ...state, fight: { ...state.fight, end: { tick: 1800, lost, apart } } } as SimState);
   assert.deepEqual(endCard(ended([null, 'struck']), 0, tally)?.ending, { who: 'she', how: 'struck' });
   assert.deepEqual(endCard(ended([null, 'struck']), 1, tally)?.ending, { who: 'me', how: 'struck' });
-  assert.deepEqual(endCard(ended([null, null]), 0, tally)?.ending, { who: 'none' });
+  assert.deepEqual(endCard(ended([null, null]), 0, tally)?.ending, { who: 'none', apart: false }, 'parted at nightfall');
+  // Sailing out of the fight: the ship that ran broke off the action; both sailing apart is drawn.
+  assert.deepEqual(endCard(ended(['broke off', null], true), 1, tally)?.ending, { who: 'she', how: 'broke off' });
+  assert.deepEqual(endCard(ended([null, null], true), 0, tally)?.ending, { who: 'none', apart: true }, 'sailed apart');
   const card = endCard(ended(['sunk', null]), 1, tally)!;
   assert.equal(card.seconds, 60);
   assert.deepEqual(card.ships.map((s) => s.fired), [1, 2], 'mine first');

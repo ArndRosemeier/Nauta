@@ -9,8 +9,8 @@ import type { SimState } from '../sim/state';
 import type { SimEvent } from '../sim/step';
 import { STEPS_PER_SECOND } from '../sim/units';
 
-/** How a match ended for me: she (the other ship) or I lost, and how; or drawn (nightfall, or both lost at once). */
-export type Ending = { readonly who: 'she' | 'me'; readonly how: LostHow } | { readonly who: 'none' };
+/** How a match ended for me: she (the other ship) or I lost, and how; or drawn (at nightfall, both lost at once, or `apart`: both sailed out of the fight). */
+export type Ending = { readonly who: 'she' | 'me'; readonly how: LostHow } | { readonly who: 'none'; readonly apart: boolean };
 
 /** One ship's numbers on the card. */
 export interface ShipNumbers {
@@ -65,7 +65,7 @@ export function endCard(state: SimState, mine: number, tally: Tally): EndCard | 
   const end = state.fight.end;
   if (!end) return null;
   const won = winner(state.fight), hers = 1 - mine;
-  const ending: Ending = won === null ? { who: 'none' } : won === mine ? { who: 'she', how: end.lost[hers]! } : { who: 'me', how: end.lost[mine]! };
+  const ending: Ending = won === null ? { who: 'none', apart: end.apart && end.lost.every((l) => l === null) } : won === mine ? { who: 'she', how: end.lost[hers]! } : { who: 'me', how: end.lost[mine]! };
   const order = state.ships.length > 1 ? [mine, hers] : [mine];
   const ships = order.map((i) => {
     const d = state.ships[i]!.damage;
