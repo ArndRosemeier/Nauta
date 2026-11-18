@@ -46,10 +46,11 @@ import { VOICES, type Point3, type Speaker, type Voice } from '../../app/speech/
 import type { CrewKnobs } from '../../app/quality';
 import { pageSeconds } from '../../app/pageMatch';
 import { EYE } from '../../app/standpoints';
-import { stainOf, stained, takenBelow, TRAIL_EVERY, SHOWN } from '../../app/violence';
+import { stainOf, stained, coveredOf, TRAIL_EVERY, SHOWN } from '../../app/violence';
 import type { Violence } from '../../app/settings';
 import { NearPool, type PoolChar } from './nearPool';
 import { Blood } from './blood';
+import { Shrouds } from './shroud';
 import { geometryBytes } from '../bytes';
 
 /** Actors' crowd level: all the workbench draws (it only bakes the figures). */
@@ -115,16 +116,14 @@ interface Drawn {
   harm: Harm | null;
   hurtAt: number;
   fellAt: number;
-  /** How far his shirt is stained now (violence.ts), and how much of him is taken below (0..1, mild). */
+  /** How far his shirt is stained now (violence.ts), and how far the canvas is laid over him (0..1, mild). */
   stain: number;
-  gone: number;
+  covered: number;
   /** Where the last drop fell when he was carried (her space), for the trail. */
   dripped: { x: number; z: number } | null;
   /** A new hurt to lay blood for once he is placed (he has a place to bleed on), and whether he has been placed. */
   fresh: Harm | null;
   placed: boolean;
-  /** How much of him is faded out as drawn now (`gone` as last applied). */
-  faded: number;
 }
 
 /** How the trial draws the other crew (`?crew`, plan N4.0): on her own deck (`aboard`), or off her bow at `offset` (ship space, m). */
@@ -180,6 +179,8 @@ export class CrewView {
   private readonly officerMen: number[];
   /** The blood on each ship's decks (violence.ts). */
   private readonly blood: Blood[];
+  /** The sheets over the killed at the mild level, on each ship. */
+  private readonly shrouds: Shrouds[];
   /** Men who matter now (speaking, addressed) until a page second. */
   private readonly matters = new Map<number, number>();
   /** When the pool last began dressing a man, page seconds. */
@@ -216,9 +217,10 @@ export class CrewView {
     }
     this.all = rosters.flatMap((roster, ship) => roster.map((m, man) => {
       const seed = manSeed(ship, man);
-      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, gone: 0, dripped: null, fresh: null, placed: false, faded: 0 };
+      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false };
     }));
     this.byShip = rosters.map((_, s) => this.all.filter((d) => d.ship === s));
+    this.shrouds = rosters.map((_, s) => new Shrouds(this.groups[s]!));
     this.blood = rosters.map((_, s) => { const b = new Blood(); b.attach(this.groups[s]!); return b; });
     for (const v of VOICES) this.voices.set(v, voiceMan(v, rosters[0]));
     this.officerMen = OFFICERS.map((o) => this.voices.get(o)!);
@@ -351,8 +353,8 @@ export class CrewView {
   }
 
   /** Her men now hurt, where they are drawn (her space): for the browser checks, which stand near one (tools/shot/men.mjs). */
-  hurtMen(ship: number): { man: number; harm: Harm; space: string; x: number; y: number; z: number; clip: string | null; shown: boolean; seen: boolean }[] {
-    return (this.byShip[ship] ?? []).flatMap((d) => (d.harm && d.placed ? [{ man: d.man, harm: d.harm, space: d.at.space, x: d.at.x, y: d.at.y, z: d.at.z, clip: d.clip, shown: d.shown, seen: d.seen }] : []));
+  hurtMen(ship: number): { man: number; harm: Harm; space: string; x: number; y: number; z: number; clip: string | null; shown: boolean; seen: boolean; covered: number; shroud: { x: number; y: number; z: number; scale: number } | null }[] {
+    return (this.byShip[ship] ?? []).flatMap((d) => (d.harm && d.placed ? [{ man: d.man, harm: d.harm, space: d.at.space, x: d.at.x, y: d.at.y, z: d.at.z, clip: d.clip, shown: d.shown, seen: d.seen, covered: d.covered, shroud: this.shrouds[ship]!.shownAt(d.man) }] : []));
   }
 
   /** Her men now at a gun with what the drill has them doing, where they are drawn (her space): for the browser checks, which stand beside a gun crew (tools/shot/guns.mjs `drill`). */
@@ -404,7 +406,7 @@ export class CrewView {
       d.harm = harm;
       if (harm === null) { d.hurtAt = Infinity; d.fellAt = Infinity; }
     }
-    d.gone = takenBelow(level, d.harm, at - d.fellAt);
+    d.covered = coveredOf(level, d.harm, at - d.fellAt);
   }
 
   /** The men carried below at the unsparing level leave a drop every few metres, under their bearers' feet. */
@@ -433,7 +435,7 @@ export class CrewView {
     d.distance = Math.hypot(at.x - eye.x, at.y + BODY_MIDDLE - eye.y, at.z - eye.z);
     // A man the match puts where the captain's eye is (it does not keep the captain clear) is not drawn: he is not seen inside out.
     const inEye = apartOnWater(at, eye) < EYE_CLEAR && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT;
-    d.shown = this.crews > d.ship && !inEye && d.gone < 1 && (view ? view.zoneGroupOf(at.space).visible : !belowDeck(at.space));
+    d.shown = this.crews > d.ship && !inEye && (view ? view.zoneGroupOf(at.space).visible : !belowDeck(at.space));
     d.placed = true;
     if (d.fresh) {
       // Where he fell, if it is a deck (not aloft): the blood the violence setting shows (blood.ts).
@@ -443,7 +445,10 @@ export class CrewView {
     this.local.set(at.x, at.y + BODY_MIDDLE, at.z).applyMatrix4(this.groups[d.ship]!.matrixWorld);
     d.seen = d.shown && this.frustum.intersectsSphere(this.sphere.set(this.local, BODY_RADIUS));
     d.step = stepAt(fr.knobs, d.distance, d.seen);
-    if (!d.shown) { this.hideMan(d); return; }
+    // Mild: the killed are covered, and the canvas goes with him (shroud.ts); once it is over him he is not drawn.
+    if (d.shown && d.covered > 0) this.shrouds[d.ship]!.set(d.man, at.x, at.y, at.z, at.yaw, d.covered);
+    else this.shrouds[d.ship]!.clear(d.man);
+    if (!d.shown || d.covered >= 1) { this.hideMan(d); return; }
     if (!d.crowd) this.showMan(d);
     const c = d.crowd!;
     this.turn.setFromAxisAngle(UP, at.yaw);
@@ -455,10 +460,9 @@ export class CrewView {
     }
     const dressed = d.distance <= fr.knobs.dressTo + (d.dressed ? DRESS_STICK : 0);
     if (dressed !== d.dressed) { d.dressed = dressed; this.figures.setLook(c, { show: dressed ? d.figure.show : [] }); }
-    // The violence setting: his shirt stained by his hurt, and (mild) the killed carried below, out of sight by a fade.
+    // The violence setting: his shirt stained by his hurt.
     const stain = d.figure.tints.length > SHIRT_GROUP ? stainOf(fr.violence, d.harm) : 0;
     if (stain !== d.stain) { d.stain = stain; this.figures.setLook(c, { tints: this.tintsOf(d) }); }
-    if (d.gone !== d.faded) { d.faded = d.gone; this.figures.fade(c, 1 - d.gone); }
   }
 
   /** A man's tint colours with his shirt as stained as the setting shows it. */
@@ -491,7 +495,6 @@ export class CrewView {
     const f = d.figure;
     d.crowd = this.figures.add(f.kind, { skin: skinToneColor(f.skinTone), hair: f.hairColour, tints: this.tintsOf(d), show: d.dressed ? f.show : [] });
     d.clip = null;
-    d.faded = 0;
     const p = this.pool.of(this.key(d));
     if (p?.shown) this.figures.fade(d.crowd, 0);
   }
@@ -508,7 +511,7 @@ export class CrewView {
     const mine = this.byShip[fr.mine] ?? [], size = this.crews > 0 ? this.poolInUse : 0;
     const at = fr.state.to.tick / STEPS_PER_SECOND;
     // A man just hurt matters too (plan "Faces": speaking, struck or addressed): his face is a living one, near enough to be seen.
-    const candidates = mine.filter((d) => d.man !== 0 && d.crowd !== null && d.gone === 0).map((d) => ({
+    const candidates = mine.filter((d) => d.man !== 0 && d.crowd !== null && d.covered === 0).map((d) => ({
       man: d.man, distance: d.distance, seen: d.seen,
       matters: (this.matters.get(d.man) ?? 0) > fr.now || (at - d.hurtAt < HURT_MATTERS && d.distance <= HURT_REACH),
     }));
