@@ -149,11 +149,11 @@ export const SMOKE = { gun: 0.06, clears: 60, spoils: 3 } as const;
  *   with the sea. Short hands stretch it like the drill (rules above, `STRETCH`).
  * - JUDGING: his error in judging the range he lays for, a share of it (one standard deviation).
  */
-export const DISPERSION = 0.6 * DEGREE;
+export const DISPERSION = 0.4 * DEGREE;
 export const CHAIN_WANDER = 2;
 export const SPEED_SPREAD = 0.02;
-export const TIMING = 0.6;
-export const JUDGING = 0.25;
+export const TIMING = 0.35;
+export const JUDGING = 0.6;
 /** How often he judges the range afresh, s (his error holds meanwhile, so he lays steadily). */
 export const JUDGE_SECONDS = 10;
 

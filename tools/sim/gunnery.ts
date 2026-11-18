@@ -33,10 +33,10 @@ const FORCE = 4;
 const RANGES: readonly (readonly [range: number, share: number])[] = [[100, 0.75], [200, 0.5], [400, 0.2]];
 /**
  * How far a share may stray from the design's, absolute. The shares are counted over RUNS x about 28 shots, so one
- * share is good to about 2 points (one standard deviation); the hull the shot is traced through changed with the
- * raised decks (N2.12) and the measured 400 m share went from 23 % to 29 %, so 3 standard deviations of room.
+ * share is good to about 2 points (one standard deviation); the scatter was tuned again after the raised decks (N2.12)
+ * made the hull taller, so 5 standard deviations of room.
  */
-const SHARE_SLACK = 0.15;
+const SHARE_SLACK = 0.1;
 /** Seconds of firing at each range, and the runs (seeds) at each. */
 const SECONDS = 120;
 const RUNS = 20;

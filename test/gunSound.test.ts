@@ -55,7 +55,8 @@ test('her own gun close by: the near report on her own bus at once, and a jolt a
   const w = new GunWatch(), gun = STARBOARD[3]!;
   w.keepFired([fired(0, gun, LEVEL, 30)]);
   const jolts: GunHeard['jolts'][number][] = [];
-  const got = listen(w, QUARTERDECK, 1, 2, 0, (h) => jolts.push(...h.jolts));
+  // The scatter decides whether her own ball falls near enough to be heard splashing; the report is what is tested.
+  const got = listen(w, QUARTERDECK, 1, 2, 0, (h) => jolts.push(...h.jolts)).filter((g) => g.id !== SHOT_SPLASH.id);
   assert.equal(got.length, 1, got.map((g) => g.id).join());
   const [report] = got;
   assert.equal(report!.id, GUN_NEAR.id);
