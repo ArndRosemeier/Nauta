@@ -131,9 +131,11 @@ export const SHOT: Readonly<Record<ShotKind, ShotRow>> = {
  * Powder smoke about a ship (N7.5a, "the weather position must pay"; guns/smoke.ts): each gun fired by either ship lays
  * `gun` of thick smoke on the ship to leeward (in full dead to leeward, less as the wind draws abeam); it clears as the
  * wind carries it `clears` m off (half a minute in a light breeze, a few seconds in a strong one); while it hangs her gun
- * captains lay and time their guns `spoils` times as badly again at the thickest. First proposals of N7.5a.
+ * captains lay and time their guns `spoils` times as badly again at the thickest. Between equal captains the weather
+ * position then wins about 51 % of the fights at 1.5, 53 % at 2, 60 % at 3 and 67 % at 4 (120 seasoned duels each, N7.5):
+ * the sheet wants more than 55 % and the design thread no more than 70 %.
  */
-export const SMOKE = { gun: 0.06, clears: 60, spoils: 1.5 } as const;
+export const SMOKE = { gun: 0.06, clears: 60, spoils: 3 } as const;
 
 /**
  * Scatter (seeded; tuned so that against a brig broadside on in a force 4 sea, fired as they bear, about three round
