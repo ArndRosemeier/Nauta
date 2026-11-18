@@ -224,6 +224,11 @@
       "field": "began",
       "owner": "src/sim/crew/crew.ts",
       "what": "the tick a crew task's work began (N4.1)"
+    },
+    {
+      "field": "guns",
+      "owner": "src/sim/guns/guns.ts",
+      "what": "a ship's guns packed, two whole numbers a gun in battery order: drill, load, mounting, work left; laying (N5.1)"
     }
   ]
 }

@@ -12,13 +12,14 @@ import { startSea, type SeaState } from './sea/sea';
 import { startOrders, type ShipOrders } from './orders';
 import { openShip, type Closures } from './crew/closures';
 import { startCrew, type Crew } from './crew/crew';
+import { startGuns, type Battery } from './guns/guns';
 import { startMotion, type ShipMotion } from './ship/motion';
 import { startSailing, type Sailing } from './ship/sailing';
 import { START_CANVAS, type CanvasName } from './rules/sailing';
 import { STEPS_PER_SECOND } from './units';
 import { makeWind, meanWind, windAt, type WindState } from './wind';
 
-/** One ship of the match: how she lies on the water (motion.ts owns it), how she sails (sailing.ts), what she has been told (orders.ts), her crew at work (crew/crew.ts) and what is shut aboard her (crew/closures.ts). */
+/** One ship of the match: how she lies on the water (motion.ts owns it), how she sails (sailing.ts), what she has been told (orders.ts), her crew at work (crew/crew.ts), what is shut aboard her (crew/closures.ts) and her guns (guns/guns.ts). */
 export interface SimShip {
   readonly motion: ShipMotion;
   /** Her heading, way, helm, canvas and yards: the sailing model's state. */
@@ -29,6 +30,8 @@ export interface SimShip {
   readonly crew: Crew;
   /** The ways through her that are shut (crew/closures.ts owns it). */
   readonly closures: Closures;
+  /** Her guns through their drill, packed in battery order (guns/guns.ts owns them; `gunAt` reads one). */
+  readonly guns: Battery;
 }
 
 /** The whole match. Changed only by `step` (and made by `startMatch`); rules.json `owners` names each field's owner. */
@@ -87,6 +90,7 @@ export function startMatch(setup: MatchSetup): SimState {
       told: startOrders(s.heading, s.canvas ?? START_CANVAS),
       crew: startCrew(),
       closures: openShip(),
+      guns: startGuns(),
     })),
   };
 }
