@@ -41,16 +41,18 @@ test('a ball through her side above the water: dark outside, daylight inside, no
   assert.equal(at(b, SIDE_REGIONS.ceiling(1), z, h, MARK.hole), HOLE_DARK);
 });
 
-test('a ball through a bulwark cuts it inside and out; a section smashed out takes its rail', () => {
+test('a ball through a bulwark is a dark opening outside and daylight inside, nothing cut; a section smashed out is cut and takes its rail', () => {
   const b = block(), marks = new HullMarks(b), [u, v] = middle(bulwark), along = bulwark.aft + Math.round(u / 0.04) * 0.04, height = bulwark.from + Math.round(v / 0.04) * 0.04;
   marks.bringUpTo(holed([holeCode(bulwark.id, u, v, 'round', 'carronade', false)]));
-  assert.equal(at(b, SIDE_REGIONS.side(1), shipZ(along), girthTo(along, height), MARK.cut), 255);
-  assert.equal(at(b, SIDE_REGIONS.bulwark(1), shipZ(along), height - sheer(along), MARK.cut), 255);
-  assert.equal(at(b, SIDE_REGIONS.rail(1), shipZ(along), 0, MARK.cut), 0);
-  assert.equal(marks.cut, true);
+  assert.equal(at(b, SIDE_REGIONS.side(1), shipZ(along), girthTo(along, height), MARK.hole), HOLE_DARK);
+  assert.equal(at(b, SIDE_REGIONS.bulwark(1), shipZ(along), height - sheer(along), MARK.hole), HOLE_LIGHT);
+  assert.equal(at(b, SIDE_REGIONS.side(1), shipZ(along), girthTo(along, height), MARK.cut), 0);
+  assert.equal(at(b, SIDE_REGIONS.bulwark(1), shipZ(along), height - sheer(along), MARK.cut), 0);
+  assert.equal(marks.cut, false);
   const smashed = Array.from({ length: SMASHED }, (_, k) => holeCode(bulwark.id, 0.1 + 0.2 * k, 0.1, 'grape', 'long6', false));
   marks.bringUpTo(holed(smashed));
   assert.equal(at(b, SIDE_REGIONS.rail(1), shipZ(bulwark.aft + (bulwark.fore - bulwark.aft) / 2), 0, MARK.cut), 255);
+  assert.equal(marks.cut, true);
 });
 
 test('her sails: each hole cut where the seed puts it, a split from head to foot; the same rent draws the same', () => {

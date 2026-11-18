@@ -6,13 +6,13 @@
  *
  * A map's texel has four marks: the hole's opening (`HOLE`: light beyond it, or dark), scorch (`SCORCH`, fire's: N6.5
  * part 3), the splintered rim of fresh wood or frayed canvas round it (`RIM`), and whether the surface is cut away
- * there (`CUT`: a bulwark shot through or smashed out, a hole in a sail; drawn through by the holed kinds). The hull
- * and decks are not cut: what lies behind them is dark, so a hole is drawn as one, and from inside as the light that
- * comes through it.
+ * there (`CUT`: a bulwark section smashed out, a hole in a sail; drawn through by the holed kinds). The hull, her
+ * bulwarks and decks are not cut by a shot: what lies behind a ball's hole is dark, so it is drawn as one, and from
+ * inside as the light that comes through it.
  *
  * Pure (no three.js): the page writes the bytes into the textures (damageView.ts).
  */
-import { hash2f } from '@futuremagic/core';
+import { Noise, hash2f } from '@futuremagic/core';
 import { holeAt, cellState, type Damage, type Hole } from '../../sim/damage';
 import { girthTo, plankingPlace } from '../../sim/damage/meet';
 import { RAGGED } from '../../sim/rules/damage';
@@ -43,8 +43,12 @@ const RIM_IN = 1.6;
 const JAG = 0.35;
 /** A panel stove in or a section smashed out has an edge this ragged, m. */
 const JAG_EDGE = 0.12;
+/** How much of its torn edge is the long tear; the rest is finer bites. */
+const TEAR_SHARE = 0.7;
 /** Its splintered rim, m. */
 const RIM_EDGE = 0.1;
+/** The least of its full strength the splintered rim has anywhere (the rest comes with the noise). */
+const RIM_LEAST = 0.6;
 /** Harmonics of a hole's ragged edge. */
 const JAG_WAVES = 5;
 /** A turn, rad. */
@@ -52,6 +56,23 @@ const TURN = 2 * Math.PI;
 /** Seeds of the holes' edges and of the sails' holes. */
 const EDGE_SEED = 6211;
 const SAIL_SEED = 4447;
+
+/** The smooth noise the edges of holes, stove panels and scorch wander by (a ragged line, never texel-sized specks). */
+const EDGE_NOISE = new Noise(EDGE_SEED);
+/** Where a mark's noise changes over, in texels: a hole's rim, a panel's torn edge (and its finer bites), a fire's scorch edge. */
+const RIM_PERIOD = 3;
+const TEAR_PERIOD = 5;
+const BITE_PERIOD = 2;
+const CHAR_PERIOD = 4;
+/** Distinct offsets a seed picks from. */
+const SEED_OFFSETS = 997;
+/** The noise's offset in the map from a mark's seed, so each hole has its own (texels, per seed unit). */
+const SEED_STEP = 3.7;
+/** Noise in about [0, 1] at a texel, for a mark's `seed`, changing over `period` texels. */
+function wobble(seed: number, x: number, y: number, period: number): number {
+  const o = (((seed % SEED_OFFSETS) + SEED_OFFSETS) % SEED_OFFSETS) * SEED_STEP;
+  return (EDGE_NOISE.n2(x / period + o, y / period - o) + 1) / 2;
+}
 
 /** One ship's block of rows in a texture shared by both ships (each ship's map stacked over the other's). */
 export interface MapBlock {
@@ -102,7 +123,7 @@ function disc(b: MapBlock, d: Disc): void {
       }
       // The rim: fresh wood thinning out from the edge, in splinters (the hash breaks it up).
       const out = (r - edge) / Math.max(d.rim, DAMAGE_TEXEL);
-      if (out < 1) raise(b, x, y, MARK.rim, FULL * (1 - Math.max(0, out)) * (1 / 2 + hash2f(d.seed, x, y) / 2));
+      if (out < 1) raise(b, x, y, MARK.rim, FULL * (1 - Math.max(0, out)) * (RIM_LEAST + (1 - RIM_LEAST) * wobble(d.seed, x, y, RIM_PERIOD)));
     }
   }
 }
@@ -119,7 +140,7 @@ function patch(b: MapBlock, region: number, u0: number, u1: number, v0: number, 
     for (let x = x0; x <= x1; x++) {
       // Distance inside the rectangle's edge (m; along a rail only its ends count), less a ragged bite out of it.
       const inX = Math.min(x + 1 / 2 - a[0], c[0] - x - 1 / 2), inY = r.byPlace ? inX : Math.min(y + 1 / 2 - a[1], c[1] - y - 1 / 2);
-      const inside = Math.min(inX, inY) * DAMAGE_TEXEL - JAG_EDGE * hash2f(seed, x, y >> 1);
+      const inside = Math.min(inX, inY) * DAMAGE_TEXEL - JAG_EDGE * (TEAR_SHARE * wobble(seed, x, y, TEAR_PERIOD) + (1 - TEAR_SHARE) * wobble(seed + 1, x, y, BITE_PERIOD));
       if (inside >= 0) {
         raise(b, x, y, MARK.hole, hole);
         if (cut) raise(b, x, y, MARK.cut, FULL);
@@ -152,8 +173,8 @@ function holeMarks(b: MapBlock, code: number, h: Hole, cell: Cell, plugged: bool
     inside(SIDE_REGIONS.ceiling(cell.side), height, plugged || underWater(along, height) ? HOLE_DARK : HOLE_LIGHT, false);
   } else if (cell.kind === 'bulwark') {
     const height = cell.from + h.v;
-    outside(SIDE_REGIONS.side(cell.side), girthTo(along, height), true);
-    inside(SIDE_REGIONS.bulwark(cell.side), height - sheer(along), HOLE_LIGHT, true);
+    outside(SIDE_REGIONS.side(cell.side), girthTo(along, height), false);
+    inside(SIDE_REGIONS.bulwark(cell.side), height - sheer(along), HOLE_LIGHT, false);
   } else if (cell.kind === 'deck') {
     // One region for a deck's top and its underside: the shader shows the light only to an eye below the weather deck.
     const across = cell.side * (cell.from + h.v);
@@ -249,7 +270,7 @@ function scorch(b: MapBlock, space: number, size: number): void {
     const top = r.y + Math.ceil(r.height / DAMAGE_TEXEL) - 1;
     for (let y = Math.max(r.y, Math.floor(m[1] - rv)); y <= Math.min(top, Math.ceil(m[1] + rv)); y++) {
       for (let x = Math.max(0, Math.floor(m[0] - ru)); x <= Math.min(b.width - 1, Math.ceil(m[0] + ru)); x++) {
-        const out = Math.hypot((x + 1 / 2 - m[0]) / ru, (y + 1 / 2 - m[1]) / rv) + SCORCH_RAGGED * (hash2f(seed, x >> 1, y >> 1) - 1 / 2);
+        const out = Math.hypot((x + 1 / 2 - m[0]) / ru, (y + 1 / 2 - m[1]) / rv) + SCORCH_RAGGED * (wobble(seed, x, y, CHAR_PERIOD) - 1 / 2);
         if (out < 1) raise(b, x, y, MARK.scorch, FULL * Math.min(1, (1 - out) / SCORCH_EDGE));
       }
     }
