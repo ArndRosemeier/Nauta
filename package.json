@@ -17,7 +17,8 @@
     "dup": "node tools/duplicate-candidates/find-duplicate-candidates.mjs",
     "repeated": "node tools/repeated-code/find-repeated-code.mjs",
     "shot": "node tools/shot/shot.mjs",
-    "guards": "node tools/guards/guards.mjs"
+    "guards": "node tools/guards/guards.mjs",
+    "plan:draw": "tsx tools/plan/draw.ts"
   },
   "dependencies": {
     "@futuremagic/core": "file:vendor/assetgenerator/packages/core",
