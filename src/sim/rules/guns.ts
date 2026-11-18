@@ -133,7 +133,7 @@ export const SHOT: Readonly<Record<ShotKind, ShotRow>> = {
  * wind carries it `clears` m off (half a minute in a light breeze, a few seconds in a strong one); while it hangs her gun
  * captains lay and time their guns `spoils` times as badly again at the thickest. First proposals of N7.5a.
  */
-export const SMOKE = { gun: 0.06, clears: 60, spoils: 2 } as const;
+export const SMOKE = { gun: 0.06, clears: 60, spoils: 1.5 } as const;
 
 /**
  * Scatter (seeded; tuned so that against a brig broadside on in a force 4 sea, fired as they bear, about three round

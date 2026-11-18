@@ -133,13 +133,14 @@ export type HurtBy = ShotKind | 'splinter' | 'fall';
 /**
  * How a man struck is hurt, by what struck him (a man aloft on a spar that falls is thrown down: `fall`): the shares
  * wounded, badly wounded and killed (they add up to one, tested). Splinters and grape put about half the men they strike
- * or more out of the fight (N7.5a, "splinters and grape hurt"), so a well-served broadside thins a gun deck.
+ * out of the fight (N7.5a, "splinters and grape hurt"), so a well-served broadside thins a gun deck; held there so
+ * that no fight is over within 5 min of the first broadside, however close the ships lie (design ruling, N7.5a rerun).
  */
 export const HURT: Readonly<Record<HurtBy, readonly [wounded: number, badly: number, killed: number]>> = {
   round: [0, 0.3, 0.7],
   chain: [0, 0.4, 0.6],
-  grape: [0.3, 0.4, 0.3],
-  splinter: [0.4, 0.35, 0.25],
+  grape: [0.45, 0.35, 0.2],
+  splinter: [0.5, 0.3, 0.2],
   fall: [0.2, 0.4, 0.4],
 };
 
