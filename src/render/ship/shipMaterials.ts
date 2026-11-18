@@ -56,14 +56,13 @@ export const SHIP_OBJECT = {
   fade: uniform(new Vector2()).onObjectUpdate(({ object }) => object.userData.fade ?? WHOLE),
 };
 
+/** Bytes per texel of the damage map (before the map: the bundle reads it as undefined when it comes later, and the map is empty). */
+const RGBA = 4;
 /** The damage map (damageMap.ts): one texel per 4 cm of her hull and decks; N6.5 writes holes and scorches into it. */
 export const DAMAGE_TEXTURE = new DataTexture(new Uint8Array(DAMAGE_MAP_SIZE.width * DAMAGE_MAP_SIZE.height * RGBA), DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height, RGBAFormat, UnsignedByteType);
 DAMAGE_TEXTURE.needsUpdate = true;
 /** Each region's least u and v (m) and its corner in the map (texels), by region number less one. */
 const REGIONS = uniformArray(DAMAGE_REGIONS.map((r) => new Vector4(r.u, r.v, r.x, r.y)), 'vec4');
-
-/** Bytes per texel of the damage map. */
-const RGBA = 4;
 
 /** The grain, shared by all the ship's kinds (made once, on first use). */
 let grain = null;

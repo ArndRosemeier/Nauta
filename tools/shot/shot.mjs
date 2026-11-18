@@ -6,7 +6,7 @@
  */
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { TIMEOUT, openBrowser, openGame, shotSize } from './browser.mjs';
+import { TIMEOUT, openBrowser, openGame, shotSize, snap } from './browser.mjs';
 
 const args = process.argv.slice(2);
 if (args.length < 2 || args.length % 2) {
@@ -34,7 +34,7 @@ for (let i = 0; i < args.length; i += 2) {
     await touch('pointerup', x + drag[0], y + drag[1]);
   }
   await page.waitForTimeout(Number(process.env.SHOT_WAIT ?? 0));
-  await page.screenshot({ path: out, timeout: TIMEOUT });
+  await snap(page, out);
   const hud = (await page.textContent('#hud', { timeout: TIMEOUT })) ?? '';
   console.log(`${out}: ${hud}`);
   if (game.failed()) failed = true;

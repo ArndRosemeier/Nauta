@@ -4,7 +4,8 @@
  * GRAIN_SPAN metres of wood and repeats seamlessly; the wood kind lays it in metres (shipMaterials.ts), shifted per
  * plank so no two planks look alike.
  */
-import { DataTexture, LinearMipmapLinearFilter, LinearFilter, RGBAFormat, RepeatWrapping, UnsignedByteType } from 'three/webgpu';
+import { DataTexture, RGBAFormat, UnsignedByteType } from 'three/webgpu';
+import { tiling } from '../tiling';
 import { Noise, hash2f } from '@futuremagic/core';
 
 /** Metres of wood the texture covers: along the grain and across it. */
@@ -91,11 +92,7 @@ export function makeGrainTexture(): DataTexture {
     }
   }
   const t = new DataTexture(data, SIZE.along, SIZE.across, RGBAFormat, UnsignedByteType);
-  t.wrapS = t.wrapT = RepeatWrapping;
-  t.magFilter = LinearFilter;
-  t.minFilter = LinearMipmapLinearFilter;
-  t.generateMipmaps = true;
-  t.anisotropy = ANISOTROPY;
+  tiling(t, ANISOTROPY);
   t.needsUpdate = true;
   return t;
 }

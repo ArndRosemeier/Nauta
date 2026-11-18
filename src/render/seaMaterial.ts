@@ -10,7 +10,7 @@
  * the crest.
  *
  * The fragment stage draws the water as light finds it. Its normal comes per pixel from every simulated wave and the
- * fine waves below them (seaFine.ts), each faded out where a pixel is too coarse to hold it; what is faded becomes
+ * fine waves below them (the GPU's bands, seaBands.ts), each faded out where a pixel is too coarse to hold it; what is faded becomes
  * roughness instead, so the far sea blurs the sky it reflects and spreads the sun's glitter into a path as the real
  * sea does (Cox and Munk). On it: the sky's reflection from the light rig's environment map, the sun's (or the moon's)
  * glitter, the deep water's own colour lit by the sun and the sky, light through the thin tops of crests, gust patches
@@ -18,21 +18,23 @@
  * window, the dark of total reflection around it, and the murk of the deep.
  */
 import {
-  ClampToEdgeWrapping, DataTexture, DoubleSide, InstancedBufferAttribute, LinearFilter, LinearMipmapLinearFilter, MeshBasicNodeMaterial,
-  RGFormat, RGBAFormat, RepeatWrapping, BackSide, Vector2, Vector3, Vector4, type Texture,
+  ClampToEdgeWrapping, DataTexture, DoubleSide, InstancedBufferAttribute, LinearFilter, MeshBasicNodeMaterial,
+  RGFormat, RGBAFormat, BackSide, Vector2, Vector3, Vector4, type Texture,
 } from 'three/webgpu';
 import {
-  Break, Fn, If, Loop, abs, attribute, clamp, cos, cross, dFdx, dFdy, dot, exp, exp2, float, frontFacing, length, max, min, mix, mod,
-  log, normalize, pmremTexture, positionGeometry, positionLocal, pow, reflect, refract, saturate, select, sin, smoothstep, sqrt, texture,
+  Fn, If, Loop, abs, int, attribute, clamp, cos, cross, dFdx, dFdy, dot, exp, exp2, float, frontFacing, length, max, min, mix, mod,
+  log, log2, normalize, pmremTexture, positionGeometry, positionLocal, pow, reflect, refract, saturate, select, sin, smoothstep, sqrt, texture,
   uniform, uniformArray, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
 import { fullSky } from '@futuremagic/sky/rig';
 import { EARTH_RADIUS } from './earth';
+import { tiling } from './tiling';
 import { seaCut } from './seaCut';
 import { SEA_LOD_RANGE, SEA_MAX_TILES, SEA_MORPH_START, SEA_TILE_CELLS, SEA_WAVE_FULL_CELLS, SEA_WAVE_GONE_CELLS } from './seaGrid';
 import { SEA_DRAWN_WAVES, SEA_WAVE_STRIDE } from './seaWaves';
-import { SEA_FINE_DRAWN, SEA_FINE_STRIDE } from './seaFine';
-import { FOAM_TEXELS, FOAM_WRAP, foamPattern } from './seaFoam';
+import type { FineSea } from './seaBands';
+import { FINE_CHOP, MOST_BANDS } from './seaFine';
+import { FOAM_DEPTH_NONE, FOAM_RAMP, FOAM_TEXELS, FOAM_WRAP, foamPattern } from './seaFoam';
 import { RIPPLE_LONGEST, RIPPLE_REPEATS, RIPPLE_REPEATS_SECOND, RIPPLE_SHORTEST, RIPPLE_RANGE, RIPPLE_TEXELS, ripplePattern } from './seaRipples';
 import { GUST_GROWTH_TOP, GUST_SPAN, GUST_STRENGTH_TOP, GUST_TEXELS, gustMap } from './seaGusts';
 
@@ -124,6 +126,8 @@ const FOAM_FAR_FRESH = 0.8;
 const BREAKING_TILE = 64;
 const BREAKING_LOW = 0.42;
 const BREAKING_HIGH = 0.58;
+/** How much of old foam's lace is the foam the bands left where they folded (the rest the seeded strands). */
+const LINGER_LACE = 0.6;
 /** Old foam: how much of its shape is the lace's strands, the rest the soft breakup's patches. */
 const LACE_SHARE = 0.45;
 /** Old foam's lace: how soft its strands' edges are as it thins. */
@@ -161,12 +165,7 @@ const v3 = (c: readonly number[]) => vec3(c[0], c[1], c[2]);
 
 /** A seeded pattern (the foam's, the ripples') as a tiling, mipmapped texture. */
 function tilingTexture(data: Uint8Array, texels: number, format: typeof RGFormat | typeof RGBAFormat): Texture {
-  const t = new DataTexture(data, texels, texels, format);
-  t.wrapS = t.wrapT = RepeatWrapping;
-  t.magFilter = LinearFilter;
-  t.minFilter = LinearMipmapLinearFilter;
-  t.generateMipmaps = true;
-  t.anisotropy = FOAM_ANISOTROPY;
+  const t = tiling(new DataTexture(data, texels, texels, format), FOAM_ANISOTROPY);
   t.needsUpdate = true;
   return t;
 }
@@ -195,11 +194,14 @@ export const SEA_INPUTS = {
   lift: uniform(0),
   /** How many of the densest grid's cells one drawn cell spans: 1, or 2 and more for a sparser grid (SeaView `setCells`). */
   spacing: uniform(1),
-  /** Per fine wave, long to short: kx, kz, phase now at the origin, height; and |k|, the slope of it and all shorter, gust share (seaFine.ts). */
-  fine: uniformArray(Array.from({ length: SEA_FINE_DRAWN }, () => new Vector4()), 'vec4'),
-  fineMore: uniformArray(Array.from({ length: SEA_FINE_DRAWN }, () => new Vector4()), 'vec4'),
-  fineCount: uniform(0, 'int'),
-  fineExcess: uniform(0),
+  /**
+   * The fine sea's bands (seaBands.ts), coarsest first, and how many are drawn: per band the corner of its tile from
+   * the sea's origin (x, z, m, with half a texel: the texel's middle stands for its corner), the tile's side (m) and
+   * the texel's (m); and the slope it carries now, ln of its longest and shortest wave (m), how much gusts roughen it.
+   */
+  band: uniformArray(Array.from({ length: MOST_BANDS }, () => new Vector4()), 'vec4'),
+  bandMore: uniformArray(Array.from({ length: MOST_BANDS }, () => new Vector4()), 'vec4'),
+  bandCount: uniform(0, 'int'),
   /** The ripples' slope (seaRipples.ts), and where each of their two layers has drifted to (in their tiles). */
   ripples: uniform(0),
   rippleDrift: uniform(new Vector4()),
@@ -207,9 +209,15 @@ export const SEA_INPUTS = {
   eye: uniform(new Vector3()),
   /** Twice the deviation of the surface's height (m): a crest this high is a tall one. */
   crest: uniform(1),
-  /** Foam: the stretch below which it forms and how far further down it is fully white (seaFoam.ts `foamLevels`). */
+  /** Foam that lingers behind the crests: the stretch below which it formed and how far further down it is fully white (seaFoam.ts `foamLevels`). */
   foamLevel: uniform(-1),
   foamRamp: uniform(1),
+  /**
+   * Fresh foam per pixel: how many deviations of the whole bunching (the simulated waves' and the bands') it lies
+   * below, the variance of the simulated waves' part, and each band's (seaFoam.ts `foamDeviations`).
+   */
+  foamDepth: uniform(FOAM_DEPTH_NONE),
+  coarseBunch: uniform(0),
   /** How far the foam's pattern has drifted with the wind, m (x, z). */
   foamDrift: uniform(new Vector2()),
   /** How stirred the water is by the wind, 0 clear to 1 a gale's. */
@@ -225,12 +233,16 @@ export const SEA_INPUTS = {
   /** How thick the air's haze is, per m. */
   haze: uniform(0),
 };
-if (SEA_WAVE_STRIDE !== SEA_TILE_STRIDE || SEA_FINE_STRIDE !== SEA_TILE_STRIDE) throw new Error('the wave and tile lists are read as vec4');
+if (SEA_WAVE_STRIDE !== SEA_TILE_STRIDE) throw new Error('the wave and tile lists are read as vec4');
 
 /** The sky's environment map (SkyView), set before the warm-up builds the sea. */
 let skyMap: Texture | null = null;
 /** Hand the sea the light rig's environment map: its reflections and the light of the sky come from it. */
 export function useSeaSky(env: Texture): void { skyMap = env; }
+/** The fine sea's bands (SeaView), set before the warm-up builds the sea. */
+let fineSea: FineSea | null = null;
+/** Hand the sea its fine bands: the material reads their textures. */
+export function useFineSea(fine: FineSea): void { fineSea = fine; }
 
 /** Beckmann's distribution of facets at `nh` (cosine to the half vector) for a mean square slope `m2`. */
 function beckmann(nh, m2) {
@@ -252,7 +264,8 @@ const fresnel = (c) => float(FRESNEL_DOWN).add(float(1 - FRESNEL_DOWN).mul(pow(f
 
 export function makeSeaMaterial(): MeshBasicNodeMaterial {
   if (!skyMap) throw new Error('the sea was built before the sky\'s environment map (useSeaSky)');
-  const I = SEA_INPUTS, env = skyMap;
+  if (!fineSea) throw new Error('the sea was built before its fine bands (useFineSea)');
+  const I = SEA_INPUTS, env = skyMap, bands = fineSea;
   const m = new MeshBasicNodeMaterial({ side: DoubleSide, fog: false });
   m.name = 'sea';
 
@@ -294,18 +307,31 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       xx1.subAssign(kxx.mul(c1)); xz1.subAssign(kxz.mul(c1)); zz1.subAssign(kzz.mul(c1));
       xx2.subAssign(kxx.mul(c2)); xz2.subAssign(kxz.mul(c2)); zz2.subAssign(kzz.mul(c2));
     });
-    const flat = vec2(calm.x.add(sx), calm.y.add(sz));
+    // --- The fine sea's bands where the grid can hold them, each read at the mip level of the grid's cell here.
+    const fx = float(0).toVar(), fh = float(0).toVar(), fz = float(0).toVar();
+    for (let b = 0; b < bands.maxBands; b++) {
+      If(I.bandCount.greaterThan(int(b)), () => {
+        const B = I.band.element(b);
+        // Drawn fully where even the band's shortest wave spans a few cells, gone where its middle one no longer does.
+        const M = I.bandMore.element(b), shortest = exp(M.z), middle = exp(M.y.add(M.z).mul(HALF));
+        const held = float(1).sub(smoothstep(shortest.div(SEA_WAVE_GONE_CELLS), middle.div(SEA_WAVE_GONE_CELLS), span));
+        const shape = bands.shape(b, calm.add(B.xy).div(B.z)).mul(held);
+        fx.addAssign(shape.x); fh.addAssign(shape.y); fz.addAssign(shape.z);
+      });
+    }
+    const flat = vec2(calm.x.add(sx).add(fx), calm.y.add(sz).add(fz));
     const fromEye = flat.sub(I.eye.xz);
     // The earth's curve (earth.ts `earthDrop`): the sea falls away from the eye to a true horizon.
     const drop = dot(fromEye, fromEye).div(2 * EARTH_RADIUS);
-    const placed = vec3(flat.x, h.add(I.lift).sub(drop), flat.y);
-    // How bunched the water is (1 calm, lower on a crest) and how much of that turns it white (seaFoam.ts).
+    const placed = vec3(flat.x, h.add(fh).add(I.lift).sub(drop), flat.y);
+    // How bunched the water is (1 calm, lower on a crest): now (the fragment stage adds the bands' and turns it white
+    // there), and a little while ago, turned white as foam that lingers (seaFoam.ts).
     const stretch = (a, b, c) => float(1).add(a).mul(float(1).add(c)).sub(b.mul(b));
     const white = (j) => float(1).sub(smoothstep(I.foamLevel.sub(I.foamRamp.mul(HALF)), I.foamLevel.add(I.foamRamp.mul(HALF)), j));
-    const fresh = white(stretch(xx, xz, zz));
+    const now = stretch(xx, xz, zz);
     const old = max(white(stretch(xx1, xz1, zz1)).mul(FOAM_LEFT_NEAR), white(stretch(xx2, xz2, zz2)).mul(FOAM_LEFT_FAR));
     vCalm.assign(calm);
-    vFoam.assign(vec2(fresh, old));
+    vFoam.assign(vec2(now, old));
     vCrest.assign(h.div(I.crest));
     vToEye.assign(I.eye.sub(placed));
     return placed;
@@ -336,7 +362,7 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
 
     // --- The surface's slope and stretch per pixel: every simulated wave, then the fine ones, long to short.
     const hx = float(0).toVar(), hz = float(0).toVar(), xx = float(0).toVar(), xz = float(0).toVar(), zz = float(0).toVar();
-    const rough = I.fineExcess.mul(grow).mul(grow).add(ROUGH_LEAST).toVar();
+    const rough = float(ROUGH_LEAST).toVar();
     Loop({ start: 0, end: I.count, type: 'int', condition: '<' }, ({ i }) => {
       const w = I.wave.element(i), more = I.more.element(i);
       const fade = smoothstep(gone, full, float(TURN).div(more.y));
@@ -347,21 +373,24 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       const slope = w.w.mul(more.y);
       rough.addAssign(float(1).sub(fade.mul(fade)).mul(slope).mul(slope).div(2));
     });
-    Loop({ start: 0, end: I.fineCount, type: 'int', condition: '<' }, ({ i }) => {
-      const w = I.fine.element(i), more = I.fineMore.element(i);
-      const length_ = float(TURN).div(more.x);
-      // This wave and every shorter one are below the pixel: all of them are roughness.
-      If(length_.lessThan(gone), () => {
-        rough.addAssign(more.y.mul(grow).mul(grow));
-        Break();
+    // The fine sea's bands: slope, bunching and the foam they leave, each filtered to the pixel by its mipmaps; the
+    // part of a band's slope too fine for the pixel is roughness instead, and its bunching no longer counts.
+    const bunch = float(0).toVar(), linger = float(0).toVar(), bunchVar = I.coarseBunch.toVar(), resolved = float(0).toVar();
+    for (let b = 0; b < bands.maxBands; b++) {
+      If(I.bandCount.greaterThan(int(b)), () => {
+        const B = I.band.element(b), M = I.bandMore.element(b);
+        const F = bands.slope(b, calm.add(B.xy).div(B.z));
+        const g = mix(float(1), grow, M.w);
+        hx.addAssign(F.x.mul(g)); hz.addAssign(F.y.mul(g));
+        // The share of the band's range (on a log scale) longer than the pixel can still draw.
+        const drawn = saturate(M.y.sub(max(log(gone), M.z)).div(M.y.sub(M.z)));
+        rough.addAssign(M.x.mul(g).mul(g).mul(float(1).sub(drawn)));
+        bunch.addAssign(F.z);
+        linger.assign(max(linger, F.w));
+        bunchVar.addAssign(M.x.mul(FINE_CHOP * FINE_CHOP).mul(drawn));
+        if (b === 0) resolved.assign(drawn);
       });
-      const fade = smoothstep(gone, full, length_);
-      const a = w.w.mul(mix(float(1), grow, more.z));
-      const as = a.mul(fade).mul(sin(w.x.mul(calm.x).add(w.y.mul(calm.y)).add(w.z)));
-      hx.subAssign(w.x.mul(as)); hz.subAssign(w.y.mul(as));
-      const slope = a.mul(more.x);
-      rough.addAssign(float(1).sub(fade.mul(fade)).mul(slope).mul(slope).div(2));
-    });
+    }
     // The ripples: two layers of their texture, the second smaller and turned a quarter, each drifting its own way.
     // Its mipmaps filter what a pixel cannot show; that share of their slope is roughness instead.
     const r1 = texture(RIPPLES, p.mul(RIPPLE_REPEATS / FOAM_WRAP).add(I.rippleDrift.xy)).xy;
@@ -385,7 +414,13 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     // and green-white where foam has filled it with bubbles.
     // Not all of a crest breaks at once: a broad noise picks the stretches that do.
     const breaking = smoothstep(BREAKING_LOW, BREAKING_HIGH, texture(FOAM, p.div(BREAKING_TILE)).y);
-    const foamNow = vFoam.x.mul(breaking), foamOld = vFoam.y.mul(breaking);
+    // Fresh foam where the whole bunching (the simulated waves' and the bands') lies deep enough below its mean that
+    // the white share is Monahan's; where the bands are too fine for the pixel, the broad noise breaks it up instead.
+    const deviation = sqrt(bunchVar), level = float(1).sub(deviation.mul(I.foamDepth)), ramp = max(deviation.mul(FOAM_RAMP), PIXEL_LEAST);
+    const fresh = float(1).sub(smoothstep(level.sub(ramp.mul(HALF)), level.add(ramp.mul(HALF)), vFoam.x.add(bunch)));
+    const foamNow = fresh.mul(mix(breaking, float(1), resolved));
+    // Old foam: where the simulated waves bunched a while ago; its lace is partly where the bands folded (seaBands.ts).
+    const foamOld = vFoam.y.mul(breaking);
     const bubbles = saturate(foamNow.add(foamOld)).mul(AERATED_SHARE);
     const albedo = mix(mix(v3(DEEP), v3(DEEP_STIRRED), I.stirred), v3(AERATED), bubbles);
     const body = albedo.mul(daylight);
@@ -420,7 +455,7 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
       const breakup = smoothstep(BREAKUP_LOW, BREAKUP_HIGH, mix(coarse.y, fine.y, BREAKUP_FINE));
       const freshShape = smoothstep(0, FOAM_EDGE, foamNow.mul(FOAM_FULLEST).sub(breakup)).mul(mix(float(1), fine.z, BUBBLE_DEPTH));
       const freshCover = mix(freshShape, foamNow.mul(foamNow).mul(FOAM_FAR_FRESH), blurred);
-      const ragged = mix(coarse.y, coarse.x, LACE_SHARE);
+      const ragged = mix(mix(coarse.y, coarse.x, LACE_SHARE), linger, LINGER_LACE);
       const oldShape = smoothstep(float(1).sub(foamOld), float(1).sub(foamOld).add(LACE_SOFT), ragged).mul(foamOld);
       const oldCover = mix(oldShape, foamOld.mul(foamOld).mul(FOAM_FAR_SHARE), blurred);
       const cover = max(freshCover, oldCover);

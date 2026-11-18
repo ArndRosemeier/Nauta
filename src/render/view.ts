@@ -13,7 +13,7 @@ const FAR = 120000;
 
 export interface View {
   readonly renderer: WebGPURenderer;
-  readonly backend: 'webgpu' | 'webgl2';
+  readonly backend: 'webgpu';
   readonly scene: Scene;
   readonly camera: PerspectiveCamera;
   readonly stage: Stage;
@@ -30,9 +30,10 @@ export interface View {
 
 /** The camera stands at zero until the caller places it. */
 /** `shadows`: the sun casts shadows (a ship is drawn); decided before the warm-up, as it is part of every lit shader's key. */
-export async function createView(canvas: HTMLCanvasElement, forceWebGL: boolean, shadows = false): Promise<View> {
-  // WebGPU where the browser has it. WebGL 2 stays as a fallback until the sea needs GPU compute (plan N1).
-  const { renderer, backend } = await createRenderer(canvas, { backends: 'webgpu-or-webgl2', forceWebGL, depth: 'reversed', tone: 'agx' });
+export async function createView(canvas: HTMLCanvasElement, shadows = false): Promise<View> {
+  // WebGPU only: the fine sea is computed on the GPU (plan N1.2). A browser without it gets a plain page (main.ts).
+  const { renderer } = await createRenderer(canvas, { backends: 'webgpu', depth: 'reversed', tone: 'agx' });
+  const backend = 'webgpu' as const;
   const scene = new Scene();
   const camera = new PerspectiveCamera(FOV, 1, NEAR, FAR);
   camera.rotation.order = 'YXZ';
