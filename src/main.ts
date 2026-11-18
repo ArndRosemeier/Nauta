@@ -5,6 +5,7 @@ import { watchLook } from './app/lookInput';
 import { standpoint, type Standpoint } from './app/standpoints';
 import { showStandpoints } from './app/standpointBar';
 import { showVersion } from './app/whatsNew';
+import { QualityChooser, type QualityKnobs } from './app/quality';
 import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
@@ -77,10 +78,16 @@ async function start(): Promise<void> {
   if (ship) showStandpoints(where, (s) => { where = s; input.look = s.look; });
   if (params.hud) hud.style.display = 'block';
   showVersion(el<HTMLButtonElement>('version'));
+  // The quality level: from the top, stepping down in the first seconds while frames are late (plan N1.8).
+  const quality = new QualityChooser(params.quality);
+  const apply = (k: QualityKnobs) => { view.setRenderScale(k.renderScale); seaView.setCells(k.seaCells); };
+  apply(quality.knobs);
+  document.addEventListener('visibilitychange', () => quality.interrupt());
 
   let last = performance.now(), frames = 0, shown = last, ms = 0;
   view.renderer.setAnimationLoop(() => {
     const now = performance.now(), dt = Math.min(MAX_FRAME_SECONDS, (now - last) / MS_PER_SECOND);
+    if (window.__nautaReady && quality.frame(now - last)) apply(quality.knobs);
     last = now;
     seaTime += dt;
     meanWind(wind, seaTime, blowing);
@@ -100,7 +107,8 @@ async function start(): Promise<void> {
     frames++;
     if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${params.wind} · eye ${params.eye} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris, ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\n${view.stage.hudLine()}`;
+      const px = view.drawnSize();
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${params.wind} · eye ${params.eye} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris, ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;

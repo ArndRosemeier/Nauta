@@ -193,6 +193,8 @@ export const SEA_INPUTS = {
   more: uniformArray(Array.from({ length: SEA_DRAWN_WAVES }, () => new Vector4()), 'vec4'),
   count: uniform(0, 'int'),
   lift: uniform(0),
+  /** How many of the densest grid's cells one drawn cell spans: 1, or 2 and more for a sparser grid (SeaView `setCells`). */
+  spacing: uniform(1),
   /** Per fine wave, long to short: kx, kz, phase now at the origin, height; and |k|, the slope of it and all shorter, gust share (seaFine.ts). */
   fine: uniformArray(Array.from({ length: SEA_FINE_DRAWN }, () => new Vector4()), 'vec4'),
   fineMore: uniformArray(Array.from({ length: SEA_FINE_DRAWN }, () => new Vector4()), 'vec4'),
@@ -265,9 +267,10 @@ export function makeSeaMaterial(): MeshBasicNodeMaterial {
     const range = size.mul(SEA_LOD_RANGE);
     const away = length(vec3(plain.x.sub(I.eye.x), I.eye.y, plain.y.sub(I.eye.z)));
     const morph = clamp(away.sub(range.mul(SEA_MORPH_START)).div(range.mul(1 - SEA_MORPH_START)), 0, 1);
-    const calm = tile.xy.add(index.sub(mod(index, 2).mul(morph)).mul(cell)).toVar();
+    // A sparse grid draws every `spacing`-th vertex; its odd ones slide onto the coarser grid as the dense grid's do.
+    const calm = tile.xy.add(index.sub(mod(index, I.spacing.mul(2)).mul(morph)).mul(cell)).toVar();
     // The grid's cell here: a wave shorter than a few of these is faded out, not drawn as noise.
-    const span = cell.mul(morph.add(1));
+    const span = cell.mul(I.spacing).mul(morph.add(1));
 
     // --- The waves, summed as seaAt sums them (src/sim/sea/sea.ts), each weighted by how well the grid holds it;
     // and the sideways stretch now and a little while ago, for the foam.

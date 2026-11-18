@@ -1,0 +1,3 @@
+The game now picks its picture quality by itself in the first seconds: it starts sharp and draws fewer pixels while the iPad cannot keep 60 frames a second.
+With ?hud the second line shows the level chosen, the pixels drawn and why.
+Try ?quality=high, medium, low or lowest to fix a level and compare.

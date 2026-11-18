@@ -1,5 +1,5 @@
 /** The one renderer, scene and camera, and the Stage everything enters the scene through (docs/SHADERS.md). */
-import { DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, type WebGPURenderer } from 'three/webgpu';
+import { DirectionalLight, HemisphereLight, PerspectiveCamera, Scene, Vector2, type WebGPURenderer } from 'three/webgpu';
 import { Stage, createRenderer } from '@futuremagic/stage';
 import { allKinds, standInAttribute } from './materials';
 import { shadowingSun } from './ship/shipView';
@@ -22,6 +22,10 @@ export interface View {
   readonly hemi: HemisphereLight;
   /** The view's vertical angle over its height in pixels: what a drag of one pixel turns the look by. */
   radPerPixel(): number;
+  /** Draws `scale` of the device's pixels along each side (the quality level's `renderScale`, src/app/quality.ts). */
+  setRenderScale(scale: number): void;
+  /** The pixels drawn now, width × height. */
+  drawnSize(): Vector2;
 }
 
 /** The camera stands at zero until the caller places it. */
@@ -50,5 +54,12 @@ export async function createView(canvas: HTMLCanvasElement, forceWebGL: boolean,
   };
   fit();
   new ResizeObserver(fit).observe(canvas);
-  return { renderer, backend, scene, camera, stage, sun, hemi, radPerPixel: () => (FOV * DEGREE) / Math.max(1, canvas.clientHeight) };
+  // The device's pixels per CSS pixel as the Stage capped them: the render scale is a share of these.
+  const devicePixels = renderer.getPixelRatio(), drawn = new Vector2();
+  return {
+    renderer, backend, scene, camera, stage, sun, hemi,
+    radPerPixel: () => (FOV * DEGREE) / Math.max(1, canvas.clientHeight),
+    setRenderScale: (scale) => renderer.setPixelRatio(devicePixels * scale),
+    drawnSize: () => renderer.getDrawingBufferSize(drawn),
+  };
 }

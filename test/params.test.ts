@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readParams } from '../src/app/params.ts';
 
 test('no query: WebGPU, no HUD, a morning that moves', () => {
-  assert.deepEqual(readParams(''), { forceWebGL: false, hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, slice: null, eye: 4.5, wind: 4, look: null });
+  assert.deepEqual(readParams(''), { forceWebGL: false, hud: false, hour: 10, dayMinutes: 24, probe: false, rig: false, slice: null, quality: null, eye: 4.5, wind: 4, look: null });
 });
 
 test('the query sets the backend, the HUD, the hour, the day length, the eye and the wind', () => {
-  assert.deepEqual(readParams('?gl&hud&hour=17.5&day=0&eye=30&wind=7'), { forceWebGL: true, hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, slice: null, eye: 30, wind: 7, look: null });
+  assert.deepEqual(readParams('?gl&hud&hour=17.5&day=0&eye=30&wind=7'), { forceWebGL: true, hud: true, hour: 17.5, dayMinutes: 0, probe: false, rig: false, slice: null, quality: null, eye: 30, wind: 7, look: null });
 });
 
 test('nonsense falls back, and numbers are held to their range', () => {
@@ -38,4 +38,9 @@ test('?slice stands on the slice of her waist, at the standpoint named', () => {
   assert.equal(readParams('?slice').slice, '');
   assert.equal(readParams('?slice=below').slice, 'below');
   assert.equal(readParams('').slice, null);
+});
+
+test('?quality names a level, or leaves the choice to measuring', () => {
+  assert.equal(readParams('?quality=low').quality, 'low');
+  assert.equal(readParams('').quality, null);
 });

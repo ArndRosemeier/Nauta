@@ -10,7 +10,7 @@ import type { WaveSet } from '../sim/sea/waves';
 import type { WindState } from '../sim/wind';
 import { DEEP, SEA } from './materials';
 import { SEA_INPUTS, SEA_TILE_ATTRIBUTE, SEA_TILE_STRIDE, TILE_AT, useSeaSky } from './seaMaterial';
-import { SEA_MAX_TILES, SEA_TILE_CELLS, seaDropAtReach, seaReach, seaTiles } from './seaGrid';
+import { SEA_MAX_TILES, SEA_TILE_CELLS, seaCellChoices, seaDropAtReach, seaReach, seaTiles, seaTileTriangles } from './seaGrid';
 import { SEA_WAVE_STRIDE, WAVE_AT, fillSeaWaves, seaWaveTable } from './seaWaves';
 import { SEA_FINE_STRIDE, fillFineWaves, fineTable, slopeVariance } from './seaFine';
 import { FOAM_WRAP, foamLevels } from './seaFoam';
@@ -47,19 +47,23 @@ const STIRRED_FULL = 20;
 /** Twice the deviation of the surface's height: a tall crest (the significant height is four deviations). */
 const CREST_DEVIATIONS = 2;
 
-/** One tile of the grid: (cells + 1)² vertices whose position is their (column, 0, row), two triangles a cell. */
-function tileGrid(cells: number): BufferGeometry {
-  const side = cells + 1, pos: number[] = [], idx: number[] = [];
-  for (let j = 0; j <= cells; j++) for (let i = 0; i <= cells; i++) pos.push(i, 0, j);
-  for (let j = 0; j < cells; j++) for (let i = 0; i < cells; i++) {
-    const a = j * side + i, b = a + 1, c = a + side, d = c + 1;
-    // Every cell split along the same diagonal, so a cell of the coarser grid is two cells' worth of this one.
-    idx.push(a, c, d, a, d, b);
+/**
+ * One tile of the grid: the densest grid's (SEA_TILE_CELLS + 1)² vertices, whose position is their (column, 0, row),
+ * and the triangles of every grid a quality level may draw (`seaCells`), one after the other: a level picks its run
+ * of the index by the draw range, so the shader and the vertices stay the same and nothing is compiled.
+ */
+function tileGrid(): { geometry: BufferGeometry; runs: Map<number, { start: number; count: number }> } {
+  const pos: number[] = [], idx: number[] = [], runs = new Map<number, { start: number; count: number }>();
+  for (let j = 0; j <= SEA_TILE_CELLS; j++) for (let i = 0; i <= SEA_TILE_CELLS; i++) pos.push(i, 0, j);
+  for (const cells of seaCellChoices()) {
+    const tris = seaTileTriangles(cells);
+    runs.set(cells, { start: idx.length, count: tris.length });
+    idx.push(...tris);
   }
   const g = new BufferGeometry();
   g.setAttribute('position', new Float32BufferAttribute(pos, XYZ));
   g.setIndex(idx);
-  return g;
+  return { geometry: g, runs };
 }
 
 export class SeaView {
@@ -87,10 +91,14 @@ export class SeaView {
   /** Where each ripple layer has drifted to, in its tiles (u, v of the first, then of the second), kept within one. */
   private readonly rippleDrift = [0, 0, 0, 0];
 
+  /** Where each grid's triangles stand in the index, by cells along a tile's side. */
+  private readonly runs: Map<number, { start: number; count: number }>;
+
   /** The sky's light rig must exist: the sea reflects its environment map. */
   constructor(sky: SkyView) {
     useSeaSky(sky.envTexture);
-    const grid = tileGrid(SEA_TILE_CELLS);
+    const { geometry: grid, runs } = tileGrid();
+    this.runs = runs;
     grid.setAttribute(SEA_TILE_ATTRIBUTE, SEA_INPUTS.tiles);
     this.mesh = new Mesh(grid, SEA.make());
     this.mesh.name = 'sea';
@@ -102,6 +110,15 @@ export class SeaView {
     this.deep.renderOrder = DEEP_ORDER;
     this.deep.visible = false;
     this.gusts = { data: SEA_INPUTS.gusts.image.data as Uint8Array, x0: 0, z0: 0 };
+    this.setCells(SEA_TILE_CELLS);
+  }
+
+  /** Draws every tile with `cells` along its side (the quality level's `seaCells`): a uniform and a draw range, no compile. */
+  setCells(cells: number): void {
+    const run = this.runs.get(cells);
+    if (!run) throw new Error(`the sea's grid has no run of ${cells} cells a side (seaCellChoices)`);
+    this.mesh.geometry.setDrawRange(run.start, run.count);
+    SEA_INPUTS.spacing.value = SEA_TILE_CELLS / cells;
   }
 
   /**

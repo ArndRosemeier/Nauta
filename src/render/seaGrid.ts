@@ -12,9 +12,12 @@
  */
 import { earthDrop, horizonDistance } from './earth';
 
-/** Cells along a tile's side. Even, so its vertices pair up when they slide onto the coarser grid. */
+/**
+ * Cells along a tile's side at the densest. Even, so its vertices pair up when they slide onto the coarser grid. A
+ * sparser grid (the quality level's `seaCells`, src/app/quality.ts) draws every second or fourth of its vertices.
+ */
 export const SEA_TILE_CELLS = 16;
-/** The finest cell, m: the grid right under the eye. A wave shorter than a few of these is left to the fine sea (N1.2). */
+/** The finest cell at the densest grid, m: right under the eye. A wave shorter than a few of these is left to the fine sea (N1.2). */
 export const SEA_FINEST_CELL = 0.25;
 /**
  * How far from the eye a level's tiles reach, as a multiple of their side (the level's range). With it the grid's
@@ -83,6 +86,33 @@ export interface SeaEye {
 export type TileFn = (x: number, z: number, size: number, level: number) => void;
 /** Whether a tile (corner, side) could show. */
 export type TileTest = (x: number, z: number, size: number) => boolean;
+
+/** Whether a tile can be drawn with `cells` along its side: a whole share of the densest grid, its vertices pairing up. */
+export function seaCellsFit(cells: number): boolean {
+  return Number.isInteger(cells) && cells >= 2 && SEA_TILE_CELLS % cells === 0 && cells % 2 === 0;
+}
+
+/** Every number of cells a tile's side can be drawn with, densest first (16, 8, 4, 2). */
+export function seaCellChoices(): number[] {
+  const out: number[] = [];
+  for (let cells = SEA_TILE_CELLS; cells >= 2; cells--) if (seaCellsFit(cells)) out.push(cells);
+  return out;
+}
+
+/**
+ * The triangles of one tile's grid with `cells` along its side, as indices into the densest grid's
+ * (SEA_TILE_CELLS + 1)² vertices (row by row): every SEA_TILE_CELLS / cells-th vertex, two triangles a cell, every
+ * cell split along the same diagonal, so a cell of the coarser grid is two cells' worth of this one.
+ */
+export function seaTileTriangles(cells: number): number[] {
+  if (!seaCellsFit(cells)) throw new Error(`a sea tile cannot have ${cells} cells along its side (SEA_TILE_CELLS is ${SEA_TILE_CELLS})`);
+  const side = SEA_TILE_CELLS + 1, step = SEA_TILE_CELLS / cells, idx: number[] = [];
+  for (let j = 0; j < SEA_TILE_CELLS; j += step) for (let i = 0; i < SEA_TILE_CELLS; i += step) {
+    const a = j * side + i, b = a + step, c = a + step * side, d = c + step;
+    idx.push(a, c, d, a, d, b);
+  }
+  return idx;
+}
 
 /** Distance from the eye to the nearest point of a tile, through the air, to its calm place. */
 function nearest(eye: SeaEye, x: number, z: number, size: number): number {

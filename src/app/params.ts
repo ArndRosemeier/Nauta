@@ -1,4 +1,4 @@
-/** What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?yaw=70&pitch=-10`, `?probe`, `?rig`, `?slice=below`). Pure: it takes the query string. */
+/** What the page's address asks for (`?gl&hud&hour=17`, `?eye=30&wind=6`, `?yaw=70&pitch=-10`, `?probe`, `?rig`, `?slice=below`, `?quality=low`). Pure: it takes the query string. */
 import { DEGREE, HOURS_PER_DAY } from '../sim/units';
 import { PITCH_LIMIT, type Look } from './look';
 import { WIND_PRESETS } from '../sim/rules/wind';
@@ -40,6 +40,8 @@ export interface Params {
   readonly look: Look | null;
   /** Stand on the slice of her waist (`?slice`, plan N2.0), at the standpoint named (`?slice=below`; empty: the first). */
   readonly slice: string | null;
+  /** The quality level asked for (`?quality=low`, src/app/quality.ts); null: chosen from measured frame time. */
+  readonly quality: string | null;
 }
 
 export function readParams(query: string): Params {
@@ -51,7 +53,7 @@ export function readParams(query: string): Params {
   return {
     forceWebGL: q.has('gl'), hud: q.has('hud'), hour: num('hour', START_HOUR, 0, HOURS_PER_DAY) % HOURS_PER_DAY,
     dayMinutes: num('day', DAY_MINUTES, 0, DAY_MINUTES_MAX), probe: q.has('probe'), rig: q.has('rig'),
-    slice: q.get('slice'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(num('wind', WIND_FORCE, 0, WIND_PRESETS.length - 1)),
+    slice: q.get('slice'), quality: q.get('quality'), eye: num('eye', EYE_HEIGHT, EYE_LOWEST, EYE_HIGHEST), wind: Math.round(num('wind', WIND_FORCE, 0, WIND_PRESETS.length - 1)),
     look: q.has('yaw') || q.has('pitch')
       ? { yaw: num('yaw', 0, -HALF_TURN_DEGREES, HALF_TURN_DEGREES) * DEGREE, pitch: num('pitch', 0, -PITCH_LIMIT / DEGREE, PITCH_LIMIT / DEGREE) * DEGREE }
       : null,

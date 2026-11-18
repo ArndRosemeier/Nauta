@@ -5,6 +5,7 @@
     "src/app/look.ts",
     "src/app/params.ts",
     "src/app/standpoints.ts",
+    "src/app/quality.ts",
     "src/probe/report.ts",
     "src/probe/waves.ts"
   ],
