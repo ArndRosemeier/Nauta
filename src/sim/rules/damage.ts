@@ -150,6 +150,12 @@ export const PUMP_POST = 'station-pumps';
  * side as she rolls (her free surface).
  */
 export const CROSS_SECONDS = 12;
+/**
+ * Foundered (her water at `founderTonnes`: her deck's lowest edge at the sea), the sea pours in over her side and down
+ * her hatches, as much again as founders her in about AWASH_SECONDS, and she goes down (N6.4: her decks awash in about a
+ * minute; she is lost).
+ */
+export const AWASH_SECONDS = 60;
 
 // ---- Spars falling (N6.2) ----
 

@@ -11,7 +11,9 @@
  * been told (guns/gunnery.ts) and floats one step on that sea as her sailing says (motion.ts).
  * Before she sails, what her damage leads to is worked out (damage.ts `stepAftermath`: water, falling spars, fire), and
  * what is left of her sails, her steering and the water's weight go to her sailing and floating.
- * Last, ships that have run into each other are pushed apart (ship/touch.ts: struck, fouled). Before the ships move,
+ * Last, ships that have run into each other are pushed apart (ship/touch.ts: struck, fouled), and the fight is
+ * judged (end.ts): a ship beaten, a ship lost, the end of the fight or of the light. After the end every order is
+ * refused, and the simulation goes on (she is seen going down). Before the ships move,
  * every shot in flight is traced through them for the part of its flight this step covers (damage.ts), and what each
  * ball hits is done and reported (`hit`); after, the shots fired in the step are put in flight.
  */
@@ -19,6 +21,7 @@ import { stepCrew } from './crew/crew';
 import { repairsDue } from './crew/repairs';
 import { launch, outOf, stepAftermath, stepHits, type Aftermath, type Hit } from './damage';
 import { carryOut, giveOrder, heard, wordSpent, type AnswerCode, type Order, type RefusalCode, type SailingOrder } from './orders';
+import { stepFight, type FightEvent } from './end';
 import { stepGunnery } from './guns/gunnery';
 import type { GunFired } from './guns/shot';
 import { followWind } from './sea/sea';
@@ -29,7 +32,7 @@ import { simTime, type SimShip, type SimState } from './state';
 import { meanWind, windAt } from './wind';
 
 /** Something that happened in a step, for the drawing, the sound and the interface; plain data like the state. */
-export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit | Aftermath;
+export type SimEvent = OrderRefused | OrderAnswered | OrderDone | Sailed | ShortHanded | GunFired | TouchEvent | Hit | Aftermath | FightEvent;
 
 /** An order the ship could not take: why, as a code (the phrase book, N4.5, words it) and in English for now. */
 export interface OrderRefused {
@@ -98,6 +101,10 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
       events.push({ kind: 'refused', tick, order, code: 'no ship', reason: `there is no ship ${order.ship}` });
       continue;
     }
+    if (state.fight.end) {
+      events.push({ kind: 'refused', tick, order, code: 'fight over', reason: 'the fight is over' });
+      continue;
+    }
     const answer = giveOrder(ship.told, ship.sailing, order, { tick, wind, force: state.wind.windForce });
     if (answer.refused) events.push({ kind: 'refused', tick, order, code: answer.code, reason: answer.reason });
     else if (answer.code) events.push({ kind: 'answered', tick, ship: order.ship, order, code: answer.code, reason: answer.reason });
@@ -140,5 +147,8 @@ export function step(state: SimState, orders: readonly Order[] = []): StepResult
   for (const e of events) if (e.kind === 'fired') flying = launch(flying, e);
   const touched = touch(state.ships, next, tick);
   events.push(...touched.events);
-  return { state: { ...state, tick: tick + 1, sea, flying, ships: touched.ships }, events };
+  // Whether a ship is beaten or lost now, and the fight's end (end.ts).
+  const fought = stepFight(state.fight, state.ships, touched.ships, tick);
+  events.push(...fought.events);
+  return { state: { ...state, tick: tick + 1, sea, flying, ships: touched.ships, fight: fought.fight }, events };
 }

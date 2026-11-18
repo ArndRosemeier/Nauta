@@ -15,9 +15,8 @@ import { holeCode, startDamage, stepAftermath, type AftermathIn, type Damage } f
 import { fallsDue, standingOf } from '../src/sim/damage/fall.ts';
 import { burnt, kindled, magazineSpace, type Fire } from '../src/sim/damage/fire.ts';
 import { founderTonnes, inflow, pumped, sinkingFor } from '../src/sim/damage/flood.ts';
-import { plankingPlace, sparParts } from '../src/sim/damage/meet.ts';
+import { sparParts } from '../src/sim/damage/meet.ts';
 import { FIRE, FOUNDER_MINUTES, PUMPING } from '../src/sim/rules/damage.ts';
-import { designWaterline } from '../src/sim/ship/hull.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { stepSailing, UNDAMAGED, type SailingDamage } from '../src/sim/ship/sailing.ts';
@@ -25,24 +24,13 @@ import { startMatch, type SimState } from '../src/sim/state.ts';
 import { step } from '../src/sim/step.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { windAt } from '../src/sim/wind.ts';
+import { spotUnder } from './support/damage.ts';
 
 /** The men the quarter bill posts at the pumps (rules/crew.ts). */
 const PUMP_HANDS = 6;
 /** A hole "at her waterline" in the design's sense: her roll and the waves put it about this far under, on the average, m. */
 const AT_WATERLINE = 0.3;
 const SECONDS_PER_MINUTE = 60;
-
-/** A planking cell of her side (`side`) amidships with a spot `depth` m under her load waterline: the cell and the spot's girth. */
-function spotUnder(side: 1 | -1, depth: number): { cell: number; u: number; v: number } {
-  for (const c of shipPlan().cells) {
-    if (c.kind !== 'planking' || c.side !== side || c.aft > 0 || c.fore < 0) continue;
-    for (let v = 0; v < c.to - c.from; v += 0.04) {
-      const p = plankingPlace(c, 0.5, v);
-      if (Math.abs(p[2] - (designWaterline(p[0]) - depth)) < 0.03) return { cell: c.id, u: 0.5, v };
-    }
-  }
-  throw new Error('no such spot');
-}
 
 test('the pumps hold a small leak and lose to a large one', () => {
   const pumps = pumped(PUMP_HANDS, PUMPING.least + 1);

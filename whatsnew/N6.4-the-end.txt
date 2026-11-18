@@ -1,0 +1,3 @@
+A fight can now end: a ship sinks, burns out, blows up or strikes her colours, and a match with no result is drawn after 40 minutes (the master warns when the light is failing, five minutes before).
+New order "Strike the colours": the first lieutenant asks "Strike, sir?", and you give it again within ten seconds to strike. When your ship is beaten he says "We must strike, sir", but you may fight on.
+Try it in ?sail&hud with the order panel; the end is written there until it is shown.

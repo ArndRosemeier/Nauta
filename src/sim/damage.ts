@@ -33,14 +33,14 @@
 import { deriveSeed, Rng } from '@futuremagic/core';
 import { fallsDue, sparUnder, standingOf, wreckOf, type Standing, type Wreck } from './damage/fall';
 import { atHand, burnt, kindled, spaceAt, type Fire } from './damage/fire';
-import { flowed, inflow, loadOf, lyingOf, pumped } from './damage/flood';
+import { flowed, founderTonnes, inflow, loadOf, lyingOf, pumped } from './damage/flood';
 import { meetings, nearHer, plankingPlace, type Aboard, type Meeting, type Place, type TimberPart } from './damage/meet';
 import { atWork, manAt, type Crew, type Mended } from './crew/crew';
 import { brigRoster, type Man } from './crew/roster';
 import { battery, dismountGun, gunAt, gunCount, type Battery } from './guns/guns';
 import type { GunFired, Shot, Vec } from './guns/shot';
 import {
-  CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
+  AWASH_SECONDS, CHAIN_BITE, FIGHT_AT_HAND, FIR_AS_OAK, FIRE_CHANCE, GLANCING, GUN_AS_OAK, HARMS, HOLE_GRID, HURT, LEAST_PUNCH, LODGED_SPLINTERS,
   MAN_AS_OAK, PIERCE, PUMP_POST, SMASHED, SPLINTER_CONE, SPLINTER_REACH, SPLINTER_STRIKE, STOVE_IN, TIMBER, WAD_RANGE, type Harm, type HurtBy,
 } from './rules/damage';
 import { SHOT, PATH_STEP, type ShotKind } from './rules/guns';
@@ -281,7 +281,7 @@ function aboardOf(s: HitShip, w: Working, roster: readonly Man[]): Aboard {
     return [spot.along, spot.across, height] as Place;
   });
   const mounted = Array.from({ length: gunCount(w.battery) }, (_, i) => !gunAt(w.battery, i).dismounted);
-  const standing = standingOf(s.damage.fallen, s.damage.cut, s.damage.rent);
+  const standing = standingNow(s.damage);
   w.aboard = { men, mounted, sails: s.canvas.map((c, i) => (standing.sailDown[i] ? 0 : sailShare(c))), down: standing.down, gone: standing.gone, steering: w.steering };
   return w.aboard;
 }
@@ -539,6 +539,9 @@ export function openHoles(d: Damage): readonly Leak[] {
   return open;
 }
 
+/** What of her rig stands now (damage/fall.ts `standingOf` of what she has had broken, cut and holed). */
+export const standingNow = (d: Damage): Standing => standingOf(d.fallen, d.cut, d.rent);
+
 /** The men out of the quarter bill: badly hurt or killed (roster places); the same set while nothing changes. */
 const outs = new WeakMap<readonly number[], ReadonlySet<number>>();
 export function outOf(d: Damage): ReadonlySet<number> {
@@ -614,6 +617,8 @@ export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly 
       const q = inflow(h.shot, h.gun, depth, level + h.at[1] * roll - h.at[2]);
       if (h.at[1] < 0) inL += q; else inS += q;
     }
+    // Foundered, the sea pours in over her side.
+    if (larboard + starboard >= founderTonnes()) { const pour = founderTonnes() / AWASH_SECONDS / 2; inL += pour; inS += pour; }
     const flooded = flowed(larboard, starboard, inL, inS, pumped(pumpHands(input.crew, d, roster), larboard + starboard), roll);
     if (flooded[0] !== larboard || flooded[1] !== starboard) next = { ...next, flooded };
   }
@@ -621,7 +626,7 @@ export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly 
   // Spars falling.
   let standing: Standing | null = null;
   if (d.wounds.length > 0 || d.cut.length > 0) {
-    standing = standingOf(d.fallen, d.cut, d.rent);
+    standing = standingNow(d);
     const { ay } = apparentAt(input.sailing, input.wind);
     let aback: boolean[] | null = null;
     const falls = fallsDue(standing, d.wounds, {
@@ -663,7 +668,7 @@ export function stepAftermath(was: Damage, input: AftermathIn, roster: readonly 
 function sailingDamage(d: Damage, standing: Standing | null): SailingDamage {
   const intact = d.steering && d.alongside.length === 0 && d.fallen.length === 0 && d.cut.length === 0 && d.flooded[0] + d.flooded[1] === 0 && d.rent.every((r) => r === 0);
   if (intact) return UNDAMAGED;
-  const st = standing ?? standingOf(d.fallen, d.cut, d.rent);
+  const st = standing ?? standingNow(d);
   return { draws: st.draws, steered: d.steering, wrecks: wrecks(d.alongside), flooded: d.flooded[0] + d.flooded[1] };
 }
 

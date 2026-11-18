@@ -140,7 +140,7 @@ export class CrewWatch {
 
   /** Events of a step (`step`'s, or a session's listener): kept until the next frame; other ships' are left out. */
   note(events: readonly SimEvent[]): void {
-    for (const e of events) if ((e.kind === 'refused' ? e.order.ship : e.ship) === this.shipIndex) this.events.push(e);
+    for (const e of events) if ((e.kind === 'refused' ? e.order.ship : 'ship' in e ? e.ship : null) === this.shipIndex) this.events.push(e);
   }
 
   /** One frame: what of the crew is heard now. */

@@ -23,7 +23,7 @@ import { step } from '../../src/sim/step.ts';
 import { parseOrder, type Order } from '../../src/sim/orders.ts';
 import { RIPPLE } from '../../src/sim/rules/guns.ts';
 import type { GunFired } from '../../src/sim/guns/shot.ts';
-import { DEGREE, STEPS_PER_SECOND, wrapBearing } from '../../src/sim/units.ts';
+import { DEGREE, SECONDS_PER_MINUTE, STEPS_PER_SECOND, wrapBearing } from '../../src/sim/units.ts';
 
 const SEED = 1805;
 const FORCE = 4;
@@ -83,6 +83,32 @@ function broadsideByOrders(): void {
     if (fired.some((e) => e.fired.balls.some((b) => b.path.length < 2 || b.path.some((p) => !p.every(Number.isFinite))))) problems.push('broadside: a shot has no flight');
     if (ticks.size < Math.ceil(fired.length / RIPPLE)) problems.push(`broadside: ${fired.length} guns in ${ticks.size} steps, more than ${RIPPLE} a step`);
   }
+}
+
+/**
+ * A headless duel always ends (N6.4): the duel's start as `?sail` gives it, both ships at quarters firing as they bear
+ * and nothing more ordered, stepped until the fight is over: a ship lost, or drawn at nightfall. Fails if it is not
+ * over by then, or the end is not what the state says.
+ */
+function headlessDuel(): void {
+  let s = startMatch(duelStart(SEED));
+  const orders = [0, 1].flatMap((ship) => [{ kind: 'quarters', ship }, { kind: 'bear', ship }] as Order[]);
+  let light = -1, ended = -1, fired = 0;
+  for (let k = 0; k <= s.fight.nightfall && ended < 0; k++) {
+    const r = step(s, k === 0 ? orders : []);
+    s = r.state;
+    for (const e of r.events) {
+      if (e.kind === 'fired') fired++;
+      if (e.kind === 'light') light = e.tick;
+      if (e.kind === 'end') ended = e.tick;
+    }
+  }
+  const end = s.fight.end, minutes = (t: number) => (t / STEPS_PER_SECOND / SECONDS_PER_MINUTE).toFixed(1);
+  if (!end || ended < 0) { problems.push('headless duel: not over at nightfall'); return; }
+  const how = end.lost.every((l) => l === null) ? 'drawn at nightfall' : end.lost.map((l, i) => `ship ${i} ${l ?? 'not lost'}`).join(', ');
+  console.log(`headless duel at quarters: ${fired} guns fired, over at ${minutes(end.tick)} min: ${how}${light >= 0 ? `; the light failing at ${minutes(light)} min` : ''}`);
+  if (end.tick !== ended) problems.push('headless duel: the end event and the state disagree');
+  if (end.lost.every((l) => l === null) && light < 0) problems.push('headless duel: drawn without the master\'s warning');
 }
 
 /** Whether a ball's path passes through her larboard side (the side toward the firing ship) as she lies at `pose`. */
@@ -163,6 +189,7 @@ for (const shot of ['chain', 'grape'] as const) {
   console.log(`${shot} at 100 m: ${out.struck} of ${out.fired} balls through her side; the farthest went ${out.farthest.toFixed(0)} m`);
 }
 broadsideByOrders();
+headlessDuel();
 console.log(`gunnery: ${((performance.now() - began) / 1000).toFixed(1)} s`);
 if (problems.length > 0) {
   for (const p of problems) console.error(`FAIL ${p}`);

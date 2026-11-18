@@ -9,36 +9,24 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { holeCode, mend, openHoles, outOf, startDamage, type Damage } from '../src/sim/damage.ts';
-import { plankingPlace, sparParts } from '../src/sim/damage/meet.ts';
+import { mend, openHoles, outOf, startDamage, type Damage } from '../src/sim/damage.ts';
+import { sparParts } from '../src/sim/damage/meet.ts';
 import { atWork, NO_ACT, sameSpot, type Crew } from '../src/sim/crew/crew.ts';
 import { billOrder, brigRoster, placeSpot } from '../src/sim/crew/roster.ts';
 import { handsAtGuns } from '../src/sim/guns/guns.ts';
 import { parseOrder, type Order } from '../src/sim/orders.ts';
 import { CARRY_PARTIES, PLUG_PARTIES, REPAIRS, SURGEON } from '../src/sim/rules/crew.ts';
 import { HARMS } from '../src/sim/rules/damage.ts';
-import { designWaterline } from '../src/sim/ship/hull.ts';
 import { shipPlan } from '../src/sim/ship/plan.ts';
 import { rigPlan } from '../src/sim/ship/rig.ts';
 import { startMatch, type SimState } from '../src/sim/state.ts';
 import { step, type SimEvent } from '../src/sim/step.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
+import { holesUnder } from './support/damage.ts';
 
 const roster = brigRoster();
 const BADLY = HARMS.indexOf('badly'), KILLED = HARMS.indexOf('killed');
 const hurtCode = (man: number, harm: number): number => man * HARMS.length + harm;
-
-/** Planking holes of her starboard side amidships, `depth` m under her load waterline, `n` of them a hand apart. */
-function holesUnder(depth: number, n: number): number[] {
-  for (const c of shipPlan().cells) {
-    if (c.kind !== 'planking' || c.side !== 1 || c.aft > 0 || c.fore < 0) continue;
-    for (let v = 0; v < c.to - c.from; v += 0.04) {
-      const p = plankingPlace(c, 0.5, v);
-      if (Math.abs(p[2] - (designWaterline(p[0]) - depth)) < 0.03) return Array.from({ length: n }, (_, k) => holeCode(c.id, 0.2 + 0.2 * k, v, 'round', 'carronade', false));
-    }
-  }
-  throw new Error('no such spot');
-}
 
 /** One ship lying still in a calm with the damage `damage`. */
 function lying(damage: Partial<Damage>): SimState {

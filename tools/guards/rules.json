@@ -137,7 +137,7 @@
     {
       "field": "told",
       "owner": "src/sim/orders.ts",
-      "what": "what a ship has been told to do: her course or full and by, her canvas, hove to, masts aback, the acts still to be done and the orders being carried out (N3.4); at quarters, the shot, the aim, how her guns fire and the captain's word (N5.3a); the orders for her life: the pumps, fire party and wreckage parties and what the carpenter's crew does first (N6.3)"
+      "what": "what a ship has been told to do: her course or full and by, her canvas, hove to, masts aback, the acts still to be done and the orders being carried out (N3.4); at quarters, the shot, the aim, how her guns fire and the captain's word (N5.3a); the orders for her life: the pumps, fire party and wreckage parties and what the carpenter's crew does first (N6.3); strike the colours asked and struck (N6.4)"
     },
     {
       "field": "waysClosed",
@@ -313,6 +313,16 @@
       "field": "plugged",
       "owner": "src/sim/damage.ts",
       "what": "the holes the carpenter's crew has plugged (N6.3)"
+    },
+    {
+      "field": "fight",
+      "owner": "src/sim/end.ts",
+      "what": "how the fight stands: when the light fails, who is beaten, and its end (N6.4)"
+    },
+    {
+      "field": "nightfall",
+      "owner": "src/sim/end.ts",
+      "what": "the tick the match is drawn at (N6.4)"
     }
   ]
 }

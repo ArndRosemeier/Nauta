@@ -16,6 +16,7 @@ import { gunAt, gunCount, type Battery } from '../sim/guns/guns';
 import { rigPlan, sparOf } from '../sim/ship/rig';
 import { MASTS } from '../sim/ship/sailing';
 import { simTime, type SimState } from '../sim/state';
+import type { LostHow } from '../sim/end';
 import type { SimEvent } from '../sim/step';
 import { DEGREE, KNOT, SECONDS_PER_MINUTE, STEPS_PER_SECOND, wrapBearing } from '../sim/units';
 import { meanWind } from '../sim/wind';
@@ -172,7 +173,22 @@ export function eventWords(e: SimEvent, ship: number): string | null {
     // never written; the men's cries for it ("the wheel's shot away", "fire!") come with the phrase book (N4.5).
     case 'hit':
     case 'aftermath': return null;
+    // What the first lieutenant and the master say of the fight, until the phrase book's bubbles (N4.5); and its end.
+    case 'beaten': return e.ship === ship ? `${at} we must strike, sir` : null;
+    case 'light': return `${at} the light is failing, sir`;
+    case 'end': return `${at} the fight is over: ${endWords(e.lost, ship)}`;
   }
+}
+
+/** How the panel says a fight ended, for my ship `ship`. */
+function endWords(lost: readonly (LostHow | null)[], ship: number): string {
+  const how = (l: LostHow, ours: boolean): string => {
+    if (l === 'struck') return ours ? 'we have struck' : 'she has struck';
+    if (l === 'blew up') return ours ? 'our magazine has gone up' : 'she has blown up';
+    return ours ? `we are ${l === 'sunk' ? 'sinking' : 'burnt out'}` : `she is ${l === 'sunk' ? 'sinking' : 'burnt out'}`;
+  };
+  const words = lost.flatMap((l, i) => (l === null ? [] : [how(l, i === ship)]));
+  return words.length === 0 ? 'they part at nightfall, drawn' : words.join(', ');
 }
 
 /**
@@ -194,6 +210,7 @@ export function isStanding(order: Order, told: ShipOrders): boolean {
     case 'pumps': case 'fires': case 'wreckage': return told[order.kind] !== null;
     case 'plug': return told.carpenter === 'plug';
     case 'pumping': return told.carpenter === 'pump';
+    case 'strike': return told.struck;
     default: return told.given.some((g) => g.order.kind === order.kind);
   }
 }
