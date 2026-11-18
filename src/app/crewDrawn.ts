@@ -20,7 +20,7 @@ import type { JobName } from '../sim/rules/crew';
 import type { Bunk } from '../sim/rules/bunks';
 import { shipY, shipZ } from '../sim/ship/section';
 import type { CrewKnobs } from './quality';
-import { CLIMBED, type CrewClimb } from './ladders';
+import { CLIMBED, SIDLING, type CrewClimb } from './ladders';
 import { floorApart } from './officers';
 import { standByClip, standToClip, watchClip } from './standBy';
 import { apartOnWater } from '../sim/units';
@@ -30,6 +30,8 @@ import { gunClip, gunWork, stepBack, type GunWork } from './gunDrill';
 /** The motion a man hauling plays (at a pin, tailing on a fall). */
 /** A man climbing is taken from the route's line to the rungs over this much of the height he climbs from either end of his way, m. */
 const CLIMB_EASE_RISE = 0.5;
+/** A man at the top of the way up to a footrope steps onto it over this much of the height he climbs under it (hands to the jackstay, feet on the rope), m. */
+const STEP_ON_RISE = 1;
 const HAUL = 'pick up';
 /** What a man at work plays, by his job (crewLooks.ts PACK_CLIPS): hauling at the pins, at the wheel, out on a yard, the repairs. */
 export const JOB_CLIPS: Readonly<Record<JobName, string>> = {
@@ -112,13 +114,15 @@ export interface ManDrawn {
   /** Climbing a ladder or shrouds hand over hand (ladders.ts): which, else null. His feet are on the line the route gives; the drawing puts him on the rungs, `climbEase` of the way (0 at either end of the way, 1 in the middle of it). */
   climb: CrewClimb | null;
   climbEase: number;
+  /** How far he is onto the footrope the way he climbs ends on, leaning over its yard: 0 on the rungs, 1 out on it (a man on a footrope is always 1). */
+  climbOnto: number;
 }
 
 /** A new, empty man drawn (to be filled by `manDrawn`). */
-export const newManDrawn = (): ManDrawn => ({ x: 0, y: 0, z: 0, yaw: FORWARD, space: '', clip: JOB_CLIPS.tackle, way: null, climb: null, climbEase: 0 });
+export const newManDrawn = (): ManDrawn => ({ x: 0, y: 0, z: 0, yaw: FORWARD, space: '', clip: JOB_CLIPS.tackle, way: null, climb: null, climbEase: 0, climbOnto: 0 });
 
 /** Where a man is in one state, before the frame's in-between. */
-interface At { along: number; across: number; height: number; space: string; yaw: number; way: string | null; moving: boolean; bunked?: boolean; climb?: CrewClimb; climbEase?: number }
+interface At { along: number; across: number; height: number; space: string; yaw: number; way: string | null; moving: boolean; bunked?: boolean; climb?: CrewClimb; climbEase?: number; climbOnto?: number }
 
 /** His spot and height in one state, which way he faces and whether he is on his way. */
 function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
@@ -132,7 +136,13 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
       // Climbing: how far in from either end of the way (CLIMB_EASE_RISE), for the drawing to take him from the route's line to the rungs.
       const [from, to] = leg.rise, up = to > from;
       out.climb = { way: w.way, kind: leg.kind, up };
-      out.climbEase = Math.max(0, Math.min(1, Math.min(Math.abs(w.height - from), Math.abs(to - w.height)) / CLIMB_EASE_RISE));
+      // The way up to a footrope is left onto the rope instead (`climbOnto`), not eased back to the route's line.
+      const roped = leg.kind === 'footrope', near = roped ? Math.abs(w.height - from) : Math.min(Math.abs(w.height - from), Math.abs(to - w.height));
+      out.climbEase = Math.max(0, Math.min(1, near / CLIMB_EASE_RISE));
+      out.climbOnto = roped ? Math.max(0, Math.min(1, 1 - Math.abs(to - w.height) / STEP_ON_RISE)) : 0;
+    } else if (leg && w.way === null && leg.kind === 'footrope') {
+      out.climb = { way: w.space, kind: SIDLING, up: true };
+      out.climbEase = out.climbOnto = 1;
     }
     const bed = m.bunk ?? m.berth;
     return bed ? outOfBunk(out, bed, placeSpot(bed.station)) : out;
@@ -162,7 +172,13 @@ function atIn(ship: SimShip, man: number, m: Man, task: Task | null): At {
     }
     yaw = Math.atan2(at.spot.across - across, shipZ(at.spot.along) - shipZ(along));
   }
-  return { along, across, height, space: at.spot.space, yaw, way: null, moving: false };
+  const out: At = { along, across, height, space: at.spot.space, yaw, way: null, moving: false };
+  // Out on a yard's footrope, working: leaning over it.
+  if (routeNetwork().surfaces.get(out.space)?.kind === 'footrope') {
+    out.climb = { way: out.space, kind: SIDLING, up: true };
+    out.climbEase = out.climbOnto = 1;
+  }
+  return out;
 }
 
 /**
@@ -339,6 +355,7 @@ export function manDrawn(from: SimShip, to: SimShip, f: number, man: number, m: 
   out.way = b.way;
   out.climb = b.climb ?? null;
   out.climbEase = out.climb ? a.climb ? a.climbEase! + g * (b.climbEase! - a.climbEase!) : b.climbEase! : 0;
+  out.climbOnto = out.climb ? a.climb ? a.climbOnto! + g * (b.climbOnto! - a.climbOnto!) : b.climbOnto! : 0;
   const gun = !b.moving && !task && !isDown(to, man) ? gunWork(to, man, m) : null;
   // At the report the men at a gun step clear of her (only the drawing moves them).
   if (gun) out.x -= Math.sign(out.x) * stepBack(gun);

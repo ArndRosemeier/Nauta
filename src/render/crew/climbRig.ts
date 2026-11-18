@@ -1,6 +1,6 @@
 /**
  * The crew's climbing figure (Arnd 2026-11-18: "sailors have a running animation when climbing into the sails"): one
- * Actors character that is never drawn, posed each time as a man climbs a ladder or the shrouds hand over hand, by the
+ * Actors character that is never drawn, posed each time as a man climbs a ladder or the shrouds hand over hand, or leans over a yard out on its footrope, by the
  * same @futuremagic/figure `LadderClimb` and `FigureRig` the captain climbs with (render/captain/captainView.ts), then
  * its bones lent to the man who climbs: a crowd figure takes its pose (`CrowdFigures.pose`), a pool character the
  * bones of his body (`lendTo`). There is no climbing clip for the rigging in the motion library (mocap-climbing
@@ -14,7 +14,7 @@ import { Character, type CharacterCatalog } from '@actors/generator';
 import { nodeMaterials } from '@actors/three/webgpu';
 import type { ThreeActor } from '@actors/three';
 import type { WebGPURenderer } from 'three/webgpu';
-import { FigureRig, LadderClimb, type OnLadder } from '@futuremagic/figure';
+import { FigureRig, LadderClimb, type OnLadder, type Yard } from '@futuremagic/figure';
 import HumanWorker from '@actors/human/worker?worker';
 import { CLIMBER } from '../../app/aloftClimb';
 import { packCatalog } from '../../app/crewLooks';
@@ -63,10 +63,26 @@ export class ClimbRig {
    * faces; his pose is then in `actor` for `CrowdFigures.pose`, or `lendTo`.
    */
   cling(on: OnLadder, up: boolean): ClimberAt {
-    const c = this.climb;
     this.rig.relax();
-    c.up.copy(UP);
-    c.cling(on.ladder, on.h, up, CLIMBER, 0);
+    this.climb.up.copy(UP);
+    this.climb.cling(on.ladder, on.h, up, CLIMBER, 0);
+    return this.settle();
+  }
+
+  /**
+   * The figure posed out on `yard`'s footrope, `s` metres out along it: leaning over the yard, hands on the jackstay,
+   * the feet sliding along the rope. His stance depends on `s` alone, so each frame stands on its own.
+   */
+  sidle(yard: Yard, s: number): ClimberAt {
+    this.rig.relax();
+    this.climb.up.copy(UP);
+    this.climb.sidle(yard, s, CLIMBER, 0);
+    return this.settle();
+  }
+
+  /** The climb's pose and holds put on the body, and where his soles are. */
+  private settle(): ClimberAt {
+    const c = this.climb;
     this.body.position.copy(c.pos);
     this.body.quaternion.setFromAxisAngle(UP, c.yaw + Math.PI);
     this.body.updateMatrixWorld(true);

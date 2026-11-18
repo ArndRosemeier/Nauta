@@ -50,8 +50,8 @@ import { stainOf, stained, coveredOf, TRAIL_EVERY, SHOWN } from '../../app/viole
 import type { Violence } from '../../app/settings';
 import { NearPool, type PoolChar } from './nearPool';
 import { ClimbRig } from './climbRig';
-import { crewLadder } from '../../app/ladders';
-import type { OnLadder } from '@futuremagic/figure';
+import { crewLadder, crewYard, SIDLING } from '../../app/ladders';
+import type { OnLadder, Yard } from '@futuremagic/figure';
 import { Blood } from './blood';
 import { Shrouds } from './shroud';
 import { Hammocks } from './hammocks';
@@ -63,6 +63,8 @@ const CROWD_LEVEL = 2;
 const BAKE_FPS = 30;
 /** A man's clip changes over this long, s. */
 const CLIP_FADE = 0.3;
+/** A man stepping onto a footrope is posed as on the rope from this far (0..1) onto it, else as on the rungs. */
+const HALF_ONTO = 0.5;
 /** A body reaches about this far round his feet: what is tested against the view, m. */
 const BODY_RADIUS = 1.2;
 const BODY_MIDDLE = 0.9;
@@ -139,6 +141,8 @@ interface Drawn {
   /** The rungs he climbs and whether up them, while he climbs (the donor posed for him, `climbRig.ts`); else null. His crowd figure is then in a live pose (`posed`), not a clip. */
   on: OnLadder | null;
   up: boolean;
+  /** Or the yard he leans over out on its footrope and how far out along it, m (`ClimbRig.sidle`); null while he is not there. */
+  rope: { yard: Yard; s: number } | null;
   posed: boolean;
 }
 
@@ -239,7 +243,7 @@ export class CrewView {
     }
     this.all = rosters.flatMap((roster, ship) => roster.map((m, man) => {
       const seed = manSeed(ship, man);
-      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false, on: null, up: true, posed: false };
+      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false, on: null, up: true, rope: null, posed: false };
     }));
     this.byShip = rosters.map((_, s) => this.all.filter((d) => d.ship === s));
     this.shrouds = rosters.map((_, s) => new Shrouds(this.groups[s]!));
@@ -491,8 +495,8 @@ export class CrewView {
     this.turn.setFromAxisAngle(UP, at.yaw);
     this.scale.setScalar(d.figure.scale);
     c.matrix.compose(this.local.set(at.x, at.y, at.z), this.turn, this.scale);
-    if (d.on) {
-      // On the rungs: the donor, posed for him by `climbs` just now (hands and feet on the holds), faded in from the clip he walked up to them in.
+    if (d.on || d.rope) {
+      // On the rungs or the footrope: the donor, posed for him by `climbs` just now (hands and feet on the holds), faded in from the clip he walked up to them in.
       this.figures.pose(c, this.climber.actor, d.posed ? undefined : { fade: CLIP_FADE });
       d.posed = true;
       d.clip = null;
@@ -512,17 +516,33 @@ export class CrewView {
     if (stain !== d.stain) { d.stain = stain; this.figures.setLook(c, { tints: this.tintsOf(d) }); }
   }
 
-  /** A man climbing a ladder or the shrouds: taken from the route's line onto the rungs (the more, the further along his way), `d.on` the rungs he is on, else null. */
+  /** A man climbing a ladder or the shrouds, or out on a footrope: taken from the route's line onto the rungs (the more, the further along his way) or onto the rope, `d.on` the rungs or `d.rope` the yard he holds, else both null. */
   private climbs(d: Drawn): void {
     const at = d.at, c = at.climb;
-    d.on = c ? crewLadder(c, at.y) : null;
-    if (!c || !d.on) return;
+    d.on = d.rope = null;
+    if (!c) return;
+    const rungs = c.kind === SIDLING ? null : crewLadder(c, at.y);
+    // The way up to a footrope ends leaning over its yard; one with no rungs (the jib-boom's) is all on the rope.
+    const onto = c.kind === SIDLING || (c.kind === 'footrope' && !rungs) ? 1 : at.climbOnto;
+    const yard = onto > 0 ? crewYard(c, at.x, at.z) : null;
+    if (!rungs && !yard) return;
     d.up = c.up;
-    const to = this.climber.cling(d.on, c.up), e = at.climbEase;
+    // Both holds give a position; between them he is blended, and his pose is the one he is nearer to (`holds`).
+    const r = rungs ? { ...this.climber.cling(rungs, c.up) } : null, w = yard ? { ...this.climber.sidle(yard.yard, yard.s) } : null;
+    const to = r && w ? { x: r.x + (w.x - r.x) * onto, y: r.y + (w.y - r.y) * onto, z: r.z + (w.z - r.z) * onto, yaw: r.yaw + turnBetween(r.yaw, w.yaw) * onto } : (r ?? w)!, e = at.climbEase;
+    d.on = onto < HALF_ONTO ? rungs : null;
+    d.rope = onto < HALF_ONTO ? null : yard;
     at.x += (to.x - at.x) * e;
     at.y += (to.y - at.y) * e;
     at.z += (to.z - at.z) * e;
     at.yaw += turnBetween(at.yaw, to.yaw) * e;
+    this.holds(d);
+  }
+
+  /** The donor posed as `d` holds on (the rungs, or the footrope's yard): its bones are then his. */
+  private holds(d: Drawn): void {
+    if (d.on) this.climber.cling(d.on, d.up);
+    else if (d.rope) this.climber.sidle(d.rope.yard, d.rope.s);
   }
 
   /** A man's tint colours with his shirt as stained as the setting shows it. */
@@ -641,7 +661,7 @@ export class CrewView {
       if (p.words && p.words.until > fr.now) { p.ch.lookAt(fr.camera); p.ch.say(p.words.text, SPEAKING_RATE); p.looking = p.words.until - fr.now; }
       p.words = null;
       p.ch.update(dt);
-      if (d.on) { this.climber.cling(d.on, d.up); this.climber.lendTo(p.ch.actor); }
+      if (d.on || d.rope) { this.holds(d); this.climber.lendTo(p.ch.actor); }
     }
   }
 

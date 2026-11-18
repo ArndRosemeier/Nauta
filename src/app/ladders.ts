@@ -4,10 +4,10 @@
  * climbs them played out (captain.ts, aloftClimb.ts); the crew's men climb them by their height along the way
  * (`crewLadder`, drawn by render/crew/climbRig.ts).
  */
-import type { Ladder, OnLadder } from '@futuremagic/figure';
+import type { Ladder, OnLadder, Yard } from '@futuremagic/figure';
 import { shipY, shipZ } from '../sim/ship/section';
 import { shipPlan, type Way } from '../sim/ship/plan';
-import { aloftWay } from '../sim/ship/aloftWalk';
+import { aloftWay, surfaceOf } from '../sim/ship/aloftWalk';
 import { rigPlan } from '../sim/ship/rig';
 
 /** A ladder's two halves for the figure, in ship space: from its foot (on at the bottom) and at its head (off at the top). */
@@ -29,15 +29,20 @@ export function ladderAt(bottom: Ladder, rim: Ladder | null, y: number): OnLadde
   return { ladder: l, h: y - (l.rim ? l.lo : l.floor) };
 }
 
-/** What a man on a way is climbing: the way (its id and kind, as the route's leg has them) and whether he goes up it. */
+/**
+ * What a man on a way is climbing: the way (its id and kind, as the route's leg has them) and whether he goes up it. A
+ * man on a yard's footrope has kind `SIDLING` and the footrope's surface for his `way`.
+ */
 export interface CrewClimb {
   readonly way: string;
   readonly kind: string;
   readonly up: boolean;
 }
 
-/** The kinds of way a man climbs hand over hand: a deck ladder, a mast's shrouds, the topmast shrouds. */
-export const CLIMBED = new Set(['ladder', 'shrouds', 'topmast shrouds']);
+/** The kind of a man out on a footrope leaning over its yard, hands on the jackstay (the figure's `sidle`). */
+export const SIDLING = 'sidling';
+/** The kinds of way a man climbs hand over hand: a deck ladder, a mast's shrouds, the topmast shrouds, and the shrouds up to a footrope. */
+export const CLIMBED = new Set(['ladder', 'shrouds', 'topmast shrouds', 'footrope']);
 
 const deckLadders = new Map<string, Ladder>();
 
@@ -53,9 +58,23 @@ export function crewLadder(c: CrewClimb, y: number): OnLadder | null {
     }
     return { ladder: l, h: Math.max(0, y - l.floor) };
   }
-  if (c.kind !== 'shrouds' && c.kind !== 'topmast shrouds') return null;
+  if (!CLIMBED.has(c.kind)) return null;
   const [bottom, rim] = aloftWay(rigPlan(), c.way).ladders;
   if (!bottom) return null;
-  const on = ladderAt(bottom, rim ?? null, y);
+  // The shrouds' futtock ladder goes over the rim; the one ladder of a way up to a footrope has none.
+  const on = ladderAt(bottom, c.kind === 'footrope' ? null : rim ?? null, y);
   return { ladder: on.ladder, h: Math.max(0, on.h) };
+}
+
+/**
+ * Where a man leaning over a footrope's yard is: the yard and how far out along it `s` (m, signed as the yard's own), from
+ * where his feet are (`x`, `z`, ship space). A man on a footrope surface is on it (`SIDLING`); a man on the way up to
+ * one (`footrope`) is where it ends. Null: no yard (a deck ladder, the shrouds).
+ */
+export function crewYard(c: CrewClimb, x: number, z: number): { yard: Yard; s: number } | null {
+  const id = c.kind === SIDLING ? c.way : c.kind === 'footrope' ? aloftWay(rigPlan(), c.way).to.space : null;
+  const yard = id === null ? undefined : surfaceOf(rigPlan(), id)?.yard;
+  if (!yard) return null;
+  const along = (x - yard.x) * yard.ax + (z - yard.z) * yard.az;
+  return { yard, s: Math.sign(along || 1) * Math.min(yard.reach, Math.abs(along)) };
 }
