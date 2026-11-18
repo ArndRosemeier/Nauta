@@ -390,10 +390,16 @@ export const DOORS: readonly DoorRow[] = [
   { id: 'fore-hold-door', between: ['hold', 'fore-hold'], along: 11.46, across: 0 },
 ];
 
+/** The fore lower mast and its top are the main's scaled as her trucks are, 29 m over the deck to 32 (ship.md), until N3.2's spar table gives them. */
+const FORE_SCALE = 29 / 32;
+/** The lower foremast, m: its heel (above the base), length, diameter at the partners and the hounds, its masthead. */
+export const FORE_MAST = { step: 1.3, length: MAIN_MAST.length * FORE_SCALE, partners: 0.53, hounds: MAIN_MAST.hounds * FORE_SCALE, head: MAIN_MAST.head * FORE_SCALE } as const;
+/** The fore top, m: athwart, fore and aft, its thickness, and the lubber's hole. */
+export const FORE_TOP = { breadth: MAIN_TOP.breadth * FORE_SCALE, length: MAIN_TOP.length * FORE_SCALE, thick: MAIN_TOP.thick, hole: MAIN_TOP.hole * FORE_SCALE } as const;
 /** The masts: where each stands (m forward of the mainmast), where its heel is stepped (m above the base), and its diameter at the deck, m. */
 export const MASTS = {
   main: { along: 0, step: MAIN_MAST.step, diameter: MAIN_MAST.partners },
-  fore: { along: 14.64, step: 1.3, diameter: 0.53 },
+  fore: { along: 14.64, step: FORE_MAST.step, diameter: FORE_MAST.partners },
 } as const;
 /** The square of the partners round a mast through a deck, m across (the slice's partners). */
 export const PARTNERS = 0.82;
@@ -487,6 +493,20 @@ export const STATIONS: readonly StationRow[] = [
   { id: 'pumps', name: 'the well and the pumps', who: 'the carpenter', orders: ['sound the well', 'man the pumps', 'plug and patch'], space: 'deck', along: 0, across: 1.5 },
   { id: 'surgeon', name: 'the cockpit', who: 'the surgeon', orders: [], space: 'cockpit', along: 5.28, across: -2.6 },
 ];
+/**
+ * Her lanterns below deck (plan N2.4): [space, m forward of the mainmast, m from the centreline], each hung from the
+ * beams over its space. Horn lanterns burned in every inhabited space; the magazine has none (it is lit through the
+ * light room's glass) and the officers' cabins one each. N2.6 may refine the places with the furniture.
+ */
+export const LANTERNS: readonly (readonly [space: string, along: number, across: number])[] = [
+  ['cabin', -7.0, 0.6], ['passage', -4.6, 0], ['passage', -1.0, 0], ['master', -4.84, -2.6], ['surgeon', -2.6, -2.6],
+  ['purser', -0.3, -2.6], ['lieutenant', -4.77, 2.6], ['second', -2.6, 2.6], ['gunner', -0.3, 2.6], ['midships', 3.4, 0.8],
+  ['boatswain', 1.67, -2.6], ['carpenter', 1.67, 2.6], ['steward', 3.4, -2.6], ['pilot', 3.4, 2.6], ['cockpit', 5.3, -2.6],
+  ['stewards-room', 5.3, 2.6], ['messdeck', 7.4, 1.4], ['messdeck', 9.9, -1.4], ['galley', 13.3, 0.7], ['sailroom', 11.8, -2.6],
+  ['dry-store', 13.2, -2.6], ['boatswain-store', 12.5, 2.6], ['fore-store', 15.6, 0.6], ['lightroom', -2.0, 0.6],
+  ['spirit', 0.9, 0.9], ['hold', 4.0, 0.9], ['hold', 9.4, -0.9], ['fore-hold', 13.0, 0.6], ['breadroom', -9.0, 0.6],
+];
+
 /** Where the plan's walk begins: the quarterdeck, by the capstan. */
 export const QUARTERDECK = 'quarterdeck';
 

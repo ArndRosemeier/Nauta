@@ -2,7 +2,7 @@
  * The vertices of the ship's solid parts as her material kinds read them (materials.ts: SHIP_WOOD, SHIP_IRON,
  * SHIP_COPPER, SHIP_GLOW): position and normal in ship space, the paint or tint and how much paint covers the wood
  * (`finish`), the grain's coordinates in metres along and across it with the planks' width (`grain`), and the ambient
- * occlusion the builder knows and how worn an edge is (`shade`). One mesh per kind, so all her timber is one draw.
+ * occlusion the builder knows, how worn an edge is and the damage map's region (`shade`). One mesh per kind, so all her timber is one draw.
  */
 import type { Vector3 } from 'three/webgpu';
 import { Gathered } from './gathered';
@@ -17,13 +17,18 @@ export interface Finish {
   readonly plank?: number;
   /** A number that makes this piece's grain its own (each plank and timber looks different). */
   readonly seed?: number;
+  /**
+   * The damage map's region this surface is laid out in (damageMap.ts), its grain's u and v being the region's
+   * coordinates; 0 or absent: no damage is drawn on it.
+   */
+  readonly damage?: number;
 }
 
 /** Numbers per attribute. */
 const XYZ = 3;
 const RGBA = 4;
 const GRAIN = 4;
-const SHADE = 2;
+const SHADE = 3;
 
 /** One kind's vertices, gathered and turned into a geometry. */
 export class Solid extends Gathered {
@@ -41,7 +46,7 @@ export class Solid extends Gathered {
     this.nor.push(n.x, n.y, n.z);
     this.col.push(f.rgb[0], f.rgb[1], f.rgb[2], f.paint);
     this.grain.push(u, v, f.plank ?? 0, f.seed ?? 0);
-    this.shade.push(ao, wear);
+    this.shade.push(ao, wear, f.damage ?? 0);
     return this.vertices - 1;
   }
 

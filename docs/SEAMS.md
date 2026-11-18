@@ -125,28 +125,57 @@ Before writing code that does something, look here. If a row covers it, call tha
 | Her whole weight fitted for sea and its centre | `src/sim/ship/weight.ts#shipWeight` |
 | Tonnes of sea water a volume displaces | `src/sim/ship/weight.ts#displacementTonnes` |
 | The plan's drawings (lines, decks, walk graph) | `tools/plan/draw.ts#lines` |
-| Where one stands on the slice, and the look from there | `src/app/standpoints.ts#STANDPOINTS` |
+| Where one stands on her (and off her), and the look from there | `src/app/standpoints.ts#STANDPOINTS` |
 | The standpoints' buttons | `src/app/standpointBar.ts#showStandpoints` |
 | Vertices gathered and handed to the GPU as one geometry | `src/render/ship/gathered.ts#Gathered` |
 | Her solid parts' vertices (finish, grain, occlusion, wear) | `src/render/ship/solid.ts#Solid` |
 | A finished timber or plate with rounded edges | `src/render/ship/shapes.ts#box` |
 | A turned part (mast, hoops, ring bolts) | `src/render/ship/shapes.ts#lathe` |
 | A round bar between two points | `src/render/ship/shapes.ts#rod` |
-| A curved surface from rows of points (hull, decks, ceiling) | `src/render/ship/shapes.ts#sheet` |
+| A curved surface from rows of points (hull, decks, ceiling), cells into one solid or one per zone | `src/render/ship/shapes.ts#sheet` |
+| A profile swept along her (rail, waterway) | `src/render/ship/shapes.ts#sweep` |
+| A rounded oblong's profile for a sweep | `src/render/ship/shapes.ts#roundedProfile` |
+| The unit direction between two points | `src/render/ship/shapes.ts#direction` |
 | Rope as tubes round centre lines | `src/render/ship/rope.ts#Ropes` |
 | A rope hanging between two points | `src/render/ship/rope.ts#hanging` |
 | Her paint and the tints of her timber | `src/render/ship/looks.ts#BLACK` |
 | Loading the fittings pack made in AssetGenerator | `src/render/ship/fittings.ts#loadFittings` |
 | Placing a fitting into her solids, slot by slot | `src/render/ship/fittings.ts#place` |
-| The slice of her waist (N2.0) | `src/render/ship/slice.ts#buildSlice` |
-| Her rig within the slice: mast, top, channels, deadeyes, shrouds, ratlines, pin rails, coils | `src/render/ship/rig.ts#buildRig` |
+| The whole ship built: hull, decks, rooms, guns, lower rigs, the far ship, her lights and portals (N2.4) | `src/render/ship/ship.ts#buildShip` |
+| Where the sky comes in below deck, per zone | `src/render/ship/ship.ts#skyOpenings` |
+| Building the ship in a worker at load | `src/render/ship/loadShip.ts#loadShip` |
+| Every buffer of a build, to send it without a copy | `src/render/ship/ship.ts#shipBuffers` |
+| A build's typed arrays made into a geometry | `src/render/ship/gathered.ts#geometryOf` |
+| Her zones: which spaces are drawn together, the outside | `src/render/ship/zones.ts#zoneOfSpaces` |
+| The zone a place in her lies in | `src/render/ship/zones.ts#zoneAt` |
+| The zone under a place on a deck | `src/render/ship/zones.ts#zoneUnder` |
+| The portals between zones (deck openings, doors) | `src/render/ship/zones.ts#portals` |
+| The openings through one deck | `src/render/ship/zones.ts#openingsOn` |
+| The middle of an oblong of the plan | `src/render/ship/zones.ts#rectCentre` |
+| Which zones can be seen from the eye (portals on screen) | `src/render/ship/visibility.ts#Visibility` |
+| Each zone's solids and ropes, and her doors | `src/render/ship/parts.ts#ShipParts` |
+| Her outside: bands of planking, wales, copper, keel, stem, transom | `src/render/ship/hullSide.ts#buildOutside` |
+| Her bulwarks: the inside face, ports, lids, rail, waterway | `src/render/ship/hullSide.ts#buildBulwarks` |
+| Where the deck meets her side at her ends | `src/render/ship/hullSide.ts#deckEnds` |
+| Her side's outside and inside lines (planking, bulwark, ceiling) | `src/render/ship/hullSide.ts#outsideX` |
+| A port lid's lower edge (its lanyard's end) | `src/render/ship/hullSide.ts#lidEdge` |
+| Places along her for rows, cut at given places | `src/render/ship/hullSide.ts#rowsAlong` |
+| The weather deck and its underside, per zone | `src/render/ship/decks.ts#buildWeatherDeck` |
+| A deck's planking cut for holes, and its underside per zone | `src/render/ship/decks.ts#deckCells` |
+| The deck beams, knees and carlings | `src/render/ship/decks.ts#buildDeckBeams` |
+| The weather deck's openings: coamings, gratings, the companion, the skylight | `src/render/ship/decks.ts#buildDeckOpenings` |
+| The masts' partners on the weather deck | `src/render/ship/decks.ts#buildPartners` |
+| Her rooms: floors, ceiling, bulkheads, doors, ladders, lanterns | `src/render/ship/rooms.ts#buildRooms` |
+| Her damage map's layout (N6.5 writes into it) | `src/render/ship/damageMap.ts#DAMAGE_REGIONS` |
+| Where a point of a damaged surface lies in the damage map | `src/render/ship/damageMap.ts#damageTexel` |
+| Her lower rigs: masts, tops, channels, deadeyes, shrouds, ratlines, pin rails, coils | `src/render/ship/rig.ts#buildRigs` |
 | The timber's grain, pores and grime as one texture | `src/render/ship/grain.ts#makeGrainTexture` |
 | Her timber's shader: grain, planks, seams, paint, wear, grime | `src/render/ship/shipMaterials.ts#makeWoodMaterial` |
 | Her iron, copper, lantern glow and rope shaders | `src/render/ship/shipMaterials.ts#makeRopeMaterial` |
-| What her shaders read each frame (eye, lantern, hatch) | `src/render/ship/shipMaterials.ts#SHIP_INPUTS` |
-| Her half-breadth and deck height in a shader | `src/render/ship/hullNode.ts#hullHalfBreadth` |
+| What her shaders read each frame (lanterns, sky openings, glow, time) | `src/render/ship/shipMaterials.ts#SHIP_INPUTS` |
+| Her half-breadth and deck height in a shader | `src/render/ship/hullNode.ts#hullAt` |
 | No water drawn inside her hull | `src/render/seaCut.ts#seaCut` |
-| The ship drawn and riding the sea, the eye carried with her | `src/render/ship/shipView.ts#ShipView` |
+| The ship drawn and riding the sea, the eye carried with her, the zones seen, the far ship crossfaded, her doors swung | `src/render/ship/shipView.ts#ShipView` |
 | The sun's shadow map round her | `src/render/ship/shipView.ts#shadowingSun` |
 | Every knob that trades looks for frame time, by quality level (a package that costs frame time adds its knob here) | `src/app/quality.ts#QUALITY_LEVELS` |
 | Choosing the quality level from measured frame time in the first seconds (`?quality=` fixes one) | `src/app/quality.ts#QualityChooser` |

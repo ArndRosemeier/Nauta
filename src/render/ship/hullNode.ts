@@ -1,37 +1,49 @@
 // @ts-nocheck -- three's TSL typings infer vector widths poorly for shader math; checked by rendering it (npm run shot).
 /**
- * Her midship section for shaders: the moulded half-breadth at a ship-space height, read from a table of the section
- * (sim/ship/section.ts) and interpolated. The ship's kinds use it to know what lies inside her below the deck (no
- * open sky there), and the sea's cut uses it to leave out the water inside her hull (seaCut.ts).
+ * Her hull for shaders (plan N2.4): the outside of her planking's half-breadth at any place along her and height,
+ * and the deck at her side along her, read from a small texture made from her lines (sim/ship/hull.ts). The sea's cut
+ * uses it to leave out the water inside her hull (seaCut.ts).
  */
-import { abs, clamp, float, floor, int, min, mix, uniformArray } from 'three/tsl';
-import { DECK_AT_SIDE, DECK_CAMBER, RAIL_TOP } from '../../sim/rules/ships';
-import { halfBreadth, shipY } from '../../sim/ship/section';
+import { DataTexture, LinearFilter, RGBAFormat, UnsignedByteType } from 'three/webgpu';
+import { texture, vec2 } from 'three/tsl';
+import { PLANKING } from '../../sim/rules/ships';
+import { HULL_AFT, HULL_FORE, HULL_HIGH, HULL_LOW, hullHalfBreadth, sheer } from '../../sim/ship/hull';
+import { shipY, shipZ } from '../../sim/ship/section';
 
-/** Readings of the table, from her keel's bottom to the rail. */
-const READINGS = 48;
-const LOWEST = shipY(0);
-const HIGHEST = shipY(RAIL_TOP);
-/** The top reading is read a hair below, so its pair is still in the table. */
-const SHY_OF_TOP = 1e-3;
-const STEP = (HIGHEST - LOWEST) / (READINGS - 1);
-const TABLE = uniformArray(Array.from({ length: READINGS }, (_, i) => halfBreadth(i * STEP)), 'float');
+/** The texture's texels along her and up, and the widest half-breadth and highest deck it holds, m. */
+const ALONG = 256;
+const UP = 128;
+const MOST_HALF = 5;
+/** A byte's largest value. */
+const BYTE = 255;
+/** Bytes per texel. */
+const RGBA = 4;
 
-/** The deck's height at her side, ship space. */
-export const DECK_SIDE_Y = shipY(DECK_AT_SIDE);
+const Z0 = shipZ(HULL_FORE), Z1 = shipZ(HULL_AFT), Y0 = shipY(HULL_LOW), Y1 = shipY(HULL_HIGH);
 
-/** Her half-breadth at the deck, m. */
-const DECK_HALF = halfBreadth(DECK_AT_SIDE);
-
-/** The weather deck's top at ship-space `x` (a float node): cambered, highest on the centreline (section.ts deckY). */
-export function deckTopY(x) {
-  const f = min(abs(x).div(DECK_HALF), 1);
-  return float(DECK_SIDE_Y).add(float(DECK_CAMBER).mul(float(1).sub(f.mul(f))));
+/** R: her half-breadth outside her planking over MOST_HALF; G: the deck at her side above her lowest point, over her whole height. */
+function makeHullTexture(): DataTexture {
+  const data = new Uint8Array(ALONG * UP * RGBA);
+  for (let i = 0; i < ALONG; i++) {
+    const along = -(Z0 + ((Z1 - Z0) * i) / (ALONG - 1));
+    const deck = Math.round((BYTE * (shipY(sheer(along)) - Y0)) / (Y1 - Y0));
+    for (let j = 0; j < UP; j++) {
+      const h = HULL_LOW + ((HULL_HIGH - HULL_LOW) * j) / (UP - 1), half = hullHalfBreadth(along, h);
+      const k = (j * ALONG + i) * RGBA;
+      data[k] = half > 0 ? Math.min(BYTE, Math.round((BYTE * (half + PLANKING.side)) / MOST_HALF)) : 0;
+      data[k + 1] = deck;
+    }
+  }
+  const t = new DataTexture(data, ALONG, UP, RGBAFormat, UnsignedByteType);
+  t.magFilter = LinearFilter;
+  t.minFilter = LinearFilter;
+  t.needsUpdate = true;
+  return t;
 }
+const HULL_TEXTURE = makeHullTexture();
 
-/** The moulded half-breadth (to the outside of her frames) at ship-space height `y` (a float node). */
-export function hullHalfBreadth(y) {
-  const f = clamp(y.sub(LOWEST).div(STEP), 0, READINGS - 1 - SHY_OF_TOP);
-  const i = int(floor(f));
-  return mix(TABLE.element(i), TABLE.element(i.add(1)), f.sub(float(i)));
+/** Her half-breadth outside her planking (m) and the deck's height at her side (ship space), at ship-space z and y (float nodes). */
+export function hullAt(z, y) {
+  const t = texture(HULL_TEXTURE, vec2(z.sub(Z0).div(Z1 - Z0), y.sub(Y0).div(Y1 - Y0)));
+  return { half: t.r.mul(MOST_HALF), deck: t.g.mul(Y1 - Y0).add(Y0) };
 }

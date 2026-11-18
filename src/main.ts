@@ -11,8 +11,7 @@ import { createView } from './render/view';
 import { SkyView } from './render/skyView';
 import { SeaView } from './render/seaView';
 import { makeTestBodies } from './render/testBodies';
-import { loadFittings } from './render/ship/fittings';
-import { buildSlice } from './render/ship/slice';
+import { loadShip } from './render/ship/loadShip';
 import { ShipView } from './render/ship/shipView';
 import { SeaSound } from './audio/seaSound';
 import { Vector3 } from 'three/webgpu';
@@ -62,9 +61,9 @@ const el = <T extends HTMLElement>(id: string) => document.getElementById(id) as
 async function start(): Promise<void> {
   const params = readParams(location.search);
   const canvas = el<HTMLCanvasElement>('view'), hud = el('hud'), loading = el('loading');
-  // `?slice`: her waist, built from the fittings pack behind the loading screen (plan N2.0); the sun casts shadows then.
-  const ship = params.slice !== null ? new ShipView(buildSlice(await loadFittings(import.meta.env.BASE_URL))) : null;
-  let where: Standpoint = standpoint(params.slice ?? '');
+  // `?ship`: the whole brig, built in a worker behind the loading screen (plan N2.4); the sun casts shadows then.
+  const ship = params.ship !== null ? new ShipView(await loadShip(import.meta.env.BASE_URL)) : null;
+  let where: Standpoint = standpoint(params.ship ?? '');
   const view = await createView(canvas, params.forceWebGL, ship !== null);
   view.camera.position.set(0, params.eye, 0);
   const startLook = params.look ?? START_LOOK;
@@ -174,7 +173,7 @@ async function start(): Promise<void> {
     if (params.hud && now - shown >= HUD_EVERY_MS) {
       ms = (now - shown) / frames; frames = 0; shown = now;
       const px = view.drawnSize();
-      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris, ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}`;
+      hud.textContent = `${view.backend} · ${ms.toFixed(1)} ms · ${sky.clock} · force ${wind.windForce} · eye ${view.camera.position.y.toFixed(1)} m · sea ${seaView.tilesDrawn} tiles${ship ? ` · ship ${Math.round(ship.triangles / THOUSAND)}k tris (${Math.round(ship.trianglesDrawn / THOUSAND)}k drawn), ${Math.round(ship.bytes / MEGABYTE)} MB` : ''} · ${view.renderer.info.render.drawCalls} draws\nquality ${quality.knobs.name}, ${px.x} × ${px.y} px: ${quality.reason}\n${view.stage.hudLine()}\n${sound.engine.summary()}`;
     }
     if (!window.__nautaReady) {
       window.__nautaReady = true;

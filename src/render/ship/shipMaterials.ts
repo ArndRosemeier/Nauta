@@ -8,28 +8,62 @@
  * deck no sky comes in but through the hatch, so the sky's fill there falls off with the distance from it; and the
  * lantern's light is added to what it shines on, in the shader (a light of the scene's would be in every lit shader).
  */
-import { Color, DoubleSide, FrontSide, MeshBasicNodeMaterial, MeshStandardNodeMaterial, Vector3, Vector4 } from 'three/webgpu';
+import { Color, DataTexture, DoubleSide, FrontSide, Matrix4, MeshBasicNodeMaterial, MeshStandardNodeMaterial, RGBAFormat, UnsignedByteType, Vector2, Vector4 } from 'three/webgpu';
 import {
-  Fn, abs, attribute, clamp, dot, float, floor, fract, fwidth, hash, length, max, min, mix, normalGeometry, normalLocal, normalize,
-  positionGeometry, positionLocal, smoothstep, step, texture, transformNormalToView, uniform, varyingProperty, vec2, vec3,
+  Fn, Loop, abs, attribute, clamp, dot, float, floor, fract, fwidth, hash, int, length, max, min, mix, modelViewMatrix, normalGeometry,
+  normalLocal, normalize, positionGeometry, positionLocal, screenCoordinate, sin, smoothstep, step, texture, transformNormalToView,
+  uniform, uniformArray, varyingProperty, vec2, vec3, vec4,
 } from 'three/tsl';
-import { DECK_PLANK_LENGTH, PLANKING } from '../../sim/rules/ships';
+import { DECK_PLANK_LENGTH } from '../../sim/rules/ships';
 import { GRAIN_SPAN, makeGrainTexture } from './grain';
-import { deckTopY, hullHalfBreadth } from './hullNode';
+import { DAMAGE_MAP_SIZE, DAMAGE_REGIONS, DAMAGE_TEXEL } from './damageMap';
 
-/** What the ship's shaders read, written each frame by the ship's view (shipView.ts). */
+/** How many lanterns and sky openings her shaders can hold. */
+export const MOST_LAMPS = 40;
+export const MOST_SKIES = 24;
+
+/** What the ship's shaders read, written by the ship's view (shipView.ts). */
 export const SHIP_INPUTS = {
-  /** The eye in ship space (rope is widened to a pixel toward it), and the view's angle per pixel, rad. */
-  eye: uniform(new Vector3()),
+  /** The view's angle per pixel, rad (rope is widened to a pixel). */
   pixel: uniform(0.001),
-  /** The lantern's flame in ship space, and its light: colour times strength as the scene's lights carry it. */
-  flame: uniform(new Vector3()),
+  /** The lanterns' light: colour times strength as the scene's lights carry it. */
   lantern: uniform(new Color()),
-  /** The horn's glow: colour times strength (it flickers with the flame). */
+  /** The horn's glow: colour times strength. */
   glow: uniform(new Color()),
-  /** The hatch's opening: middle x and z, half its width and half its length, ship space (m). */
-  hatch: uniform(new Vector4()),
+  /** Seconds, for the flames' flicker. */
+  time: uniform(0),
+  /** Her lanterns' flames (ship space) and each one's flicker phase, grouped by zone. */
+  lamps: uniformArray(Array.from({ length: MOST_LAMPS }, () => new Vector4()), 'vec4'),
+  /** The openings that let the sky in below, grouped by zone: middle x and z, half width and half length (ship space, m)... */
+  skyPlace: uniformArray(Array.from({ length: MOST_SKIES }, () => new Vector4()), 'vec4'),
+  /** ...and the height of the deck they are in (ship space) and how much they let through. */
+  skyKind: uniformArray(Array.from({ length: MOST_SKIES }, () => new Vector4()), 'vec4'),
 };
+
+/** No light ranges: the outside, under the open sky. */
+const OUTSIDE_RANGE = new Vector4(-1, -1, -1, -1);
+const IDENTITY = new Matrix4();
+/** Drawn whole: no fading. */
+const WHOLE = new Vector2(0, 1);
+
+/** What each mesh of her tells her shaders, read as each is drawn (mesh.userData, written by shipView.ts). */
+export const SHIP_OBJECT = {
+  /** Which lanterns light it and which openings let the sky in: [first lamp, past the last, first opening, past the last]; all -1 outside. */
+  light: uniform(new Vector4()).onObjectUpdate(({ object }) => object.userData.light ?? OUTSIDE_RANGE),
+  /** From its own space into ship space (a door turns on its hinge). */
+  toShip: uniform(new Matrix4()).onObjectUpdate(({ object }) => object.userData.toShip ?? IDENTITY),
+  /** Its share of a crossfade between levels of detail: drawn where the screen's dither lies in [x, y). */
+  fade: uniform(new Vector2()).onObjectUpdate(({ object }) => object.userData.fade ?? WHOLE),
+};
+
+/** The damage map (damageMap.ts): one texel per 4 cm of her hull and decks; N6.5 writes holes and scorches into it. */
+export const DAMAGE_TEXTURE = new DataTexture(new Uint8Array(DAMAGE_MAP_SIZE.width * DAMAGE_MAP_SIZE.height * RGBA), DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height, RGBAFormat, UnsignedByteType);
+DAMAGE_TEXTURE.needsUpdate = true;
+/** Each region's least u and v (m) and its corner in the map (texels), by region number less one. */
+const REGIONS = uniformArray(DAMAGE_REGIONS.map((r) => new Vector4(r.u, r.v, r.x, r.y)), 'vec4');
+
+/** Bytes per texel of the damage map. */
+const RGBA = 4;
 
 /** The grain, shared by all the ship's kinds (made once, on first use). */
 let grain = null;
@@ -75,41 +109,73 @@ const SEAMS_FADE = 0.5;
 
 // --- Below deck.
 /**
- * Below her deck the sky's light comes only through the hatch: the share of the open sky a point sees through an
+ * Below her deck the sky's light comes only through her openings: the share of the open sky a point sees through an
  * opening of area A at distance d is about A / (A + π d²) (a disc seen face on); turned toward it, a little more.
  */
 const HATCH_TURN = 1 / 2;
-/** Even far from the hatch a little light finds its way (scuttles, gratings, the cut ends of this slice). */
+/** Even far from an opening a little light finds its way (seams, gratings, scuttles), a share of the sky. */
 const BELOW_FLOOR = 0.012;
-/** The ship's inside is this far inside her moulded breadth (m): her outer planking lies outside it. */
-const INSIDE = PLANKING.side;
-/** The lantern's light falls off as 1/(d² + this), m²: a flame is not a point. */
+/** A lantern's light falls off as 1/(d² + this), m²: a flame is not a point. */
 const FLAME_SIZE = 0.04;
+/** The flames' flicker: how deep, its two rates (Hz), and how far apart the second rate's phase is from the first's. */
+const FLICKER = { depth: 0.12, slow: 1.3, fast: 7.7, apart: 2.7 } as const;
+/** Lengths below this are none, m. */
+const TINY = 1e-3;
+/** A turn, rad. */
+const TURN = 2 * Math.PI;
 
-/** One kind's lighting of her below deck: how much sky reaches a point (ambient occlusion), and the lantern's light on it. */
+/**
+ * How a mesh of hers is lit below deck: the share of the sky reaching a point through the openings of its zone
+ * (times the ambient occlusion `ao`), and the light of its zone's lanterns on it. Outside both are as under the sky.
+ */
 function belowDeck(ao) {
-  const I = SHIP_INPUTS, p = positionLocal, n = normalize(normalLocal);
-  // Below the deck's underside and inside her planking: no open sky but through the hatch.
-  const inside = step(abs(p.x), hullHalfBreadth(p.y).sub(INSIDE));
-  const under = step(p.y, deckTopY(p.x).sub(PLANKING.deck / 2));
-  const below = inside.mul(under);
-  const toHatch = vec3(I.hatch.x, deckTopY(I.hatch.x), I.hatch.y).sub(p);
-  const d = length(toHatch);
-  const facing = mix(float(1 - HATCH_TURN), float(1 + HATCH_TURN), dot(n, toHatch.div(max(d, NO_PLANKS))).mul(1 / 2).add(1 / 2));
-  const area = I.hatch.z.mul(I.hatch.w).mul(2 * 2);
-  const open = area.div(area.add(d.mul(d).mul(Math.PI))).mul(facing).max(BELOW_FLOOR);
-  const sky = mix(float(1), open, below).mul(ao);
-  const toFlame = I.flame.sub(p), f2 = dot(toFlame, toFlame);
-  const lamp = I.lantern.mul(max(dot(n, normalize(toFlame)), 0)).div(f2.add(FLAME_SIZE)).mul(below);
-  return { sky, lamp };
+  const O = SHIP_OBJECT, I = SHIP_INPUTS, r = O.light;
+  const p = O.toShip.mul(vec4(positionLocal, 1)).xyz, n = normalize(O.toShip.mul(vec4(normalLocal, 0)).xyz);
+  const inside = step(0, r.w);
+  const light = Fn(() => {
+    const sky = float(0).toVar(), lamp = vec3(0).toVar();
+    Loop({ start: int(r.z), end: int(r.w), type: 'int', condition: '<' }, ({ i }) => {
+      const place = I.skyPlace.element(i), kind = I.skyKind.element(i);
+      const to = vec3(place.x, kind.x, place.y).sub(p), d = length(to);
+      const facing = mix(float(1 - HATCH_TURN), float(1 + HATCH_TURN), dot(n, to.div(max(d, TINY))).mul(1 / 2).add(1 / 2));
+      const area = place.z.mul(place.w).mul(2 * 2);
+      sky.addAssign(area.div(area.add(d.mul(d).mul(Math.PI))).mul(facing).mul(kind.y));
+    });
+    Loop({ start: int(r.x), end: int(r.y), type: 'int', condition: '<' }, ({ i }) => {
+      const L = I.lamps.element(i), to = L.xyz.sub(p), f2 = dot(to, to);
+      const flicker = float(1).add(sin(I.time.mul(FLICKER.slow * TURN).add(L.w)).add(sin(I.time.mul(FLICKER.fast * TURN).add(L.w.mul(FLICKER.apart)))).mul(FLICKER.depth / 2));
+      lamp.addAssign(I.lantern.mul(flicker).mul(max(dot(n, normalize(to)), 0)).div(f2.add(FLAME_SIZE)));
+    });
+    return vec4(sky.max(BELOW_FLOOR), lamp);
+  })();
+  return { sky: mix(float(1), light.x, inside).mul(ao), lamp: light.yzw.mul(inside) };
 }
 
-/** Her timber: grain, planks and their caulked seams, paint and its wear, grime. One kind for every piece of wood. */
-export function makeWoodMaterial(): MeshStandardNodeMaterial {
+/** Where a mesh being crossfaded is not drawn (its share of the screen's dither lies elsewhere). */
+function fading() {
+  const d = hash(screenCoordinate.xy), f = SHIP_OBJECT.fade;
+  return step(f.x, d).mul(step(d, f.y.sub(TINY / 2))).greaterThan(1 / 2);
+}
+
+/** The damage drawn on a surface laid out in the damage map (shade.z its region): scorch darkens it. N6.5 adds holes. */
+function scorched(colour, gr, region) {
+  const k = REGIONS.element(int(max(region.sub(1), 0)));
+  const uv = vec2(k.z.add(gr.x.sub(k.x).div(DAMAGE_TEXEL)), k.w.add(gr.y.sub(k.y).div(DAMAGE_TEXEL))).div(vec2(DAMAGE_MAP_SIZE.width, DAMAGE_MAP_SIZE.height));
+  const scorch = texture(DAMAGE_TEXTURE, uv).g.mul(step(1 / 2, region));
+  return mix(colour, vec3(...CHAR), scorch);
+}
+/** Charred timber (linear RGB). */
+const CHAR = [0.008, 0.007, 0.006];
+
+/**
+ * Her timber: grain, planks and their caulked seams, paint and its wear, grime, and the damage drawn on it. One kind
+ * for every piece of wood; `crossfade` makes the kind of it a crossfade between levels of detail draws with.
+ */
+export function makeWoodMaterial(crossfade = false): MeshStandardNodeMaterial {
   // Both faces cast: her timbers touch (beam under deck, mast through partners), and back faces alone let the sun in at the joints.
   const m = new MeshStandardNodeMaterial({ side: FrontSide, shadowSide: DoubleSide });
   m.name = 'ship wood';
-  const fin = attribute('finish', 'vec4'), gr = attribute('grain', 'vec4'), sh = attribute('shade', 'vec2');
+  const fin = attribute('finish', 'vec4'), gr = attribute('grain', 'vec4'), sh = attribute('shade', 'vec3');
   const plank = gr.z, planked = step(NO_PLANKS, plank);
   // Which plank: rows across the planks, butts along them every plank's length, staggered by row.
   const across = gr.y.div(max(plank, NO_PLANKS)), row = floor(across).mul(planked);
@@ -138,12 +204,13 @@ export function makeWoodMaterial(): MeshStandardNodeMaterial {
   const fade = float(1).sub(smoothstep(0, SEAMS_FADE, wAcross.div(max(plank, NO_PLANKS))));
   const seam = max(seamA, seamB).mul(planked).mul(fade);
   const seamColour = mix(vec3(...PITCH), surface.mul(SEAM_UNDER_PAINT), cover);
-  m.colorNode = mix(surface, seamColour, seam);
+  m.colorNode = scorched(mix(surface, seamColour, seam), gr, sh.z);
   m.roughnessNode = mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover)));
   m.metalnessNode = float(0);
   const light = belowDeck(ao);
   m.aoNode = light.sky;
   m.emissiveNode = m.colorNode.mul(light.lamp);
+  if (crossfade) m.maskNode = fading();
   return m;
 }
 
@@ -151,16 +218,17 @@ export function makeWoodMaterial(): MeshStandardNodeMaterial {
 const ROUGH_IRON = 0.55;
 const METAL_IRON = 0.35;
 /** Iron: black-leaded or painted, its colour from the fittings pack or the builder. */
-export function makeIronMaterial(): MeshStandardNodeMaterial {
+export function makeIronMaterial(crossfade = false): MeshStandardNodeMaterial {
   const m = new MeshStandardNodeMaterial({ side: FrontSide, shadowSide: DoubleSide });
   m.name = 'ship iron';
-  const fin = attribute('finish', 'vec4'), sh = attribute('shade', 'vec2');
+  const fin = attribute('finish', 'vec4'), sh = attribute('shade', 'vec3');
   m.colorNode = fin.rgb;
   m.roughnessNode = float(ROUGH_IRON);
   m.metalnessNode = float(METAL_IRON);
   const light = belowDeck(sh.x);
   m.aoNode = light.sky;
   m.emissiveNode = fin.rgb.mul(light.lamp);
+  if (crossfade) m.maskNode = fading();
   return m;
 }
 
@@ -181,7 +249,7 @@ const LAP = 0.004;
 const ROUGH_COPPER = 0.42;
 const ROUGH_TARNISH = 0.3;
 /** The copper sheathing below her waterline: sheets, laps, nails, tarnish and verdigris. */
-export function makeCopperMaterial(): MeshStandardNodeMaterial {
+export function makeCopperMaterial(crossfade = false): MeshStandardNodeMaterial {
   const m = new MeshStandardNodeMaterial({ side: FrontSide });
   m.name = 'ship copper';
   const fin = attribute('finish', 'vec4'), gr = attribute('grain', 'vec4');
@@ -201,6 +269,7 @@ export function makeCopperMaterial(): MeshStandardNodeMaterial {
   m.colorNode = mix(mix(metal, vec3(...VERDIGRIS), green), vec3(...COPPER_BROWN), max(lap, nail));
   m.metalnessNode = float(1).sub(green);
   m.roughnessNode = mix(float(ROUGH_TARNISH), float(ROUGH_COPPER), tarnish).add(green.mul(1 / 2));
+  if (crossfade) m.maskNode = fading();
   return m;
 }
 
@@ -238,7 +307,7 @@ export function makeRopeMaterial(): MeshStandardNodeMaterial {
   const cover = varyingProperty('float', 'vRopeCover');
   m.positionNode = Fn(() => {
     const centre = positionGeometry, radius = r.z;
-    const least = length(centre.sub(I.eye)).mul(I.pixel).mul(ROPE_PIXELS / 2);
+    const least = length(modelViewMatrix.mul(vec4(centre, 1)).xyz).mul(I.pixel).mul(ROPE_PIXELS / 2);
     const w = max(radius, least);
     cover.assign(radius.div(w));
     return centre.add(normalGeometry.mul(w));
@@ -251,6 +320,7 @@ export function makeRopeMaterial(): MeshStandardNodeMaterial {
   m.colorNode = mix(vec3(...HEMP), vec3(...TAR), r.w).mul(groove);
   m.roughnessNode = mix(float(ROUGH_HEMP), float(ROUGH_TAR), r.w);
   m.metalnessNode = float(0);
-  m.opacityNode = cover;
+  // Crossfading between levels of detail, a rope fades by its share instead of being dithered.
+  m.opacityNode = cover.mul(SHIP_OBJECT.fade.y.sub(SHIP_OBJECT.fade.x));
   return m;
 }
