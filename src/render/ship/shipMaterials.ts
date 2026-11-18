@@ -214,7 +214,8 @@ export function crossfadeMask() {
  * by its place along her alone), from its ship's block of the map: hole, scorch, rim, cut (damageMarks.ts `MARK`).
  */
 function damageAt(gr, region) {
-  const i = int(clamp(region.sub(1), 0, DAMAGE_REGIONS.length - 1)), k = REGIONS.element(i);
+  // The region number arrives interpolated (6 a hair under reads as 5 if cut off, not rounded): its middle between whole numbers is rounded to.
+  const i = int(clamp(region.sub(1 / 2), 0, DAMAGE_REGIONS.length - 1)), k = REGIONS.element(i);
   const laid = step(1 / 2, region).mul(step(region, DAMAGE_REGIONS.length + 1 / 2));
   const v = mix(gr.y, k.y.add(DAMAGE_TEXEL / 2), BY_PLACE.element(i));
   const row = k.w.add(v.sub(k.y).div(DAMAGE_TEXEL)).add(SHIP_OBJECT.ship.mul(DAMAGE_MAP_SIZE.height));
@@ -231,28 +232,34 @@ const SPLINTERED = [0.42, 0.3, 0.17];
 const HOLE_FROM = 0.2;
 const LIGHT_FROM = 0.75;
 const CUT_FROM = 0.5;
-/** The splintered rim is broken into splinters this many to a metre, and this much of it shows at most. */
-const SPLINTERS_PER_M = 40;
+/**
+ * The splintered rim breaks up along the grain: the late-wood rings (long streaks) carry it past this share of the
+ * rim's strength in the map (below it: bare), over this softness. The rim shows this much of fresh wood at most.
+ */
+const RIM_FROM = 0.3;
+const RIM_SOFT = 0.25;
 const RIM_SHOWS = 0.85;
-/** The edges of holes and cuts wander by this much of a mark (fine raggedness under the map's texel). */
-const EDGE_WANDER = 0.12;
+/** Less rim than this in the map (a byte's step) is none: no splinters where nothing was struck. */
+const RIM_LEAST = 0.004;
+/** How much the rings move the rim's edge (a share of the rim's strength): the splinters' length. */
+const SPLINTER_REACH = 0.7;
+/** The edges of holes and cuts wander by this much of a mark (the grime noise, smooth: a ragged line, no specks). */
+const EDGE_WANDER = 0.2;
 
-/** Her timber as the damage map has it: the rim splintered, scorch charred, a hole dark (its light is `holeLight`). */
-function damaged(colour, d, gr) {
-  const splinters = hash(floor(gr.xy.mul(SPLINTERS_PER_M)).dot(vec2(1, SPLINTERS_PER_M)));
-  const rim = d.b.mul(smoothstep(0, 1, splinters.add(d.b).sub(1 / 2))).mul(RIM_SHOWS);
+/** Her timber as the damage map has it: the rim splintered along the grain, scorch charred, a hole dark (its light is `holeLight`). */
+function damaged(colour, d, g) {
+  const rim = smoothstep(RIM_FROM, RIM_FROM + RIM_SOFT, d.b.add(g.x.sub(1 / 2).mul(SPLINTER_REACH))).mul(RIM_SHOWS).mul(step(RIM_LEAST, d.b));
   const scorch = d.g;
-  const hole = step(HOLE_FROM, d.r.add(splinters.sub(1 / 2).mul(EDGE_WANDER)));
+  const hole = step(HOLE_FROM, d.r.add(g.w.sub(1 / 2).mul(EDGE_WANDER)));
   return mix(mix(mix(colour, vec3(...SPLINTERED), rim), vec3(...CHAR), scorch), vec3(...HOLE_INSIDE), hole);
 }
 /** The daylight through a hole from inside her (a lit room or the deck's underside): its colour, to add as light. */
 function holeLight(d, inside) {
   return SHIP_INPUTS.daylight.mul(step(LIGHT_FROM, d.r)).mul(inside);
 }
-/** Where a surface is cut away (a bulwark shot through or smashed out): not drawn. */
-function uncut(d, gr) {
-  const wander = hash(floor(gr.xy.mul(SPLINTERS_PER_M)).dot(vec2(1, SPLINTERS_PER_M))).sub(1 / 2).mul(EDGE_WANDER);
-  return d.a.add(wander).lessThan(CUT_FROM);
+/** Where a surface is cut away (a bulwark section smashed out): not drawn. */
+function uncut(d, g) {
+  return d.a.add(g.w.sub(1 / 2).mul(EDGE_WANDER)).lessThan(CUT_FROM);
 }
 
 /**
@@ -295,7 +302,7 @@ export function makeWoodMaterial(crossfade = false, holed = crossfade): MeshStan
   const seam = max(seamA, seamB).mul(planked).mul(fade);
   const seamColour = mix(vec3(...PITCH), surface.mul(SEAM_UNDER_PAINT), cover);
   // Her outside wet where the sea has climbed it (wakeMap.ts `wetHull`); inside, dry.
-  const dmg = damageAt(gr, sh.z), marked = damaged(mix(surface, seamColour, seam), dmg, gr);
+  const dmg = damageAt(gr, sh.z), marked = damaged(mix(surface, seamColour, seam), dmg, g);
   const wet = wetHull(positionLocal, marked, mix(mix(float(ROUGH_WOOD), float(ROUGH_PAINT), cover), float(ROUGH_PITCH), seam.mul(float(1).sub(cover))), SHIP_OBJECT.ship, SHIPS_DRAWN);
   const outside = float(1).sub(step(0, SHIP_OBJECT.light.w));
   m.colorNode = mix(marked, wet.colour, outside);
@@ -304,7 +311,7 @@ export function makeWoodMaterial(crossfade = false, holed = crossfade): MeshStan
   const light = belowDeck(ao);
   m.aoNode = light.sky;
   m.emissiveNode = m.colorNode.mul(light.lamp).add(holeLight(dmg, float(1).sub(outside)));
-  if (crossfade || holed) m.maskNode = crossfade ? crossfadeMask().and(uncut(dmg, gr)) : uncut(dmg, gr);
+  if (crossfade || holed) m.maskNode = crossfade ? crossfadeMask().and(uncut(dmg, g)) : uncut(dmg, g);
   return m;
 }
 
