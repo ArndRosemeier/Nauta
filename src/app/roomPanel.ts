@@ -10,7 +10,7 @@ import { MOST_PLAYERS, roomRefusal } from '../net/wire';
 import { make } from './dom';
 import { openSheet } from './sheet';
 import type { WordKey } from './words';
-import { hubKey, openHub } from './hub';
+import { openHub } from './hub';
 import { joinLink, type Params } from './params';
 
 /** How the captain is named to the other player. */
@@ -72,7 +72,7 @@ export class RoomPanel {
       this.hub = null;
       this.pendingSession = null;
       const why = err instanceof Error ? err.message.replace(/^gamehub: /, '') : String(err);
-      this.problem = hubKey(this.params) || this.params.hub ? why : `This build has no GameHub key yet (${why}): add ?key=… to the address`;
+      this.problem = why;
       if (this.open) this.open(); else this.openRooms();
     }
   }

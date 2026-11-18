@@ -73,15 +73,19 @@ export class PageMatch implements OrderSession {
     this.changed.add(fn);
   }
 
-  /** Runs `s` from now on, as soon as its match has begun. */
-  use(s: DuelSession): void {
+  /**
+   * Runs `s` from now on, as soon as its match has begun and it has a ship for me: a guest starts from the room's state
+   * of before he came, and the host seats him a moment later, so the view never shows the host's ship as his.
+   */
+  useSession(s: DuelSession): void {
+    const ready = () => s.started && s.mine >= 0;
     const swap = () => {
-      if (!s.started || this.current === s) return;
+      if (!ready() || this.current === s) return;
       this.current = this.attach(s);
       this.drawnNow = s.drawn();
       for (const fn of this.changed) fn();
     };
-    if (s.started) swap(); else s.on('change', swap);
+    if (ready()) swap(); else s.on('change', swap);
   }
 
   /** Once a frame: the match run up to the clock, and what to draw of it. */

@@ -12,10 +12,16 @@ import type { SimEvent } from '../src/sim/step.ts';
 import { STEPS_PER_SECOND } from '../src/sim/units.ts';
 import { DuelRoom } from './support/duelRoom.ts';
 
-/** GameHub's limit of messages a second per player, and the plan's network budget: 20 states a second of 16 KB at most. */
+/**
+ * GameHub's limit of messages a second per player, and the plan's network budget (design thread, 2026-11-18): at most
+ * 20 deltas a second, each under 1 KB, and a whole state now and then under 64 KB as sent.
+ */
 const HUB_MESSAGES_PER_SECOND = 60;
-const STATES_PER_SECOND = 20;
-const STATE_BYTES = 16 * 1024;
+const DELTAS_PER_SECOND = 20;
+const DELTA_BYTES = 1024;
+const STATE_BYTES = 64 * 1024;
+/** How often the host sends a whole state at most when nothing goes wrong, s: every 5 s, and once at the join. */
+const STATE_EVERY_SECONDS = 5;
 
 async function twoInARoom(): Promise<{ room: DuelRoom; host: DuelSession; guest: DuelSession }> {
   const room = new DuelRoom();
@@ -148,7 +154,9 @@ test('what the host sends fits GameHub\'s limits and the plan\'s network budget'
   room.run(seconds * STEPS_PER_SECOND, (i) => { if (i % STEPS_PER_SECOND === 0) { host.give({ kind: 'away', ship: 0 } as Order); guest.give({ kind: 'up', ship: 1 } as Order); } });
   const sent = room.server.sent;
   assert.ok((sent.state + sent.delta) / seconds < HUB_MESSAGES_PER_SECOND / 2, `${sent.state + sent.delta} messages from the host in ${seconds} s`);
-  assert.ok(sent.state / seconds <= STATES_PER_SECOND);
+  assert.ok(sent.delta / seconds <= DELTAS_PER_SECOND, `${sent.delta} deltas in ${seconds} s`);
+  assert.ok(sent.deltaBytes < DELTA_BYTES, `a delta is ${sent.deltaBytes} bytes`);
+  assert.ok(sent.state <= seconds / STATE_EVERY_SECONDS + 2, `${sent.state} whole states in ${seconds} s`);
   assert.ok(sent.stateBytes < STATE_BYTES, `a state is ${sent.stateBytes} bytes`);
   assert.ok(sent.msg <= seconds + 1, `${sent.msg} orders from the guest`);
 });

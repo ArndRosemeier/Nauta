@@ -85,14 +85,6 @@ jobs:
       # as well, so a test that leans on another file's leftovers fails.
       - name: npm test, each file in its own process
         run: node tools/guards/budget.mjs 120 180 -- npm test -- --isolated
-      - name: Two headless browsers play one match through a GameHub stand-in, and the guest takes over when the host leaves (N3.7)
-        run: node tools/guards/budget.mjs 120 180 -- npm run check:room
-      - name: The same against the live GameHub, once the game's app key is a repository variable (N3.7)
-        if: vars.GAMEHUB_KEY != ''
-        env:
-          GAMEHUB_URL: https://games.futuremagic.de
-          GAMEHUB_KEY: ${{ vars.GAMEHUB_KEY }}
-        run: node tools/guards/budget.mjs 120 180 -- npm run check:room
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -124,6 +116,15 @@ jobs:
         env:
           SHOT_TIMEOUT: 170000
         run: node tools/guards/budget.mjs 120 180 -- npm run shot:sails -- shots/sails
+      - name: Two headless browsers play one match through a GameHub stand-in, and the guest takes over when the host leaves (N3.7)
+        timeout-minutes: 3
+        run: node tools/guards/budget.mjs 60 120 -- npm run check:room
+      # A server outside our hands: the check gives a connection that fails one more try, and stops within its 3 minutes.
+      - name: The same against the live GameHub, with the game's own app key (N3.7)
+        timeout-minutes: 3
+        env:
+          GAMEHUB_URL: https://games.futuremagic.de
+        run: node tools/guards/budget.mjs 60 120 -- npm run check:room
       - uses: actions/upload-artifact@v4
         if: always()
         with:

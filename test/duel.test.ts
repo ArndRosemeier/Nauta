@@ -74,6 +74,27 @@ test('a guest\'s order is carried out on the host for his ship, and he hears it 
   assert.deepEqual(refusal(heard), refusal(hostHeard));
 });
 
+test('a guest who gives an order before the host has seated him still has it carried out, for the ship he is given', async () => {
+  const room = new DuelRoom();
+  const host = room.machine('Host'), guest = room.machine('Guest');
+  await host.create('duel');
+  await room.settle();
+  // The guest starts from the room's snapshot of before, where no ship is his yet, and gives an order at once.
+  let unseated = false;
+  guest.on('change', () => {
+    if (guest.role !== 'guest' || guest.mine !== -1 || unseated) return;
+    unseated = true;
+    guest.give({ kind: 'sail', ship: 0, canvas: 'plain' });
+  });
+  await guest.join(host.code);
+  await room.settle();
+  assert.ok(unseated, 'he was a guest without a ship for a moment');
+  assert.equal(guest.mine, 1);
+  room.run(STEPS_PER_SECOND);
+  assert.equal(host.state.ships[1]!.told.canvas, 'plain');
+  assert.equal(host.state.ships[0]!.told.canvas, 'battle');
+});
+
 test('a late joiner starts from the host\'s snapshot and agrees with it', async () => {
   const room = new DuelRoom();
   const host = room.machine('Host');

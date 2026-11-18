@@ -217,11 +217,15 @@ export class DuelSession {
     this.hub?.close();
   }
 
-  /** An order for my own ship, by the captain: stepped at once by a host, sent to the host by a guest. */
+  /**
+   * An order for my own ship, by the captain: stepped at once by a host, sent to the host by a guest. A guest the host
+   * has not seated yet (he started from the room's state of before he came) still sends it: the host names every
+   * guest's order to the ship it gives him.
+   */
   give(order: Order): void {
     const ship = this.mine;
-    if (ship < 0 || this.role === 'refused') return;
-    const given: GivenOrder = { seq: ++this.seq, order: cleanOrder(order, ship) };
+    if (this.role === 'refused' || (ship < 0 && this.role !== 'guest')) return;
+    const given: GivenOrder = { seq: ++this.seq, order: cleanOrder(order, Math.max(0, ship)) };
     if (this.hosting) this.queue.push({ player: this.me, seq: given.seq, order: given.order as Order });
     else {
       this.unstepped.push(given);
@@ -462,7 +466,9 @@ export class DuelSession {
   }
 
   private roster(captains: Captains, acks: readonly Ack[]): void {
+    const was = this.mine;
     if (Array.isArray(captains)) this.captains = captains.map((c) => (Number.isInteger(c) ? c : null));
+    if (this.mine !== was) this.emit('change');
     if (!Array.isArray(acks)) return;
     for (const a of acks) if (Array.isArray(a) && Number.isInteger(a[0]) && Number.isInteger(a[1])) this.acks.set(a[0], a[1]);
     const mine = this.acks.get(this.me) ?? 0;

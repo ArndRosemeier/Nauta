@@ -47,8 +47,6 @@ jobs:
           VITE_BASE: /Nauta/
           # The deploy's build: it must know its version and every note must belong to a build.
           NAUTA_RELEASE: '1'
-          # GameHub's app key for the game (N3.7), a repository variable once Arnd has registered the game; app keys are not secrets.
-          VITE_GAMEHUB_KEY: ${{ vars.GAMEHUB_KEY }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true
