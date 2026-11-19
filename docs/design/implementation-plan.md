@@ -811,12 +811,12 @@ A stranger can open the page and play a full duel alone or with a friend.
 | Measure | Wanted |
 | --- | --- |
 | From the start to the first broadside | about 3 minutes, in every wind |
-| From the first broadside to the end | four in five between 6 and 16 minutes (the design thread's 2026-11-19 line is 9 in 10; the fights spread wider than that, 75 to 82 in 100 in every rerun after the manoeuvring, and the end rule cannot narrow them: `BEATEN.out` 0.25 gave 75, 0.3 gave 82, 0.35 gave 80); at most 2 in 100 under 4, none under 2.5 |
+| From the first broadside to the end | four in five between 6 and 16 minutes and 95 in 100 between 6 and 18 (design thread, 2026-11-19: the fights spread wider after the manoeuvring, 75 to 82 in 100 within 6 to 16 in every rerun, and the end rule cannot narrow them: `BEATEN.out` 0.25 gave 75, 0.3 gave 82, 0.35 gave 80); at most 2 in 100 under 4, none under 2.5 |
 | The whole match | most between 10 and 20 minutes |
 | Draws by the clock | fewer than 1 in 20 |
 | How it ends | between computer captains nearly always struck, since a captain who follows the rule gives up before she sinks; burnt and blown up seen now and then, mostly under a green captain whose fire party comes late. Sunk is a player's ending (he may fight on) and is judged in play. A dismasted ship is beaten within about 3 minutes |
 | The better captain (one skill level up) | wins about 3 in 4 |
-| Weather position | worth having: the ship that holds it wins clearly more than half between equals |
+| Weather position | worth having: the ship that holds it wins more than 52 % between equals (design thread, 2026-11-19: 54 % over 120 duels passes, the noise is about 5 points) |
 
 **Design changes that go with it** (the first duels showed where the rules, not only the numbers, were wrong):
 

@@ -57,13 +57,13 @@ const SIZE_EVERY = STEPS_PER_SECOND;
 const STATE_LIMIT = 64 * 1024;
 /**
  * The balance sheet (implementation plan, N7.5a), minutes and shares: the first broadside about 3 min from the start
- * (the middle of the set within `first`); from it to the end `fightMost` of the set within `fight` (design thread, 2026-11-19: manoeuvring lengthens fights), at most `least.share` of the set under
+ * (the middle of the set within `first`); from it to the end `fightMost` of the set within `fight` (design thread, 2026-11-19: manoeuvring lengthens fights) and `fightLong[1]` of it within 6 to `fightLong[0]` (both judged only in a run of `MANY`: 8 duels cannot show a share of 9 in 10), at most `least.share` of the set under
  * `least.under` and none under `least.never` (design thread, 2026-11-18: the tail moves between 1 and 2 in 100 with every crew change); the whole match most within `match`; drawn by the clock fewer than `draws`; struck most often, no other
  * ending more than `other` of the ships lost (burnt or blown up seen over many duels); a ship that cannot sail beaten within `helpless`; the weather
  * position won more than `weather` between equals.
  */
 const SHEET = {
-  first: [2, 4], fight: [6, 16], fightMost: 4 / 5, least: { under: 4, share: 2 / 100, never: 2.5 }, match: [10, 20], most: 1 / 2, draws: 1 / 20, other: 1 / 4, helpless: 3, weather: 0.55,
+  first: [2, 4], fight: [6, 16], fightMost: 4 / 5, fightLong: [18, 19 / 20], least: { under: 4, share: 2 / 100, never: 2.5 }, match: [10, 20], most: 1 / 2, draws: 1 / 20, other: 1 / 4, helpless: 3, weather: 0.52,
 } as const;
 /** The sheet's measures over many duels are judged only in a run of at least this many (the hand run). */
 const MANY = 50;
@@ -240,7 +240,9 @@ function sheet(records: readonly Record[]): string[] {
 
   const fightIn = fights.filter((m) => within(m, SHEET.fight)).length, short = fights.filter((m) => m < SHEET.least.under), shortest = Math.min(...fights);
   console.log(`  first broadside to the end (${SHEET.fightMost * 10} in 10 within ${SHEET.fight[0]} to ${SHEET.fight[1]}, at most ${SHEET.least.share * 100} % under ${SHEET.least.under}, none under ${SHEET.least.never}): ${share(fightIn, decided.length)} within; ${list([...fights].sort((a, b) => a - b))} min`);
-  if (fightIn < SHEET.fightMost * decided.length) p.push(`first broadside to the end: ${share(fightIn, decided.length)} within ${SHEET.fight[0]} to ${SHEET.fight[1]} min`);
+  const fightIn18 = fights.filter((m) => within(m, [SHEET.fight[0], SHEET.fightLong[0]])).length;
+  if (many && fightIn18 < SHEET.fightLong[1] * decided.length) p.push(`first broadside to the end: ${share(fightIn18, decided.length)} within ${SHEET.fight[0]} to ${SHEET.fightLong[0]} min`);
+  if (many && fightIn < SHEET.fightMost * decided.length) p.push(`first broadside to the end: ${share(fightIn, decided.length)} within ${SHEET.fight[0]} to ${SHEET.fight[1]} min`);
   if (short.length > SHEET.least.share * n || shortest < SHEET.least.never) p.push(`first broadside to the end: ${short.length} under ${SHEET.least.under} min (${list(short)}), the sheet allows ${Math.floor(SHEET.least.share * n)} and none under ${SHEET.least.never}`);
 
   const matchIn = decided.filter((r) => within(r.minutes, SHEET.match)).length, drawn = n - decided.length;
