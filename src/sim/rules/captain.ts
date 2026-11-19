@@ -87,7 +87,7 @@ export interface SkillRow {
  * The levels. A green captain looks round every 8 s, misjudges a range by a quarter, steers straight at her, fights
  * at 180 m, opens fire at 800 m and sees to the water late. A seasoned one looks every 4 s, works a little for the wind
  * and her stern, fights at 110 m and closes to grape. A master looks every 2 s, judges within 5 %, works hard for the
- * weather position and the rake, fights at 90 m with grape inside 60 m, cripples a ship to windward with chain, fires
+ * weather position and the rake, fights at 90 m with grape inside 60 m, fires
  * his broadsides on the roll and sees to every leak and fire at once. Beaten, the green one strikes at once, the seasoned
  * one fights on ten seconds and the master twenty, in case it turns (not when she is going down under him).
  */
@@ -112,7 +112,7 @@ export const SKILL: Readonly<Record<Skill, SkillRow>> = {
   },
   master: {
     look: 2, judgeRange: 0.05, judgeBearing: 1 * DEGREE, range: 90, gauge: 250, rake: 1, lead: 1, quarters: Infinity, open: 400,
-    grape: 60, roundAt: 'hull', chain: true, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, saveMast: 0, strikeAfter: 20, drill: 1.05, horizon: 60, headings: 36, caution: 1, reckons: true, slows: true, waver: 0.02, margin: 0.5,
+    grape: 60, roundAt: 'hull', chain: false, word: true, keepBearing: true, plainBeyond: 1000, pumpsAt: 3, fireAt: 0, plugAt: 2, saveMast: 0, strikeAfter: 20, drill: 1.05, horizon: 60, headings: 36, caution: 1, reckons: true, slows: true, waver: 0.02, margin: 0.5,
   },
 };
 

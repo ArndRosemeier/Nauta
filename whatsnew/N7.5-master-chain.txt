@@ -1,0 +1,1 @@
+The master no longer loads chain shot at a ship to windward, so the best captains win more often again.
