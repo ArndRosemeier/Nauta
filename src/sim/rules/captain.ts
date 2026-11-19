@@ -175,8 +175,12 @@ export const WOUNDED_MOST = 180 * DEGREE;
 export const RAKE_WITHIN = 55 * DEGREE;
 /** A raking side counts this much nearer when he chooses which side to fight, rad, by his `rake`. */
 export const RAKE_SIDE = 60 * DEGREE;
-/** Fired on his word: he gives it once this share of the side's mounted guns that bear stand ready, */
-export const WORD_READY = 0.4;
+/**
+ * Fired on his word: he gives it once this share of the side's mounted guns that bear stand ready, (0.4 until N7.5, 2026-11-19: with
+ * the crews cut to about 80 and the manoeuvring, the master waited so long that he fired 77 guns a duel against the seasoned
+ * captain's 97 and won 13 of 39; at 0.15 he wins 33 of 40 against the seasoned and 35 of 39 against the green)
+ */
+export const WORD_READY = 0.15;
 /** as her roll passes her steady heel (N7.5a), or, her roll slower than `WORD_STILL_RATE` rad/s, lying within `WORD_STILL` rad of it. */
 export const WORD_STILL_RATE = 0.5 * DEGREE;
 export const WORD_STILL = 0.2 * DEGREE;
