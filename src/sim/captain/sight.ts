@@ -36,6 +36,8 @@ export interface EnemySeen {
   readonly quarters: boolean;
   /** How many of her masts still stand (fore, main). */
   readonly masts: number;
+  /** The share of each side of her battery standing loaded and run out (larboard, starboard), as the smoke and the open ports show it: 1 for a captain who does not read it (`SkillRow.reckons`). */
+  readonly loaded: readonly [number, number];
 }
 
 /** A side of his battery as his gunner reports it: the mounted guns, those standing ready, those ready that bear on her (she lies within their training), and whether she lies where the side bears. */
@@ -50,6 +52,8 @@ export interface SideReport {
 
 /** What he knows at a look. */
 export interface Sight {
+  /** The match's seed, for the seeded wavering of his judgement (tactics.ts). */
+  readonly matchSeed: number;
   readonly tick: number;
   readonly t: number;
   readonly ship: number;
@@ -117,6 +121,12 @@ export function sideReports(own: SimShip, off: number, trueOff: number): [SideRe
   return [{ ...counts[0]!, bears: bears(-1), leaks: leaks[0]! }, { ...counts[1]!, bears: bears(1), leaks: leaks[1]! }];
 }
 
+/** The share of each side's mounted guns that stand ready (larboard, starboard): a side with none mounted counts as none. */
+function loadedShares(ship: SimShip): readonly [number, number] {
+  const [l, s] = sideReports(ship, 0, 0);
+  return [l.mounted > 0 ? l.ready / l.mounted : 0, s.mounted > 0 ? s.ready / s.mounted : 0];
+}
+
 /** The lower masts' places in the rig plan's spars (fore, main). */
 let lowerMasts: readonly number[] | null = null;
 /** The masts of a ship still standing, as seen from across the water. */
@@ -142,8 +152,8 @@ export function sightOf(state: SimState, ship: number, skill: Skill, foe: number
   const off = angleDiff(own.sailing.heading, bearing), trueOff = angleDiff(own.sailing.heading, bearingTo(me, her));
   const d = own.damage;
   return {
-    tick: state.tick, t, ship, own,
-    enemy: { x: her.x, z: her.z, heading: other.sailing.heading, ahead: other.sailing.ahead, quarters: other.told.quarters, masts: mastsStanding(other) },
+    matchSeed: state.matchSeed, tick: state.tick, t, ship, own,
+    enemy: { x: her.x, z: her.z, heading: other.sailing.heading, ahead: other.sailing.ahead, quarters: other.told.quarters, masts: mastsStanding(other), loaded: row.reckons ? loadedShares(other) : [1, 1] },
     wind, windFrom, force: state.wind.windForce, range, bearing, off,
     windward: (me.x - her.x) * wx + (me.z - her.z) * wz,
     sides: sideReports(own, off, trueOff),

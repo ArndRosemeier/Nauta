@@ -9,6 +9,7 @@
  */
 import { angleDiff } from '@futuremagic/core';
 import { sideReports } from './captain/sight';
+import { crossedAt } from './captain/tactics';
 import { founderTonnes } from './damage/flood';
 import { waterIn } from './end';
 import { foeOf } from './foes';
@@ -26,7 +27,8 @@ export type Notice =
   | { readonly kind: 'guns bear'; readonly tick: number; readonly ship: number; readonly side: -1 | 1 }
   | { readonly kind: 'water'; readonly tick: number; readonly ship: number; readonly mark: number }
   | { readonly kind: 'wind'; readonly tick: number; readonly how: 'shifts' | 'freshens' | 'eases' }
-  | { readonly kind: 'off beam'; readonly tick: number; readonly ship: number; readonly how: OffBeam };
+  | { readonly kind: 'off beam'; readonly tick: number; readonly ship: number; readonly how: OffBeam }
+  | { readonly kind: 'crossed'; readonly tick: number; readonly ship: number; readonly end: 'stern' | 'bow' };
 
 /** Where she lies against our beam: drawing ahead of it or dropping astern of it. */
 export type OffBeam = 'ahead' | 'astern';
@@ -103,6 +105,13 @@ export function noticed(before: SimState, after: SimState, ship: number, firstLo
   // The master keeping her on the beam: her drawing ahead of it or dropping astern of it (also as the order is given).
   const beam = offBeam(after, ship);
   if (beam && beam !== offBeam(before, ship)) out.push({ kind: 'off beam', tick, ship, how: beam });
+  // The master crossing her stern or her bow as ordered: her end lying across our broadside (also as the order is given).
+  const keeps = mine.told.keep;
+  if (her && herWas && (keeps?.kind === 'rake' || keeps?.kind === 'crossbow')) {
+    const end = keeps.kind === 'rake' ? 'stern' : 'bow';
+    const placed = (x: typeof mine, y: typeof mine) => crossedAt({ ...x.motion.pose, heading: x.sailing.heading }, { ...y.motion.pose, heading: y.sailing.heading }, end);
+    if (placed(mine, her) && !placed(was, herWas)) out.push({ kind: 'crossed', tick, ship, end });
+  }
   // The master: the wind shifting a point, freshening or easing over the last minute.
   const w = windChange(after, simTime(after)), v = windChange(before, simTime(before));
   if (w.shift >= WIND_SHIFT && v.shift < WIND_SHIFT) out.push({ kind: 'wind', tick, how: 'shifts' });
