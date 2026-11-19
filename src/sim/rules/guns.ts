@@ -133,10 +133,12 @@ export const SHOT: Readonly<Record<ShotKind, ShotRow>> = {
  * `gun` of thick smoke on the ship to leeward (in full dead to leeward, less as the wind draws abeam); it clears as the
  * wind carries it `clears` m off (half a minute in a light breeze, a few seconds in a strong one); while it hangs her gun
  * captains lay and time their guns `spoils` times as badly again at the thickest. Between equal captains the weather
- * position then wins about 51 % of the fights at 1.5, 53 % at 2, 60 % at 3 and 67 % at 4 (120 seasoned duels each, N7.5):
- * the sheet wants more than 55 % and the design thread no more than 70 %.
+ * position then won about 51 % of the fights at 1.5, 53 % at 2, 60 % at 3 and 67 % at 4 (120 seasoned duels each, N7.5, 121 men
+ * and no planning); with the crews of 80 and the captains' manoeuvring it won 54 % at 3 and 54 % at 4 (120 duels each, the noise
+ * about 5 points), so it was set to 4 on the design thread's rule (below 58 % use 3 to 4) and left there until the planner
+ * settles: the sheet wants more than 55 % and the design thread no more than 70 %.
  */
-export const SMOKE = { gun: 0.06, clears: 60, spoils: 3 } as const;
+export const SMOKE = { gun: 0.06, clears: 60, spoils: 4 } as const;
 
 /**
  * Scatter (seeded; tuned so that against a brig broadside on in a force 4 sea, fired as they bear, about three round
