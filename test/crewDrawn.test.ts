@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { OUTFITS, type CharacterCatalog } from '@actors/generator';
-import { CAPTAIN_CLEAR, DUCK, FULL, JOB_CLIPS, LYING, MEDIUM, POOL_STICK, RUNNING, SLEEPING, SURFACE_WALKS, WALKING, duckTo, choosePool, dueThisFrame, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
+import { CAPTAIN_CLEAR, DUCK, FULL, JOB_CLIPS, LYING, MEDIUM, POOL_STICK, RUNNING, SLEEPING, SURFACE_WALKS, WALKING, duckTo, choosePool, dueAfter, firstPlacedAt, STEP_SECONDS, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, type ManDrawn, type PoolCandidate } from '../src/app/crewDrawn.ts';
 import { BERTH_HEADROOM, BREAKS } from '../src/sim/rules/ships.ts';
 import { shipY } from '../src/sim/ship/section.ts';
 import { heightAt, routeNetwork } from '../src/sim/crew/network.ts';
@@ -196,9 +196,20 @@ test('men are placed again less often far off and out of sight, spread evenly ov
   assert.equal(stepAt(knobs, 1, true), knobs.steps[0]);
   assert.equal(stepAt(knobs, 1e4, true), knobs.steps[knobs.steps.length - 1]);
   assert.equal(stepAt(knobs, 1, false), knobs.hiddenStep);
-  const step = 4, due = Array.from({ length: step }, (_, frame) => roster.filter((_, i) => dueThisFrame(frame, step, i)).length);
-  assert.equal(due.reduce((s, n) => s + n, 0), roster.length);
-  assert.ok(Math.max(...due) - Math.min(...due) <= 1, 'the same few each frame');
+  // The men's turns at 60, 30 and 15 frames a second: every `step` frames of a 60 Hz display, in time, however the frames come.
+  const step = 4, seconds = 2;
+  for (const fps of [60, 30, 15]) {
+    const dt = 1 / fps, last = roster.map((_, i) => firstPlacedAt(0, step, i)), turns = roster.map(() => 0), perFrame: number[] = [];
+    for (let f = 1; f <= seconds * fps; f++) {
+      let n = 0;
+      roster.forEach((_, i) => { if (dueAfter(f * dt - last[i]!, step, dt)) { last[i] = f * dt; turns[i]!++; n++; } });
+      perFrame.push(n);
+    }
+    const every = Math.max(1, Math.round(step * STEP_SECONDS * fps));
+    for (const t of turns) assert.ok(Math.abs(t - (seconds * fps) / every) <= 1.5, `${fps} fps: ${t} turns in ${seconds} s`);
+    if (fps === 60) assert.ok(Math.max(...perFrame.slice(step)) - Math.min(...perFrame.slice(step)) <= 1 + roster.length / step / 2, 'the same few each frame');
+  }
+  assert.ok(dueAfter(Infinity, step, 0.016), 'a man never placed is due');
 });
 
 test('the near pool takes the men who matter first, then the nearest seen within reach, at most its size; a man in it keeps his place a little longer', () => {
