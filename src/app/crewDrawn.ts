@@ -420,8 +420,23 @@ export function stepAt(k: CrewKnobs, distance: number, seen: boolean): number {
   return k.steps[i < 0 ? k.steps.length - 1 : i]!;
 }
 
-/** Whether a man is placed again this frame: every `step` frames, spread over the frames by his place in the crew. */
-export const dueThisFrame = (frame: number, step: number, man: number): boolean => (frame + man) % step === 0;
+/** A step of the animation is this many seconds: `stepAt` counts in frames of a display at 60 Hz, and keeps that pace when the frames come slower. */
+export const STEP_SECONDS = 1 / 60;
+
+/**
+ * Whether a man is placed again this frame, `since` seconds after he last was (Infinity: never yet): once `step`
+ * frames' time has passed, as a display at 60 Hz counts it. Counted in time, not frames, so a tablet drawing 30
+ * frames a second places a man every other frame where it placed him every fourth, and he moves at the same
+ * pace as on a desk (counted in frames, his motion halved with the frame rate and the quality level that followed it).
+ * `dt` is this frame's length: the frame nearer the time is the one.
+ */
+export const dueAfter = (since: number, step: number, dt: number): boolean => since >= step * STEP_SECONDS - dt / 2;
+
+/**
+ * When a man placed for the first time counts as last placed: a little before now, by his place in the crew over the
+ * `step` frames, so the men of a crew are not all due on the same frames.
+ */
+export const firstPlacedAt = (now: number, step: number, man: number): number => now - (man % step) * STEP_SECONDS;
 
 /** A man of her crew the near pool could take. */
 export interface PoolCandidate {

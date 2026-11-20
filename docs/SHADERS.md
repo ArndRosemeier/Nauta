@@ -9,3 +9,5 @@ A shader that compiles while the game is drawn is a stutter, and on a tablet a l
 5. **After the warm-up compiles are capped:** at most a third of every second goes to them, each aims for 10 ms, one per frame, then a wait of twice its time.
 
 The tablet (iPad Air M4, Safari) is where this is judged: check the HUD line there after adding a kind.
+
+**Where the load goes:** `window.__nautaLoad` lists each line the loading screen showed with the page's milliseconds when it appeared; `npm run shot:probe -- "<query>"` counts pipelines and shows what the busiest GPU submits first used. The crew's warm-up dresses the near pool in each dress of each navy once (18 looks), not once for every ship: ships of a navy are dressed alike, so a repeat builds nothing (measured: 72 looks at each level built the same 48 + 19 shaders as 18, and took 10 s more on the software GPU).

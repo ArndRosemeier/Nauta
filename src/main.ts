@@ -144,6 +144,8 @@ declare global {
   interface Window {
     /** Set once the first frame with everything in it is drawn (the headless checks wait for it). */
     __nautaReady?: boolean;
+    /** The loading screen's lines with the page's ms when each appeared: where the load's time went. */
+    __nautaLoad?: { at: number; what: string }[];
     /**
      * Sets the scene from a query (`hour=6.3&day=0&sea=gale&eye=10&look=0,-6`: hour and day, wind or sea, eye, look; on
      * the brig `ship=bow`, the standpoint) with
@@ -270,6 +272,9 @@ async function start(): Promise<void> {
   const guns = ship && fittings ? new GunsView(view.renderer, fittings, furnish(shipPlan())) : null;
   if (ship && guns) ship.addMoving(guns.draws.group);
   const note = loading.querySelector('.title-note')!;
+  // Where the load's time goes: each line the loading screen shows, with the page's ms when it appeared (`window.__nautaLoad`, read by the browser checks and by hand).
+  const loadLog: { at: number; what: string }[] = window.__nautaLoad = [];
+  new MutationObserver(() => loadLog.push({ at: Math.round(performance.now()), what: note.textContent ?? '' })).observe(note, { childList: true, characterData: true, subtree: true });
   // Walking, his own body (plan N2.7): an Actors figure from the crew's pack, his head not drawn.
   if (walking && ship) note.textContent = 'dressing the captain';
   const captain = walking && ship ? await CaptainView.load(view.renderer, import.meta.env.BASE_URL, ship.group) : null;

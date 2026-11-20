@@ -34,9 +34,10 @@ import { STEPS_PER_SECOND } from '../../sim/units';
 import type { Spot } from '../../sim/ship/plan';
 import { shipY, shipZ } from '../../sim/ship/section';
 import { belowDeck } from '../../audio/crewHearing';
-import { BUILDS, DRESSES, HAT_ITEMS, PACK, SHIRT_GROUP, SHIRT_GARMENT, crowdKinds, figureOf, fullLook, kindId, navyOf, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
+import { NAVIES } from '../../app/terms';
+import { BUILDS, DRESSES, HAT_ITEMS, PACK, SHIRT_GROUP, SHIRT_GARMENT, crowdKinds, figureOf, fullLook, kindId, packCatalog, wearing, type Dress, type Figure, type Navy } from '../../app/crewLooks';
 import {
-  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, SURFACE_WALKS, WALKING, carryOf, choosePool, clipPhase, dueThisFrame, duckTo, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, turnBetween, type ManDrawn,
+  JOB_CLIPS, LYING, MEDIUM, ONCE_CLIPS, RUNNING, SLEEPING, SURFACE_WALKS, WALKING, carryOf, choosePool, clipPhase, dueAfter, duckTo, firstPlacedAt, manDrawn, manSeed, newManDrawn, poolLevel, stepAside, stepAt, turnBetween, type ManDrawn,
 } from '../../app/crewDrawn';
 import { FACING_FORWARD, OFFICERS, floorApart, postOf, voiceMan, type Officer } from '../../app/officers';
 import type { ManOnScreen } from '../../app/fanOrders';
@@ -140,6 +141,8 @@ interface Drawn {
   /** A new hurt to lay blood for once he is placed (he has a place to bleed on), and whether he has been placed. */
   fresh: Harm | null;
   placed: boolean;
+  /** When he was last placed, in the crew's seconds (`time`). */
+  placedAt: number;
   /** The rungs he climbs and whether up them, while he climbs (the donor posed for him, `climbRig.ts`); else null. His crowd figure is then in a live pose (`posed`), not a clip. */
   on: OnLadder | null;
   up: boolean;
@@ -215,7 +218,6 @@ export class CrewView {
   /** When the pool last began dressing a man, page seconds. */
   private dressedAt = -Infinity;
   private readonly held = new Set<number>();
-  private frame = 0;
   private time = 0;
   private mine = 0;
   private lastCamera: Camera | null = null;
@@ -248,7 +250,7 @@ export class CrewView {
     this.eyes = rosters.map(() => new Vector3());
     this.all = rosters.flatMap((roster, ship) => roster.map((m, man) => {
       const seed = manSeed(ship, man);
-      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), local: new Matrix4(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false, on: null, up: true, rope: null, posed: false };
+      return { ship, man, m, seed, figure: figureOf(ship, man, m), at: newManDrawn(), local: new Matrix4(), crowd: null, clip: null, dressed: true, bareheaded: false, distance: Infinity, seen: false, shown: false, step: 1, struck: Infinity, harm: null, hurtAt: Infinity, fellAt: Infinity, stain: 0, covered: 0, dripped: null, fresh: null, placed: false, placedAt: -Infinity, on: null, up: true, rope: null, posed: false };
     }));
     this.byShip = rosters.map((_, s) => this.all.filter((d) => d.ship === s));
     this.shrouds = rosters.map((_, s) => new Shrouds(this.groups[s]!));
@@ -296,14 +298,16 @@ export class CrewView {
       k.mesh.visible = k.men.length > 0;
     }
     // Every dress of both navies with its first hairstyle, and the seamen's every hairstyle.
-    const warmLook = (s: number, dress: Dress, hair: string) => {
-      const build = DRESSES[dress].builds[0]!, navy = navyOf(s);
+    const warmLook = (navy: Navy, dress: Dress, hair: string) => {
+      const build = DRESSES[dress].builds[0]!;
       const f: Figure = { kind: kindId(navy, dress, build), dress, navy, build, show: [hair, ...DRESSES[dress].hats], skinTone: 0, hairColour: '#000000', tints: DRESSES[dress].tints.map(() => '#808080'), scale: 1 };
       return fullLook(this.pool.catalog, f);
     };
-    const looks = this.groups.flatMap((_, s) => [
-      ...(Object.keys(DRESSES) as Dress[]).map((dress) => warmLook(s, dress, DRESSES[dress].hair[0]!)),
-      ...DRESSES.seaman.hair.slice(1).map((hair) => warmLook(s, 'seaman', hair)),
+    // One look for each navy, not for each ship: ships of a navy are dressed alike, so a second ship's look builds nothing new
+    // (a match of eight ships once dressed the pool 72 times at each level, at 18 distinct looks).
+    const looks = NAVIES.flatMap((navy) => [
+      ...(Object.keys(DRESSES) as Dress[]).map((dress) => warmLook(navy, dress, DRESSES[dress].hair[0]!)),
+      ...DRESSES.seaman.hair.slice(1).map((hair) => warmLook(navy, 'seaman', hair)),
     ]);
     await this.pool.warm(looks, async (objects, what) => {
       note(`building the crew's shaders: ${what}`);
@@ -344,7 +348,6 @@ export class CrewView {
   /** Once a frame, after the ships' poses (ShipView.update): every man placed and moving, the pool handed out. */
   animate(dt: number, fr: CrewFrame): void {
     const t0 = performance.now();
-    this.frame++;
     this.time += dt;
     this.mine = fr.mine;
     this.lastState = fr.state.to;
@@ -371,7 +374,7 @@ export class CrewView {
         d.struck += dt;
         this.noteHurt(d, to, at, fr.violence);
         const step = this.everyFrame ? 1 : d.step;
-        if (dueThisFrame(this.frame, step, d.man) || this.pool.of(this.key(d)) || (ship === fr.mine && this.officerMen.includes(d.man))) {
+        if (!d.placed || dueAfter(this.time - d.placedAt, step, dt) || this.pool.of(this.key(d)) || (ship === fr.mine && this.officerMen.includes(d.man))) {
           this.placeMan(d, from, to, fr);
           s.placed++;
         }
@@ -477,6 +480,7 @@ export class CrewView {
     // A man the match puts where the captain's eye is (it does not keep the captain clear) is not drawn: he is not seen inside out.
     const inEye = apartOnWater(at, eye) < EYE_CLEAR && Math.abs(eye.y - at.y - EYE) < EYE_CLEAR_HEIGHT;
     d.shown = this.crews > d.ship && !inEye && (view ? view.zoneGroupOf(at.space).visible : !belowDeck(at.space));
+    const first = !d.placed;
     d.placed = true;
     if (d.fresh) {
       // Where he fell, if it is a deck (not aloft): the blood the violence setting shows (blood.ts).
@@ -486,6 +490,7 @@ export class CrewView {
     this.local.set(at.x, at.y + BODY_MIDDLE, at.z).applyMatrix4(this.groups[d.ship]!.matrixWorld);
     d.seen = d.shown && this.frustum.intersectsSphere(this.sphere.set(this.local, BODY_RADIUS));
     d.step = stepAt(fr.knobs, d.distance, d.seen);
+    d.placedAt = first ? firstPlacedAt(this.time, d.step, d.man) : this.time;
     // Mild: the killed are covered, and the canvas goes with him (shroud.ts); once it is over him he is not drawn.
     if (d.shown && d.covered > 0) this.shrouds[d.ship]!.set(d.man, at.x, at.y, at.z, at.yaw, d.covered);
     else this.shrouds[d.ship]!.clear(d.man);
